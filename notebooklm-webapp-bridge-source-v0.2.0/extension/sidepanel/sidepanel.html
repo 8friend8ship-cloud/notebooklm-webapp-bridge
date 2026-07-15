@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NotebookLM Bridge</title><link rel="stylesheet" href="sidepanel.css"></head>
+<body>
+  <main>
+    <h1>NotebookLM Bridge</h1>
+    <p class="muted">프런트앱·Apps Script·NotebookLM 연결 상태를 설정합니다.</p>
+    <label>Apps Script 배포 URL<input id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec"></label>
+    <label>허용할 프런트앱 주소<input id="frontendOrigin" placeholder="https://프로젝트.vercel.app"></label>
+    <div class="buttons"><button id="save">설정 저장</button><button id="test" class="secondary">API 확인</button></div>
+    <section><h2>Chrome Google 계정</h2><p id="profile">확인 중…</p></section>
+    <section><h2>상태</h2><p id="status">준비 중…</p></section>
+    <section><h2>최근 로그</h2><div id="logs" class="logs"></div></section>
+  </main>
+  <script src="sidepanel.js"></script>
+</body></html>

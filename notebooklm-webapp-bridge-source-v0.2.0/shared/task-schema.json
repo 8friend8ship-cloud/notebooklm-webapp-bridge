@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NotebookLMTask",
+  "type": "object",
+  "required": [
+    "taskId",
+    "taskType",
+    "sourceText"
+  ],
+  "properties": {
+    "taskId": {
+      "type": "string"
+    },
+    "contentId": {
+      "type": "string"
+    },
+    "taskType": {
+      "enum": [
+        "CHAT",
+        "AUDIO_OVERVIEW",
+        "VIDEO_OVERVIEW",
+        "SLIDE_DECK",
+        "QUIZ",
+        "MIND_MAP"
+      ]
+    },
+    "sourceText": {
+      "type": "string"
+    },
+    "instruction": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "notebookUrl": {
+      "type": "string"
+    },
+    "driveFolderId": {
+      "type": "string"
+    },
+    "autoSubmit": {
+      "type": "boolean"
+    },
+    "timeoutSeconds": {
+      "type": "integer",
+      "minimum": 30,
+      "maximum": 900
+    }
+  }
+}

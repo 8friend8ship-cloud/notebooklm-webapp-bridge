@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "NotebookLM WebApp Bridge",
+  "version": "0.2.0",
+  "description": "Google 로그인 프런트앱과 Apps Script 작업큐를 NotebookLM 브라우저 작업에 연결하는 로컬 Chrome 에이전트입니다.",
+  "permissions": [
+    "identity",
+    "identity.email",
+    "scripting",
+    "sidePanel",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://notebooklm.google.com/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
+  ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost/*",
+      "http://127.0.0.1/*",
+      "https://*.vercel.app/*"
+    ]
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "NotebookLM WebApp Bridge"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://notebooklm.google.com/*"
+      ],
+      "js": [
+        "content/notebooklm-runner.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

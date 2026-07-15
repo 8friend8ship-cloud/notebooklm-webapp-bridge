@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NotebookLM 작업 관제센터</title><link rel="stylesheet" href="styles.css"><script src="https://accounts.google.com/gsi/client" async defer></script></head>
+<body><main>
+<header><div><p class="eyebrow">Writer WebApp → NotebookLM → Drive</p><h1>NotebookLM 작업 관제센터</h1></div><div id="googleButton"></div></header>
+<section class="status-grid"><article><span>Google 로그인</span><strong id="loginStatus">로그인 전</strong></article><article><span>Chrome 확장</span><strong id="extensionStatus">확인 전</strong></article><article><span>Chrome 계정</span><strong id="chromeProfile">확인 전</strong></article></section>
+<section class="toolbar"><button id="connectExtension">확장 연결 확인</button><button id="loadTasks">오늘 작업 불러오기</button></section>
+<p id="message" class="message">Google 로그인 후 작업을 불러오세요.</p>
+<section><h2>작업큐</h2><div id="taskList" class="task-list"></div></section>
+</main><script src="config.js"></script><script src="app.js"></script></body></html>
