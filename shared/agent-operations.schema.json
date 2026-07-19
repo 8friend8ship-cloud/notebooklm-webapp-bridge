@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/8friend8ship-cloud/notebooklm-webapp-bridge/shared/agent-operations.schema.json",
+  "title": "Agent Operations Platform task contract",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "REQUEST_ID",
+    "TASK_ID",
+    "PROJECT_ID",
+    "CONTENT_ID",
+    "MASTER_CONTENT_ID",
+    "SCHEMA_VERSION",
+    "STATUS"
+  ],
+  "properties": {
+    "REQUEST_ID": { "type": "string", "minLength": 1 },
+    "TASK_ID": { "type": "string", "minLength": 1 },
+    "PROJECT_ID": { "type": "string", "minLength": 1 },
+    "CONTENT_ID": { "type": "string", "minLength": 1 },
+    "MASTER_CONTENT_ID": { "type": "string", "minLength": 1 },
+    "CONCERN_CATEGORY_ID": { "type": "string" },
+    "CONCERN_SUBCATEGORY_ID": { "type": "string" },
+    "AUDIENCE_ID": { "type": "string" },
+    "LOCALE_ID": { "type": "string" },
+    "PLATFORM_ID": { "type": "string" },
+    "PUBLISH_ID": { "type": "string" },
+    "RESULT_ID": { "type": "string" },
+    "SCHEMA_VERSION": { "const": "1.0.0" },
+    "STATUS": {
+      "enum": [
+        "QUEUED",
+        "CLAIMED",
+        "RUNNING",
+        "REVIEW_REQUIRED",
+        "DONE",
+        "RETRYABLE_ERROR",
+        "BLOCKED",
+        "CANCELLED"
+      ]
+    },
+    "IDEMPOTENCY_KEY": { "type": "string", "minLength": 1 },
+    "DUPLICATE_FINGERPRINT": { "type": "string" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "STATUS": { "const": "RETRYABLE_ERROR" } } },
+      "then": { "required": ["IDEMPOTENCY_KEY"] }
+    }
+  ]
+}
