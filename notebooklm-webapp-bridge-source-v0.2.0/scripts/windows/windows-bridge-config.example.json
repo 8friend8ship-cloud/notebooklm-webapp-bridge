@@ -1,0 +1,5 @@
+{
+  "frontendUrl": "https://YOUR-BRIDGE-FRONTEND.vercel.app/",
+  "chromePath": "",
+  "holdAwakeSeconds": 300
+}
