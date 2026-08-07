@@ -2,6 +2,7 @@
 node_modules/
 dist/
 frontend/config.local.js
+notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/windows-bridge-config.json
 *.pem
 *.key
 .env*
