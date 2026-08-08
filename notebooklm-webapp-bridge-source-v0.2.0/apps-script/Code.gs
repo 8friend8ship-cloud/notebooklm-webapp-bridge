@@ -1,4 +1,4 @@
-const VERSION = "0.2.0";
+const VERSION = "0.2.1-compat";
 const DEFAULT_SHEET = "NotebookLM_Task_Queue";
 const HEADERS = [
   "TASK_ID","CONTENT_ID","TASK_DATE","TASK_TYPE","TITLE","SOURCE_TEXT","INSTRUCTION","LANGUAGE",
@@ -7,14 +7,44 @@ const HEADERS = [
   "ERROR_MESSAGE","CALLBACK_URL","CALLBACK_TOKEN","CREATED_AT","UPDATED_AT"
 ];
 
-function doGet(e){ return json_({ok:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()}); }
+// 기존 WEBAPP_TEMPLATE_03의 GET 송·호출 테스트와 호환을 유지합니다.
+function doGet(e){
+  return json_({
+    ok:true,
+    method:"GET",
+    template:true,
+    legacyCompatible:true,
+    version:VERSION,
+    service:"NotebookLM WebApp Bridge",
+    time:new Date().toISOString()
+  });
+}
+
+// action 없는 기존 POST 테스트는 그대로 성공시키고,
+// action이 있는 요청만 NotebookLM 브리지 라우터로 처리합니다.
 function doPost(e){
   try{
-    const body=JSON.parse((e&&e.postData&&e.postData.contents)||"{}");
-    const action=String(body.action||"");
-    if(action==="health") return json_({ok:true,version:VERSION,time:new Date().toISOString()});
+    const raw=(e&&e.postData&&e.postData.contents)||"{}";
+    let body={};
+    try{ body=JSON.parse(raw||"{}"); }catch(_e){ body=(e&&e.parameter)||{}; }
+    const action=String(body.action||"").trim();
+
+    if(!action){
+      return json_({
+        ok:true,
+        method:"POST",
+        template:true,
+        legacyCompatible:true,
+        bridgeReady:true,
+        version:VERSION,
+        time:new Date().toISOString()
+      });
+    }
+
+    if(action==="health") return json_({ok:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});
     if(action==="login") return json_(login_(body));
     if(action==="enqueueFromWriter") return json_(enqueueFromWriter_(body));
+
     const session=verifySession_(body.sessionToken);
     if(action==="listTasks") return json_(listTasks_(session,body));
     if(action==="claimTask") return json_(claimTask_(session,body));
@@ -22,8 +52,19 @@ function doPost(e){
     if(action==="completeTask") return json_(completeTask_(session,body));
     if(action==="createTask") return json_(createTask_(session,body.task||{}));
     throw new Error("지원되지 않는 action입니다: "+action);
-  }catch(error){ return json_({ok:false,error:error&&error.message?error.message:String(error)}); }
+  }catch(error){
+    return json_({ok:false,error:error&&error.message?error.message:String(error)});
+  }
 }
+
+// 기존에 권한 승인에 사용한 함수도 그대로 유지합니다.
+function authorizeCore_(){
+  const spreadsheetId=SpreadsheetApp.getActiveSpreadsheet().getId();
+  const driveRootName=DriveApp.getRootFolder().getName();
+  Logger.log({spreadsheetId,driveRootName});
+  return {spreadsheetId,driveRootName};
+}
+
 function json_(data){ return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON); }
 function props_(){ return PropertiesService.getScriptProperties(); }
 function requiredProp_(name){ const value=props_().getProperty(name); if(!value) throw new Error(`Script Property ${name}가 없습니다.`); return value; }
