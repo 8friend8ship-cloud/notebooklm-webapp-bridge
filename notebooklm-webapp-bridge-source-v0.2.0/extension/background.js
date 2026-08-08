@@ -2,11 +2,13 @@ const SOURCE = "notebooklm-webapp-bridge";
 const CONFIG_KEY = "nlmBridgeConfig";
 const LOG_KEY = "nlmBridgeLogs";
 const MAX_LOGS = 100;
+const NOTEBOOK_HOSTS = ["notebook.google.com", "notebooklm.google.com"];
+const NOTEBOOK_HOME = "https://notebook.google.com/";
 
 const DEFAULT_CONFIG = Object.freeze({
   appsScriptUrl: "",
   frontendOrigin: "",
-  notebookHomeUrl: "https://notebooklm.google.com/"
+  notebookHomeUrl: NOTEBOOK_HOME
 });
 
 async function configureSidePanel() {
@@ -41,6 +43,15 @@ function isManifestAllowedOrigin(origin) {
   return origin === "http://localhost" ||
     origin === "http://127.0.0.1" ||
     /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+}
+
+function isNotebookUrl(url) {
+  try {
+    const parsed = new URL(String(url || ""));
+    return parsed.protocol === "https:" && NOTEBOOK_HOSTS.includes(parsed.hostname);
+  } catch {
+    return false;
+  }
 }
 
 async function assertTrustedSender(sender) {
@@ -81,19 +92,19 @@ async function getChromeProfile() {
 }
 
 async function findOrOpenNotebookTab(url) {
-  const targetUrl = /^https:\/\/notebooklm\.google\.com\//.test(url || "")
-    ? url : "https://notebooklm.google.com/";
-  const tabs = await chrome.tabs.query({ url: "https://notebooklm.google.com/*" });
+  const targetUrl = isNotebookUrl(url) ? url : NOTEBOOK_HOME;
+  const tabs = await chrome.tabs.query({
+    url: ["https://notebook.google.com/*", "https://notebooklm.google.com/*"]
+  });
   let tab = tabs.find((item) => item.active) || tabs[0];
-  if (!tab) tab = await chrome.tabs.create({ url: targetUrl, active: true });
-  else {
-    if (targetUrl !== "https://notebooklm.google.com/" && tab.url !== targetUrl) {
-      tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: true });
-    } else {
-      tab = await chrome.tabs.update(tab.id, { active: true });
-    }
+  if (!tab) {
+    tab = await chrome.tabs.create({ url: targetUrl, active: true });
+  } else if (tab.url !== targetUrl) {
+    tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: true });
+  } else {
+    tab = await chrome.tabs.update(tab.id, { active: true });
   }
-  if (!tab?.id) throw new Error("NotebookLM 탭을 열지 못했습니다.");
+  if (!tab?.id) throw new Error("Gemini Notebook 탭을 열지 못했습니다.");
   return tab;
 }
 
@@ -104,7 +115,7 @@ async function waitForTab(tabId, timeoutMs = 45000) {
     if (tab.status === "complete") return tab;
     await new Promise((resolve) => setTimeout(resolve, 600));
   }
-  throw new Error("NotebookLM 페이지 로딩 시간이 초과되었습니다.");
+  throw new Error("Gemini Notebook 페이지 로딩 시간이 초과되었습니다.");
 }
 
 async function sendToNotebook(tabId, message) {
@@ -143,7 +154,7 @@ async function runTask({ apiUrl, sessionToken, taskId, frontendOrigin }) {
       type: "RUN_NOTEBOOK_TASK",
       task
     });
-    if (!response?.ok) throw new Error(response?.error || "NotebookLM 실행에 실패했습니다.");
+    if (!response?.ok) throw new Error(response?.error || "Gemini Notebook 실행에 실패했습니다.");
 
     const completed = await apiPost(apiUrl, {
       action: "completeTask",
