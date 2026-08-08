@@ -122,4 +122,16 @@ function appendTask_(task,ownerEmail){
 function notifyWriter_(data,result){
   if(!data.CALLBACK_URL) return; try{UrlFetchApp.fetch(String(data.CALLBACK_URL),{method:"post",contentType:"application/json",payload:JSON.stringify({taskId:data.TASK_ID,contentId:data.CONTENT_ID,callbackToken:data.CALLBACK_TOKEN,...result}),muteHttpExceptions:true});}catch(_e){}
 }
-function setupNotebookLMBridge(){ sheet_(); return {version:VERSION,sheet:sheet_().getName(),headers:HEADERS}; }
+function setupNotebookLMBridge(){
+  const p=props_();
+  if(!p.getProperty("SESSION_SECRET")) p.setProperty("SESSION_SECRET",Utilities.getUuid()+Utilities.getUuid());
+  if(!p.getProperty("WRITER_SHARED_SECRET")) p.setProperty("WRITER_SHARED_SECRET",Utilities.getUuid()+Utilities.getUuid());
+  const sh=sheet_();
+  return {
+    version:VERSION,
+    sheet:sh.getName(),
+    headers:HEADERS,
+    sessionSecretReady:!!p.getProperty("SESSION_SECRET"),
+    writerSecretReady:!!p.getProperty("WRITER_SHARED_SECRET")
+  };
+}
