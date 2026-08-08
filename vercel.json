@@ -1,5 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "",
-  "outputDirectory": "notebooklm-webapp-bridge-source-v0.2.0/frontend"
+  "outputDirectory": "notebooklm-webapp-bridge-source-v0.2.0/frontend",
+  "cleanUrls": true,
+  "trailingSlash": false
 }
