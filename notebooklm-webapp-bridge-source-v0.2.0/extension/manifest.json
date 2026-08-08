@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.1",
-  "description": "Google 로그인 프런트앱과 Apps Script 작업큐를 NotebookLM 브라우저 작업에 연결하는 로컬 Chrome 에이전트입니다.",
+  "version": "0.2.4",
+  "description": "Google 로그인 프런트앱과 Apps Script 작업큐를 NotebookLM/Gemini Notebook 브라우저 작업에 연결하는 로컬 Chrome 에이전트입니다.",
   "permissions": [
     "identity",
     "identity.email",
@@ -13,6 +13,7 @@
   ],
   "host_permissions": [
     "https://notebooklm.google.com/*",
+    "https://notebook.google.com/*",
     "https://script.google.com/*",
     "https://script.googleusercontent.com/*"
   ],
@@ -36,7 +37,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://notebooklm.google.com/*"
+        "https://notebooklm.google.com/*",
+        "https://notebook.google.com/*"
       ],
       "js": [
         "content/notebooklm-runner.js"
