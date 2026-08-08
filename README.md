@@ -10,6 +10,12 @@
 - `shared/`: TASK 패키지 스키마
 - `docs/`: 구조 및 설치 순서
 
+## Vercel 배포
+
+저장소 루트의 `vercel.json`이 `notebooklm-webapp-bridge-source-v0.2.0/frontend`를 자동 배포 대상으로 지정합니다.
+따라서 Vercel에서 이 저장소를 최초 1회 Import할 때 별도로 Root Directory를 입력하지 않아도 됩니다.
+GitHub 저장소가 Vercel 프로젝트와 연결된 이후에는 `main` 브랜치 변경이 Vercel 자동 재배포로 이어지는 운영을 기본으로 합니다.
+
 ## 보안 원칙
 
 - 프런트 Google ID token은 Apps Script가 Google tokeninfo로 검증합니다.
