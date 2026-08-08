@@ -31,14 +31,14 @@ async function waitForTabComplete(tabId, timeoutMs=45000){
     if(tab.status==="complete") return tab;
     await new Promise((resolve)=>setTimeout(resolve,500));
   }
-  throw new Error("NotebookLM 페이지 로딩 시간이 초과되었습니다.");
+  throw new Error("Gemini Notebook 페이지 로딩 시간이 초과되었습니다.");
 }
 async function runNotebookInputTest(){
-  const tabs=await chrome.tabs.query({url:"https://notebooklm.google.com/*"});
+  const tabs=await chrome.tabs.query({url:["https://notebook.google.com/*","https://notebooklm.google.com/*"]});
   let tab=tabs.find((item)=>item.active)||tabs[0];
-  if(!tab) tab=await chrome.tabs.create({url:"https://notebooklm.google.com/",active:true});
+  if(!tab) tab=await chrome.tabs.create({url:"https://notebook.google.com/",active:true});
   else tab=await chrome.tabs.update(tab.id,{active:true});
-  if(!tab?.id) throw new Error("NotebookLM 탭을 열지 못했습니다.");
+  if(!tab?.id) throw new Error("Gemini Notebook 탭을 열지 못했습니다.");
   await waitForTabComplete(tab.id);
 
   const [execution]=await chrome.scripting.executeScript({
@@ -53,14 +53,14 @@ async function runNotebookInputTest(){
       const normalize=(value)=>String(value||"").replace(/\s+/g," ").trim().toLowerCase();
       const dialogs=[...document.querySelectorAll("[role='dialog'],dialog")].filter(visible);
       if(dialogs.length){
-        return {ok:false,error:"NotebookLM에 열린 대화상자가 있습니다. 대화상자를 닫고 다시 실행하세요."};
+        return {ok:false,error:"Gemini Notebook에 열린 대화상자가 있습니다. 대화상자를 닫고 다시 실행하세요."};
       }
 
       const raw=[...document.querySelectorAll("textarea,[contenteditable='true'][role='textbox'],[contenteditable='true']")];
       const candidates=[...new Set(raw)].filter((element)=>visible(element)&&!element.closest("[role='dialog'],dialog")&&!element.disabled&&!element.readOnly);
-      if(!candidates.length) return {ok:false,error:"NotebookLM 입력창을 찾지 못했습니다. 먼저 노트북 하나를 열어 주세요."};
+      if(!candidates.length) return {ok:false,error:"Gemini Notebook 입력창을 찾지 못했습니다. 먼저 노트북 하나를 열어 주세요."};
 
-      const keywords=["질문","메시지","대화","채팅","ask","message","chat","prompt"];
+      const keywords=["질문","창작","메시지","대화","채팅","ask","message","chat","prompt"];
       const scored=candidates.map((element)=>{
         const text=normalize([
           element.getAttribute("aria-label"),
@@ -101,7 +101,7 @@ async function runNotebookInputTest(){
     }
   });
   const result=execution?.result;
-  if(!result?.ok) throw new Error(result?.error||"NotebookLM 입력 테스트 결과를 받지 못했습니다.");
+  if(!result?.ok) throw new Error(result?.error||"Gemini Notebook 입력 테스트 결과를 받지 못했습니다.");
   return result;
 }
 $("#save").addEventListener("click",async()=>{try{
@@ -110,8 +110,8 @@ $("#save").addEventListener("click",async()=>{try{
 }catch(e){setStatus(String(e),true)}});
 $("#test").addEventListener("click",async()=>{try{setStatus("API 확인 중…"); const result=await send("TEST_API"); setStatus(`API 정상: ${result.response.version}`)}catch(e){setStatus(String(e),true)}});
 $("#testNotebook").addEventListener("click",async()=>{try{
-  setStatus("NotebookLM 탭과 입력창을 확인 중…");
+  setStatus("Gemini Notebook 탭과 입력창을 확인 중…");
   const result=await runNotebookInputTest();
-  setStatus(`NotebookLM 제어 정상 · ${result.pageTitle} · 시험 문구 입력 완료(전송 안 함)`);
+  setStatus(`Gemini Notebook 제어 정상 · ${result.pageTitle} · 시험 문구 입력 완료(전송 안 함)`);
 }catch(e){setStatus(e instanceof Error?e.message:String(e),true)}});
 load().catch((e)=>setStatus(String(e),true));
