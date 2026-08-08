@@ -3,6 +3,7 @@
   globalThis.__NLM_WEBAPP_BRIDGE_LOADED__ = true;
 
   const SOURCE = "notebooklm-webapp-bridge";
+  const NOTEBOOK_HOSTS = new Set(["notebook.google.com", "notebooklm.google.com"]);
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const normalize = (value) => String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
 
@@ -57,7 +58,7 @@
       if (editor) return editor;
       await sleep(500);
     }
-    throw new Error("NotebookLM 입력창을 찾지 못했습니다. 노트북이 열린 상태인지 확인해 주세요.");
+    throw new Error("Gemini Notebook 입력창을 찾지 못했습니다. 노트북이 열린 상태인지 확인해 주세요.");
   }
 
   function findButton(words) {
@@ -72,7 +73,6 @@
       return words.some((word) => haystack.includes(normalize(word)));
     }) || null;
   }
-
 
   async function waitForElement(factory, timeoutMs = 12000) {
     const started = Date.now();
@@ -98,7 +98,7 @@
 
   async function addPastedTextSource(task) {
     if (!task.sourceText) return { ok: false, skipped: true, reason: "sourceText 없음" };
-    const addButton = findButton(["소스 추가", "자료 추가", "add source", "add sources", "source"]);
+    const addButton = findButton(["소스 추가", "자료 추가", "출처 추가", "add source", "add sources", "source"]);
     if (!addButton) return { ok: false, reason: "소스 추가 버튼을 찾지 못했습니다." };
     addButton.click();
 
@@ -144,7 +144,7 @@
 
   async function submitEditor() {
     const button = findButton(["보내기", "제출", "send", "submit", "질문"]);
-    if (!button) throw new Error("NotebookLM 전송 버튼을 찾지 못했습니다.");
+    if (!button) throw new Error("Gemini Notebook 전송 버튼을 찾지 못했습니다.");
     button.click();
   }
 
@@ -199,7 +199,7 @@
   }
 
   async function runTask(task) {
-    if (location.hostname !== "notebooklm.google.com") throw new Error("NotebookLM 페이지가 아닙니다.");
+    if (!NOTEBOOK_HOSTS.has(location.hostname)) throw new Error("Gemini Notebook 페이지가 아닙니다.");
     if (!task?.taskId) throw new Error("TASK_ID가 없습니다.");
 
     const source = await addPastedTextSource(task);
