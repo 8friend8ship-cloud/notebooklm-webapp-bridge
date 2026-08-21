@@ -192,6 +192,7 @@ try {
   $manifest = Invoke-RestMethod -Uri $TaskManifestUrl -Method Get
   if ([string]$manifest.channel -ne 'CENTRAL_APPS_SCRIPT_RUNNER_V1') { throw 'TASK_CHANNEL_MISMATCH' }
   $state = Load-State
+  $runHadFailure = $false
 
   foreach ($task in @($manifest.tasks)) {
     if (!$task.enabled) { continue }
@@ -218,12 +219,17 @@ try {
       Save-State $state
       Write-RunnerLog "TASK_COMPLETED id=$taskId"
     } catch {
+      $runHadFailure = $true
       $state.tasks[$taskId] = [ordered]@{ status = 'FAILED'; attempts = $attempts; action = [string]$task.action; failedAt = (Get-Date).ToUniversalTime().ToString('o'); error = $_.Exception.Message }
       Save-State $state
       Write-RunnerLog "TASK_FAILED id=$taskId error=$($_.Exception.Message)"
     }
   }
-  Write-RunnerLog 'RUN_END'
+  if ($runHadFailure) {
+    Write-RunnerLog 'RUN_END_WITH_TASK_FAILURE'
+    exit 2
+  }
+  Write-RunnerLog 'RUN_END_SUCCESS'
   exit 0
 } catch {
   Write-RunnerLog "RUN_FATAL error=$($_.Exception.Message)"
