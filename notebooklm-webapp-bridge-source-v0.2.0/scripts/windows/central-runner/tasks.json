@@ -1,0 +1,16 @@
+{
+  "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V1",
+  "version": "20260821.1",
+  "pollIntervalMinutes": 5,
+  "tasks": [
+    {
+      "taskId": "TASK_20260821_TRAVEL_APPS_SCRIPT_REPAIR_001",
+      "action": "TRAVEL_APPS_SCRIPT_REPAIR",
+      "enabled": true,
+      "targetTitle": "WEBAPP_TEMPLATE_07",
+      "expectedDeploymentId": "AKfycbyzSZZqDwMAgqltkfCYQb4-aIZ4zSFlRHkh9dyN5F_Qd7hfUev6oVNqjUSsEtYE3b4VBA",
+      "maxAttempts": 3,
+      "notes": "Reuse existing local clasp authorization. Same Script ID only. No new OAuth, project, deployment, trigger deletion, or destructive action."
+    }
+  ]
+}
