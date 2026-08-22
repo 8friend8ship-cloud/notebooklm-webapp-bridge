@@ -1,16 +1,25 @@
 {
-  "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V1",
-  "version": "20260821.1",
+  "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V2",
+  "version": "20260822.2",
   "pollIntervalMinutes": 5,
   "tasks": [
     {
       "taskId": "TASK_20260821_TRAVEL_APPS_SCRIPT_REPAIR_001",
       "action": "TRAVEL_APPS_SCRIPT_REPAIR",
-      "enabled": true,
+      "enabled": false,
       "targetTitle": "WEBAPP_TEMPLATE_07",
       "expectedDeploymentId": "AKfycbyzSZZqDwMAgqltkfCYQb4-aIZ4zSFlRHkh9dyN5F_Qd7hfUev6oVNqjUSsEtYE3b4VBA",
       "maxAttempts": 3,
-      "notes": "Reuse existing local clasp authorization. Same Script ID only. No new OAuth, project, deployment, trigger deletion, or destructive action."
+      "notes": "Known-good Travel runtime preserved. Disabled to prevent duplicate repair."
+    },
+    {
+      "taskId": "TASK_20260822_CONTENTOS_BOUND_SYNC_001",
+      "action": "CONTENTOS_APPS_SCRIPT_SYNC",
+      "enabled": true,
+      "targetTitle": "WEBAPP_TEMPLATE_05",
+      "expectedDeploymentId": "AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo",
+      "maxAttempts": 3,
+      "notes": "Reuse existing Git/clasp authorization and existing WEBAPP_TEMPLATE_05 only. Clone/snapshot live source, copy canonical Content OS modules, inject exactly one fail-open scheduler adapter into existing processTaskQueue, push same Script ID, clean reclone readback. No new OAuth/project/deployment/physical trigger."
     }
   ]
 }
