@@ -12,7 +12,7 @@ $runnerPath = Join-Path $installDir 'CentralAppsScriptRunner.ps1'
 $wrapperPath = Join-Path $installDir 'CentralAppsScriptRunnerWrapper.ps1'
 $statePath = Join-Path $installDir 'state.json'
 $logPath = Join-Path $installDir 'install.log'
-$runnerUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/fix/central-appscript-runner-20260821/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunner.ps1'
+$runnerUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/fix/central-appscript-runner-20260821/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1'
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 
 function Write-InstallLog([string]$Message) {
@@ -20,8 +20,6 @@ function Write-InstallLog([string]$Message) {
 }
 
 try {
-  # Windows PowerShell on this machine blocks npm/clasp *.ps1 shims by policy.
-  # Canonical local execution therefore uses the *.cmd shims without changing ExecutionPolicy.
   $claspCmd = Get-Command clasp.cmd -ErrorAction SilentlyContinue
   if (!$claspCmd) {
     $npmCmd = Get-Command npm.cmd -ErrorAction SilentlyContinue
@@ -34,7 +32,7 @@ try {
   }
 
   # Reuse only the authorization already verified on this Windows profile.
-  # This installer never calls clasp login or creates a new project/deployment.
+  # Never start a new clasp login or create a new project/deployment here.
   & $claspCmd.Source show-authorized-user --json *> $null
   if ($LASTEXITCODE -ne 0) {
     & $claspCmd.Source show-authorized-user *> $null
@@ -45,11 +43,7 @@ try {
   Invoke-WebRequest -UseBasicParsing -Uri $runnerUrl -OutFile $runnerPath
   if (!(Test-Path $runnerPath) -or (Get-Item $runnerPath).Length -lt 1000) { throw 'RUNNER_DOWNLOAD_FAILED' }
 
-  # The legacy runner calls `clasp`; wrap it so those calls route to clasp.cmd.
   $wrapper = @'
-function global:clasp {
-  & clasp.cmd @args
-}
 & "$env:LOCALAPPDATA\CentralAppsScriptRunner\CentralAppsScriptRunner.ps1"
 exit $LASTEXITCODE
 '@
@@ -67,7 +61,6 @@ exit $LASTEXITCODE
   Register-ScheduledTask -TaskName $TaskName -InputObject $task -Force | Out-Null
   Write-InstallLog "Scheduled task registered: $TaskName identity=$currentIdentity every $IntervalMinutes minutes."
 
-  # Run once now; later runs are automatic.
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapperPath
   $firstExit = $LASTEXITCODE
   Write-InstallLog "Initial runner exit=$firstExit"
@@ -75,9 +68,10 @@ exit $LASTEXITCODE
   if (!(Test-Path $statePath)) { throw 'RUNNER_STATE_NOT_CREATED' }
 
   $registered = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
-  Write-InstallLog "INSTALL_VERIFIED taskState=$($registered.State)"
+  Write-InstallLog "INSTALL_VERIFIED taskState=$($registered.State) runner=V2"
 
   Write-Host 'CENTRAL_APPS_SCRIPT_RUNNER_INSTALLED'
+  Write-Host 'RUNNER_VERSION=CENTRAL_APPS_SCRIPT_RUNNER_V2_20260822'
   Write-Host "TASK_NAME=$TaskName"
   Write-Host "INTERVAL_MINUTES=$IntervalMinutes"
   Write-Host "RUNNER_PATH=$runnerPath"
