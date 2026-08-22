@@ -9,6 +9,7 @@ if ($IntervalMinutes -lt 5) { throw 'IntervalMinutes must be at least 5.' }
 
 $installDir = Join-Path $env:LOCALAPPDATA 'CentralAppsScriptRunner'
 $runnerPath = Join-Path $installDir 'CentralAppsScriptRunner.ps1'
+$wrapperPath = Join-Path $installDir 'CentralAppsScriptRunnerWrapper.ps1'
 $statePath = Join-Path $installDir 'state.json'
 $logPath = Join-Path $installDir 'install.log'
 $runnerUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/fix/central-appscript-runner-20260821/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunner.ps1'
@@ -19,29 +20,45 @@ function Write-InstallLog([string]$Message) {
 }
 
 try {
-  if (!(Get-Command clasp -ErrorAction SilentlyContinue)) {
-    if (!(Get-Command npm -ErrorAction SilentlyContinue)) { throw 'CLASP_AND_NPM_NOT_FOUND' }
-    Write-InstallLog 'clasp missing; installing current @google/clasp with npm.'
-    & npm install --global '@google/clasp@latest'
-    if ($LASTEXITCODE -ne 0 -or !(Get-Command clasp -ErrorAction SilentlyContinue)) { throw 'CLASP_INSTALL_FAILED' }
+  # Windows PowerShell on this machine blocks npm/clasp *.ps1 shims by policy.
+  # Canonical local execution therefore uses the *.cmd shims without changing ExecutionPolicy.
+  $claspCmd = Get-Command clasp.cmd -ErrorAction SilentlyContinue
+  if (!$claspCmd) {
+    $npmCmd = Get-Command npm.cmd -ErrorAction SilentlyContinue
+    if (!$npmCmd) { throw 'CLASP_CMD_AND_NPM_CMD_NOT_FOUND' }
+    Write-InstallLog 'clasp.cmd missing; installing current @google/clasp with npm.cmd.'
+    & $npmCmd.Source install --global '@google/clasp@latest'
+    if ($LASTEXITCODE -ne 0) { throw 'CLASP_INSTALL_FAILED' }
+    $claspCmd = Get-Command clasp.cmd -ErrorAction SilentlyContinue
+    if (!$claspCmd) { throw 'CLASP_CMD_NOT_FOUND_AFTER_INSTALL' }
   }
 
   # Reuse only the authorization already verified on this Windows profile.
   # This installer never calls clasp login or creates a new project/deployment.
-  & clasp show-authorized-user --json *> $null
+  & $claspCmd.Source show-authorized-user --json *> $null
   if ($LASTEXITCODE -ne 0) {
-    & clasp show-authorized-user *> $null
+    & $claspCmd.Source show-authorized-user *> $null
     if ($LASTEXITCODE -ne 0) { throw 'EXISTING_CLASP_AUTH_NOT_AVAILABLE_NO_LOGIN_STARTED' }
   }
-  Write-InstallLog 'Existing clasp authorization verified.'
+  Write-InstallLog 'Existing clasp authorization verified through clasp.cmd.'
 
   Invoke-WebRequest -UseBasicParsing -Uri $runnerUrl -OutFile $runnerPath
   if (!(Test-Path $runnerPath) -or (Get-Item $runnerPath).Length -lt 1000) { throw 'RUNNER_DOWNLOAD_FAILED' }
 
+  # The legacy runner calls `clasp`; wrap it so those calls route to clasp.cmd.
+  $wrapper = @'
+function global:clasp {
+  & clasp.cmd @args
+}
+& "$env:LOCALAPPDATA\CentralAppsScriptRunner\CentralAppsScriptRunner.ps1"
+exit $LASTEXITCODE
+'@
+  Set-Content -LiteralPath $wrapperPath -Value $wrapper -Encoding UTF8
+
   $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
   if ([string]::IsNullOrWhiteSpace($currentIdentity)) { throw 'WINDOWS_IDENTITY_NOT_RESOLVED' }
 
-  $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$runnerPath`""
+  $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
   $start = (Get-Date).AddMinutes(1)
   $trigger = New-ScheduledTaskTrigger -Once -At $start -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) -RepetitionDuration (New-TimeSpan -Days 3650)
   $settings = New-ScheduledTaskSettingsSet -WakeToRun -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
@@ -51,7 +68,7 @@ try {
   Write-InstallLog "Scheduled task registered: $TaskName identity=$currentIdentity every $IntervalMinutes minutes."
 
   # Run once now; later runs are automatic.
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runnerPath
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapperPath
   $firstExit = $LASTEXITCODE
   Write-InstallLog "Initial runner exit=$firstExit"
   if ($firstExit -ne 0) { throw "INITIAL_RUN_FAILED:$firstExit" }
@@ -64,6 +81,7 @@ try {
   Write-Host "TASK_NAME=$TaskName"
   Write-Host "INTERVAL_MINUTES=$IntervalMinutes"
   Write-Host "RUNNER_PATH=$runnerPath"
+  Write-Host "WRAPPER_PATH=$wrapperPath"
   Write-Host "STATE_PATH=$statePath"
   exit 0
 } catch {
