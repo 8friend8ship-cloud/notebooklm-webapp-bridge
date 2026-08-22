@@ -1,0 +1,7 @@
+{
+  "appId": "APP_NLM_BRIDGE",
+  "writerT1Template": "INHERIT_SOURCE_APP_PERSONA",
+  "t2Template": "T2_MEDIA_BRIDGE_TASK_V2",
+  "requiredOutputs": ["task_id","source_app_id","content_id","input_package","requested_output","asset_lineage","approval_state"],
+  "runtimeStatus": "BRIDGE_E2E_X2_PENDING"
+}
