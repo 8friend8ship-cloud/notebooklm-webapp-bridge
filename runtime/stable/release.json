@@ -15,7 +15,7 @@
     {"path":"manifest.json","gitBlobSha1":"e8a20dfb633b54efe4f07bf830285c229e59e9d1"},
     {"path":"background.js","gitBlobSha1":"288f371205a36c8557727ebe78c0f2956c7c10d5"},
     {"path":"front-main.js","gitBlobSha1":"a246bcfe6a199ae7d171d1cf21b19a20d39db42f"},
-    {"path":"front-extension.js","gitBlobSha1":"8cc9d698da043defc7bad5917869c593a2977c2c"},
+    {"path":"front-extension.js","gitBlobSha1":"01590edbfd9eb9d1f0b1271ea7755a49a4a81871"},
     {"path":"content/notebooklm-runner.js","gitBlobSha1":"edaa6089c197ad17c496f96c7dd648a41c77f4ee"}
   ]
 }
