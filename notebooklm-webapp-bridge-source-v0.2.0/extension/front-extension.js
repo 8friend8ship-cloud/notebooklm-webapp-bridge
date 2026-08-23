@@ -5,6 +5,7 @@
   const STORE = "homeDesignBridgeSessionV7";
   const MAIN = "HOMEDESIGN_V025_MAIN";
   const EXT = "HOMEDESIGN_V025_EXT";
+  const CONTROL = "HOMEDESIGN_CONTROL_CENTER";
 
   async function bootstrap() {
     let token = "";
@@ -18,8 +19,14 @@
   window.addEventListener("message", async (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     const data = event.data || {};
-    if (data.source !== MAIN) return;
 
+    if (data.source === CONTROL && data.type === "CLEAR_PERSISTED_SESSION") {
+      try { await chrome.storage.local.remove(STORE); } catch {}
+      window.postMessage({ source: EXT, type: "CLEAR_SESSION" }, location.origin);
+      return;
+    }
+
+    if (data.source !== MAIN) return;
     if (data.type === "REQUEST_BOOTSTRAP") {
       await bootstrap();
       return;
