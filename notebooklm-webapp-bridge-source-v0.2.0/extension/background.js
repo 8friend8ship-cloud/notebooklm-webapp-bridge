@@ -1,17 +1,25 @@
 const SOURCE = "notebooklm-webapp-bridge";
 const CONFIG_KEY = "nlmBridgeConfig";
 const LOG_KEY = "nlmBridgeLogs";
-const MAX_LOGS = 100;
+const AUTO_STATE_KEY = "nlmAutoRunnerStateV025";
+const SESSION_STORE_KEYS = ["homeDesignBridgeSessionV7", "nlmPersistentSessionV5"];
+const MAX_LOGS = 200;
 const NOTEBOOK_HOSTS = ["notebook.google.com", "notebooklm.google.com"];
 const NOTEBOOK_HOME = "https://notebook.google.com/";
+const POLL_ALARM = "nlm-auto-ready-poll";
+const DEFAULT_POLL_MINUTES = 1;
+const MAX_TASKS_PER_POLL = 2;
 
 const DEFAULT_CONFIG = Object.freeze({
   appsScriptUrl: "",
-  frontendOrigin: "",
-  notebookHomeUrl: NOTEBOOK_HOME
+  frontendOrigin: "https://notebooklm-webapp-bridge.vercel.app",
+  notebookHomeUrl: NOTEBOOK_HOME,
+  autoRunEnabled: true,
+  pollMinutes: DEFAULT_POLL_MINUTES
 });
 
 async function configureSidePanel() {
+  if (!chrome.sidePanel) return;
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 }
 
@@ -24,6 +32,7 @@ async function saveConfig(patch) {
   const current = await getConfig();
   const next = { ...current, ...patch };
   await chrome.storage.local.set({ [CONFIG_KEY]: next });
+  await ensureAutoAlarm(next);
   return next;
 }
 
@@ -32,6 +41,26 @@ async function addLog(level, message, details = {}) {
   const logs = Array.isArray(stored[LOG_KEY]) ? stored[LOG_KEY] : [];
   logs.unshift({ level, message, details, createdAt: new Date().toISOString() });
   await chrome.storage.local.set({ [LOG_KEY]: logs.slice(0, MAX_LOGS) });
+}
+
+async function getAutoState() {
+  const stored = await chrome.storage.local.get(AUTO_STATE_KEY);
+  return {
+    runningTaskId: "",
+    busyUntil: 0,
+    lastPollAt: "",
+    lastSuccessAt: "",
+    lastError: "",
+    requiresLogin: false,
+    ...(stored[AUTO_STATE_KEY] || {})
+  };
+}
+
+async function saveAutoState(patch) {
+  const current = await getAutoState();
+  const next = { ...current, ...patch };
+  await chrome.storage.local.set({ [AUTO_STATE_KEY]: next });
+  return next;
 }
 
 function senderOrigin(sender) {
@@ -91,6 +120,16 @@ async function getChromeProfile() {
   }
 }
 
+async function getPersistedSessionToken() {
+  const stored = await chrome.storage.local.get(SESSION_STORE_KEYS);
+  for (const key of SESSION_STORE_KEYS) {
+    const value = stored[key];
+    const token = typeof value === "string" ? value : value?.token;
+    if (token) return String(token);
+  }
+  return "";
+}
+
 async function findOrOpenNotebookTab(url) {
   const targetUrl = isNotebookUrl(url) ? url : NOTEBOOK_HOME;
   const tabs = await chrome.tabs.query({
@@ -104,7 +143,7 @@ async function findOrOpenNotebookTab(url) {
   } else {
     tab = await chrome.tabs.update(tab.id, { active: true });
   }
-  if (!tab?.id) throw new Error("Gemini Notebook 탭을 열지 못했습니다.");
+  if (!tab?.id) throw new Error("NotebookLM 탭을 열지 못했습니다.");
   return tab;
 }
 
@@ -115,7 +154,7 @@ async function waitForTab(tabId, timeoutMs = 45000) {
     if (tab.status === "complete") return tab;
     await new Promise((resolve) => setTimeout(resolve, 600));
   }
-  throw new Error("Gemini Notebook 페이지 로딩 시간이 초과되었습니다.");
+  throw new Error("NotebookLM 페이지 로딩 시간이 초과되었습니다.");
 }
 
 async function sendToNotebook(tabId, message) {
@@ -154,7 +193,7 @@ async function runTask({ apiUrl, sessionToken, taskId, frontendOrigin }) {
       type: "RUN_NOTEBOOK_TASK",
       task
     });
-    if (!response?.ok) throw new Error(response?.error || "Gemini Notebook 실행에 실패했습니다.");
+    if (!response?.ok) throw new Error(response?.error || "NotebookLM 실행에 실패했습니다.");
 
     const completed = await apiPost(apiUrl, {
       action: "completeTask",
@@ -172,18 +211,111 @@ async function runTask({ apiUrl, sessionToken, taskId, frontendOrigin }) {
   }
 }
 
+function isSessionError(message) {
+  return /로그인 세션|세션.*만료|session/i.test(String(message || ""));
+}
+
+async function openControlCenter(config) {
+  const base = String(config.frontendOrigin || DEFAULT_CONFIG.frontendOrigin || "").replace(/\/$/, "");
+  if (!/^https:\/\//.test(base)) return;
+  const tabs = await chrome.tabs.query({ url: `${base}/*` });
+  if (tabs[0]?.id) {
+    await chrome.tabs.update(tabs[0].id, { active: true, url: `${base}/` });
+  } else {
+    await chrome.tabs.create({ url: `${base}/`, active: true });
+  }
+}
+
+async function pollReadyTasks(reason = "alarm") {
+  const config = await getConfig();
+  if (!config.autoRunEnabled) return { ok: true, skipped: "disabled" };
+  if (!config.appsScriptUrl) return { ok: true, skipped: "api_not_configured" };
+
+  const state = await getAutoState();
+  if (Number(state.busyUntil || 0) > Date.now()) {
+    return { ok: true, skipped: "busy", runningTaskId: state.runningTaskId || "" };
+  }
+
+  const sessionToken = await getPersistedSessionToken();
+  if (!sessionToken) {
+    await saveAutoState({ lastPollAt: new Date().toISOString(), requiresLogin: true, lastError: "NO_SESSION" });
+    return { ok: true, skipped: "no_session" };
+  }
+
+  await saveAutoState({
+    lastPollAt: new Date().toISOString(),
+    requiresLogin: false,
+    busyUntil: Date.now() + 10 * 60 * 1000
+  });
+
+  let processed = 0;
+  try {
+    const listed = await apiPost(config.appsScriptUrl, {
+      action: "listTasks",
+      sessionToken
+    });
+    const tasks = Array.isArray(listed.tasks) ? listed.tasks : [];
+    const runnable = tasks.filter((task) =>
+      ["READY", "RETRY"].includes(String(task.status || "READY").toUpperCase()) &&
+      task.autoSubmit !== false
+    );
+
+    for (const task of runnable.slice(0, MAX_TASKS_PER_POLL)) {
+      await saveAutoState({ runningTaskId: task.taskId, busyUntil: Date.now() + 10 * 60 * 1000 });
+      await addLog("info", "자동 작업 시작", { reason, taskId: task.taskId });
+      await runTask({
+        apiUrl: config.appsScriptUrl,
+        sessionToken,
+        taskId: task.taskId,
+        frontendOrigin: config.frontendOrigin
+      });
+      processed += 1;
+      await saveAutoState({
+        runningTaskId: "",
+        lastSuccessAt: new Date().toISOString(),
+        lastError: ""
+      });
+    }
+
+    await saveAutoState({ runningTaskId: "", busyUntil: 0, requiresLogin: false });
+    return { ok: true, processed, available: runnable.length };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await saveAutoState({ runningTaskId: "", busyUntil: 0, lastError: message, requiresLogin: isSessionError(message) });
+    await addLog("error", "자동 폴링 실패", { reason, error: message });
+    if (isSessionError(message)) await openControlCenter(config).catch(() => {});
+    throw error;
+  }
+}
+
+async function ensureAutoAlarm(config = null) {
+  const current = config || await getConfig();
+  await chrome.alarms.clear(POLL_ALARM);
+  if (!current.autoRunEnabled) return;
+  const minutes = Math.max(1, Number(current.pollMinutes || DEFAULT_POLL_MINUTES));
+  await chrome.alarms.create(POLL_ALARM, { delayInMinutes: 0.25, periodInMinutes: minutes });
+}
+
 async function handleExternal(message, sender) {
   const origin = await assertTrustedSender(sender);
   if (!message || message.source !== SOURCE) throw new Error("잘못된 메시지 출처입니다.");
 
   if (message.type === "PING") {
-    return { ok: true, version: chrome.runtime.getManifest().version, origin, profile: await getChromeProfile() };
+    return {
+      ok: true,
+      version: chrome.runtime.getManifest().version,
+      origin,
+      profile: await getChromeProfile(),
+      autoState: await getAutoState()
+    };
   }
   if (message.type === "RUN_TASK") {
     const result = await runTask({ ...message, frontendOrigin: origin });
     return { ok: true, ...result };
   }
   if (message.type === "GET_PROFILE") return { ok: true, profile: await getChromeProfile() };
+  if (message.type === "GET_AUTO_STATUS") return { ok: true, state: await getAutoState(), config: await getConfig() };
+  if (message.type === "RUN_AUTO_POLL") return { ok: true, result: await pollReadyTasks("external") };
   throw new Error("지원되지 않는 외부 요청입니다.");
 }
 
@@ -200,7 +332,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     if (message?.source !== SOURCE) return { ok: false, error: "잘못된 메시지입니다." };
-    if (message.type === "GET_CONFIG") return { ok: true, config: await getConfig(), profile: await getChromeProfile() };
+    if (message.type === "GET_CONFIG") return { ok: true, config: await getConfig(), profile: await getChromeProfile(), autoState: await getAutoState() };
     if (message.type === "SAVE_CONFIG") return { ok: true, config: await saveConfig(message.config || {}) };
     if (message.type === "GET_LOGS") {
       const stored = await chrome.storage.local.get(LOG_KEY);
@@ -210,10 +342,27 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const config = await getConfig();
       return { ok: true, response: await apiPost(config.appsScriptUrl, { action: "health" }) };
     }
+    if (message.type === "RUN_AUTO_POLL") return { ok: true, result: await pollReadyTasks("internal") };
+    if (message.type === "GET_AUTO_STATUS") return { ok: true, state: await getAutoState(), config: await getConfig() };
     return { ok: false, error: "지원되지 않는 내부 요청입니다." };
   })().then(sendResponse).catch((error) => sendResponse({ ok: false, error: String(error) }));
   return true;
 });
 
-chrome.runtime.onInstalled.addListener(() => configureSidePanel().catch(console.error));
-chrome.runtime.onStartup.addListener(() => configureSidePanel().catch(console.error));
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === POLL_ALARM) pollReadyTasks("alarm").catch(() => {});
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  Promise.all([configureSidePanel(), ensureAutoAlarm()])
+    .then(() => pollReadyTasks("installed"))
+    .catch(console.error);
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  Promise.all([configureSidePanel(), ensureAutoAlarm()])
+    .then(() => pollReadyTasks("startup"))
+    .catch(console.error);
+});
+
+ensureAutoAlarm().catch(() => {});
