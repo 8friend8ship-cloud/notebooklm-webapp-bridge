@@ -13,8 +13,18 @@ function BLog([string]$m) {
   Add-Content -LiteralPath $BootstrapLog -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $m" -Encoding UTF8
 }
 
-function Sha256([string]$Path) {
-  return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+function GitBlobSha1([string]$Path) {
+  $bytes = [IO.File]::ReadAllBytes($Path)
+  $header = [Text.Encoding]::ASCII.GetBytes(("blob " + $bytes.Length + [char]0))
+  $all = New-Object byte[] ($header.Length + $bytes.Length)
+  [Buffer]::BlockCopy($header,0,$all,0,$header.Length)
+  [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
+  $sha = [Security.Cryptography.SHA1]::Create()
+  try {
+    return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '')
+  } finally {
+    $sha.Dispose()
+  }
 }
 
 $mutex = New-Object System.Threading.Mutex($false,'HomeDesignLocalAgentBootstrapV1')
@@ -30,16 +40,16 @@ try {
       if ($meta.enabled) {
         $needs = -not (Test-Path -LiteralPath $AgentFile)
         if (-not $needs) {
-          $needs = (Sha256 $AgentFile) -ne ([string]$meta.sha256).ToLowerInvariant()
+          $needs = (GitBlobSha1 $AgentFile) -ne ([string]$meta.gitBlobSha1).ToLowerInvariant()
         }
 
         if ($needs) {
           $tmp = $AgentFile + '.download'
           $url = "$AgentBaseUrl/$($meta.version)/HomeDesignLocalAgent.ps1"
           Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing -TimeoutSec 60
-          if ((Sha256 $tmp) -ne ([string]$meta.sha256).ToLowerInvariant()) {
+          if ((GitBlobSha1 $tmp) -ne ([string]$meta.gitBlobSha1).ToLowerInvariant()) {
             Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
-            throw 'Agent SHA256 mismatch.'
+            throw 'Agent Git blob SHA1 mismatch.'
           }
           Move-Item -LiteralPath $tmp -Destination $AgentFile -Force
           BLog "Agent updated to $($meta.version)."
