@@ -22,28 +22,38 @@ if (-not $mutex.WaitOne(0,$false)) { exit 0 }
 
 try {
   do {
+    $pollSeconds = 300
     try {
       $meta = Invoke-RestMethod -Uri $AgentMetaUrl -Method Get -TimeoutSec 30
+      if ($meta.pollSeconds) { $pollSeconds = [Math]::Max(60,[int]$meta.pollSeconds) }
+
       if ($meta.enabled) {
         $needs = -not (Test-Path -LiteralPath $AgentFile)
         if (-not $needs) {
           $needs = (Sha256 $AgentFile) -ne ([string]$meta.sha256).ToLowerInvariant()
         }
+
         if ($needs) {
           $tmp = $AgentFile + '.download'
           $url = "$AgentBaseUrl/$($meta.version)/HomeDesignLocalAgent.ps1"
           Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing -TimeoutSec 60
-          if ((Sha256 $tmp) -ne ([string]$meta.sha256).ToLowerInvariant()) { throw 'Agent SHA256 mismatch.' }
+          if ((Sha256 $tmp) -ne ([string]$meta.sha256).ToLowerInvariant()) {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+            throw 'Agent SHA256 mismatch.'
+          }
           Move-Item -LiteralPath $tmp -Destination $AgentFile -Force
           BLog "Agent updated to $($meta.version)."
         }
+
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $AgentFile
+      } else {
+        BLog 'Agent stable channel is disabled.'
       }
     } catch {
       BLog ("Bootstrap cycle error: " + $_.Exception.Message)
     }
 
-    if ($Loop) { Start-Sleep -Seconds 300 }
+    if ($Loop) { Start-Sleep -Seconds $pollSeconds }
   } while ($Loop)
 } finally {
   try { $mutex.ReleaseMutex() } catch {}
