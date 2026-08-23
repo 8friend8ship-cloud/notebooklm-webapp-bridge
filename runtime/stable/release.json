@@ -1,7 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
+  "action": "apply",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.5_20260823_1411",
   "version": "0.2.5",
   "releasedAt": "2026-08-23T14:11:00+09:00",
   "requiresUserApproval": false,
@@ -10,10 +12,10 @@
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
-    {"path":"manifest.json","sha256":"e45d48988c6b81a02138ef040d9ac4de31abf7ce8b424c0fb106c21e3449f95a"},
-    {"path":"background.js","sha256":"e6ee509ddc69cb444f2bc78d193e389351651708736b8dee477c937a46c233e7"},
-    {"path":"front-main.js","sha256":"05e65d19063889a20345b79f13b4dd48b249ea81c9646fb6b1a9ba1663c6322b"},
-    {"path":"front-extension.js","sha256":"6b2ed96a08c27247ce4f95ab3f753bde918a4f5d3aa590c2cb2ba3fb497cef06"},
-    {"path":"content/notebooklm-runner.js","sha256":"162a47727ec7fe3fbb4064bfd32efabc205670a7d3f0060a625733a4f3bd3e92"}
+    {"path":"manifest.json","gitBlobSha1":"e8a20dfb633b54efe4f07bf830285c229e59e9d1"},
+    {"path":"background.js","gitBlobSha1":"288f371205a36c8557727ebe78c0f2956c7c10d5"},
+    {"path":"front-main.js","gitBlobSha1":"a246bcfe6a199ae7d171d1cf21b19a20d39db42f"},
+    {"path":"front-extension.js","gitBlobSha1":"8cc9d698da043defc7bad5917869c593a2977c2c"},
+    {"path":"content/notebooklm-runner.js","gitBlobSha1":"edaa6089c197ad17c496f96c7dd648a41c77f4ee"}
   ]
 }
