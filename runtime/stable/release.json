@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "channel": "stable",
+  "enabled": true,
+  "version": "0.2.5",
+  "releasedAt": "2026-08-23T14:11:00+09:00",
+  "requiresUserApproval": false,
+  "description": "Automatic READY queue polling, persistent session reuse, clean NotebookLM result capture, dedicated Chrome for Testing runtime.",
+  "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
+  "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
+  "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
+  "files": [
+    {"path":"manifest.json","sha256":"e45d48988c6b81a02138ef040d9ac4de31abf7ce8b424c0fb106c21e3449f95a"},
+    {"path":"background.js","sha256":"e6ee509ddc69cb444f2bc78d193e389351651708736b8dee477c937a46c233e7"},
+    {"path":"front-main.js","sha256":"05e65d19063889a20345b79f13b4dd48b249ea81c9646fb6b1a9ba1663c6322b"},
+    {"path":"front-extension.js","sha256":"6b2ed96a08c27247ce4f95ab3f753bde918a4f5d3aa590c2cb2ba3fb497cef06"},
+    {"path":"content/notebooklm-runner.js","sha256":"162a47727ec7fe3fbb4064bfd32efabc205670a7d3f0060a625733a4f3bd3e92"}
+  ]
+}
