@@ -3,232 +3,392 @@
   globalThis.__NLM_WEBAPP_BRIDGE_LOADED__ = true;
 
   const SOURCE = "notebooklm-webapp-bridge";
-  const NOTEBOOK_HOSTS = new Set(["notebook.google.com", "notebooklm.google.com"]);
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const normalize = (value) => String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const HOSTS = new Set(["notebook.google.com", "notebooklm.google.com"]);
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const norm = (v) => String(v || "").replace(/\s+/g, " ").trim().toLowerCase();
 
-  function visible(element) {
-    if (!(element instanceof HTMLElement)) return false;
-    const style = getComputedStyle(element);
-    const rect = element.getBoundingClientRect();
-    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 2 && rect.height > 2;
+  function visible(el) {
+    if (!(el instanceof HTMLElement)) return false;
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return s.display !== "none" && s.visibility !== "hidden" && r.width > 2 && r.height > 2;
   }
 
-  function findEditor() {
-    const selectors = [
-      "textarea",
-      "[contenteditable='true'][role='textbox']",
-      "[contenteditable='true']"
-    ];
-    for (const selector of selectors) {
-      const items = [...document.querySelectorAll(selector)].filter(visible);
-      if (items.length) return items.at(-1);
+  async function waitFor(factory, timeout = 25000, interval = 350) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      try {
+        const v = factory();
+        if (v) return v;
+      } catch {}
+      await sleep(interval);
     }
     return null;
   }
 
-  function setNativeValue(element, value) {
-    const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
-    setter?.call(element, value);
+  function findButton(words, root = document, excludeDialogs = false) {
+    return [...root.querySelectorAll("button,[role='button']")]
+      .filter(el => visible(el) && (!excludeDialogs || !el.closest("[role='dialog'],dialog")))
+      .find(el => {
+        const t = norm([
+          el.innerText,
+          el.textContent,
+          el.getAttribute("aria-label"),
+          el.getAttribute("title"),
+          el.getAttribute("data-testid")
+        ].join(" "));
+        return words.some(w => t.includes(norm(w)));
+      }) || null;
   }
 
-  function fillEditor(element, text) {
-    element.focus();
-    if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
-      setNativeValue(element, text);
-      element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
-      element.dispatchEvent(new Event("change", { bubbles: true }));
+  function nativeValue(el, value) {
+    const proto = el instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+    setter?.call(el, value);
+  }
+
+  function fill(el, text) {
+    el.focus();
+    if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+      nativeValue(el, text);
+      el.dispatchEvent(new InputEvent("input", {bubbles:true, inputType:"insertText", data:text}));
+      el.dispatchEvent(new Event("change", {bubbles:true}));
       return;
     }
-    const selection = window.getSelection();
+
+    const sel = window.getSelection();
     const range = document.createRange();
-    range.selectNodeContents(element);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
+    range.selectNodeContents(el);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
     document.execCommand("insertText", false, text);
-    element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
-    selection?.removeAllRanges();
+    el.dispatchEvent(new InputEvent("input", {bubbles:true, inputType:"insertText", data:text}));
+    sel?.removeAllRanges();
   }
 
-  async function waitForEditor(timeoutMs = 30000) {
-    const started = Date.now();
-    while (Date.now() - started < timeoutMs) {
-      const editor = findEditor();
-      if (editor) return editor;
-      await sleep(500);
-    }
-    throw new Error("Gemini Notebook 입력창을 찾지 못했습니다. 노트북이 열린 상태인지 확인해 주세요.");
+  function dialogs() {
+    return [...document.querySelectorAll("[role='dialog'],dialog")].filter(visible);
   }
 
-  function findButton(words) {
-    const candidates = [...document.querySelectorAll("button,[role='button']")].filter(visible);
-    return candidates.find((element) => {
-      const haystack = normalize([
-        element.innerText,
-        element.textContent,
-        element.getAttribute("aria-label"),
-        element.getAttribute("title")
-      ].join(" "));
-      return words.some((word) => haystack.includes(normalize(word)));
-    }) || null;
-  }
-
-  async function waitForElement(factory, timeoutMs = 12000) {
-    const started = Date.now();
-    while (Date.now() - started < timeoutMs) {
-      const element = factory();
-      if (element) return element;
-      await sleep(350);
+  function dialogEditor() {
+    for (const d of dialogs()) {
+      const list = [...d.querySelectorAll("textarea,[contenteditable='true'][role='textbox'],[contenteditable='true']")].filter(visible);
+      if (list.length) return list.at(-1);
     }
     return null;
   }
 
-  function editorsInDialog() {
-    const dialogs = [...document.querySelectorAll("[role='dialog'],dialog")].filter(visible);
-    const roots = dialogs.length ? dialogs : [document];
-    const found = [];
-    for (const root of roots) {
-      for (const element of root.querySelectorAll("textarea,[contenteditable='true'][role='textbox'],[contenteditable='true']")) {
-        if (visible(element)) found.push(element);
-      }
+  async function addSource(task) {
+    if (!task.sourceText) return {ok:false, skipped:true};
+
+    let choice = null;
+    for (const d of dialogs()) {
+      choice = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
+      if (choice) break;
     }
-    return found;
+
+    if (!choice) {
+      const add = findButton(["소스 추가","자료 추가","출처 추가","add source","add sources"]);
+      if (!add) return {ok:false, skipped:true, reason:"add source control not found"};
+      add.click();
+
+      choice = await waitFor(() => {
+        for (const d of dialogs()) {
+          const b = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
+          if (b) return b;
+        }
+        return null;
+      }, 20000);
+    }
+
+    if (!choice) return {ok:false, skipped:true, reason:"pasted text source type not found"};
+    choice.click();
+
+    const editor = await waitFor(() => dialogEditor(), 20000);
+    if (!editor) return {ok:false, skipped:true, reason:"source editor not found"};
+    fill(editor, task.sourceText);
+
+    const confirm = await waitFor(() => {
+      for (const d of dialogs()) {
+        const b = findButton(["삽입","추가","저장","완료","insert","add","save","submit"], d);
+        if (b) return b;
+      }
+      return null;
+    }, 15000);
+
+    if (!confirm) return {ok:false, skipped:true, reason:"source save control not found"};
+    confirm.click();
+    await waitFor(() => dialogs().length === 0 ? document.body : null, 35000, 500);
+    await sleep(2500);
+    return {ok:true};
   }
 
-  async function addPastedTextSource(task) {
-    if (!task.sourceText) return { ok: false, skipped: true, reason: "sourceText 없음" };
-    const addButton = findButton(["소스 추가", "자료 추가", "출처 추가", "add source", "add sources", "source"]);
-    if (!addButton) return { ok: false, reason: "소스 추가 버튼을 찾지 못했습니다." };
-    addButton.click();
-
-    const textChoice = await waitForElement(() => findButton([
-      "복사한 텍스트", "붙여넣은 텍스트", "copied text", "paste text", "text"
-    ]));
-    if (textChoice) textChoice.click();
-
-    const editor = await waitForElement(() => editorsInDialog().at(-1));
-    if (!editor) return { ok: false, reason: "소스 텍스트 입력창을 찾지 못했습니다." };
-    fillEditor(editor, task.sourceText);
-
-    const titleInput = [...document.querySelectorAll("[role='dialog'] input,dialog input")]
-      .filter(visible)
-      .find((element) => normalize(element.placeholder).includes("title") || normalize(element.getAttribute("aria-label")).includes("제목"));
-    if (titleInput && task.title) {
-      setNativeValue(titleInput, task.title);
-      titleInput.dispatchEvent(new InputEvent("input", { bubbles: true, data: task.title }));
+  function chatEditor() {
+    const list = [];
+    for (const sel of ["textarea","[contenteditable='true'][role='textbox']","[contenteditable='true']"]) {
+      for (const el of document.querySelectorAll(sel)) {
+        if (!visible(el) || el.closest("[role='dialog'],dialog")) continue;
+        list.push(el);
+      }
     }
+    if (!list.length) return null;
 
-    const confirm = await waitForElement(() => findButton([
-      "삽입", "추가", "저장", "완료", "insert", "add", "save", "submit"
-    ]));
-    if (!confirm) return { ok: false, reason: "소스 저장 버튼을 찾지 못했습니다." };
-    confirm.click();
-    await sleep(1200);
-    return { ok: true };
+    return list.find(el => {
+      const h = norm([
+        el.getAttribute("placeholder"),
+        el.getAttribute("aria-label"),
+        el.getAttribute("data-placeholder")
+      ].join(" "));
+      return ["질문","메시지","ask","chat","message","prompt"].some(w => h.includes(w));
+    }) || list.at(-1);
   }
 
   function buildPrompt(task, sourceAdded) {
-    const sections = [
+    return [
       `[TASK_ID] ${task.taskId}`,
       `[CONTENT_ID] ${task.contentId || ""}`,
       `[작업 유형] ${task.taskType || "CHAT"}`,
       `[언어] ${task.language || "ko-KR"}`,
       "",
       "[NotebookLM 작업 지시서]",
-      task.instruction || "원문의 사실과 흐름을 유지해서 요청된 결과물을 만들어 주세요.",
-      ...(sourceAdded ? [] : ["", "[작가 웹앱 마스터 원문]", task.sourceText || ""])
-    ];
-    return sections.join("\n").trim();
+      task.instruction || "요청된 결과를 만들어 주세요.",
+      ...(sourceAdded ? [] : ["", "[원문]", task.sourceText || ""])
+    ].join("\n").trim();
   }
 
-  async function submitEditor() {
-    const button = findButton(["보내기", "제출", "send", "submit", "질문"]);
-    if (!button) throw new Error("Gemini Notebook 전송 버튼을 찾지 못했습니다.");
-    button.click();
+  function marker(task) {
+    const m = String(task?.instruction || "").match(/\bNLM_E2E_PASS_[A-Z0-9_-]+\b/i);
+    return m ? m[0] : "";
   }
 
-  const studioWords = {
-    AUDIO_OVERVIEW: ["오디오 개요", "audio overview", "오디오"],
-    VIDEO_OVERVIEW: ["동영상 개요", "video overview", "동영상", "video"],
-    SLIDE_DECK: ["슬라이드 자료", "slide deck", "슬라이드"],
-    QUIZ: ["퀴즈", "quiz"],
-    MIND_MAP: ["마인드맵", "mind map"]
-  };
-
-  async function tryStudioAction(taskType) {
-    const words = studioWords[taskType];
-    if (!words) return { attempted: false };
-    const button = findButton(words);
-    if (!button) return { attempted: true, clicked: false, warning: `${taskType} 생성 버튼을 찾지 못했습니다.` };
-    button.click();
-    return { attempted: true, clicked: true };
+  function markerCount(value) {
+    if (!value) return 0;
+    const text = document.body?.innerText || "";
+    return text.split(value).length - 1;
   }
 
-  function captureResult() {
-    const selected = window.getSelection()?.toString().trim() || "";
-    const candidates = [...document.querySelectorAll("article,[role='article'],[class*='answer'],[class*='response']")]
-      .filter(visible)
-      .map((element) => (element.innerText || element.textContent || "").trim())
-      .filter((text) => text.length >= 30 && text.length <= 50000);
-    const urls = [...document.querySelectorAll("a[href]")]
-      .filter(visible)
-      .map((a) => a.href)
-      .filter((url) => /^https?:\/\//.test(url))
-      .slice(-30);
-    return {
-      resultText: selected || candidates.at(-1) || "",
-      resultUrls: [...new Set(urls)],
-      notebookUrl: location.href,
-      pageTitle: document.title,
-      capturedAt: new Date().toISOString()
-    };
-  }
+  function resultCandidates() {
+    const out = [];
+    const seen = new Set();
 
-  async function waitForResult(initialText, timeoutMs) {
-    const started = Date.now();
-    let last = captureResult();
-    while (Date.now() - started < timeoutMs) {
-      await sleep(2000);
-      last = captureResult();
-      if (last.resultText && last.resultText !== initialText) return last;
-      const body = normalize(document.body.innerText);
-      if (!body.includes("생성 중") && !body.includes("generating") && last.resultUrls.length) return last;
+    for (const sel of ["article","[role='article']","[class*='answer']","[class*='response']","[class*='message']","[class*='chat']"]) {
+      for (const el of document.querySelectorAll(sel)) {
+        if (!visible(el) || el.closest("nav,[role='dialog'],dialog")) continue;
+        const t = (el.innerText || el.textContent || "").trim();
+        if (t.length < 2 || t.length > 30000 || seen.has(t)) continue;
+        seen.add(t);
+        out.push(t);
+      }
     }
-    return { ...last, warning: "완료 감지 시간이 초과되어 현재 화면 결과만 저장했습니다." };
+    return out;
+  }
+
+  function sendButtonNear(editor) {
+    const selectors = [
+      "button[type='submit']",
+      "button[aria-label*='send' i]",
+      "button[aria-label*='보내기']",
+      "button[title*='send' i]",
+      "button[title*='보내기']",
+      "button[data-testid*='send' i]",
+      "[role='button'][aria-label*='send' i]",
+      "[role='button'][aria-label*='보내기']"
+    ];
+
+    for (const sel of selectors) {
+      const all = [...document.querySelectorAll(sel)].filter(visible);
+      if (all.length) return all.at(-1);
+    }
+
+    const direct = findButton(["보내기","전송","제출","send","submit"], document, true);
+    if (direct) return direct;
+
+    let root = editor?.parentElement;
+    for (let depth = 0; depth < 5 && root; depth++, root = root.parentElement) {
+      const buttons = [...root.querySelectorAll("button,[role='button']")].filter(visible);
+      const likely = buttons.find(b => {
+        const label = norm([
+          b.getAttribute("aria-label"),
+          b.getAttribute("title"),
+          b.getAttribute("data-testid")
+        ].join(" "));
+        return /send|submit|보내기|전송/.test(label);
+      });
+      if (likely) return likely;
+    }
+
+    return null;
+  }
+
+  async function submitEditor(editor) {
+    const button = sendButtonNear(editor);
+
+    if (button && !button.disabled && button.getAttribute("aria-disabled") !== "true") {
+      button.click();
+      await sleep(800);
+      return {method:"BUTTON"};
+    }
+
+    editor.focus();
+
+    const opts = {
+      key:"Enter",
+      code:"Enter",
+      keyCode:13,
+      which:13,
+      bubbles:true,
+      cancelable:true,
+      shiftKey:false,
+      ctrlKey:false,
+      altKey:false,
+      metaKey:false
+    };
+
+    editor.dispatchEvent(new KeyboardEvent("keydown", opts));
+    editor.dispatchEvent(new KeyboardEvent("keypress", opts));
+    editor.dispatchEvent(new KeyboardEvent("keyup", opts));
+    await sleep(1000);
+
+    return {method:"ENTER_FALLBACK"};
+  }
+
+  function exactAssistantMarker(markerText) {
+    if (!markerText) return null;
+
+    const selectors = [
+      "p","span","div","article","[role='article']","[class*='answer']","[class*='response']","[class*='message']"
+    ];
+    const candidates = [];
+
+    for (const sel of selectors) {
+      for (const el of document.querySelectorAll(sel)) {
+        if (!visible(el)) continue;
+        if (el.closest("textarea,[contenteditable='true'],[role='textbox'],[role='dialog'],dialog")) continue;
+
+        const t = (el.innerText || el.textContent || "").trim();
+        if (t !== markerText) continue;
+
+        let parent = el;
+        let looksLikePrompt = false;
+        let looksLikeAnswer = false;
+        for (let depth = 0; depth < 5 && parent; depth++, parent = parent.parentElement) {
+          const pt = (parent.innerText || parent.textContent || "").trim();
+          if (pt.includes("[TASK_ID]") || pt.includes("[NotebookLM 작업 지시서]") || pt.includes("[원문]")) {
+            looksLikePrompt = true;
+            break;
+          }
+          if (/메모에 저장|keep_pin|copy_all|thumb_up|thumb_down/i.test(pt)) {
+            looksLikeAnswer = true;
+          }
+        }
+
+        if (!looksLikePrompt) candidates.push({el, looksLikeAnswer});
+      }
+    }
+
+    if (!candidates.length) return null;
+    return (candidates.find(x => x.looksLikeAnswer) || candidates.at(-1)).el;
+  }
+
+  async function waitResult(task, baselineMarker, baselineCandidates, timeoutMs) {
+    const mk = marker(task);
+    const start = Date.now();
+
+    while (Date.now() - start < timeoutMs) {
+      await sleep(1400);
+
+      if (mk) {
+        const answerNode = exactAssistantMarker(mk);
+        if (answerNode) {
+          return {
+            resultText: mk,
+            resultUrls: [],
+            verificationMarker: mk,
+            captureMode: "EXACT_ASSISTANT_MARKER",
+            notebookUrl: location.href,
+            pageTitle: document.title,
+            capturedAt: new Date().toISOString()
+          };
+        }
+      } else {
+        const current = resultCandidates();
+        const fresh = current
+          .filter(t => !baselineCandidates.includes(t) && t.length >= 3)
+          .filter(t => !t.includes("[TASK_ID]") && !t.includes("[NotebookLM 작업 지시서]") && !t.includes("[원문]"))
+          .filter(t => !/페이지 읽는 중|소스 참조 중/i.test(t));
+
+        if (fresh.length) {
+          const chosen = [...fresh].sort((a,b) => a.length - b.length)[0];
+          return {
+            resultText: chosen,
+            resultUrls: [],
+            captureMode: "SMALLEST_NEW_RESULT",
+            notebookUrl: location.href,
+            pageTitle: document.title,
+            capturedAt: new Date().toISOString()
+          };
+        }
+      }
+    }
+
+    if (mk) throw new Error(`실제 NotebookLM 답변 마커를 찾지 못했습니다: ${mk}`);
+    throw new Error("실제 NotebookLM 답변 텍스트가 생성되지 않았습니다.");
   }
 
   async function runTask(task) {
-    if (!NOTEBOOK_HOSTS.has(location.hostname)) throw new Error("Gemini Notebook 페이지가 아닙니다.");
+    if (!HOSTS.has(location.hostname)) throw new Error("NotebookLM 페이지가 아닙니다.");
     if (!task?.taskId) throw new Error("TASK_ID가 없습니다.");
 
-    const source = await addPastedTextSource(task);
-    const editor = await waitForEditor();
-    const initial = captureResult().resultText;
-    fillEditor(editor, buildPrompt(task, source.ok));
+    const source = await addSource(task);
+    const editor = await waitFor(() => chatEditor(), 70000, 600);
+    if (!editor) throw new Error("NotebookLM 채팅 입력창을 찾지 못했습니다.");
 
-    if (task.autoSubmit !== false) await submitEditor();
-    const studio = await tryStudioAction(task.taskType);
+    fill(editor, buildPrompt(task, source.ok));
+
+    const mk = marker(task);
+    const baselineMarker = markerCount(mk);
+    const baselineCandidates = resultCandidates();
+
+    let submit = {method:"PREPARED"};
+    if (task.autoSubmit !== false) submit = await submitEditor(editor);
+
     const result = task.autoSubmit === false
-      ? { ...captureResult(), status: "PREPARED", warning: "자동 제출이 꺼져 있어 입력까지만 완료했습니다." }
-      : await waitForResult(initial, Number(task.timeoutSeconds || 180) * 1000);
+      ? {
+          resultText:"",
+          resultUrls:[],
+          notebookUrl:location.href,
+          pageTitle:document.title,
+          status:"PREPARED"
+        }
+      : await waitResult(task, baselineMarker, baselineCandidates, Number(task.timeoutSeconds || 180) * 1000);
+
+    if (task.autoSubmit !== false && !String(result.resultText || "").trim()) {
+      throw new Error("NotebookLM 실제 답변 텍스트가 비어 있습니다.");
+    }
 
     return {
       ...result,
-      status: "DONE",
-      taskId: task.taskId,
-      contentId: task.contentId || "",
-      taskType: task.taskType || "CHAT",
-      studio,
-      source
+      status:"DONE",
+      taskId:task.taskId,
+      contentId:task.contentId || "",
+      taskType:task.taskType || "CHAT",
+      source,
+      submit
     };
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (!message || message.source !== SOURCE || message.type !== "RUN_NOTEBOOK_TASK") return false;
+
     runTask(message.task)
-      .then((result) => sendResponse({ ok: true, result }))
-      .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      .then(result => sendResponse({ok:true, result}))
+      .catch(error => sendResponse({
+        ok:false,
+        error:error instanceof Error ? error.message : String(error)
+      }));
+
     return true;
   });
 })();
