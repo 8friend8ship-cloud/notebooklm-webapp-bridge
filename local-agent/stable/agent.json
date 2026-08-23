@@ -4,7 +4,7 @@
   "enabled": true,
   "version": "1.0.0",
   "releasedAt": "2026-08-23T14:11:00+09:00",
-  "sha256": "21052f18caa98536f0d8f25dca066ae0cf44ec4dc69a2453647158584ce15ce2",
+  "sha256": "404a095e71fed0f51daa38011ea3e08776b938539169f90a11bc6ac6439d4b17",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300
 }
