@@ -41,6 +41,20 @@ function Sha256([string]$Path) {
   return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+function GitBlobSha1([string]$Path) {
+  $bytes = [IO.File]::ReadAllBytes($Path)
+  $header = [Text.Encoding]::ASCII.GetBytes(("blob " + $bytes.Length + [char]0))
+  $all = New-Object byte[] ($header.Length + $bytes.Length)
+  [Buffer]::BlockCopy($header,0,$all,0,$header.Length)
+  [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
+  $sha = [Security.Cryptography.SHA1]::Create()
+  try {
+    return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '')
+  } finally {
+    $sha.Dispose()
+  }
+}
+
 function Find-CftChrome {
   if (-not (Test-Path -LiteralPath $CftRoot)) { return $null }
   return Get-ChildItem -LiteralPath $CftRoot -Recurse -Filter chrome.exe -File -ErrorAction SilentlyContinue |
@@ -111,7 +125,7 @@ function Test-InstalledFiles($Release) {
   foreach ($f in @($Release.files)) {
     $local = Join-Path $ExtensionRoot ([string]$f.path).Replace('/','\')
     if (-not (Test-Path -LiteralPath $local)) { return $false }
-    if ((Sha256 $local) -ne ([string]$f.sha256).ToLowerInvariant()) { return $false }
+    if ((GitBlobSha1 $local) -ne ([string]$f.gitBlobSha1).ToLowerInvariant()) { return $false }
   }
   return $true
 }
@@ -128,9 +142,9 @@ function Download-Release($Release,[string]$Stage) {
     if (-not $baseUrl.StartsWith('https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/')) { throw 'Untrusted release baseUrl.' }
     $url = "$baseUrl/$rel"
     Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing -TimeoutSec 60
-    $actual = Sha256 $dest
-    $expected = ([string]$f.sha256).ToLowerInvariant()
-    if ($actual -ne $expected) { throw "SHA256 mismatch: $rel" }
+    $actual = GitBlobSha1 $dest
+    $expected = ([string]$f.gitBlobSha1).ToLowerInvariant()
+    if ($actual -ne $expected) { throw "Git blob SHA1 mismatch: $rel" }
   }
 }
 
@@ -164,6 +178,9 @@ function Cleanup-Backups {
   }
 }
 
+$release = $null
+$backup = ''
+
 try {
   Log '=== HomeDesign Local Agent cycle START ==='
   Write-State @{ status='CHECKING'; lastError='' }
@@ -175,6 +192,42 @@ try {
     exit 0
   }
   if ([string]$release.channel -ne 'stable') { throw 'Unexpected release channel.' }
+
+  $action = [string]$release.action
+  if ([string]::IsNullOrWhiteSpace($action)) { $action = 'apply' }
+  $actionId = [string]$release.actionId
+
+  if ($action -eq 'rollback') {
+    $state = $null
+    try {
+      if (Test-Path -LiteralPath $StateFile) {
+        $state = Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+      }
+    } catch {}
+
+    if ($state -and [string]$state.lastActionId -eq $actionId -and [string]$state.status -eq 'CENTRAL_ROLLBACK_DONE') {
+      Log "Rollback action already applied: $actionId"
+      exit 0
+    }
+
+    $latestBackup = Get-ChildItem -LiteralPath $BackupRoot -Directory -ErrorAction SilentlyContinue |
+      Sort-Object Name -Descending | Select-Object -First 1
+    if (-not $latestBackup) { throw 'Central rollback requested but no backup exists.' }
+
+    Rollback $latestBackup.FullName ([string]$release.frontUrl)
+    Write-State @{
+      status='CENTRAL_ROLLBACK_DONE'
+      lastActionId=$actionId
+      rollbackSource=$latestBackup.FullName
+      lastSuccessAt=(Get-Date).ToString('o')
+      awaitingE2E=$false
+    }
+    Log "Central rollback SUCCESS from $($latestBackup.FullName)"
+    exit 0
+  }
+
+  if ($action -ne 'apply') { throw "Unsupported release action: $action" }
+
   if ($release.requiresUserApproval) {
     Log 'Release requires user approval; skipped.'
     Write-State @{ status='NEEDS_USER_APPROVAL'; candidateVersion=[string]$release.version }
@@ -188,7 +241,9 @@ try {
   }
 
   $filesHealthy = Test-InstalledFiles $release
-  $needsUpdate = ([version]$installedVersion -lt [version][string]$release.version) -or (-not $filesHealthy)
+  $installedV = [version]$installedVersion
+  $candidateV = [version]([string]$release.version)
+  $needsUpdate = ($installedV -ne $candidateV) -or (-not $filesHealthy)
   Log "Installed=$installedVersion Candidate=$($release.version) FilesHealthy=$filesHealthy NeedsUpdate=$needsUpdate"
 
   if (-not $needsUpdate) {
@@ -196,7 +251,7 @@ try {
       Launch-DedicatedChrome ([string]$release.frontUrl)
       Log 'Dedicated Chrome was down and has been restarted.'
     }
-    Write-State @{ status='HEALTHY'; installedVersion=$installedVersion; candidateVersion=[string]$release.version; lastSuccessAt=(Get-Date).ToString('o') }
+    Write-State @{ status='HEALTHY'; installedVersion=$installedVersion; candidateVersion=[string]$release.version; lastActionId=$actionId; lastSuccessAt=(Get-Date).ToString('o') }
     Log 'No update required.'
     exit 0
   }
@@ -206,7 +261,7 @@ try {
   $backup = Join-Path $BackupRoot $cycle
 
   Download-Release $release $stage
-  Log 'Release downloaded and SHA256 verified.'
+  Log 'Release downloaded and Git blob SHA1 verified.'
   Backup-Extension $backup
   Log "Backup created: $backup"
 
@@ -228,6 +283,7 @@ try {
     backup=$backup
     lastSuccessAt=(Get-Date).ToString('o')
     awaitingE2E=$true
+    lastActionId=$actionId
   }
   Log "Update SUCCESS to $($release.version). Awaiting central E2E evidence."
   Cleanup-Backups
