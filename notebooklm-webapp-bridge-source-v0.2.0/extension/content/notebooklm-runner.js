@@ -231,6 +231,8 @@
       return {method:"BUTTON"};
     }
 
+    // V7.3 fallback for current Gemini Notebook UI:
+    // the prompt is already inserted, so submit with the same Enter gesture a user would use.
     editor.focus();
 
     const opts = {
@@ -254,6 +256,7 @@
     return {method:"ENTER_FALLBACK"};
   }
 
+
   function exactAssistantMarker(markerText) {
     if (!markerText) return null;
 
@@ -270,6 +273,7 @@
         const t = (el.innerText || el.textContent || "").trim();
         if (t !== markerText) continue;
 
+        // Reject an exact marker node if it is nested inside the submitted user prompt.
         let parent = el;
         let looksLikePrompt = false;
         let looksLikeAnswer = false;
@@ -300,6 +304,10 @@
       await sleep(1400);
 
       if (mk) {
+        // V7.4: do NOT use raw marker-count growth. The submitted user prompt itself
+        // contains the marker and can briefly create duplicate DOM copies while NotebookLM
+        // is generating. Wait for an actual visible assistant-answer node whose text is
+        // exactly the requested marker.
         const answerNode = exactAssistantMarker(mk);
         if (answerNode) {
           return {
@@ -320,6 +328,7 @@
           .filter(t => !/페이지 읽는 중|소스 참조 중/i.test(t));
 
         if (fresh.length) {
+          // Prefer the smallest meaningful newly-created result instead of a page-wide container.
           const chosen = [...fresh].sort((a,b) => a.length - b.length)[0];
           return {
             resultText: chosen,
