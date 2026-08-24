@@ -56,6 +56,10 @@ function lpIsStaleClaim(task){
   if(!started) return false;
   return Date.now()-started>(lpTimeoutSeconds(task)+LP_STALE_GRACE_SECONDS)*1000;
 }
+function lpIsClaimConflict(error){
+  const text=String(error?.message||error||"");
+  return text.includes("현재 실행할 수 없는 상태입니다: CLAIMED") || text.includes("TASK_ALREADY_CLAIMED");
+}
 async function lpApi(url,payload){
   if(!/^https:\/\/script\.google\.com\/macros\/s\//.test(url||"")) throw new Error("Apps Script URL missing");
   const r=await fetch(url,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
@@ -103,19 +107,26 @@ async function lpPollCore(reason="alarm"){
     candidateMap.set(String(task.taskId),task);
   }
   const tasks=[...candidateMap.values()];
-  let processed=0;
+  let processed=0,claimConflicts=0;
   for(const task of tasks.slice(0,LP_MAX)){
+    let claimed;
     try{
       const profile=await chrome.identity.getProfileUserInfo({accountStatus:"ANY"}).catch(()=>({email:""}));
-      const claimed=await lpApi(config.appsScriptUrl,{action:"claimTask",sessionToken,taskId:task.taskId,chromeProfileEmail:profile.email||""});
+      try{
+        claimed=await lpApi(config.appsScriptUrl,{action:"claimTask",sessionToken,taskId:task.taskId,chromeProfileEmail:profile.email||""});
+      }catch(error){
+        if(lpIsClaimConflict(error)){claimConflicts++;continue;}
+        throw error;
+      }
       const result=await lpHost(claimed.task);
       await lpApi(config.appsScriptUrl,{action:"completeTask",sessionToken,taskId:task.taskId,result:{resultText:JSON.stringify(result,null,2),resultUrls:[],notebookUrl:""}});
       processed++;
     }catch(error){
+      if(!claimed) continue;
       try{await lpApi(config.appsScriptUrl,{action:"updateTask",sessionToken,taskId:task.taskId,status:"ERROR",patch:{error:String(error?.message||error)}});}catch{}
     }
   }
-  return {ok:true,reason,processed,available:tasks.length,recoveredStaleClaims:recovered.map(t=>t.taskId)};
+  return {ok:true,reason,processed,available:tasks.length,claimConflicts,recoveredStaleClaims:recovered.map(t=>t.taskId)};
 }
 async function lpPoll(reason="alarm"){
   if(lpBusy) return {ok:true,skipped:"local_runner_busy",reason};
