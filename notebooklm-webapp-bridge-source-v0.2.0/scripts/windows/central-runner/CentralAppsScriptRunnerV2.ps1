@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$RunnerVersion = 'CENTRAL_APPS_SCRIPT_RUNNER_V2_20260822'
+$RunnerVersion = 'CENTRAL_APPS_SCRIPT_RUNNER_V2_20260824'
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CentralAppsScriptRunner'
 $StatePath = Join-Path $StateRoot 'state.json'
 $LogPath = Join-Path $StateRoot 'runner.log'
@@ -47,6 +47,15 @@ function Invoke-AllowlistedTask($Task) {
       $json = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -TargetTitle ([string]$Task.targetTitle) -ExpectedDeploymentId ([string]$Task.expectedDeploymentId) 2>&1 | Out-String)
       if ($LASTEXITCODE -ne 0) { throw "CONTENTOS_SYNC_FAILED:$json" }
       try { return ($json | ConvertFrom-Json) } catch { return [ordered]@{ok=$true; action='CONTENTOS_APPS_SCRIPT_SYNC'; raw=$json.Trim()} }
+    }
+    'CHROME_FLOW_HEALTH' {
+      $script = Download-ActionScript 'ChromeFlowHealth.ps1'
+      $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$script)
+      if ($Task.appsScriptUrl) { $args += @('-AppsScriptUrl',[string]$Task.appsScriptUrl) }
+      if ($Task.frontendUrl) { $args += @('-FrontendUrl',[string]$Task.frontendUrl) }
+      $json = (& powershell.exe @args 2>&1 | Out-String)
+      if ($LASTEXITCODE -ne 0) { throw "CHROME_FLOW_HEALTH_FAILED:$json" }
+      try { return ($json | ConvertFrom-Json) } catch { return [ordered]@{ok=$true; action='CHROME_FLOW_HEALTH'; raw=$json.Trim()} }
     }
     default { throw 'ACTION_NOT_WHITELISTED' }
   }
