@@ -8,8 +8,8 @@ $patched=Join-Path $Root 'HomeDesignLocalCommandHost-1.2.1-patched.ps1'
 $url='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases/1.2.0/HomeDesignLocalCommandHost.ps1'
 Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $src -TimeoutSec 60
 $code=Get-Content -LiteralPath $src -Raw -Encoding UTF8
-$versionOld="$HostVersion='1.2.0'"
-$versionNew="$HostVersion='1.2.1'"
+$versionOld="`$HostVersion='1.2.0'"
+$versionNew="`$HostVersion='1.2.1'"
 if(-not $code.Contains($versionOld)){throw 'Host 1.2.0 version patch target not found'}
 $code=$code.Replace($versionOld,$versionNew)
 $old="'tools/Run-VideoFrameQA.ps1')"
