@@ -1,14 +1,16 @@
 const HD_SELF_HEAL_SOURCE = "notebooklm-webapp-bridge";
 const HD_SELF_HEAL_HOST = "http://127.0.0.1:8765";
-const HD_SELF_HEAL_KEY = "homeDesignLocalStableSelfHealV1";
+const HD_SELF_HEAL_KEY = "homeDesignLocalStableSelfHealV2";
 const HD_SELF_HEAL_ALARM = "home-design-local-stable-self-heal";
+const HD_SELF_HEAL_PERIOD_MINUTES = 5;
 
 function hdSelfHealVersion() {
   try { return String(chrome.runtime.getManifest().version || "unknown"); }
   catch { return "unknown"; }
 }
-function hdSelfHealTaskId(version) {
-  return `LOCAL_STABLE_SELF_HEAL_${String(version).replace(/[^A-Za-z0-9_.-]/g, "_").replace(/\./g, "_")}`;
+function hdBucket() { return Math.floor(Date.now() / (HD_SELF_HEAL_PERIOD_MINUTES * 60 * 1000)); }
+function hdSelfHealTaskId(version, bucket) {
+  return `LOCAL_STABLE_SELF_HEAL_${String(version).replace(/[^A-Za-z0-9_.-]/g, "_").replace(/\./g, "_")}_${bucket}`;
 }
 async function hdFetchJson(url, options = {}, timeoutMs = 8000) {
   const controller = new AbortController();
@@ -35,20 +37,18 @@ async function hdWriteSelfHealState(patch) {
 async function hdEnsureSelfHealAlarm() {
   try {
     await chrome.alarms.clear(HD_SELF_HEAL_ALARM);
-    await chrome.alarms.create(HD_SELF_HEAL_ALARM, { delayInMinutes: 0.15, periodInMinutes: 1 });
+    await chrome.alarms.create(HD_SELF_HEAL_ALARM, { delayInMinutes: 0.15, periodInMinutes: HD_SELF_HEAL_PERIOD_MINUTES });
   } catch {}
 }
 async function hdKickStableAgent(reason = "worker-load") {
   const version = hdSelfHealVersion();
+  const bucket = hdBucket();
   const state = await hdReadSelfHealState();
-  if (state.version === version && state.accepted === true) {
-    try { await chrome.alarms.clear(HD_SELF_HEAL_ALARM); } catch {}
-    return { ok: true, skipped: "already_accepted", version };
-  }
+  if (Number(state.lastBucket) === bucket) return { ok: true, skipped: "same_bucket", version, bucket };
   try {
     const health = await hdFetchJson(`${HD_SELF_HEAL_HOST}/health`, {}, 4000);
     if (!health?.asyncJobs) throw new Error("LOCAL_HOST_ASYNC_NOT_READY");
-    const taskId = hdSelfHealTaskId(version);
+    const taskId = hdSelfHealTaskId(version, bucket);
     const task = {
       taskId,
       TASK_ID: taskId,
@@ -68,12 +68,14 @@ async function hdKickStableAgent(reason = "worker-load") {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: HD_SELF_HEAL_SOURCE, task })
     }, 10000);
-    await hdWriteSelfHealState({ version, accepted: true, reason, taskId, hostVersion: health.version || "", hostState: started.state || "", lastError: "" });
-    try { await chrome.alarms.clear(HD_SELF_HEAL_ALARM); } catch {}
-    return { ok: true, version, taskId, state: started.state || "STARTED" };
+    await hdWriteSelfHealState({
+      version, lastBucket: bucket, lastKickAt: new Date().toISOString(), reason, taskId,
+      hostVersion: health.version || "", hostState: started.state || "", lastError: ""
+    });
+    return { ok: true, version, bucket, taskId, state: started.state || "STARTED" };
   } catch (error) {
-    await hdWriteSelfHealState({ version, accepted: false, reason, lastError: String(error?.message || error) });
-    return { ok: false, version, error: String(error?.message || error) };
+    await hdWriteSelfHealState({ version, lastBucket: bucket, lastKickAt: new Date().toISOString(), reason, lastError: String(error?.message || error) });
+    return { ok: false, version, bucket, error: String(error?.message || error) };
   }
 }
 
