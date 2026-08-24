@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.6",
-  "description": "HomeDesign dedicated Chrome for Testing bridge with persistent session and automatic READY task execution.",
+  "version": "0.2.7",
+  "description": "HomeDesign dedicated Chrome bridge with NotebookLM automation and allowlisted local PowerShell task handoff.",
   "permissions": [
     "alarms",
     "identity",
@@ -17,7 +17,8 @@
     "https://notebook.google.com/*",
     "https://script.google.com/*",
     "https://script.googleusercontent.com/*",
-    "https://notebooklm-webapp-bridge.vercel.app/*"
+    "https://notebooklm-webapp-bridge.vercel.app/*",
+    "http://127.0.0.1/*"
   ],
   "externally_connectable": {
     "matches": [
@@ -27,7 +28,7 @@
     ]
   },
   "background": {
-    "service_worker": "background.js",
+    "service_worker": "local-powershell-runner.js",
     "type": "module"
   },
   "action": {
@@ -39,18 +40,28 @@
         "https://notebooklm.google.com/*",
         "https://notebook.google.com/*"
       ],
-      "js": ["content/notebooklm-runner.js"],
+      "js": [
+        "content/notebooklm-runner.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://notebooklm-webapp-bridge.vercel.app/*"],
-      "js": ["front-main.js"],
+      "matches": [
+        "https://notebooklm-webapp-bridge.vercel.app/*"
+      ],
+      "js": [
+        "front-main.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://notebooklm-webapp-bridge.vercel.app/*"],
-      "js": ["front-extension.js"],
+      "matches": [
+        "https://notebooklm-webapp-bridge.vercel.app/*"
+      ],
+      "js": [
+        "front-extension.js"
+      ],
       "run_at": "document_start",
       "world": "ISOLATED"
     }
