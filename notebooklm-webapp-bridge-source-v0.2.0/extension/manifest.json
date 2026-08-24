@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.13",
-  "description": "HomeDesign dedicated Chrome bridge with restart-safe asynchronous local PowerShell jobs and a transition-safe LOCAL_POWERSHELL_ASYNC gate.",
+  "version": "0.2.14",
+  "description": "HomeDesign dedicated Chrome bridge with async local PowerShell jobs, canonical API fallback, and automatic expired-session recovery through the Control Center.",
   "permissions": [
     "alarms",
     "identity",
