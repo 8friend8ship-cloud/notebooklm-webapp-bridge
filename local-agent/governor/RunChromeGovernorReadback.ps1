@@ -12,7 +12,7 @@ $AgentState=Join-Path $AgentRoot 'state.json'
 $OneShotFile=Join-Path $GovRoot 'ChromeExtensionGovernorOneShot.ps1'
 $OneShotUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/ChromeExtensionGovernorOneShot.ps1'
 $AgentMetaUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/stable/agent.json'
-New-Item -ItemType Directory -Force -Path $GovRoot|Out-Null
+New-Item -ItemType Directory -Force -Path $GovRoot,$AgentRoot|Out-Null
 
 function Read-Json([string]$Path){if(-not(Test-Path -LiteralPath $Path)){return $null};try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}}
 function Refresh-File([string]$Url,[string]$Path){try{$tmp=$Path+'.readback.download';Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $tmp -TimeoutSec 30;Move-Item -LiteralPath $tmp -Destination $Path -Force;return $true}catch{return $false}}
@@ -44,34 +44,61 @@ if($KickStableAgent){
     $meta=Invoke-RestMethod -Uri (Bust $AgentMetaUrl $nonce) -Method Get -TimeoutSec 15
     if(-not $meta.enabled){throw 'Local Agent stable channel disabled.'}
     $target=[string]$meta.version
+    $expectedSha=([string]$meta.gitBlobSha1).ToLowerInvariant()
+    if(-not $target -or -not $expectedSha){throw 'Stable Agent metadata incomplete.'}
     $agent=Read-Json $AgentState
     $current=if($agent){[string]$agent.agentVersion}else{''}
     if($current -and $current -eq $target){
       [ordered]@{ok=$true;action='KICK_STABLE_AGENT_NOT_NEEDED';currentAgent=$current;targetAgent=$target;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
       exit 0
     }
-    $kickPath=Join-Path $env:TEMP 'HomeDesign-Kick-Stable-Agent.ps1'
+    $kickPath=Join-Path $env:TEMP 'HomeDesign-Kick-Stable-Agent-Direct.ps1'
     $kick=@'
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-Start-Sleep -Seconds 6
+function GitBlobSha1([string]$Path){
+  $bytes=[IO.File]::ReadAllBytes($Path)
+  $header=[Text.Encoding]::ASCII.GetBytes(('blob '+$bytes.Length+[char]0))
+  $all=New-Object byte[] ($header.Length+$bytes.Length)
+  [Buffer]::BlockCopy($header,0,$all,0,$header.Length)
+  [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
+  $sha=[Security.Cryptography.SHA1]::Create()
+  try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$sha.Dispose()}
+}
+function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
+$log=Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log'
+$statusPath=Join-Path $env:TEMP 'HomeDesign-Stable-Kick.status.json'
 try{
-  $base='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
-  $sep=if($base.Contains('?')){'&'}else{'?'}
-  $url=$base+$sep+'hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-  $dst=Join-Path $env:TEMP 'RESUME_LOCAL_AGENT_ONCE.latest.ps1'
-  Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dst -TimeoutSec 60
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dst *> (Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log')
+  Start-Sleep -Seconds 3
+  $metaUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/stable/agent.json'
+  $nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString()
+  $meta=Invoke-RestMethod -Uri (Bust $metaUrl $nonce) -Method Get -TimeoutSec 20
+  if(-not $meta.enabled){throw 'Local Agent stable channel disabled.'}
+  $target=[string]$meta.version
+  $expected=([string]$meta.gitBlobSha1).ToLowerInvariant()
+  $agentUrl="https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases/$target/HomeDesignLocalAgent.ps1"
+  $root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
+  New-Item -ItemType Directory -Force -Path $root|Out-Null
+  $agentFile=Join-Path $root 'HomeDesignLocalAgent.ps1'
+  $tmp=$agentFile+'.direct.download'
+  Invoke-WebRequest -UseBasicParsing -Uri (Bust $agentUrl ($expected+'-'+$nonce)) -OutFile $tmp -TimeoutSec 60
+  $actual=GitBlobSha1 $tmp
+  if($actual -ne $expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw "Agent SHA mismatch actual=$actual expected=$expected"}
+  Move-Item -LiteralPath $tmp -Destination $agentFile -Force
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $agentFile *> $log
+  $rc=$LASTEXITCODE
+  [ordered]@{ok=($rc -eq 0);targetAgent=$target;expectedSha=$expected;actualSha=$actual;exitCode=$rc;completedAt=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $statusPath -Encoding UTF8
 }catch{
-  Add-Content -LiteralPath (Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log') -Value ('KICK_ERROR: '+$_.Exception.Message) -Encoding UTF8
+  Add-Content -LiteralPath $log -Value ('DIRECT_KICK_ERROR: '+$_.Exception.Message) -Encoding UTF8
+  [ordered]@{ok=$false;error=$_.Exception.Message;completedAt=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $statusPath -Encoding UTF8
 }
 '@
     Set-Content -LiteralPath $kickPath -Value $kick -Encoding UTF8
     Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$kickPath`"") -WindowStyle Hidden|Out-Null
-    [ordered]@{ok=$true;action='KICK_STABLE_AGENT_BACKGROUND';currentAgent=$current;targetAgent=$target;delaySeconds=6;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    [ordered]@{ok=$true;action='KICK_STABLE_AGENT_DIRECT_BACKGROUND';currentAgent=$current;targetAgent=$target;expectedSha=$expectedSha;delaySeconds=3;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
     exit 0
   }catch{
-    [ordered]@{ok=$false;action='KICK_STABLE_AGENT_BACKGROUND';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    [ordered]@{ok=$false;action='KICK_STABLE_AGENT_DIRECT_BACKGROUND';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
     exit 2
   }
 }
