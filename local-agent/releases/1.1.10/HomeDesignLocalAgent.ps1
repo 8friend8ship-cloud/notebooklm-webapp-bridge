@@ -2,6 +2,7 @@ param()
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 $AgentVersion='1.1.10'
+$SourceCommit='eceb6ce92d5a93a80266701bd83853115ee95503'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $GovRoot=Join-Path $Base 'ChromeGovernor'
@@ -13,8 +14,9 @@ $PolicyFile=Join-Path $GovRoot 'policy.json'
 $ReleaseFile=Join-Path $GovRoot 'release.json'
 $ReportFile=Join-Path $GovRoot 'state.json'
 $InventoryFile=Join-Path $GovRoot 'inventory.json'
-$BaseAgentUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases/1.1.7/HomeDesignLocalAgent.ps1'
-$NodeGovernorUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/chromeGovernorFast.js'
+$ImmutableBase="https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/$SourceCommit"
+$BaseAgentUrl="$ImmutableBase/local-agent/releases/1.1.7/HomeDesignLocalAgent.ps1"
+$NodeGovernorUrl="$ImmutableBase/local-agent/governor/chromeGovernorFast.js"
 $PolicyUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/policy.json'
 $ReleaseUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/runtime/stable/release.json'
 $NormalRoot=Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
@@ -42,7 +44,7 @@ function Find-Central{
 }
 function Write-FinalState($BaseState,$NodeResult,[string]$Central,[bool]$DriveOk){
   $s=@{};if($BaseState){foreach($p in $BaseState.PSObject.Properties){$s[$p.Name]=$p.Value}}
-  $s.agentVersion=$AgentVersion;$s.governorMode='AGENT_5MIN_NODE_DIRECT';$s.governorCycleOk=[bool]$NodeResult.ok;$s.governorExitCode=$NodeResult.exitCode;$s.governorTimedOut=[bool]$NodeResult.timedOut;$s.governorError=[string]$NodeResult.stderr;$s.governorDriveSyncOk=$DriveOk;$s.governorCentralPath=$Central;$s.updatedAt=(Get-Date).ToString('o')
+  $s.agentVersion=$AgentVersion;$s.agentSourceCommit=$SourceCommit;$s.governorMode='AGENT_5MIN_NODE_DIRECT';$s.governorCycleOk=[bool]$NodeResult.ok;$s.governorExitCode=$NodeResult.exitCode;$s.governorTimedOut=[bool]$NodeResult.timedOut;$s.governorError=[string]$NodeResult.stderr;$s.governorDriveSyncOk=$DriveOk;$s.governorCentralPath=$Central;$s.updatedAt=(Get-Date).ToString('o')
   $s|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $StateFile -Encoding UTF8;$s|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $ReadbackFile -Encoding UTF8
   if($Central){$runtimeDir=Join-Path $Central 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $runtimeDir|Out-Null;$s|ConvertTo-Json -Depth 30|Set-Content -LiteralPath (Join-Path $runtimeDir 'VIDEO_LOCAL_RUNTIME_READBACK.json') -Encoding UTF8}
 }
