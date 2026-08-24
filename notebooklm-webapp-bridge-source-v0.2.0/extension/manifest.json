@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.11",
-  "description": "HomeDesign dedicated Chrome bridge with serialized local tasks, duplicate-claim conflict protection, timeout safety, and stale-claim recovery support.",
+  "version": "0.2.12",
+  "description": "HomeDesign dedicated Chrome bridge with restart-safe asynchronous local PowerShell jobs, serialized polling, duplicate-claim protection, timeout safety, and stale-claim recovery.",
   "permissions": [
     "alarms",
     "identity",
