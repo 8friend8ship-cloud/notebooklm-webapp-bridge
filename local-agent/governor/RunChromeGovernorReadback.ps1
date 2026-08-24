@@ -1,4 +1,4 @@
-param()
+param([switch]$KickStableAgent)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 
@@ -14,6 +14,34 @@ $AgentState=Join-Path $AgentRoot 'state.json'
 $GovUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/ChromeExtensionGovernor.ps1'
 $SyncUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/GovernorDriveSync.ps1'
 New-Item -ItemType Directory -Force -Path $GovRoot|Out-Null
+
+# Fast handoff used by an older synchronous Bridge/Host to bootstrap a newer stable stack.
+# The current queue task must finish before the delayed resume stops/replaces the old host.
+if($KickStableAgent){
+  try{
+    $kickPath=Join-Path $env:TEMP 'HomeDesign-Kick-Stable-Agent.ps1'
+    $kick=@'
+$ErrorActionPreference='Continue'
+$ProgressPreference='SilentlyContinue'
+Start-Sleep -Seconds 6
+try{
+  $url='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
+  $dst=Join-Path $env:TEMP 'RESUME_LOCAL_AGENT_ONCE.latest.ps1'
+  Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dst -TimeoutSec 60
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dst *> (Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log')
+}catch{
+  Add-Content -LiteralPath (Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log') -Value ("KICK_ERROR: "+$_.Exception.Message) -Encoding UTF8
+}
+'@
+    Set-Content -LiteralPath $kickPath -Value $kick -Encoding UTF8
+    Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$kickPath`"") -WindowStyle Hidden|Out-Null
+    [ordered]@{ok=$true;action='KICK_STABLE_AGENT_BACKGROUND';delaySeconds=6;note='Current synchronous queue call may complete before host replacement.';at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    exit 0
+  }catch{
+    [ordered]@{ok=$false;action='KICK_STABLE_AGENT_BACKGROUND';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    exit 2
+  }
+}
 
 function Read-Json([string]$Path){if(-not(Test-Path -LiteralPath $Path)){return $null};try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}}
 function ProcList([string]$Needle){try{return @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -and $_.CommandLine -like "*$Needle*"})}catch{return @()}}
@@ -49,11 +77,8 @@ if(-not $govRunning -and (Test-Path -LiteralPath $GovFile)){
   $govRunning=(ProcList 'ChromeGovernor*ChromeExtensionGovernor.ps1').Count -gt 0
 }
 
-# Force exactly one bounded Drive sync after state/inventory generation.
 $syncOneShot=$null
-if($state -and (Test-Path -LiteralPath $SyncFile)){
-  $syncOneShot=Run-Bounded $SyncFile 20000
-}
+if($state -and (Test-Path -LiteralPath $SyncFile)){$syncOneShot=Run-Bounded $SyncFile 20000}
 
 $agent=Read-Json $AgentState
 $sync=Read-Json $SyncState
@@ -65,32 +90,11 @@ if($state -and $state.extensions){
 if($state -and $state.duplicates){$dups=@($state.duplicates|Select-Object name,count)}
 
 $result=[ordered]@{
-  ok=([bool]$state)
-  action='CHROME_GOVERNOR_READBACK_V2'
-  at=(Get-Date).ToString('o')
-  governorRefreshed=$govRefreshed
-  driveSyncRefreshed=$syncRefreshed
-  governorRunning=$govRunning
-  governorStatePresent=[bool]$state
-  inventoryPresent=(Test-Path -LiteralPath $InventoryFile)
-  oneShot=$oneShot
-  driveSyncOneShot=$syncOneShot
-  agent=[ordered]@{
-    agentVersion=$(if($agent){$agent.agentVersion}else{$null})
-    installedVersion=$(if($agent){$agent.installedVersion}else{$null})
-    status=$(if($agent){$agent.status}else{$null})
-    commandHostVersion=$(if($agent){$agent.commandHostVersion}else{$null})
-    commandHostRunning=$(if($agent){$agent.commandHostRunning}else{$null})
-    chromeGovernorRunning=$(if($agent){$agent.chromeGovernorRunning}else{$null})
-    chromeGovernorDriveSyncRunning=$(if($agent){$agent.chromeGovernorDriveSyncRunning}else{$null})
-  }
-  summary=$(if($state){$state.summary}else{$null})
-  managedExtensions=$managed
-  issues=$issues
-  duplicates=$dups
-  inventoryCount=$inventory.Count
-  driveSync=$(if($sync){[ordered]@{ok=$sync.ok;status=$sync.status;path=$sync.path;outDir=$sync.outDir;at=$sync.at}}else{$null})
-  stateGeneratedAt=$(if($state){$state.generatedAt}else{$null})
+  ok=([bool]$state);action='CHROME_GOVERNOR_READBACK_V2';at=(Get-Date).ToString('o');governorRefreshed=$govRefreshed;driveSyncRefreshed=$syncRefreshed;
+  governorRunning=$govRunning;governorStatePresent=[bool]$state;inventoryPresent=(Test-Path -LiteralPath $InventoryFile);oneShot=$oneShot;driveSyncOneShot=$syncOneShot;
+  agent=[ordered]@{agentVersion=$(if($agent){$agent.agentVersion}else{$null});installedVersion=$(if($agent){$agent.installedVersion}else{$null});status=$(if($agent){$agent.status}else{$null});commandHostVersion=$(if($agent){$agent.commandHostVersion}else{$null});commandHostRunning=$(if($agent){$agent.commandHostRunning}else{$null});chromeGovernorRunning=$(if($agent){$agent.chromeGovernorRunning}else{$null});chromeGovernorDriveSyncRunning=$(if($agent){$agent.chromeGovernorDriveSyncRunning}else{$null})};
+  summary=$(if($state){$state.summary}else{$null});managedExtensions=$managed;issues=$issues;duplicates=$dups;inventoryCount=$inventory.Count;
+  driveSync=$(if($sync){[ordered]@{ok=$sync.ok;status=$sync.status;path=$sync.path;outDir=$sync.outDir;at=$sync.at}}else{$null});stateGeneratedAt=$(if($state){$state.generatedAt}else{$null})
 }
 $result|ConvertTo-Json -Depth 12 -Compress
 if($result.ok){exit 0}else{exit 2}
