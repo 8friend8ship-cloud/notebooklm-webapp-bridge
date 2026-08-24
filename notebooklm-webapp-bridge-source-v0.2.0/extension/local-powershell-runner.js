@@ -23,7 +23,7 @@ async function lpSession(){
   return "";
 }
 function lpTimeoutSeconds(task){
-  const raw=Number(task?.timeoutSeconds||LP_DEFAULT_TIMEOUT_SECONDS);
+  const raw=Number(task?.timeoutSeconds??task?.TIMEOUT_SECONDS??task?.timeout_seconds??LP_DEFAULT_TIMEOUT_SECONDS);
   if(!Number.isFinite(raw)||raw<=0) return LP_DEFAULT_TIMEOUT_SECONDS;
   return Math.max(30,Math.min(1800,Math.round(raw)));
 }
@@ -36,7 +36,7 @@ function lpParseTime(value){
   return Number.isFinite(parsed)?parsed:0;
 }
 function lpTaskTime(task){
-  for(const key of ["claimedAt","startedAt","updatedAt","createdAt"]){
+  for(const key of ["claimedAt","CLAIMED_AT","startedAt","STARTED_AT","updatedAt","UPDATED_AT","createdAt","CREATED_AT"]){
     const parsed=lpParseTime(task?.[key]);
     if(parsed) return parsed;
   }
@@ -50,7 +50,7 @@ function lpTaskTime(task){
   return 0;
 }
 function lpIsStaleClaim(task){
-  if(String(task?.status||"").toUpperCase()!=="CLAIMED") return false;
+  if(String(task?.status||task?.STATUS||"").toUpperCase()!=="CLAIMED") return false;
   const started=lpTaskTime(task);
   if(!started) return false;
   return Date.now()-started>(lpTimeoutSeconds(task)+LP_STALE_GRACE_SECONDS)*1000;
@@ -67,31 +67,21 @@ async function lpHost(task){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),(timeoutSeconds+15)*1000);
   try{
-    const r=await fetch(`${LP_HOST}/run`,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({source:LP_SOURCE,task}),
-      signal:controller.signal
-    });
+    const r=await fetch(`${LP_HOST}/run`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:LP_SOURCE,task}),signal:controller.signal});
     const data=await r.json().catch(()=>({ok:false,error:`HTTP ${r.status}`}));
     if(!r.ok||!data.ok) throw new Error(data.error||`Local host HTTP ${r.status}`);
     return data;
   }catch(error){
     if(error?.name==="AbortError") throw new Error(`LOCAL_HOST_TIMEOUT_${timeoutSeconds}s`);
     throw error;
-  }finally{
-    clearTimeout(timer);
-  }
+  }finally{clearTimeout(timer);}
 }
 async function lpRecoverStaleClaims(config,sessionToken,listedTasks){
   const recovered=[];
   for(const task of (Array.isArray(listedTasks)?listedTasks:[])){
     if(String(task?.taskType||"").toUpperCase()!=="LOCAL_POWERSHELL"||!lpIsStaleClaim(task)) continue;
     try{
-      await lpApi(config.appsScriptUrl,{
-        action:"updateTask",sessionToken,taskId:task.taskId,status:"RETRY",
-        patch:{error:`STALE_CLAIM_RECOVERED_AFTER_${lpTimeoutSeconds(task)}s`,claimedAt:"",startedAt:""}
-      });
+      await lpApi(config.appsScriptUrl,{action:"updateTask",sessionToken,taskId:task.taskId,status:"RETRY",patch:{error:`STALE_CLAIM_RECOVERED_AFTER_${lpTimeoutSeconds(task)}s`,clearClaim:true,claimedAt:"",startedAt:""}});
       recovered.push({...task,status:"RETRY",claimedAt:"",startedAt:""});
     }catch{}
   }
@@ -103,7 +93,7 @@ async function lpPoll(reason="alarm"){
   const sessionToken=await lpSession();
   if(!sessionToken) return {ok:true,skipped:"no_session"};
 
-  const listed=await lpApi(config.appsScriptUrl,{action:"listTasks",sessionToken});
+  const listed=await lpApi(config.appsScriptUrl,{action:"listTasks",sessionToken,includeClaimed:true});
   const listedTasks=Array.isArray(listed.tasks)?listed.tasks:[];
   const recovered=await lpRecoverStaleClaims(config,sessionToken,listedTasks);
   const candidateMap=new Map();
@@ -118,23 +108,12 @@ async function lpPoll(reason="alarm"){
   for(const task of tasks.slice(0,LP_MAX)){
     try{
       const profile=await chrome.identity.getProfileUserInfo({accountStatus:"ANY"}).catch(()=>({email:""}));
-      const claimed=await lpApi(config.appsScriptUrl,{
-        action:"claimTask",sessionToken,taskId:task.taskId,chromeProfileEmail:profile.email||""
-      });
+      const claimed=await lpApi(config.appsScriptUrl,{action:"claimTask",sessionToken,taskId:task.taskId,chromeProfileEmail:profile.email||""});
       const result=await lpHost(claimed.task);
-      await lpApi(config.appsScriptUrl,{
-        action:"completeTask",
-        sessionToken,
-        taskId:task.taskId,
-        result:{resultText:JSON.stringify(result,null,2),resultUrls:[],notebookUrl:""}
-      });
+      await lpApi(config.appsScriptUrl,{action:"completeTask",sessionToken,taskId:task.taskId,result:{resultText:JSON.stringify(result,null,2),resultUrls:[],notebookUrl:""}});
       processed++;
     }catch(error){
-      try{
-        await lpApi(config.appsScriptUrl,{
-          action:"updateTask",sessionToken,taskId:task.taskId,status:"ERROR",patch:{error:String(error?.message||error)}
-        });
-      }catch{}
+      try{await lpApi(config.appsScriptUrl,{action:"updateTask",sessionToken,taskId:task.taskId,status:"ERROR",patch:{error:String(error?.message||error)}});}catch{}
     }
   }
   return {ok:true,reason,processed,available:tasks.length,recoveredStaleClaims:recovered.map(t=>t.taskId)};
