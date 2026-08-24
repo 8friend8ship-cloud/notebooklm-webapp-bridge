@@ -51,7 +51,7 @@ function Patch-State(){
 
 $HostUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases/1.1.0/HomeDesignLocalCommandHost.ps1'
 $LegacyUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases/1.0.0/HomeDesignLocalAgent.ps1'
-$HostSha='9ea335061dc79150faef2fbaa333ab3782b0c716'
+$HostSha='476a76263fe082f60eb14c4f7db49ff05ba4ceb9'
 $LegacySha='6bf74c7b3a58e6f2bd118d11d906dda031796e57'
 
 Ensure-File $HostUrl $HostFile $HostSha
