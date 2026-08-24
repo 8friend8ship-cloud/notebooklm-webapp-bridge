@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "channel": "stable",
+  "updatedAt": "2026-08-24T13:32:00+09:00",
+  "pollSeconds": 900,
+  "rules": {
+    "noDelete": true,
+    "noCredentialRead": true,
+    "noNewOAuth": true,
+    "noNormalChromeRestart": true,
+    "unregisteredMode": "OBSERVE_ONLY",
+    "duplicateMode": "HOLD_NO_DELETE"
+  },
+  "managedExtensions": [
+    {
+      "name": "NotebookLM WebApp Bridge",
+      "canonicalVersion": "0.2.6",
+      "mode": "LOCAL_AGENT_STABLE",
+      "profile": "HomeDesignAutomationV7 dedicated CFT",
+      "canonicalRepo": "8friend8ship-cloud/notebooklm-webapp-bridge",
+      "notes": "Existing Local Agent owns update, backup, dedicated CFT restart, health and rollback."
+    },
+    {
+      "name": "Flow Agent Bridge",
+      "canonicalVersion": "0.1.0",
+      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
+      "profile": "dedicated profile required",
+      "notes": "Do not auto-update until canonical source path and queue contract are confirmed."
+    },
+    {
+      "name": "Google AI Local Bridge - Flow",
+      "canonicalVersion": "0.1.0",
+      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
+      "profile": "dedicated profile required",
+      "notes": "Alias used by central registry for Flow bridge."
+    },
+    {
+      "name": "Front App Test Bridge",
+      "canonicalVersion": "1.0.2",
+      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
+      "profile": "actual profile",
+      "notes": "Inventory, service-worker/content-script verification and preview-frame diagnostics only."
+    },
+    {
+      "name": "Google AI Local Bridge v1",
+      "canonicalVersion": "1.0.1",
+      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
+      "profile": "actual profile",
+      "notes": "P0 legacy visible-error lineage. Do not replace NotebookLM canonical path."
+    },
+    {
+      "name": "AI Studio Bridge",
+      "canonicalVersion": "0.3.2",
+      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
+      "profile": "actual profile",
+      "notes": "Inspect installed version and files; no broad-permission replacement."
+    },
+    {
+      "name": "SketchUp Plan Template Bridge",
+      "canonicalVersion": "0.2.0",
+      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
+      "profile": "actual profile",
+      "notes": "Prefer existing local asset bridge; no Chrome replacement unless browser-only need is proven."
+    }
+  ],
+  "securityHoldNames": [
+    "Save to Google Drive"
+  ],
+  "observeOnlyNames": [
+    "UniConverter 다운로드 확장 프로그램",
+    "ChatGPT"
+  ]
+}
