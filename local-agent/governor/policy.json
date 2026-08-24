@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "channel": "stable",
-  "updatedAt": "2026-08-24T16:05:00+09:00",
+  "updatedAt": "2026-08-24T16:20:00+09:00",
   "pollSeconds": 900,
   "rules": {
     "noDelete": true,
@@ -14,32 +14,36 @@
   "managedExtensions": [
     {
       "name": "NotebookLM WebApp Bridge",
-      "canonicalVersion": "0.2.13",
+      "canonicalVersion": "0.2.15",
       "mode": "LOCAL_AGENT_STABLE",
       "profile": "HomeDesignAutomationV7 dedicated CFT",
       "canonicalRepo": "8friend8ship-cloud/notebooklm-webapp-bridge",
-      "notes": "Existing Local Agent owns update, backup, dedicated CFT restart, health and rollback. v0.2.13 claims only LOCAL_POWERSHELL_ASYNC tasks, converts them to LOCAL_POWERSHELL only at async localhost Host 1.2.0, and writes DONE only after /result returns a finished process result."
+      "sourceCommit": "7ea2361ff74e05bffd4437b23ef60c847a9bb89f",
+      "notes": "Local Agent owns immutable-payload update, backup, dedicated CFT restart, async Host health and rollback. 0.2.15 keeps async LOCAL_POWERSHELL execution, session self-heal and terminal ERROR guard."
     },
     {
       "name": "Flow Agent Bridge",
       "canonicalVersion": "0.1.0",
-      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
-      "profile": "dedicated profile required",
-      "notes": "Do not auto-update until canonical source path and queue contract are confirmed."
+      "mode": "DRIVE_SOURCE_BOUND_VERIFY_THEN_UPDATE",
+      "profile": "actual installed profile; dedicated profile preferred",
+      "sourceType": "GOOGLE_DRIVE_FOLDER",
+      "sourceId": "14BcD6HVwI082uTY5ecy_L1ZOGHuVgYvb",
+      "sourceName": "flow-agent-bridge-v0.1.0",
+      "notes": "Canonical Drive source verified: manifest v3, Flow Agent Bridge 0.1.0, labs.google host, popup/content.js/content.css. Governor may verify installed files/version; update remains non-destructive and must preserve current permissions."
     },
     {
       "name": "Google AI Local Bridge - Flow",
       "canonicalVersion": "0.1.0",
-      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
-      "profile": "dedicated profile required",
-      "notes": "Alias used by central registry for Flow bridge."
+      "mode": "ALIAS_TO_FLOW_AGENT_BRIDGE",
+      "profile": "actual installed profile",
+      "notes": "Central-registry alias. Do not install a duplicate if Flow Agent Bridge is already present."
     },
     {
       "name": "Front App Test Bridge",
       "canonicalVersion": "1.0.2",
       "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
       "profile": "actual profile",
-      "notes": "Inventory, service-worker/content-script verification and preview-frame diagnostics only."
+      "notes": "Inventory, service-worker/content-script verification and preview-frame diagnostics only until source is located."
     },
     {
       "name": "Google AI Local Bridge v1",
@@ -53,7 +57,7 @@
       "canonicalVersion": "0.3.2",
       "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
       "profile": "actual profile",
-      "notes": "Inspect installed version and files; no broad-permission replacement."
+      "notes": "Inspect installed version and files; no broad-permission replacement until source is located."
     },
     {
       "name": "SketchUp Plan Template Bridge",
