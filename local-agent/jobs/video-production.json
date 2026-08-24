@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "enabled": true,
+  "jobId": "VIDEO_AGENT_DASHBOARD_FIRST_MP4_QA_RECOVERY_20260824_001",
+  "description": "Reuse the already rendered V11 MP4, run technical Frame-QA pass 1 and 2 without PowerShell job error propagation, copy MP4/QA artifacts to central Drive, and run bounded Animation Apps Script E2E as a non-blocking secondary gate.",
+  "scriptRepo": "8friend8ship-cloud/animation",
+  "scriptRef": "codex/video-promo-agent-workflow-20260823",
+  "scriptPath": "tools/Run-AgentDashboardPromoAutoRecovery.ps1",
+  "scriptBlobSha1": "f52a779e72580760016c48adcf1b617cb2488728",
+  "timeoutSeconds": 900,
+  "maxAttempts": 6,
+  "retryEveryAgentCycle": true,
+  "successReadback": "Video_Production/2026/08/AGENT_DASHBOARD_PROMO_FIRST_MP4_20260824/VIDEO_AUTO_RECOVERY_RESULT.json",
+  "approvalBoundary": "EXISTING_APPROVAL_ONLY_NO_NEW_OAUTH_NO_NEW_COST_NO_PUBLIC_PUBLISH"
+}
