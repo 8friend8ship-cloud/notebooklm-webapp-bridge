@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.12",
-  "description": "HomeDesign dedicated Chrome bridge with restart-safe asynchronous local PowerShell jobs, serialized polling, duplicate-claim protection, timeout safety, and stale-claim recovery.",
+  "version": "0.2.13",
+  "description": "HomeDesign dedicated Chrome bridge with restart-safe asynchronous local PowerShell jobs and a transition-safe LOCAL_POWERSHELL_ASYNC gate.",
   "permissions": [
     "alarms",
     "identity",
