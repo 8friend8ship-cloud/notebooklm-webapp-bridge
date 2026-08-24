@@ -59,9 +59,16 @@ function classify(inventory, policy) {
     return { profile:item.profile, id:item.id, name:item.name, installedVersion:item.version, expectedVersion, classification, mode, action, fileIntegrityOk:!!item.fileIntegrityOk, path:item.path, unpacked:!!item.unpacked, source:item.source, fileErrors:item.fileErrors||[] };
   });
 }
+function duplicateKey(x) {
+  const name = String(x.name || '');
+  if (!name) return '';
+  if (/^__MSG_[A-Za-z0-9_]+__$/i.test(name)) return x.id ? `ID:${String(x.id)}` : '';
+  return `NAME:${name}`;
+}
 function duplicates(items) {
-  const m = new Map(); for (const x of items) { if (!x.name) continue; const a=m.get(x.name)||[]; a.push(x); m.set(x.name,a); }
-  return [...m.entries()].filter(([,a])=>a.length>1).map(([name,a])=>({name,count:a.length,items:a.map(x=>({profile:x.profile,id:x.id,installedVersion:x.installedVersion,path:x.path}))}));
+  const m = new Map();
+  for (const x of items) { const key=duplicateKey(x); if (!key) continue; const a=m.get(key)||[]; a.push(x); m.set(key,a); }
+  return [...m.entries()].filter(([,a])=>a.length>1).map(([key,a])=>({key,name:String(a[0]?.name||''),count:a.length,items:a.map(x=>({profile:x.profile,id:x.id,installedVersion:x.installedVersion,path:x.path}))}));
 }
 
 try {
@@ -70,6 +77,6 @@ try {
   const reportPath=arg('report'), inventoryPath=arg('inventory'); if(!reportPath||!inventoryPath) throw new Error('missing output paths');
   const inventory=scanInventory(normalRoot,dedicatedUserData,dedicatedExtensionRoot); const extensions=classify(inventory,policy); const dups=duplicates(extensions);
   const managedProblems=extensions.filter(x=>x.classification==='CENTRAL_MANAGED'&&!['CHECK_OK','OWNED_BY_LOCAL_AGENT'].includes(x.action));
-  const report={ ok:true, version:'CHROME_EXTENSION_GOVERNOR_NODE_FAST_V3_20260824', mode:'AGENT_5MIN_NODE_DIRECT', generatedAt:new Date().toISOString(), scanEngine:'NODE_DIRECT', scanError:'', policyUpdatedAt:String(policy.updatedAt||''), notebookLocalAgent:{agentVersion:agent.agentVersion??null,installedVersion:agent.extensionVersion??null,hostVersion:agent.commandHostVersion??null,hostHealthy:agent.hostHealthy??null,targetBridgeVersion:release.version??null}, summary:{total:extensions.length,centralManaged:extensions.filter(x=>x.classification==='CENTRAL_MANAGED').length,securityHold:extensions.filter(x=>x.classification==='SECURITY_HOLD').length,unpackedUnregistered:extensions.filter(x=>x.classification==='UNPACKED_UNREGISTERED_HOLD').length,duplicates:dups.length,managedProblems:managedProblems.length}, extensions, duplicates:dups, policy:{noDelete:true,noCredentialRead:true,noNewOAuth:true,noNormalChromeRestart:true} };
+  const report={ ok:true, version:'CHROME_EXTENSION_GOVERNOR_NODE_FAST_V4_20260824', mode:'AGENT_5MIN_NODE_DIRECT', generatedAt:new Date().toISOString(), scanEngine:'NODE_DIRECT', scanError:'', policyUpdatedAt:String(policy.updatedAt||''), notebookLocalAgent:{agentVersion:agent.agentVersion??null,installedVersion:agent.extensionVersion??null,hostVersion:agent.commandHostVersion??null,hostHealthy:agent.hostHealthy??null,targetBridgeVersion:release.version??null}, summary:{total:extensions.length,centralManaged:extensions.filter(x=>x.classification==='CENTRAL_MANAGED').length,securityHold:extensions.filter(x=>x.classification==='SECURITY_HOLD').length,unpackedUnregistered:extensions.filter(x=>x.classification==='UNPACKED_UNREGISTERED_HOLD').length,duplicates:dups.length,managedProblems:managedProblems.length}, extensions, duplicates:dups, policy:{noDelete:true,noCredentialRead:true,noNewOAuth:true,noNormalChromeRestart:true} };
   atomicJson(inventoryPath,inventory); atomicJson(reportPath,report); console.log(JSON.stringify({ok:true,scanEngine:'NODE_DIRECT',count:inventory.length,summary:report.summary,reportPath,inventoryPath}));
 } catch (e) { console.error(String(e?.stack||e)); process.exit(2); }
