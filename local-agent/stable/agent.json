@@ -4,7 +4,7 @@
   "enabled": true,
   "version": "1.1.10",
   "releasedAt": "2026-08-24T17:04:00+09:00",
-  "gitBlobSha1": "832b0bed2f0669e9ffc128a1ac251afcb764222e",
+  "gitBlobSha1": "4513bd63854f21b389440468bc1398692dce60b7",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300
 }
