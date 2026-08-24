@@ -11,10 +11,12 @@ $InventoryFile=Join-Path $GovRoot 'inventory.json'
 $AgentState=Join-Path $AgentRoot 'state.json'
 $OneShotFile=Join-Path $GovRoot 'ChromeExtensionGovernorOneShot.ps1'
 $OneShotUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/ChromeExtensionGovernorOneShot.ps1'
+$AgentMetaUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/stable/agent.json'
 New-Item -ItemType Directory -Force -Path $GovRoot|Out-Null
 
 function Read-Json([string]$Path){if(-not(Test-Path -LiteralPath $Path)){return $null};try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}}
 function Refresh-File([string]$Url,[string]$Path){try{$tmp=$Path+'.readback.download';Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $tmp -TimeoutSec 30;Move-Item -LiteralPath $tmp -Destination $Path -Force;return $true}catch{return $false}}
+function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
 function Run-Bounded([string]$ScriptPath,[int]$TimeoutMs=60000){
   if(-not(Test-Path -LiteralPath $ScriptPath)){return [ordered]@{attempted=$false;reason='SCRIPT_MISSING';path=$ScriptPath}}
   $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true;$psi.Arguments='-NoProfile -ExecutionPolicy Bypass -File "'+$ScriptPath+'"'
@@ -37,12 +39,41 @@ if($StatusOnly){
 }
 
 if($KickStableAgent){
-  try{$kickPath=Join-Path $env:TEMP 'HomeDesign-Kick-Stable-Agent.ps1';$kick=@'
+  try{
+    $nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString()
+    $meta=Invoke-RestMethod -Uri (Bust $AgentMetaUrl $nonce) -Method Get -TimeoutSec 15
+    if(-not $meta.enabled){throw 'Local Agent stable channel disabled.'}
+    $target=[string]$meta.version
+    $agent=Read-Json $AgentState
+    $current=if($agent){[string]$agent.agentVersion}else{''}
+    if($current -and $current -eq $target){
+      [ordered]@{ok=$true;action='KICK_STABLE_AGENT_NOT_NEEDED';currentAgent=$current;targetAgent=$target;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+      exit 0
+    }
+    $kickPath=Join-Path $env:TEMP 'HomeDesign-Kick-Stable-Agent.ps1'
+    $kick=@'
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 Start-Sleep -Seconds 6
-try{$url='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1';$dst=Join-Path $env:TEMP 'RESUME_LOCAL_AGENT_ONCE.latest.ps1';Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dst -TimeoutSec 60;& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dst *> (Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log')}catch{Add-Content -LiteralPath (Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log') -Value ('KICK_ERROR: '+$_.Exception.Message) -Encoding UTF8}
-'@;Set-Content -LiteralPath $kickPath -Value $kick -Encoding UTF8;Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$kickPath`"") -WindowStyle Hidden|Out-Null;[ordered]@{ok=$true;action='KICK_STABLE_AGENT_BACKGROUND';delaySeconds=6;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 0}catch{[ordered]@{ok=$false;action='KICK_STABLE_AGENT_BACKGROUND';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 2}
+try{
+  $base='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
+  $sep=if($base.Contains('?')){'&'}else{'?'}
+  $url=$base+$sep+'hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $dst=Join-Path $env:TEMP 'RESUME_LOCAL_AGENT_ONCE.latest.ps1'
+  Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dst -TimeoutSec 60
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dst *> (Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log')
+}catch{
+  Add-Content -LiteralPath (Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log') -Value ('KICK_ERROR: '+$_.Exception.Message) -Encoding UTF8
+}
+'@
+    Set-Content -LiteralPath $kickPath -Value $kick -Encoding UTF8
+    Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$kickPath`"") -WindowStyle Hidden|Out-Null
+    [ordered]@{ok=$true;action='KICK_STABLE_AGENT_BACKGROUND';currentAgent=$current;targetAgent=$target;delaySeconds=6;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    exit 0
+  }catch{
+    [ordered]@{ok=$false;action='KICK_STABLE_AGENT_BACKGROUND';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    exit 2
+  }
 }
 
 $refreshed=Refresh-File $OneShotUrl $OneShotFile
