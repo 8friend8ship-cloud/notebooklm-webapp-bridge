@@ -31,7 +31,10 @@ function Invoke-Native([string]$file,[string[]]$args){
   $psi.RedirectStandardOutput=$true
   $psi.RedirectStandardError=$true
   $psi.CreateNoWindow=$true
-  foreach($a in $args){[void]$psi.ArgumentList.Add($a)}
+  $psi.Arguments = ($args | ForEach-Object {
+    $s=[string]$_
+    if($s -match '[\s"]'){'"'+($s -replace '"','\"')+'"'}else{$s}
+  }) -join ' '
   $p=New-Object Diagnostics.Process
   $p.StartInfo=$psi
   [void]$p.Start()
