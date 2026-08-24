@@ -3,116 +3,78 @@ $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
-$GovRoot=Join-Path $Base 'ChromeGovernor'
 $AgentRoot=Join-Path $Base 'LocalAgent'
+$GovRoot=Join-Path $Base 'ChromeGovernor'
 $ExtensionRoot=Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
-$StateFile=Join-Path $GovRoot 'state.json'
-$InventoryFile=Join-Path $GovRoot 'inventory.json'
-$AgentState=Join-Path $AgentRoot 'state.json'
-$OneShotFile=Join-Path $GovRoot 'ChromeExtensionGovernorOneShot.ps1'
-$OneShotUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/ChromeExtensionGovernorOneShot.ps1'
+$AgentStatePath=Join-Path $AgentRoot 'state.json'
+$GovStatePath=Join-Path $GovRoot 'state.json'
+$InventoryPath=Join-Path $GovRoot 'inventory.json'
+$KickStatusPath=Join-Path $env:TEMP 'HomeDesign-Stable-Kick.status.json'
+$KickLogPath=Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log'
 $AgentMetaUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/stable/agent.json'
-New-Item -ItemType Directory -Force -Path $GovRoot,$AgentRoot|Out-Null
+New-Item -ItemType Directory -Force -Path $AgentRoot,$GovRoot|Out-Null
 
-function Read-Json([string]$Path){if(-not(Test-Path -LiteralPath $Path)){return $null};try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}}
-function Refresh-File([string]$Url,[string]$Path){try{$tmp=$Path+'.readback.download';Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $tmp -TimeoutSec 30;Move-Item -LiteralPath $tmp -Destination $Path -Force;return $true}catch{return $false}}
+function ReadJson([string]$Path){if(-not(Test-Path -LiteralPath $Path)){return $null};try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}}
 function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
-function Run-Bounded([string]$ScriptPath,[int]$TimeoutMs=60000){
-  if(-not(Test-Path -LiteralPath $ScriptPath)){return [ordered]@{attempted=$false;reason='SCRIPT_MISSING';path=$ScriptPath}}
-  $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true;$psi.Arguments='-NoProfile -ExecutionPolicy Bypass -File "'+$ScriptPath+'"'
-  $p=New-Object Diagnostics.Process;$p.StartInfo=$psi;[void]$p.Start();$outTask=$p.StandardOutput.ReadToEndAsync();$errTask=$p.StandardError.ReadToEndAsync()
-  if(-not $p.WaitForExit($TimeoutMs)){try{& taskkill.exe /PID $p.Id /T /F 2>$null|Out-Null}catch{try{$p.Kill()}catch{}};return [ordered]@{attempted=$true;timedOut=$true;exitCode=124;stdout='';stderr='GOVERNOR_READBACK_TIMEOUT';path=$ScriptPath}}
-  $p.WaitForExit();return [ordered]@{attempted=$true;timedOut=$false;exitCode=$p.ExitCode;stdout=$outTask.Result.Trim();stderr=$errTask.Result.Trim();path=$ScriptPath}
-}
-function Find-Central{
+function FindCentral{
   $target=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDDspJHsl5DsnojspITtirjsnIQ='))
-  foreach($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
-    $root=[string]$drive.Root
-    if(-not $root){continue}
-    foreach($candidate in @((Join-Path $root $target),(Join-Path $root ('My Drive\'+$target)),(Join-Path $root ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $candidate){return $candidate}}
+  foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
+    $r=[string]$d.Root;if(-not $r){continue}
+    foreach($c in @((Join-Path $r $target),(Join-Path $r ('My Drive\'+$target)),(Join-Path $r ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $c){return $c}}
   }
-  foreach($candidate in @((Join-Path $env:USERPROFILE ('My Drive\'+$target)),(Join-Path $env:USERPROFILE ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $candidate){return $candidate}}
+  foreach($c in @((Join-Path $env:USERPROFILE ('My Drive\'+$target)),(Join-Path $env:USERPROFILE ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $c){return $c}}
   return ''
 }
-
-if($StatusOnly){
-  try{$agent=Read-Json $AgentState;$manifest=Read-Json (Join-Path $ExtensionRoot 'manifest.json');$host=$null;try{$host=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3}catch{}
-    [ordered]@{ok=$true;action='LOCAL_RUNTIME_STATUS_ONLY';at=(Get-Date).ToString('o');agentVersion=$(if($agent){$agent.agentVersion}else{$null});agentStatus=$(if($agent){$agent.status}else{$null});manifestVersion=$(if($manifest){$manifest.version}else{$null});commandHostVersion=$(if($agent){$agent.commandHostVersion}else{$null});hostHealth=[bool]$(if($host){$host.ok}else{$false});hostReportedVersion=$(if($host){$host.version}else{$null});hostTransport=$(if($host){$host.transport}else{$null});hostAsyncJobs=$(if($host){$host.asyncJobs}else{$false});dedicatedChromeRunning=$(if($agent){$agent.dedicatedChromeRunning}else{$null});lastError=$(if($agent){$agent.lastError}else{$null})}|ConvertTo-Json -Depth 8 -Compress;exit 0
-  }catch{[ordered]@{ok=$false;action='LOCAL_RUNTIME_STATUS_ONLY';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 2}
+function HostHealth{try{return Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3}catch{return $null}}
+function CopyGovernorToCentral([string]$Central){
+  $ok=$false;$out=''
+  if($Central -and (Test-Path -LiteralPath $GovStatePath) -and (Test-Path -LiteralPath $InventoryPath)){
+    try{$out=Join-Path $Central 'Chrome_Extension_Governor';New-Item -ItemType Directory -Force -Path $out|Out-Null;Copy-Item -LiteralPath $GovStatePath -Destination (Join-Path $out 'CHROME_EXTENSION_GOVERNOR_RESULT.json') -Force;Copy-Item -LiteralPath $InventoryPath -Destination (Join-Path $out 'CHROME_EXTENSION_INVENTORY.json') -Force;$ok=$true}catch{}
+  }
+  return [ordered]@{ok=$ok;outDir=$out}
 }
+function RuntimeStatus{
+  $agent=ReadJson $AgentStatePath;$manifest=ReadJson (Join-Path $ExtensionRoot 'manifest.json');$host=HostHealth;$kick=ReadJson $KickStatusPath;$gov=ReadJson $GovStatePath;$central=FindCentral;$copy=CopyGovernorToCentral $central
+  return [ordered]@{
+    ok=$true;action='LOCAL_RUNTIME_STATUS_LIGHTWEIGHT';at=(Get-Date).ToString('o')
+    agentVersion=$(if($agent){[string]$agent.agentVersion}else{'UNKNOWN'});agentStatus=$(if($agent){[string]$agent.status}else{'UNKNOWN'})
+    bridgeVersion=$(if($manifest){[string]$manifest.version}else{'UNKNOWN'});hostHealthy=$(if($host){[bool]$host.ok}else{$false});hostVersion=$(if($host){[string]$host.version}else{'UNKNOWN'});hostAsyncJobs=$(if($host){[bool]$host.asyncJobs}else{$false})
+    governorPresent=[bool]$gov;governorCycleOk=$(if($agent -and $null -ne $agent.governorCycleOk){[bool]$agent.governorCycleOk}elseif($gov -and $null -ne $gov.ok){[bool]$gov.ok}else{$false});governorDriveSyncOk=[bool]$copy.ok;governorCentralPath=$central
+    governorSummary=$(if($gov){$gov.summary}else{$null});governorScanEngine=$(if($gov){[string]$gov.scanEngine}else{''});governorScanError=$(if($gov){[string]$gov.scanError}else{''})
+    kickStatus=$kick;kickLogExists=(Test-Path -LiteralPath $KickLogPath)
+    lastError=$(if($agent){[string]$agent.lastError}else{''})
+  }
+}
+
+if($StatusOnly){RuntimeStatus|ConvertTo-Json -Depth 20 -Compress;exit 0}
 
 if($KickStableAgent){
   try{
-    $nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString()
-    $meta=Invoke-RestMethod -Uri (Bust $AgentMetaUrl $nonce) -Method Get -TimeoutSec 15
-    if(-not $meta.enabled){throw 'Local Agent stable channel disabled.'}
-    $target=[string]$meta.version
-    $expectedSha=([string]$meta.gitBlobSha1).ToLowerInvariant()
-    if(-not $target -or -not $expectedSha){throw 'Stable Agent metadata incomplete.'}
-    $agent=Read-Json $AgentState
-    $current=if($agent){[string]$agent.agentVersion}else{''}
-    if($current -and $current -eq $target){
-      [ordered]@{ok=$true;action='KICK_STABLE_AGENT_NOT_NEEDED';currentAgent=$current;targetAgent=$target;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
-      exit 0
-    }
+    $nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString();$meta=Invoke-RestMethod -Uri (Bust $AgentMetaUrl $nonce) -Method Get -TimeoutSec 20
+    if(-not $meta.enabled){throw 'Local Agent stable channel disabled'}
+    $target=[string]$meta.version;$expected=([string]$meta.gitBlobSha1).ToLowerInvariant();$agent=ReadJson $AgentStatePath;$current=$(if($agent){[string]$agent.agentVersion}else{''})
+    if($current -eq $target){[ordered]@{ok=$true;action='KICK_STABLE_AGENT_NOT_NEEDED';currentAgent=$current;targetAgent=$target;expectedSha=$expected;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 0}
     $kickPath=Join-Path $env:TEMP 'HomeDesign-Kick-Stable-Agent-Direct.ps1'
-    $kick=@'
+    $template=@'
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-function GitBlobSha1([string]$Path){
-  $bytes=[IO.File]::ReadAllBytes($Path)
-  $header=[Text.Encoding]::ASCII.GetBytes(('blob '+$bytes.Length+[char]0))
-  $all=New-Object byte[] ($header.Length+$bytes.Length)
-  [Buffer]::BlockCopy($header,0,$all,0,$header.Length)
-  [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
-  $sha=[Security.Cryptography.SHA1]::Create()
-  try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$sha.Dispose()}
-}
+function GitBlobSha1([string]$Path){$b=[IO.File]::ReadAllBytes($Path);$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[] ($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
 function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
-$log=Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log'
-$statusPath=Join-Path $env:TEMP 'HomeDesign-Stable-Kick.status.json'
+$log=Join-Path $env:TEMP 'HomeDesign-Stable-Kick.log';$status=Join-Path $env:TEMP 'HomeDesign-Stable-Kick.status.json'
 try{
-  Start-Sleep -Seconds 3
-  $metaUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/stable/agent.json'
-  $nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString()
-  $meta=Invoke-RestMethod -Uri (Bust $metaUrl $nonce) -Method Get -TimeoutSec 20
-  if(-not $meta.enabled){throw 'Local Agent stable channel disabled.'}
-  $target=[string]$meta.version
-  $expected=([string]$meta.gitBlobSha1).ToLowerInvariant()
-  $agentUrl="https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases/$target/HomeDesignLocalAgent.ps1"
-  $root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
-  New-Item -ItemType Directory -Force -Path $root|Out-Null
-  $agentFile=Join-Path $root 'HomeDesignLocalAgent.ps1'
-  $tmp=$agentFile+'.direct.download'
-  Invoke-WebRequest -UseBasicParsing -Uri (Bust $agentUrl ($expected+'-'+$nonce)) -OutFile $tmp -TimeoutSec 60
-  $actual=GitBlobSha1 $tmp
-  if($actual -ne $expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw "Agent SHA mismatch actual=$actual expected=$expected"}
-  Move-Item -LiteralPath $tmp -Destination $agentFile -Force
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $agentFile *> $log
-  $rc=$LASTEXITCODE
-  [ordered]@{ok=($rc -eq 0);targetAgent=$target;expectedSha=$expected;actualSha=$actual;exitCode=$rc;completedAt=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $statusPath -Encoding UTF8
-}catch{
-  Add-Content -LiteralPath $log -Value ('DIRECT_KICK_ERROR: '+$_.Exception.Message) -Encoding UTF8
-  [ordered]@{ok=$false;error=$_.Exception.Message;completedAt=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $statusPath -Encoding UTF8
-}
+  Start-Sleep -Seconds 2
+  $metaUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/stable/agent.json';$n=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString();$m=Invoke-RestMethod -Uri (Bust $metaUrl $n) -Method Get -TimeoutSec 20
+  if(-not $m.enabled){throw 'stable disabled'};$v=[string]$m.version;$expected=([string]$m.gitBlobSha1).ToLowerInvariant();$url="https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases/$v/HomeDesignLocalAgent.ps1"
+  $root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent';New-Item -ItemType Directory -Force -Path $root|Out-Null;$dst=Join-Path $root 'HomeDesignLocalAgent.ps1';$tmp=$dst+'.direct.download';Invoke-WebRequest -UseBasicParsing -Uri (Bust $url ($expected+'-'+$n)) -OutFile $tmp -TimeoutSec 60;$actual=GitBlobSha1 $tmp
+  if($actual -ne $expected){throw "SHA_MISMATCH actual=$actual expected=$expected"};Move-Item -LiteralPath $tmp -Destination $dst -Force
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dst *> $log;$rc=$LASTEXITCODE
+  [ordered]@{ok=($rc -eq 0);targetAgent=$v;expectedSha=$expected;actualSha=$actual;exitCode=$rc;completedAt=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $status -Encoding UTF8
+}catch{[ordered]@{ok=$false;error=$_.Exception.Message;completedAt=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $status -Encoding UTF8;Add-Content -LiteralPath $log -Value ('KICK_ERROR: '+$_.Exception.Message) -Encoding UTF8}
 '@
-    Set-Content -LiteralPath $kickPath -Value $kick -Encoding UTF8
-    Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$kickPath`"") -WindowStyle Hidden|Out-Null
-    [ordered]@{ok=$true;action='KICK_STABLE_AGENT_DIRECT_BACKGROUND';currentAgent=$current;targetAgent=$target;expectedSha=$expectedSha;delaySeconds=3;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
-    exit 0
-  }catch{
-    [ordered]@{ok=$false;action='KICK_STABLE_AGENT_DIRECT_BACKGROUND';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
-    exit 2
-  }
+    Set-Content -LiteralPath $kickPath -Value $template -Encoding UTF8;Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$kickPath`"") -WindowStyle Hidden|Out-Null
+    [ordered]@{ok=$true;action='KICK_STABLE_AGENT_DIRECT_BACKGROUND';currentAgent=$current;targetAgent=$target;expectedSha=$expected;delaySeconds=2;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 0
+  }catch{[ordered]@{ok=$false;action='KICK_STABLE_AGENT_DIRECT_BACKGROUND';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 2}
 }
 
-$refreshed=Refresh-File $OneShotUrl $OneShotFile
-$run=Run-Bounded $OneShotFile 60000
-$state=Read-Json $StateFile
-$inventory=@(Read-Json $InventoryFile)
-$central=Find-Central;$driveSyncOk=$false;$outDir=''
-if($central -and $state -and (Test-Path -LiteralPath $InventoryFile)){$outDir=Join-Path $central 'Chrome_Extension_Governor';New-Item -ItemType Directory -Force -Path $outDir|Out-Null;Copy-Item -LiteralPath $StateFile -Destination (Join-Path $outDir 'CHROME_EXTENSION_GOVERNOR_RESULT.json') -Force;Copy-Item -LiteralPath $InventoryFile -Destination (Join-Path $outDir 'CHROME_EXTENSION_INVENTORY.json') -Force;$driveSyncOk=(Test-Path (Join-Path $outDir 'CHROME_EXTENSION_GOVERNOR_RESULT.json')) -and (Test-Path (Join-Path $outDir 'CHROME_EXTENSION_INVENTORY.json'))}
-$managed=@();$issues=@();$dups=@();if($state -and $state.extensions){$managed=@($state.extensions|Where-Object{$_.classification -eq 'CENTRAL_MANAGED'}|Select-Object name,id,profile,installedVersion,expectedVersion,action,fileIntegrityOk);$issues=@($state.extensions|Where-Object{$_.action -notin @('CHECK_OK','OWNED_BY_LOCAL_AGENT','NO_AUTO_CHANGE','OBSERVE_ONLY')}|Select-Object name,id,profile,installedVersion,expectedVersion,classification,action,fileIntegrityOk)};if($state -and $state.duplicates){$dups=@($state.duplicates|Select-Object name,count)}
-$result=[ordered]@{ok=([bool]$state -and $run.exitCode -eq 0);action='CHROME_GOVERNOR_NODE_FAST_READBACK';at=(Get-Date).ToString('o');governorRefreshed=$refreshed;run=$run;driveSyncOk=$driveSyncOk;centralPath=$central;outDir=$outDir;scanEngine=$(if($state){$state.scanEngine}else{$null});scanError=$(if($state){$state.scanError}else{$null});summary=$(if($state){$state.summary}else{$null});managedExtensions=$managed;issues=$issues;duplicates=$dups;inventoryCount=$inventory.Count;stateGeneratedAt=$(if($state){$state.generatedAt}else{$null})}
-$result|ConvertTo-Json -Depth 12 -Compress
-if($result.ok){exit 0}else{exit 2}
+RuntimeStatus|ConvertTo-Json -Depth 20 -Compress
+exit 0
