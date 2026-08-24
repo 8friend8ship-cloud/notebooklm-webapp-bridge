@@ -1,253 +1,213 @@
 param([switch]$Loop)
 
-$ErrorActionPreference = 'Continue'
-$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference='Continue'
+$ProgressPreference='SilentlyContinue'
+$Version='CHROME_EXTENSION_GOVERNOR_V2_20260824'
+$Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
+$GovRoot=Join-Path $Base 'ChromeGovernor'
+$LogRoot=Join-Path $GovRoot 'Logs'
+$ReportPath=Join-Path $GovRoot 'state.json'
+$InventoryPath=Join-Path $GovRoot 'inventory.json'
+$DesktopReport=Join-Path ([Environment]::GetFolderPath('Desktop')) 'CHROME_EXTENSION_GOVERNOR_RESULT.json'
+$PolicyUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/policy.json'
+$ReleaseUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/runtime/stable/release.json'
+$AgentStatePath=Join-Path $Base 'LocalAgent\state.json'
+$DedicatedUserData=Join-Path $Base 'ChromeUserData'
+$DedicatedExtensionRoot=Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
+New-Item -ItemType Directory -Force -Path $GovRoot,$LogRoot|Out-Null
 
-$Version = 'CHROME_EXTENSION_GOVERNOR_V1_20260824'
-$Base = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
-$GovRoot = Join-Path $Base 'ChromeGovernor'
-$LogRoot = Join-Path $GovRoot 'Logs'
-$ReportPath = Join-Path $GovRoot 'state.json'
-$InventoryPath = Join-Path $GovRoot 'inventory.json'
-$DesktopReport = Join-Path ([Environment]::GetFolderPath('Desktop')) 'CHROME_EXTENSION_GOVERNOR_RESULT.json'
-$PolicyUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/policy.json'
-$NotebookReleaseUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/runtime/stable/release.json'
-$AgentRoot = Join-Path $Base 'LocalAgent'
-$AgentStatePath = Join-Path $AgentRoot 'state.json'
-$AgentBootstrap = Join-Path $AgentRoot 'AgentBootstrap.ps1'
-$DedicatedUserData = Join-Path $Base 'ChromeUserData'
-$DedicatedExtensionRoot = Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
-
-New-Item -ItemType Directory -Force -Path $GovRoot,$LogRoot | Out-Null
-
-function Log([string]$Message) {
-  $log = Join-Path $LogRoot ('governor_' + (Get-Date -Format 'yyyyMMdd') + '.log')
-  Add-Content -LiteralPath $log -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Message" -Encoding UTF8
+function Write-Log([string]$Message){
+  $logFile=Join-Path $LogRoot ('governor_'+(Get-Date -Format 'yyyyMMdd')+'.log')
+  Add-Content -LiteralPath $logFile -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Message" -Encoding UTF8
 }
-
-function Read-Json([string]$Path) {
-  if (!(Test-Path -LiteralPath $Path)) { return $null }
-  try { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json }
-  catch { return $null }
+function Read-Json([string]$Path){
+  if(-not(Test-Path -LiteralPath $Path)){return $null}
+  try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}
 }
-
-function Get-Manifest([string]$Path) {
-  return Read-Json (Join-Path $Path 'manifest.json')
+function Resolve-Manifest([string]$RootPath){
+  if([string]::IsNullOrWhiteSpace($RootPath)){return $null}
+  $manifestFile=Join-Path $RootPath 'manifest.json'
+  if(-not(Test-Path -LiteralPath $manifestFile)){return $null}
+  return Read-Json $manifestFile
 }
-
-function Add-InventoryRow([ref]$Rows,[string]$Profile,[string]$Id,[string]$Path,[bool]$Unpacked,[string]$Source) {
-  $m = Get-Manifest $Path
-  if (!$m) { return }
-  $name = [string]$m.name
-  $version = [string]$m.version
-  $fileErrors = @()
-  if ($m.background -and $m.background.service_worker) {
-    $p = Join-Path $Path ([string]$m.background.service_worker)
-    if (!(Test-Path -LiteralPath $p)) { $fileErrors += ('missing service_worker: ' + [string]$m.background.service_worker) }
+function New-InventoryItem([string]$ProfileLabel,[string]$ExtensionId,[string]$RootPath,[bool]$IsUnpacked,[string]$SourceLabel){
+  $manifest=Resolve-Manifest $RootPath
+  if(-not $manifest){return $null}
+  $fileErrors=@()
+  if($manifest.background -and $manifest.background.service_worker){
+    $workerPath=Join-Path $RootPath ([string]$manifest.background.service_worker)
+    if(-not(Test-Path -LiteralPath $workerPath)){$fileErrors+=('missing service_worker: '+[string]$manifest.background.service_worker)}
   }
-  foreach ($cs in @($m.content_scripts)) {
-    foreach ($js in @($cs.js)) {
-      $p = Join-Path $Path ([string]$js)
-      if (!(Test-Path -LiteralPath $p)) { $fileErrors += ('missing content_script: ' + [string]$js) }
+  foreach($contentSpec in @($manifest.content_scripts)){
+    if(-not $contentSpec){continue}
+    foreach($jsFile in @($contentSpec.js)){
+      if(-not $jsFile){continue}
+      $scriptPath=Join-Path $RootPath ([string]$jsFile)
+      if(-not(Test-Path -LiteralPath $scriptPath)){$fileErrors+=('missing content_script: '+[string]$jsFile)}
     }
   }
-  $Rows.Value += [pscustomobject]@{
-    profile=$Profile; id=$Id; name=$name; version=$version; path=$Path; unpacked=$Unpacked;
-    source=$Source; manifestVersion=[string]$m.manifest_version; fileIntegrityOk=($fileErrors.Count -eq 0);
+  return [pscustomobject]@{
+    profile=$ProfileLabel
+    id=$ExtensionId
+    name=[string]$manifest.name
+    version=[string]$manifest.version
+    path=$RootPath
+    unpacked=$IsUnpacked
+    source=$SourceLabel
+    manifestVersion=[string]$manifest.manifest_version
+    fileIntegrityOk=($fileErrors.Count -eq 0)
     fileErrors=$fileErrors
   }
 }
-
-function Scan-Profile([string]$ProfileName,[string]$ProfilePath) {
-  $rows = @()
-  if (!(Test-Path -LiteralPath $ProfilePath)) { return @() }
-  $seen = @{}
-  $extRoot = Join-Path $ProfilePath 'Extensions'
-  if (Test-Path -LiteralPath $extRoot) {
-    foreach ($idDir in @(Get-ChildItem -LiteralPath $extRoot -Directory -ErrorAction SilentlyContinue)) {
-      $verDir = Get-ChildItem -LiteralPath $idDir.FullName -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
-      if (!$verDir) { continue }
-      Add-InventoryRow ([ref]$rows) $ProfileName $idDir.Name $verDir.FullName $false 'PROFILE_EXTENSIONS_DIR'
-      $seen[$idDir.Name] = $true
+function Scan-ChromeProfile([string]$ProfileLabel,[string]$ProfileRoot){
+  $items=@()
+  if(-not(Test-Path -LiteralPath $ProfileRoot)){return $items}
+  $seen=@{}
+  $extensionsRoot=Join-Path $ProfileRoot 'Extensions'
+  if(Test-Path -LiteralPath $extensionsRoot){
+    foreach($idDir in @(Get-ChildItem -LiteralPath $extensionsRoot -Directory -ErrorAction SilentlyContinue)){
+      $latest=Get-ChildItem -LiteralPath $idDir.FullName -Directory -ErrorAction SilentlyContinue|Sort-Object Name -Descending|Select-Object -First 1
+      if(-not $latest){continue}
+      $item=New-InventoryItem $ProfileLabel ([string]$idDir.Name) ([string]$latest.FullName) $false 'PROFILE_EXTENSIONS_DIR'
+      if($item){$items+=$item;$seen[[string]$idDir.Name]=$true}
     }
   }
-
-  foreach ($prefName in @('Preferences','Secure Preferences')) {
-    $prefPath = Join-Path $ProfilePath $prefName
-    if (!(Test-Path -LiteralPath $prefPath)) { continue }
-    try {
-      $pref = Get-Content -LiteralPath $prefPath -Raw -Encoding UTF8 | ConvertFrom-Json
-      $settings = $pref.extensions.settings
-      if (!$settings) { continue }
-      foreach ($prop in $settings.PSObject.Properties) {
-        if ($seen[$prop.Name]) { continue }
-        $s = $prop.Value
-        if (!$s.path) { continue }
-        $p = [string]$s.path
-        if (!(Test-Path -LiteralPath (Join-Path $p 'manifest.json'))) { continue }
-        Add-InventoryRow ([ref]$rows) $ProfileName $prop.Name $p $true $prefName
-        $seen[$prop.Name] = $true
+  foreach($prefName in @('Preferences','Secure Preferences')){
+    $prefFile=Join-Path $ProfileRoot $prefName
+    if(-not(Test-Path -LiteralPath $prefFile)){continue}
+    try{
+      $prefData=Get-Content -LiteralPath $prefFile -Raw -Encoding UTF8|ConvertFrom-Json
+      $settings=$prefData.extensions.settings
+      if(-not $settings){continue}
+      foreach($settingProp in $settings.PSObject.Properties){
+        $extId=[string]$settingProp.Name
+        if($seen.ContainsKey($extId)){continue}
+        $setting=$settingProp.Value
+        if(-not $setting.path){continue}
+        $candidate=[string]$setting.path
+        if(-not [IO.Path]::IsPathRooted($candidate)){$candidate=Join-Path $ProfileRoot $candidate}
+        if(-not(Test-Path -LiteralPath (Join-Path $candidate 'manifest.json'))){continue}
+        $item=New-InventoryItem $ProfileLabel $extId $candidate $true $prefName
+        if($item){$items+=$item;$seen[$extId]=$true}
       }
-    } catch { Log "profile parse failed: $ProfileName / $prefName / $($_.Exception.Message)" }
+    }catch{Write-Log "PREFERENCES_PARSE_FAILED label=$ProfileLabel file=$prefName error=$($_.Exception.Message)"}
   }
-  return $rows
+  return $items
 }
-
-function Get-AllInventory {
-  $rows = @()
-  $normalRoot = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
-  if (Test-Path -LiteralPath $normalRoot) {
-    foreach ($d in @(Get-ChildItem -LiteralPath $normalRoot -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' })) {
-      $rows += @(Scan-Profile ('NORMAL_CHROME/' + $d.Name) $d.FullName)
+function Get-AllInventory{
+  $items=@()
+  $normalRoot=Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
+  if(Test-Path -LiteralPath $normalRoot){
+    foreach($profileDir in @(Get-ChildItem -LiteralPath $normalRoot -Directory -ErrorAction SilentlyContinue|Where-Object{$_.Name -eq 'Default' -or $_.Name -like 'Profile *'})){
+      $items+=@(Scan-ChromeProfile ('NORMAL_CHROME/'+[string]$profileDir.Name) ([string]$profileDir.FullName))
     }
   }
-  $dedicatedDefault = Join-Path $DedicatedUserData 'Default'
-  $rows += @(Scan-Profile 'HOMEDESIGN_CFT/Default' $dedicatedDefault)
-
-  if (Test-Path -LiteralPath (Join-Path $DedicatedExtensionRoot 'manifest.json')) {
-    $already = @($rows | Where-Object { $_.path -eq $DedicatedExtensionRoot })
-    if ($already.Count -eq 0) {
-      Add-InventoryRow ([ref]$rows) 'HOMEDESIGN_CFT/LoadedExtension' 'RESOLVE_FROM_PROFILE' $DedicatedExtensionRoot $true 'LOCAL_AGENT_EXTENSION_ROOT'
+  $items+=@(Scan-ChromeProfile 'HOMEDESIGN_CFT/Default' (Join-Path $DedicatedUserData 'Default'))
+  if(Test-Path -LiteralPath (Join-Path $DedicatedExtensionRoot 'manifest.json')){
+    $norm=(Resolve-Path -LiteralPath $DedicatedExtensionRoot -ErrorAction SilentlyContinue).Path
+    $exists=@($items|Where-Object{$_.path -and ((Resolve-Path -LiteralPath $_.path -ErrorAction SilentlyContinue).Path -eq $norm)}).Count -gt 0
+    if(-not $exists){
+      $item=New-InventoryItem 'HOMEDESIGN_CFT/LoadedExtension' 'RESOLVE_FROM_PROFILE' $DedicatedExtensionRoot $true 'LOCAL_AGENT_EXTENSION_ROOT'
+      if($item){$items+=$item}
     }
   }
-  return $rows
+  return $items
 }
-
-function Ensure-NotebookLocalAgent {
-  $state = Read-Json $AgentStatePath
-  $release = $null
-  try { $release = Invoke-RestMethod -Uri $NotebookReleaseUrl -Method Get -TimeoutSec 20 } catch {}
-  $target = if ($release) { [string]$release.version } else { '' }
-  $installed = if ($state) { [string]$state.installedVersion } else { '' }
-  $bootstrapRunning = $false
-  try {
-    $bootstrapRunning = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-      $_.CommandLine -and $_.CommandLine -like '*HomeDesignAutomationV7*LocalAgent*AgentBootstrap.ps1*'
-    }).Count -gt 0
-  } catch {}
-
-  if (!$bootstrapRunning -and (Test-Path -LiteralPath $AgentBootstrap)) {
-    try {
-      Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$AgentBootstrap`"",'-Loop') -WindowStyle Hidden | Out-Null
-      $bootstrapRunning = $true
-      Log 'NotebookLM Local Agent bootstrap loop restarted.'
-    } catch { Log ('NotebookLM Local Agent restart failed: ' + $_.Exception.Message) }
+function Get-Policy{
+  try{return Invoke-RestMethod -Uri $PolicyUrl -Method Get -TimeoutSec 20}catch{
+    Write-Log ('POLICY_FETCH_FAILED '+$_.Exception.Message)
+    return [pscustomobject]@{updatedAt='';pollSeconds=900;rules=[pscustomobject]@{unregisteredMode='OBSERVE_ONLY'};managedExtensions=@();securityHoldNames=@();observeOnlyNames=@()}
   }
-
+}
+function Classify-Inventory($Inventory,$Policy){
+  $classified=@()
+  $managed=@($Policy.managedExtensions)
+  $securityNames=@($Policy.securityHoldNames)
+  $observeNames=@($Policy.observeOnlyNames)
+  foreach($item in @($Inventory)){
+    $rule=$managed|Where-Object{[string]$_.name -eq [string]$item.name}|Select-Object -First 1
+    $classification='UNREGISTERED_OBSERVE_ONLY'
+    $mode=[string]$Policy.rules.unregisteredMode
+    $expected=''
+    $action='OBSERVE_ONLY'
+    if($rule){
+      $classification='CENTRAL_MANAGED';$mode=[string]$rule.mode;$expected=[string]$rule.canonicalVersion
+      if(-not [bool]$item.fileIntegrityOk){$action='REPAIR_FILES_REQUIRED'}
+      elseif($expected -and [string]$item.version -ne $expected){$action='VERSION_DIFF_HOLD_OR_CANONICAL_UPDATE'}
+      else{$action='CHECK_OK'}
+      if($mode -eq 'LOCAL_AGENT_STABLE'){$action='OWNED_BY_LOCAL_AGENT'}
+    }elseif($securityNames -contains [string]$item.name){$classification='SECURITY_HOLD';$mode='HOLD_NO_DELETE';$action='USER_REVIEW_REQUIRED_NO_AUTO_DELETE'}
+    elseif($observeNames -contains [string]$item.name){$classification='THIRD_PARTY_OBSERVE_ONLY';$mode='OBSERVE_ONLY';$action='NO_AUTO_CHANGE'}
+    elseif([bool]$item.unpacked){$classification='UNPACKED_UNREGISTERED_HOLD';$mode='HOLD_NO_DELETE';$action='REGISTER_SOURCE_BEFORE_UPDATE'}
+    $classified+=[pscustomobject]@{
+      profile=$item.profile;id=$item.id;name=$item.name;installedVersion=$item.version;expectedVersion=$expected;
+      classification=$classification;mode=$mode;action=$action;fileIntegrityOk=[bool]$item.fileIntegrityOk;
+      path=$item.path;unpacked=[bool]$item.unpacked;source=$item.source;fileErrors=@($item.fileErrors)
+    }
+  }
+  return $classified
+}
+function Get-NotebookState{
+  $agentState=Read-Json $AgentStatePath
+  $release=$null
+  try{$release=Invoke-RestMethod -Uri $ReleaseUrl -Method Get -TimeoutSec 20}catch{}
   return [ordered]@{
-    state=$state; targetVersion=$target; installedVersion=$installed; bootstrapRunning=$bootstrapRunning;
-    versionReady=([string]::IsNullOrWhiteSpace($target) -eq $false -and $installed -eq $target)
+    agentVersion=$(if($agentState){$agentState.agentVersion}else{$null})
+    installedVersion=$(if($agentState){$agentState.extensionVersion}else{$null})
+    hostVersion=$(if($agentState){$agentState.commandHostVersion}else{$null})
+    hostHealthy=$(if($agentState){$agentState.hostHealthy}else{$null})
+    targetBridgeVersion=$(if($release){$release.version}else{$null})
+    releaseActionId=$(if($release){$release.actionId}else{$null})
   }
 }
-
-function Classify($Inventory,$Policy) {
-  $out = @()
-  $managed = @($Policy.managedExtensions)
-  $securityHold = @($Policy.securityHoldNames)
-  $observeOnly = @($Policy.observeOnlyNames)
-
-  foreach ($i in $Inventory) {
-    $rule = $managed | Where-Object { [string]$_.name -eq [string]$i.name } | Select-Object -First 1
-    $classification = 'UNREGISTERED_OBSERVE_ONLY'
-    $mode = [string]$Policy.rules.unregisteredMode
-    $expected = ''
-    $action = 'OBSERVE_ONLY'
-
-    if ($rule) {
-      $classification = 'CENTRAL_MANAGED'
-      $mode = [string]$rule.mode
-      $expected = [string]$rule.canonicalVersion
-      if (!$i.fileIntegrityOk) { $action = 'REPAIR_FILES_REQUIRED' }
-      elseif ($expected -and [string]$i.version -ne $expected) { $action = 'VERSION_DIFF_HOLD_OR_CANONICAL_UPDATE' }
-      else { $action = 'CHECK_OK' }
-      if ($mode -eq 'LOCAL_AGENT_STABLE') { $action = 'OWNED_BY_LOCAL_AGENT' }
-    } elseif ($securityHold -contains [string]$i.name) {
-      $classification = 'SECURITY_HOLD'
-      $mode = 'HOLD_NO_DELETE'
-      $action = 'USER_REVIEW_REQUIRED_NO_AUTO_DELETE'
-    } elseif ($observeOnly -contains [string]$i.name) {
-      $classification = 'THIRD_PARTY_OBSERVE_ONLY'
-      $mode = 'OBSERVE_ONLY'
-      $action = 'NO_AUTO_CHANGE'
-    } elseif ($i.unpacked) {
-      $classification = 'UNPACKED_UNREGISTERED_HOLD'
-      $mode = 'HOLD_NO_DELETE'
-      $action = 'REGISTER_SOURCE_BEFORE_UPDATE'
-    }
-
-    $out += [pscustomobject]@{
-      profile=$i.profile; id=$i.id; name=$i.name; installedVersion=$i.version; expectedVersion=$expected;
-      classification=$classification; mode=$mode; action=$action; fileIntegrityOk=$i.fileIntegrityOk;
-      path=$i.path; unpacked=$i.unpacked; source=$i.source; fileErrors=$i.fileErrors
-    }
+function Run-Cycle{
+  Write-Log "CYCLE_START version=$Version"
+  $policy=Get-Policy
+  $inventory=@(Get-AllInventory)
+  $classified=@(Classify-Inventory $inventory $policy)
+  $duplicates=@()
+  foreach($group in @($classified|Group-Object name)){
+    if($group.Name -and $group.Count -gt 1){$duplicates+=[pscustomobject]@{name=$group.Name;count=$group.Count;items=@($group.Group|Select-Object profile,id,installedVersion,path)}}
   }
-  return $out
-}
-
-function Run-Cycle {
-  Log "=== Governor cycle START $Version ==="
-  $policy = $null
-  try { $policy = Invoke-RestMethod -Uri $PolicyUrl -Method Get -TimeoutSec 20 }
-  catch {
-    Log ('Policy fetch failed: ' + $_.Exception.Message)
-    $policy = [pscustomobject]@{ pollSeconds=900; rules=[pscustomobject]@{unregisteredMode='OBSERVE_ONLY'}; managedExtensions=@(); securityHoldNames=@(); observeOnlyNames=@() }
-  }
-
-  $notebook = Ensure-NotebookLocalAgent
-  $inventory = @(Get-AllInventory)
-  $classified = @(Classify $inventory $policy)
-  $duplicates = @()
-  foreach ($g in @($classified | Group-Object name)) {
-    if ($g.Count -gt 1 -and $g.Name) {
-      $duplicates += [pscustomobject]@{name=$g.Name;count=$g.Count;items=@($g.Group | Select-Object profile,id,installedVersion,path)}
-    }
-  }
-
-  $managedProblems = @($classified | Where-Object {
-    $_.classification -eq 'CENTRAL_MANAGED' -and $_.action -notin @('CHECK_OK','OWNED_BY_LOCAL_AGENT')
-  })
-  $securityProblems = @($classified | Where-Object { $_.classification -eq 'SECURITY_HOLD' })
-  $unregisteredUnpacked = @($classified | Where-Object { $_.classification -eq 'UNPACKED_UNREGISTERED_HOLD' })
-
-  $report = [ordered]@{
+  $managedProblems=@($classified|Where-Object{$_.classification -eq 'CENTRAL_MANAGED' -and $_.action -notin @('CHECK_OK','OWNED_BY_LOCAL_AGENT')})
+  $securityProblems=@($classified|Where-Object{$_.classification -eq 'SECURITY_HOLD'})
+  $unpackedProblems=@($classified|Where-Object{$_.classification -eq 'UNPACKED_UNREGISTERED_HOLD'})
+  $report=[ordered]@{
     ok=($managedProblems.Count -eq 0 -and $securityProblems.Count -eq 0)
     version=$Version
     generatedAt=(Get-Date).ToUniversalTime().ToString('o')
     policyUpdatedAt=[string]$policy.updatedAt
-    notebookLocalAgent=$notebook
+    notebookLocalAgent=Get-NotebookState
     summary=[ordered]@{
       total=$classified.Count
-      centralManaged=@($classified | Where-Object {$_.classification -eq 'CENTRAL_MANAGED'}).Count
-      thirdPartyObserve=@($classified | Where-Object {$_.classification -eq 'THIRD_PARTY_OBSERVE_ONLY'}).Count
+      centralManaged=@($classified|Where-Object{$_.classification -eq 'CENTRAL_MANAGED'}).Count
+      thirdPartyObserve=@($classified|Where-Object{$_.classification -eq 'THIRD_PARTY_OBSERVE_ONLY'}).Count
       securityHold=$securityProblems.Count
-      unpackedUnregistered=$unregisteredUnpacked.Count
+      unpackedUnregistered=$unpackedProblems.Count
       duplicates=$duplicates.Count
       managedProblems=$managedProblems.Count
     }
     extensions=$classified
     duplicates=$duplicates
-    policy=[ordered]@{
-      noDelete=$true; noCredentialRead=$true; noNewOAuth=$true; noNormalChromeRestart=$true;
-      safeAutomaticScope='inventory;file-integrity;version-diff;Local-Agent stable restart only'
-    }
+    policy=[ordered]@{noDelete=$true;noCredentialRead=$true;noNewOAuth=$true;noNormalChromeRestart=$true;safeAutomaticScope='inventory;file-integrity;version-diff;source-binding;Local-Agent stable only'}
   }
-
-  $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $ReportPath -Encoding UTF8
-  $inventory | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $InventoryPath -Encoding UTF8
-  try { Copy-Item -LiteralPath $ReportPath -Destination $DesktopReport -Force } catch {}
-  Log "cycle result total=$($classified.Count) managedProblems=$($managedProblems.Count) securityHold=$($securityProblems.Count) duplicates=$($duplicates.Count)"
-  Log '=== Governor cycle END ==='
-  return [pscustomobject]@{report=$report;pollSeconds=[Math]::Max(300,[int]$policy.pollSeconds)}
+  $report|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $ReportPath -Encoding UTF8
+  $inventory|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $InventoryPath -Encoding UTF8
+  try{Copy-Item -LiteralPath $ReportPath -Destination $DesktopReport -Force}catch{}
+  Write-Log "CYCLE_END total=$($classified.Count) managedProblems=$($managedProblems.Count) securityHold=$($securityProblems.Count) duplicates=$($duplicates.Count)"
+  $seconds=900
+  try{$seconds=[Math]::Max(300,[int]$policy.pollSeconds)}catch{}
+  return $seconds
 }
 
-$mutex = New-Object System.Threading.Mutex($false,'HomeDesignChromeExtensionGovernorV1')
-if (-not $mutex.WaitOne(0,$false)) { exit 0 }
-try {
-  do {
-    $cycle = Run-Cycle
-    if ($Loop) { Start-Sleep -Seconds $cycle.pollSeconds }
-  } while ($Loop)
-} finally {
-  try { $mutex.ReleaseMutex() } catch {}
+$mutex=New-Object System.Threading.Mutex($false,'HomeDesignChromeExtensionGovernorV2')
+if(-not $mutex.WaitOne(0,$false)){exit 0}
+try{
+  do{
+    $sleepSeconds=Run-Cycle
+    if($Loop){Start-Sleep -Seconds $sleepSeconds}
+  }while($Loop)
+}finally{
+  try{$mutex.ReleaseMutex()}catch{}
   $mutex.Dispose()
 }
