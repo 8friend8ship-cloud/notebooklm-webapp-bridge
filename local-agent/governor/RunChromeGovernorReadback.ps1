@@ -96,7 +96,13 @@ if($KickStableAgent){
     $nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString();$meta=Invoke-RestMethod -Uri (Bust $AgentMetaUrl $nonce) -Method Get -TimeoutSec 20
     if(-not $meta.enabled){throw 'Local Agent stable channel disabled'}
     $target=[string]$meta.version;$expected=([string]$meta.gitBlobSha1).ToLowerInvariant();$agentStateObj=ReadJson $AgentStatePath;$current=$(if($agentStateObj){[string]$agentStateObj.agentVersion}else{''})
-    if($current -eq $target){[ordered]@{ok=$true;action='KICK_STABLE_AGENT_NOT_NEEDED';currentAgent=$current;targetAgent=$target;expectedSha=$expected;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 0}
+    if($current -eq $target){
+      $agentFile=Join-Path $AgentRoot 'HomeDesignLocalAgent.ps1'
+      if(-not(Test-Path -LiteralPath $agentFile)){throw 'CURRENT_AGENT_FILE_MISSING'}
+      Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$agentFile`"") -WindowStyle Hidden|Out-Null
+      [ordered]@{ok=$true;action='KICK_STABLE_AGENT_COORDINATOR_CYCLE';currentAgent=$current;targetAgent=$target;expectedSha=$expected;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+      exit 0
+    }
     $kickPath=Join-Path $env:TEMP ('HomeDesign-Kick-Stable-Agent-Direct-'+$nonce+'.ps1')
     $template=@'
 $ErrorActionPreference='Continue'
