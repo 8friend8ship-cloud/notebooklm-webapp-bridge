@@ -12,24 +12,12 @@ $AgentBaseUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-w
 $BridgeReleaseUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/runtime/stable/release.json'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
-function Proc([string]$Needle){
-  try{return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name -match 'powershell|pwsh' -and $_.CommandLine -and $_.CommandLine -like "*$Needle*"})}catch{return @()}
-}
-function KillTree([int]$ProcessId){
-  try{& taskkill.exe /PID $ProcessId /T /F 2>$null|Out-Null}
-  catch{try{Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue}catch{}}
-}
+function Proc([string]$Needle){try{return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name -match 'powershell|pwsh' -and $_.CommandLine -and $_.CommandLine -like "*$Needle*"})}catch{return @()}}
+function KillTree([int]$ProcessId){try{& taskkill.exe /PID $ProcessId /T /F 2>$null|Out-Null}catch{try{Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue}catch{}}}
 function StopTarget([string]$Needle){foreach($procItem in @(Proc $Needle)){KillTree -ProcessId ([int]$procItem.ProcessId)}}
-function GitBlobSha1([string]$Path){
-  $bytes=[IO.File]::ReadAllBytes($Path)
-  $header=[Text.Encoding]::ASCII.GetBytes(("blob "+$bytes.Length+[char]0))
-  $all=New-Object byte[] ($header.Length+$bytes.Length)
-  [Buffer]::BlockCopy($header,0,$all,0,$header.Length);[Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
-  $sha=[Security.Cryptography.SHA1]::Create();try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$sha.Dispose()}
-}
-function TestHostHealth(){
-  try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3;return [bool]$h.ok}catch{return $false}
-}
+function GitBlobSha1([string]$Path){$bytes=[IO.File]::ReadAllBytes($Path);$header=[Text.Encoding]::ASCII.GetBytes(("blob "+$bytes.Length+[char]0));$all=New-Object byte[] ($header.Length+$bytes.Length);[Buffer]::BlockCopy($header,0,$all,0,$header.Length);[Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length);$sha=[Security.Cryptography.SHA1]::Create();try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$sha.Dispose()}}
+function TestHostHealth(){try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3;return [bool]$h.ok}catch{return $false}}
+function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
 
 Write-Host 'HomeDesign Local Agent - IMMEDIATE SAFE RESUME'
 Write-Host 'No reinstall / no new OAuth / no Apps Script redeploy / normal Chrome untouched.'
@@ -39,14 +27,15 @@ StopTarget 'HomeDesignLocalCommandHost.ps1'
 StopTarget 'AgentBootstrap.ps1'
 Start-Sleep -Seconds 1
 
+$nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString()
 Write-Host '[1/5] Refreshing bootstrap...'
 $tmp=$Bootstrap+'.download'
-Invoke-WebRequest -UseBasicParsing -Uri $BootstrapUrl -OutFile $tmp -TimeoutSec 60
+Invoke-WebRequest -UseBasicParsing -Uri (Bust $BootstrapUrl $nonce) -OutFile $tmp -TimeoutSec 60
 Move-Item -LiteralPath $tmp -Destination $Bootstrap -Force
 
-Write-Host '[2/5] Resolving current stable Agent + Bridge...'
-$meta=Invoke-RestMethod -Uri $AgentMetaUrl -Method Get -TimeoutSec 30
-$bridge=Invoke-RestMethod -Uri $BridgeReleaseUrl -Method Get -TimeoutSec 30
+Write-Host '[2/5] Resolving current stable Agent + Bridge with cache bypass...'
+$meta=Invoke-RestMethod -Uri (Bust $AgentMetaUrl ($nonce+'-agent')) -Method Get -TimeoutSec 30
+$bridge=Invoke-RestMethod -Uri (Bust $BridgeReleaseUrl ($nonce+'-bridge')) -Method Get -TimeoutSec 30
 if(-not $meta.enabled){throw 'Local Agent stable channel disabled.'}
 if(-not $bridge.enabled){throw 'NotebookLM bridge stable channel disabled.'}
 $targetAgent=[string]$meta.version
@@ -55,10 +44,10 @@ Write-Host ("targetAgent="+$targetAgent+" targetBridge="+$targetBridge)
 
 Write-Host '[3/5] Downloading and verifying stable Agent now...'
 $agentTmp=$AgentFile+'.resume.download'
-$agentUrl="$AgentBaseUrl/$targetAgent/HomeDesignLocalAgent.ps1"
+$expectedSha=([string]$meta.gitBlobSha1).ToLowerInvariant()
+$agentUrl=Bust ("$AgentBaseUrl/$targetAgent/HomeDesignLocalAgent.ps1") $expectedSha
 Invoke-WebRequest -UseBasicParsing -Uri $agentUrl -OutFile $agentTmp -TimeoutSec 60
 $actualSha=GitBlobSha1 $agentTmp
-$expectedSha=([string]$meta.gitBlobSha1).ToLowerInvariant()
 if($actualSha -ne $expectedSha){Remove-Item $agentTmp -Force -ErrorAction SilentlyContinue;throw "Agent SHA mismatch: actual=$actualSha expected=$expectedSha"}
 Move-Item -LiteralPath $agentTmp -Destination $AgentFile -Force
 
@@ -68,9 +57,7 @@ $directExit=$LASTEXITCODE
 Write-Host ("directAgentExit="+$directExit)
 
 Write-Host '[5/5] Starting bootstrap loop for future self-updates...'
-Start-Process -FilePath 'powershell.exe' -ArgumentList @(
-  '-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$Bootstrap`"",'-Loop'
-) -WindowStyle Hidden
+Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$Bootstrap`"",'-Loop') -WindowStyle Hidden
 
 $deadline=(Get-Date).AddSeconds(150)
 $last=$null
@@ -79,8 +66,9 @@ while((Get-Date)-lt $deadline){
   if(Test-Path -LiteralPath $StateFile){
     try{
       $last=Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8|ConvertFrom-Json
-      $av=[string]$last.agentVersion;$hv=[string]$last.commandHostVersion;$hr=TestHostHealth;$bv=[string]$last.installedVersion
-      Write-Host ("agent="+$av+" host="+$hv+" hostHealth="+$hr+" bridge="+$bv+" status="+[string]$last.status)
+      $av=[string]$last.agentVersion;$hv=[string]$last.commandHostVersion;$hr=TestHostHealth;$bv=[string]$last.extensionVersion
+      if(-not $bv){$bv=[string]$last.installedVersion}
+      Write-Host ("agent="+$av+" host="+$hv+" hostHealth="+$hr+" bridge="+$bv+" status="+[string]$last.status+" governor="+[string]$last.governorCycleOk+" driveSync="+[string]$last.governorDriveSyncOk)
       if($av -eq $targetAgent -and $hr -and $bv -eq $targetBridge){
         Write-Host 'RESUME RESULT: ACTIVE'
         Write-Host 'Stable Agent, localhost command host, and NotebookLM Bridge are aligned.'
