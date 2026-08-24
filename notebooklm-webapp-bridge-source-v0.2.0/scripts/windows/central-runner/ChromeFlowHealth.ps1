@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$Version = 'CHROME_FLOW_HEALTH_V1_20260824'
+$Version = 'CHROME_FLOW_HEALTH_V1_1_20260824'
 $Root = Join-Path $env:LOCALAPPDATA 'CentralAppsScriptRunner'
 $ReportPath = Join-Path $Root 'chrome-flow-health.json'
 $LogPath = Join-Path $Root 'chrome-flow-health.log'
@@ -41,7 +41,9 @@ function Read-Manifest([string]$Path) {
 
 function Get-ChromeExtensionInventory {
   $userData = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
-  $rows = New-Object System.Collections.Generic.List[object]
+  # Windows PowerShell 5.1 compatibility: use a normal PowerShell array here.
+  # Generic List[object] wrapped by @() can throw "Argument types do not match".
+  $rows = @()
   if (!(Test-Path -LiteralPath $userData)) { return @() }
 
   $profiles = Get-ChildItem -LiteralPath $userData -Directory -ErrorAction SilentlyContinue |
@@ -60,10 +62,10 @@ function Get-ChromeExtensionInventory {
         if (!$m) { continue }
         $key = "$($profile.Name)|$($idDir.Name)"
         $seen[$key] = $true
-        $rows.Add([pscustomobject]@{
+        $rows += [pscustomobject]@{
           profile=$profile.Name; id=$idDir.Name; name=[string]$m.name; version=[string]$m.version;
           path=$versionDir.FullName; unpacked=$false; manifest=$m
-        }) | Out-Null
+        }
       }
     }
 
@@ -82,16 +84,16 @@ function Get-ChromeExtensionInventory {
             if (!$m) { continue }
             $key = "$($profile.Name)|$($prop.Name)"
             if ($seen[$key]) { continue }
-            $rows.Add([pscustomobject]@{
+            $rows += [pscustomobject]@{
               profile=$profile.Name; id=$prop.Name; name=[string]$m.name; version=[string]$m.version;
               path=$path; unpacked=$true; manifest=$m
-            }) | Out-Null
+            }
           }
         }
       } catch { Log "PREFERENCES_PARSE_FAILED profile=$($profile.Name) error=$($_.Exception.Message)" }
     }
   }
-  return @($rows)
+  return $rows
 }
 
 function Test-ExtensionFiles($Ext,[System.Collections.Generic.List[object]]$Checks) {
