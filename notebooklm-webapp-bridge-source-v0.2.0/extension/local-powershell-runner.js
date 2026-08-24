@@ -46,7 +46,7 @@ async function lpPoll(reason="alarm"){
   const listed=await lpApi(config.appsScriptUrl,{action:"listTasks",sessionToken});
   const tasks=(Array.isArray(listed.tasks)?listed.tasks:[]).filter(t=>
     String(t.taskType||"").toUpperCase()==="LOCAL_POWERSHELL" &&
-    ["READY","RETRY"].includes(String(t.status||"READY").toUpperCase())
+    ["READY","RETRY","ERROR"].includes(String(t.status||"READY").toUpperCase())
   );
 
   let processed=0;
@@ -61,21 +61,13 @@ async function lpPoll(reason="alarm"){
         action:"completeTask",
         sessionToken,
         taskId:task.taskId,
-        result:{
-          resultText:JSON.stringify(result,null,2),
-          resultUrls:[],
-          notebookUrl:""
-        }
+        result:{resultText:JSON.stringify(result,null,2),resultUrls:[],notebookUrl:""}
       });
       processed++;
     }catch(error){
       try{
         await lpApi(config.appsScriptUrl,{
-          action:"updateTask",
-          sessionToken,
-          taskId:task.taskId,
-          status:"ERROR",
-          patch:{error:String(error?.message||error)}
+          action:"updateTask",sessionToken,taskId:task.taskId,status:"ERROR",patch:{error:String(error?.message||error)}
         });
       }catch{}
     }
@@ -86,9 +78,7 @@ async function lpEnsureAlarm(){
   await chrome.alarms.clear(LP_ALARM);
   await chrome.alarms.create(LP_ALARM,{delayInMinutes:0.2,periodInMinutes:1});
 }
-chrome.alarms.onAlarm.addListener(alarm=>{
-  if(alarm.name===LP_ALARM) lpPoll("alarm").catch(()=>{});
-});
+chrome.alarms.onAlarm.addListener(alarm=>{if(alarm.name===LP_ALARM) lpPoll("alarm").catch(()=>{});});
 chrome.runtime.onInstalled.addListener(()=>lpEnsureAlarm().then(()=>lpPoll("installed")).catch(()=>{}));
 chrome.runtime.onStartup.addListener(()=>lpEnsureAlarm().then(()=>lpPoll("startup")).catch(()=>{}));
 lpEnsureAlarm().then(()=>lpPoll("worker-load")).catch(()=>{});
