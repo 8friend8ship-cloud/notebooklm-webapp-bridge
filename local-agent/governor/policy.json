@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "channel": "stable",
-  "updatedAt": "2026-08-24T16:24:00+09:00",
+  "updatedAt": "2026-08-24T17:07:00+09:00",
   "pollSeconds": 900,
   "rules": {
     "noDelete": true,
@@ -14,12 +14,12 @@
   "managedExtensions": [
     {
       "name": "NotebookLM WebApp Bridge",
-      "canonicalVersion": "0.2.15",
+      "canonicalVersion": "0.2.16",
       "mode": "LOCAL_AGENT_STABLE",
       "profile": "HomeDesignAutomationV7 dedicated CFT",
       "canonicalRepo": "8friend8ship-cloud/notebooklm-webapp-bridge",
-      "sourceCommit": "7ea2361ff74e05bffd4437b23ef60c847a9bb89f",
-      "notes": "Local Agent owns immutable-payload update, backup, dedicated CFT restart, async Host health and rollback. 0.2.15 keeps async LOCAL_POWERSHELL execution, session self-heal and terminal ERROR guard."
+      "sourceCommit": "2349233e864ec64a8da20f99e0e3b009ce8aada3",
+      "notes": "Local Agent owns immutable-payload update, backup, dedicated CFT restart, async Host health and rollback. 0.2.16 preserves async queue/session self-heal and adds a session-free localhost-only stable-agent kick through the existing allowlisted Host task."
     },
     {
       "name": "Flow Agent Bridge",
