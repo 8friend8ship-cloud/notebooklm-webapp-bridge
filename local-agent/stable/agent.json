@@ -3,8 +3,8 @@
   "channel": "stable",
   "enabled": true,
   "version": "1.1.3",
-  "releasedAt": "2026-08-24T14:03:00+09:00",
-  "gitBlobSha1": "75311f1ab093ea0a55df7b56ef164ee9dbd3b4e6",
+  "releasedAt": "2026-08-24T14:04:00+09:00",
+  "gitBlobSha1": "2bed9e771e626b8b192b37fabf71118a79021cb8",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300
 }
