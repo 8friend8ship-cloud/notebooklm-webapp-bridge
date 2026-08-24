@@ -7,14 +7,14 @@
   "version": "0.2.7",
   "releasedAt": "2026-08-24T13:24:00+09:00",
   "requiresUserApproval": false,
-  "description": "Preserve NotebookLM automation and add allowlisted LOCAL_POWERSHELL handoff to the HomeDesign Local Command Host on 127.0.0.1.",
+  "description": "Preserve NotebookLM automation and add allowlisted LOCAL_POWERSHELL handoff to the HomeDesign Local Command Host on 127.0.0.1, including transient ERROR retry.",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {"path":"manifest.json","gitBlobSha1":"42cef8b4c3c782c00d18943556593f5008655bd9"},
     {"path":"background.js","gitBlobSha1":"288f371205a36c8557727ebe78c0f2956c7c10d5"},
-    {"path":"local-powershell-runner.js","gitBlobSha1":"cba6b22f1a528472086328a1c56a770881cd5b84"},
+    {"path":"local-powershell-runner.js","gitBlobSha1":"5cabb7b1d1996620b0d1a17d37a6ea155c9bed49"},
     {"path":"front-main.js","gitBlobSha1":"a246bcfe6a199ae7d171d1cf21b19a20d39db42f"},
     {"path":"front-extension.js","gitBlobSha1":"01590edbfd9eb9d1f0b1271ea7755a49a4a81871"},
     {"path":"content/notebooklm-runner.js","gitBlobSha1":"edaa6089c197ad17c496f96c7dd648a41c77f4ee"}
