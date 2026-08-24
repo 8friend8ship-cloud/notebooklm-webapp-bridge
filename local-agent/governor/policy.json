@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "channel": "stable",
-  "updatedAt": "2026-08-24T15:56:00+09:00",
+  "updatedAt": "2026-08-24T16:05:00+09:00",
   "pollSeconds": 900,
   "rules": {
     "noDelete": true,
@@ -14,11 +14,11 @@
   "managedExtensions": [
     {
       "name": "NotebookLM WebApp Bridge",
-      "canonicalVersion": "0.2.12",
+      "canonicalVersion": "0.2.13",
       "mode": "LOCAL_AGENT_STABLE",
       "profile": "HomeDesignAutomationV7 dedicated CFT",
       "canonicalRepo": "8friend8ship-cloud/notebooklm-webapp-bridge",
-      "notes": "Existing Local Agent owns update, backup, dedicated CFT restart, health and rollback. v0.2.12 uses restart-safe asynchronous LOCAL_POWERSHELL jobs through localhost async host v1.2.0."
+      "notes": "Existing Local Agent owns update, backup, dedicated CFT restart, health and rollback. v0.2.13 claims only LOCAL_POWERSHELL_ASYNC tasks, converts them to LOCAL_POWERSHELL only at async localhost Host 1.2.0, and writes DONE only after /result returns a finished process result."
     },
     {
       "name": "Flow Agent Bridge",
