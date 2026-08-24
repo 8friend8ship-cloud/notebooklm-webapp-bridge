@@ -11,8 +11,13 @@ New-Item -ItemType Directory -Force -Path $Root|Out-Null
 function Proc([string]$Needle){
   try{return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name -match 'powershell|pwsh' -and $_.CommandLine -and $_.CommandLine -like "*$Needle*"})}catch{return @()}
 }
-function KillTree([int]$Pid){try{& taskkill.exe /PID $Pid /T /F 2>$null|Out-Null}catch{try{Stop-Process -Id $Pid -Force -ErrorAction SilentlyContinue}catch{}}}
-function StopTarget([string]$Needle){foreach($p in @(Proc $Needle)){KillTree $p.ProcessId}}
+# NOTE: $PID is a read-only automatic variable in Windows PowerShell.
+# Never use $Pid/$PID as a parameter or assignment target here.
+function KillTree([int]$ProcessId){
+  try{& taskkill.exe /PID $ProcessId /T /F 2>$null|Out-Null}
+  catch{try{Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue}catch{}}
+}
+function StopTarget([string]$Needle){foreach($procItem in @(Proc $Needle)){KillTree -ProcessId ([int]$procItem.ProcessId)}}
 
 Write-Host 'HomeDesign Local Agent - SAFE RESUME'
 Write-Host 'Normal Chrome / OAuth / Apps Script / extension data will not be changed.'
