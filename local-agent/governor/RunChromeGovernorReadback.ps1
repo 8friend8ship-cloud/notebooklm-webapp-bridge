@@ -4,12 +4,14 @@ $ProgressPreference='SilentlyContinue'
 
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $AgentRoot=Join-Path $Base 'LocalAgent'
+$VideoRoot=Join-Path $Base 'VideoProduction'
 $GovRoot=Join-Path $Base 'ChromeGovernor'
 $ExtensionRoot=Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
 $DedicatedUserData=Join-Path $Base 'ChromeUserData'
 $NormalRoot=Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
 $AgentStatePath=Join-Path $AgentRoot 'state.json'
 $VideoJobStatePath=Join-Path $AgentRoot 'video-job-state.json'
+$VideoJobConsolePath=Join-Path $AgentRoot 'video-job-console.log'
 $GovStatePath=Join-Path $GovRoot 'state.json'
 $InventoryPath=Join-Path $GovRoot 'inventory.json'
 $NodeGovPath=Join-Path $GovRoot 'chromeGovernorFast.js'
@@ -23,6 +25,7 @@ $ReleaseUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-web
 New-Item -ItemType Directory -Force -Path $AgentRoot,$GovRoot|Out-Null
 
 function ReadJson([string]$Path){if(-not(Test-Path -LiteralPath $Path)){return $null};try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}}
+function Tail([string]$Path,[int]$Count=40){if(-not(Test-Path -LiteralPath $Path)){return @()};try{return @(Get-Content -LiteralPath $Path -Tail $Count -Encoding UTF8)}catch{return @('TAIL_ERROR: '+$_.Exception.Message)}}
 function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
 function Refresh([string]$Url,[string]$Path){$tmp=$Path+'.download';Invoke-WebRequest -UseBasicParsing -Uri (Bust $Url ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString())) -OutFile $tmp -TimeoutSec 60;Move-Item -LiteralPath $tmp -Destination $Path -Force}
 function QuoteArgs([object[]]$Items){return (($Items|ForEach-Object{$s=[string]$_;if($s -match '[\s"]'){'"'+($s -replace '"','\"')+'"'}else{$s}})-join ' ')}
@@ -36,6 +39,21 @@ function FindCentral{
   return ''
 }
 function GetHostHealth{try{return Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3}catch{return $null}}
+function GetVideoDiagnostics{
+  $latest=$null
+  try{$latest=Get-ChildItem -LiteralPath $VideoRoot -Directory -ErrorAction SilentlyContinue|Where-Object{$_.Name -like 'AUTO_QA_*'}|Sort-Object LastWriteTime -Descending|Select-Object -First 1}catch{}
+  if(-not $latest){return [ordered]@{latestAutoQaRun='';jobConsoleTail=(Tail $VideoJobConsolePath 50)}}
+  $q1=Join-Path $latest.FullName 'out\QA_PASS_1';$q2=Join-Path $latest.FullName 'out\QA_PASS_2'
+  return [ordered]@{
+    latestAutoQaRun=$latest.FullName;latestAutoQaModifiedAt=$latest.LastWriteTime.ToString('o')
+    autoQaLogTail=(Tail (Join-Path $latest.FullName 'auto-qa.log') 40)
+    jobConsoleTail=(Tail $VideoJobConsolePath 50)
+    qa1Summary=(ReadJson (Join-Path $q1 '00_FRAME_QA_SUMMARY.json'));qa2Summary=(ReadJson (Join-Path $q2 '00_FRAME_QA_SUMMARY.json'))
+    qa1ConsoleTail=(Tail (Join-Path $q1 'qa-console.log') 30);qa2ConsoleTail=(Tail (Join-Path $q2 'qa-console.log') 30)
+    qa1Files=$(if(Test-Path -LiteralPath $q1){@(Get-ChildItem -LiteralPath $q1 -File -ErrorAction SilentlyContinue|Select-Object -ExpandProperty Name)}else{@()})
+    qa2Files=$(if(Test-Path -LiteralPath $q2){@(Get-ChildItem -LiteralPath $q2 -File -ErrorAction SilentlyContinue|Select-Object -ExpandProperty Name)}else{@()})
+  }
+}
 function CopyGovernorToCentral([string]$Central){
   $ok=$false;$out=''
   if($Central -and (Test-Path -LiteralPath $GovStatePath) -and (Test-Path -LiteralPath $InventoryPath)){
@@ -55,7 +73,7 @@ function RunNodeGovernor{
   }catch{return [ordered]@{ok=$false;exitCode=1;error=$_.Exception.Message}}
 }
 function RuntimeStatus($GovernorRun=$null){
-  $agentStateObj=ReadJson $AgentStatePath;$videoJobStateObj=ReadJson $VideoJobStatePath;$bridgeManifest=ReadJson (Join-Path $ExtensionRoot 'manifest.json');$hostInfo=GetHostHealth;$kickInfo=ReadJson $KickStatusPath;$govStateObj=ReadJson $GovStatePath;$central=FindCentral;$copyInfo=CopyGovernorToCentral $central
+  $agentStateObj=ReadJson $AgentStatePath;$videoJobStateObj=ReadJson $VideoJobStatePath;$videoDiagnostics=GetVideoDiagnostics;$bridgeManifest=ReadJson (Join-Path $ExtensionRoot 'manifest.json');$hostInfo=GetHostHealth;$kickInfo=ReadJson $KickStatusPath;$govStateObj=ReadJson $GovStatePath;$central=FindCentral;$copyInfo=CopyGovernorToCentral $central
   $managed=@();$issues=@();$dups=@()
   if($govStateObj -and $govStateObj.extensions){$managed=@($govStateObj.extensions|Where-Object{$_.classification -eq 'CENTRAL_MANAGED'}|Select-Object name,id,profile,installedVersion,expectedVersion,action,fileIntegrityOk,path);$issues=@($govStateObj.extensions|Where-Object{$_.action -notin @('CHECK_OK','OWNED_BY_LOCAL_AGENT','NO_AUTO_CHANGE','OBSERVE_ONLY')}|Select-Object name,id,profile,installedVersion,expectedVersion,classification,action,fileIntegrityOk,path)}
   if($govStateObj -and $govStateObj.duplicates){$dups=@($govStateObj.duplicates|Select-Object name,count,ids,profiles)}
@@ -63,7 +81,7 @@ function RuntimeStatus($GovernorRun=$null){
     ok=$true;action='LOCAL_RUNTIME_STATUS_LIGHTWEIGHT';at=(Get-Date).ToString('o')
     agentVersion=$(if($agentStateObj){[string]$agentStateObj.agentVersion}else{'UNKNOWN'});agentStatus=$(if($agentStateObj){[string]$agentStateObj.status}else{'UNKNOWN'})
     bridgeVersion=$(if($bridgeManifest){[string]$bridgeManifest.version}else{'UNKNOWN'});hostHealthy=$(if($hostInfo){[bool]$hostInfo.ok}else{$false});hostVersion=$(if($hostInfo){[string]$hostInfo.version}else{'UNKNOWN'});hostAsyncJobs=$(if($hostInfo){[bool]$hostInfo.asyncJobs}else{$false})
-    videoWorkerInstalled=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerInstalled){[bool]$agentStateObj.videoWorkerInstalled}else{$false});videoWorkerRunning=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerRunning){[bool]$agentStateObj.videoWorkerRunning}else{$false});videoWorkerLaunchedThisCycle=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerLaunchedThisCycle){[bool]$agentStateObj.videoWorkerLaunchedThisCycle}else{$false});videoWorkerStatus=$(if($agentStateObj -and $agentStateObj.videoWorkerStatus){[string]$agentStateObj.videoWorkerStatus}elseif($videoJobStateObj){[string]$videoJobStateObj.status}else{'UNKNOWN'});videoWorkerAttempts=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerAttempts){[int]$agentStateObj.videoWorkerAttempts}elseif($videoJobStateObj -and $videoJobStateObj.attempts){[int]$videoJobStateObj.attempts}else{0});videoJobState=$videoJobStateObj
+    videoWorkerInstalled=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerInstalled){[bool]$agentStateObj.videoWorkerInstalled}else{$false});videoWorkerRunning=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerRunning){[bool]$agentStateObj.videoWorkerRunning}else{$false});videoWorkerLaunchedThisCycle=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerLaunchedThisCycle){[bool]$agentStateObj.videoWorkerLaunchedThisCycle}else{$false});videoWorkerStatus=$(if($agentStateObj -and $agentStateObj.videoWorkerStatus){[string]$agentStateObj.videoWorkerStatus}elseif($videoJobStateObj){[string]$videoJobStateObj.status}else{'UNKNOWN'});videoWorkerAttempts=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerAttempts){[int]$agentStateObj.videoWorkerAttempts}elseif($videoJobStateObj -and $videoJobStateObj.attempts){[int]$videoJobStateObj.attempts}else{0});videoJobState=$videoJobStateObj;videoDiagnostics=$videoDiagnostics
     governorPresent=[bool]$govStateObj;governorRun=$GovernorRun;governorCycleOk=$(if($govStateObj -and $null -ne $govStateObj.ok){[bool]$govStateObj.ok}elseif($agentStateObj -and $null -ne $agentStateObj.governorCycleOk){[bool]$agentStateObj.governorCycleOk}else{$false});governorDriveSyncOk=[bool]$copyInfo.ok;governorCentralPath=$central
     governorSummary=$(if($govStateObj){$govStateObj.summary}else{$null});governorScanEngine=$(if($govStateObj){[string]$govStateObj.scanEngine}else{''});governorScanError=$(if($govStateObj){[string]$govStateObj.scanError}else{''});managedExtensions=$managed;issues=$issues;duplicates=$dups
     kickStatus=$kickInfo;lastError=$(if($agentStateObj){[string]$agentStateObj.lastError}else{''})
