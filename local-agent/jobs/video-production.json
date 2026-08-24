@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "enabled": true,
-  "jobId": "VIDEO_AGENT_DASHBOARD_FIRST_MP4_QA_RECOVERY_20260824_002",
-  "description": "Reuse the already rendered V11 MP4 only. Run technical Frame-QA pass 1 and 2 with direct child PowerShell, copy MP4/manifest/QA artifacts to central Drive, and mark Animation Apps Script E2E as a separate follow-up gate so QA is not blocked by clasp/runtime latency. Diagnostic hold after two timed-out attempts; do not launch additional identical retries until root cause is patched into a new job version.",
+  "jobId": "VIDEO_AGENT_DASHBOARD_FIRST_MP4_QA_RECOVERY_20260824_003",
+  "description": "V3 root-cause repair: reuse the completed V11 MP4, patch Frame-QA ffmpeg calls with -nostdin, use nonblocking timeout handling so a child timeout cannot deadlock the outer worker, run QA pass 1 and 2, then find central Drive with the robust recursive method and copy MP4/manifest/QA/result. Animation Apps Script E2E remains a separate follow-up gate.",
   "scriptRepo": "8friend8ship-cloud/animation",
   "scriptRef": "codex/video-promo-agent-workflow-20260823",
-  "scriptPath": "tools/Run-AgentDashboardPromoAutoRecoveryV2.ps1",
-  "scriptBlobSha1": "04f5fe9f91f2b232a03bc6839c608e147a40a3d3",
-  "timeoutSeconds": 480,
-  "maxAttempts": 2,
-  "retryEveryAgentCycle": false,
+  "scriptPath": "tools/Run-AgentDashboardPromoAutoRecoveryV3.ps1",
+  "scriptBlobSha1": "77ced19ec8ed9e31da06f960b15c931fea3e9dc4",
+  "timeoutSeconds": 420,
+  "maxAttempts": 3,
+  "retryEveryAgentCycle": true,
   "successReadback": "Video_Production/2026/08/AGENT_DASHBOARD_PROMO_FIRST_MP4_20260824/VIDEO_AUTO_RECOVERY_RESULT.json",
   "approvalBoundary": "EXISTING_APPROVAL_ONLY_NO_NEW_OAUTH_NO_NEW_COST_NO_PUBLIC_PUBLISH"
 }
