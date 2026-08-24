@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.15",
-  "description": "HomeDesign dedicated Chrome bridge with async local PowerShell jobs, session self-heal, canonical API fallback, and terminal ERROR retry guard.",
+  "version": "0.2.16",
+  "description": "HomeDesign dedicated Chrome bridge with async local PowerShell jobs, session self-heal, immutable payload updates, and session-free local stable-agent recovery.",
   "permissions": ["alarms","identity","identity.email","scripting","sidePanel","storage","tabs"],
   "host_permissions": ["https://notebooklm.google.com/*","https://notebook.google.com/*","https://script.google.com/*","https://script.googleusercontent.com/*","https://notebooklm-webapp-bridge.vercel.app/*","http://127.0.0.1/*"],
   "externally_connectable": {"matches":["http://localhost/*","http://127.0.0.1/*","https://*.vercel.app/*"]},
-  "background": {"service_worker":"local-powershell-runner.js","type":"module"},
+  "background": {"service_worker":"worker.js","type":"module"},
   "action": {"default_title":"NotebookLM WebApp Bridge"},
   "content_scripts": [
     {"matches":["https://notebooklm.google.com/*","https://notebook.google.com/*"],"js":["content/notebooklm-runner.js"],"run_at":"document_idle"},
