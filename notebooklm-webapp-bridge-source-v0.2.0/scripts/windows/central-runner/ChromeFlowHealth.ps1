@@ -1,115 +1,121 @@
 param(
-  [string]$AppsScriptUrl = 'https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec',
-  [string]$FrontendUrl = 'https://notebooklm-webapp-bridge.vercel.app',
-  [int]$TimeoutSeconds = 18
+  [int]$TimeoutSeconds = 20
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$Version = 'CHROME_FLOW_HEALTH_V1_1_20260824'
-$Root = Join-Path $env:LOCALAPPDATA 'CentralAppsScriptRunner'
-$ReportPath = Join-Path $Root 'chrome-flow-health.json'
-$LogPath = Join-Path $Root 'chrome-flow-health.log'
-New-Item -ItemType Directory -Force -Path $Root | Out-Null
+$Version = 'CHROME_FLOW_HEALTH_V2_20260824'
+
+$LegacyRoot = Join-Path $env:LOCALAPPDATA 'CentralAppsScriptRunner'
+$Base = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
+$AgentRoot = Join-Path $Base 'LocalAgent'
+$AgentFile = Join-Path $AgentRoot 'HomeDesignLocalAgent.ps1'
+$BootstrapFile = Join-Path $AgentRoot 'AgentBootstrap.ps1'
+$AgentStatePath = Join-Path $AgentRoot 'state.json'
+$ExtensionRoot = Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
+$ManifestPath = Join-Path $ExtensionRoot 'manifest.json'
+$UserData = Join-Path $Base 'ChromeUserData'
+$CftRoot = Join-Path $Base 'ChromeForTesting'
+$ReportPath = Join-Path $LegacyRoot 'chrome-flow-health.json'
+$LogPath = Join-Path $LegacyRoot 'chrome-flow-health.log'
+$StableReleaseUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/runtime/stable/release.json'
+$FallbackExtensionId = 'llgjlejpknemhdmckoaifgjnjikceamp'
+
+New-Item -ItemType Directory -Force -Path $LegacyRoot | Out-Null
 
 function Log([string]$Message) {
   Add-Content -LiteralPath $LogPath -Value "$(Get-Date -Format o) $Message" -Encoding UTF8
 }
 
-function Add-Check([System.Collections.Generic.List[object]]$Checks,[string]$Name,[bool]$Ok,[string]$Detail) {
-  $Checks.Add([pscustomobject]@{ name=$Name; ok=$Ok; detail=$Detail }) | Out-Null
+function Read-JsonFile([string]$Path) {
+  if (!(Test-Path -LiteralPath $Path)) { return $null }
+  try { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json }
+  catch { Log "JSON_READ_FAIL path=$Path error=$($_.Exception.Message)"; return $null }
 }
 
-function Get-ChromePath {
-  $cmd = Get-Command chrome.exe -ErrorAction SilentlyContinue
-  if ($cmd) { return $cmd.Source }
-  $candidates = @(
-    (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
-    (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
-    (Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe')
-  )
-  foreach ($c in $candidates) { if ($c -and (Test-Path -LiteralPath $c)) { return $c } }
-  return $null
+function Normalize-PathText([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) { return '' }
+  try { return ([IO.Path]::GetFullPath($Path)).TrimEnd('\\').ToLowerInvariant() }
+  catch { return $Path.TrimEnd('\\').ToLowerInvariant() }
 }
 
-function Read-Manifest([string]$Path) {
+function Find-CftChrome {
+  if (!(Test-Path -LiteralPath $CftRoot)) { return $null }
+  return Get-ChildItem -LiteralPath $CftRoot -Recurse -Filter chrome.exe -File -ErrorAction SilentlyContinue |
+    Sort-Object FullName -Descending | Select-Object -First 1
+}
+
+function Get-ProcessRows([string]$Needle) {
   try {
-    if (!(Test-Path -LiteralPath $Path)) { return $null }
-    return Get-Content -Raw -LiteralPath $Path -Encoding UTF8 | ConvertFrom-Json
-  } catch { return $null }
+    return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+      Where-Object { $_.CommandLine -and $_.CommandLine -like "*$Needle*" })
+  } catch { return @() }
 }
 
-function Get-ChromeExtensionInventory {
-  $userData = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
-  # Windows PowerShell 5.1 compatibility: use a normal PowerShell array here.
-  # Generic List[object] wrapped by @() can throw "Argument types do not match".
-  $rows = @()
-  if (!(Test-Path -LiteralPath $userData)) { return @() }
+function Start-BootstrapLoopIfMissing {
+  if (!(Test-Path -LiteralPath $BootstrapFile)) { return $false }
+  $existing = @(Get-ProcessRows 'HomeDesignAutomationV7*LocalAgent*AgentBootstrap.ps1')
+  if ($existing.Count -gt 0) { return $true }
+  try {
+    Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+      '-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$BootstrapFile`"",'-Loop'
+    ) -WindowStyle Hidden | Out-Null
+    Start-Sleep -Seconds 1
+    Log 'LOCAL_AGENT_BOOTSTRAP_LOOP_STARTED_SAFE'
+    return $true
+  } catch {
+    Log "LOCAL_AGENT_BOOTSTRAP_LOOP_START_FAIL $($_.Exception.Message)"
+    return $false
+  }
+}
 
-  $profiles = Get-ChildItem -LiteralPath $userData -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' }
+function Invoke-SafeAgentCycleIfNeeded($Release,$State,$Manifest) {
+  if (!(Test-Path -LiteralPath $AgentFile)) { return [ordered]@{attempted=$false;reason='AGENT_FILE_MISSING'} }
+  $targetVersion = [string]$Release.version
+  $installedState = if ($State) { [string]$State.installedVersion } else { '' }
+  $manifestVersion = if ($Manifest) { [string]$Manifest.version } else { '' }
+  $dedicatedRunning = @(Get-ProcessRows $UserData).Count -gt 0
+  $needs = ($installedState -ne $targetVersion) -or ($manifestVersion -ne $targetVersion) -or (-not $dedicatedRunning)
+  if (-not $needs) { return [ordered]@{attempted=$false;reason='ALREADY_CURRENT'} }
 
-  foreach ($profile in $profiles) {
-    $seen = @{}
-    $extRoot = Join-Path $profile.FullName 'Extensions'
-    if (Test-Path -LiteralPath $extRoot) {
-      foreach ($idDir in (Get-ChildItem -LiteralPath $extRoot -Directory -ErrorAction SilentlyContinue)) {
-        $versionDir = Get-ChildItem -LiteralPath $idDir.FullName -Directory -ErrorAction SilentlyContinue |
-          Sort-Object Name -Descending | Select-Object -First 1
-        if (!$versionDir) { continue }
-        $manifestPath = Join-Path $versionDir.FullName 'manifest.json'
-        $m = Read-Manifest $manifestPath
-        if (!$m) { continue }
-        $key = "$($profile.Name)|$($idDir.Name)"
-        $seen[$key] = $true
-        $rows += [pscustomobject]@{
-          profile=$profile.Name; id=$idDir.Name; name=[string]$m.name; version=[string]$m.version;
-          path=$versionDir.FullName; unpacked=$false; manifest=$m
+  $activeAgent = @(Get-ProcessRows 'HomeDesignLocalAgent.ps1')
+  if ($activeAgent.Count -gt 0) { return [ordered]@{attempted=$false;reason='AGENT_CYCLE_ALREADY_RUNNING'} }
+
+  try {
+    Log "SAFE_AGENT_CYCLE_START target=$targetVersion state=$installedState manifest=$manifestVersion dedicatedRunning=$dedicatedRunning"
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $AgentFile
+    $exitCode = $LASTEXITCODE
+    Log "SAFE_AGENT_CYCLE_END exit=$exitCode"
+    Start-Sleep -Seconds 2
+    return [ordered]@{attempted=$true;exitCode=$exitCode;reason='STABLE_CHANNEL_APPLY_OR_HEALTH'}
+  } catch {
+    Log "SAFE_AGENT_CYCLE_FAIL $($_.Exception.Message)"
+    return [ordered]@{attempted=$true;exitCode=1;reason='EXCEPTION';error=$_.Exception.Message}
+  }
+}
+
+function Resolve-DedicatedExtensionId {
+  $expected = Normalize-PathText $ExtensionRoot
+  $preferenceFiles = @(
+    (Join-Path $UserData 'Default\Preferences'),
+    (Join-Path $UserData 'Default\Secure Preferences')
+  )
+  foreach ($pref in $preferenceFiles) {
+    if (!(Test-Path -LiteralPath $pref)) { continue }
+    try {
+      $json = Get-Content -LiteralPath $pref -Raw -Encoding UTF8 | ConvertFrom-Json
+      $settings = $json.extensions.settings
+      if (!$settings) { continue }
+      foreach ($prop in $settings.PSObject.Properties) {
+        $s = $prop.Value
+        $p = Normalize-PathText ([string]$s.path)
+        if ($p -and $p -eq $expected) {
+          return [ordered]@{id=$prop.Name;source=$pref}
         }
       }
-    }
-
-    $prefPath = Join-Path $profile.FullName 'Preferences'
-    if (Test-Path -LiteralPath $prefPath) {
-      try {
-        $p = Get-Content -Raw -LiteralPath $prefPath -Encoding UTF8 | ConvertFrom-Json
-        $settings = $p.extensions.settings
-        if ($settings) {
-          foreach ($prop in $settings.PSObject.Properties) {
-            $s = $prop.Value
-            if (!$s.path) { continue }
-            $path = [string]$s.path
-            if (!(Test-Path -LiteralPath $path)) { continue }
-            $m = Read-Manifest (Join-Path $path 'manifest.json')
-            if (!$m) { continue }
-            $key = "$($profile.Name)|$($prop.Name)"
-            if ($seen[$key]) { continue }
-            $rows += [pscustomobject]@{
-              profile=$profile.Name; id=$prop.Name; name=[string]$m.name; version=[string]$m.version;
-              path=$path; unpacked=$true; manifest=$m
-            }
-          }
-        }
-      } catch { Log "PREFERENCES_PARSE_FAILED profile=$($profile.Name) error=$($_.Exception.Message)" }
-    }
+    } catch { Log "EXTENSION_ID_PREF_PARSE_FAIL path=$pref error=$($_.Exception.Message)" }
   }
-  return $rows
-}
-
-function Test-ExtensionFiles($Ext,[System.Collections.Generic.List[object]]$Checks) {
-  if (!$Ext) { return }
-  $m = $Ext.manifest
-  $base = [string]$Ext.path
-  if ($m.background -and $m.background.service_worker) {
-    $p = Join-Path $base ([string]$m.background.service_worker)
-    Add-Check $Checks "$($Ext.name) service_worker" (Test-Path -LiteralPath $p) $p
-  }
-  foreach ($cs in @($m.content_scripts)) {
-    foreach ($js in @($cs.js)) {
-      $p = Join-Path $base ([string]$js)
-      Add-Check $Checks "$($Ext.name) content_script $js" (Test-Path -LiteralPath $p) $p
-    }
-  }
+  return [ordered]@{id=$FallbackExtensionId;source='CENTRAL_REGISTRY_FALLBACK'}
 }
 
 function Get-FreePort {
@@ -120,190 +126,173 @@ function Get-FreePort {
   return $port
 }
 
-function Invoke-ExtensionPing([string]$ChromePath,[string]$ExtensionId,[int]$TimeoutSeconds) {
+function Invoke-DedicatedExtensionPing([string]$ChromePath,[string]$ExtensionId) {
   $node = Get-Command node.exe -ErrorAction SilentlyContinue
   if (!$node) { $node = Get-Command node -ErrorAction SilentlyContinue }
-  if (!$node) { return [ordered]@{ ok=$false; error='NODE_NOT_FOUND' } }
-  if ($ExtensionId -notmatch '^[a-p]{32}$') { return [ordered]@{ ok=$false; error='INVALID_EXTENSION_ID'; extensionId=$ExtensionId } }
+  if (!$node) { return [ordered]@{ok=$false;error='NODE_NOT_FOUND_FOR_LOCAL_PING'} }
+  if ($ExtensionId -notmatch '^[a-p]{32}$') { return [ordered]@{ok=$false;error='INVALID_EXTENSION_ID';extensionId=$ExtensionId} }
 
   $port = Get-FreePort
   $stamp = Get-Date -Format 'yyyyMMdd_HHmmss_fff'
-  $tmp = Join-Path $env:TEMP "chrome-flow-ping-$stamp"
+  $tmp = Join-Path $env:TEMP "homedesign-cft-ping-$stamp"
   New-Item -ItemType Directory -Force -Path $tmp | Out-Null
   $resultPath = Join-Path $tmp 'result.json'
   $serverPath = Join-Path $tmp 'server.js'
   $resultJs = ($resultPath | ConvertTo-Json -Compress)
   $extJs = ($ExtensionId | ConvertTo-Json -Compress)
-  $timeoutMs = [Math]::Max(5000,$TimeoutSeconds*1000)
+  $timeoutMs = [Math]::Max(8000,$TimeoutSeconds*1000)
 
   $server = @'
-const http = require('http');
-const fs = require('fs');
-const port = __PORT__;
-const resultPath = __RESULT_PATH__;
-const extensionId = __EXTENSION_ID__;
-const html = `<!doctype html><meta charset="utf-8"><title>HomeDesign Chrome Bridge Check</title>
-<body style="font-family:system-ui;padding:24px"><h2>Chrome Bridge 자동 점검</h2><div id="s">확장 응답 확인 중…</div>
-<script>
-const done=(obj)=>fetch('/result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(obj)})
-  .then(()=>{document.getElementById('s').textContent=obj.ok?'연결 정상 — 이 탭은 닫아도 됩니다.':'연결 점검 필요 — '+(obj.error||'unknown');});
-try{
-  if(!globalThis.chrome || !chrome.runtime || !chrome.runtime.sendMessage){ done({ok:false,error:'CHROME_RUNTIME_UNAVAILABLE'}); }
-  else chrome.runtime.sendMessage(extensionId,{source:'notebooklm-webapp-bridge',type:'PING'},(response)=>{
-    if(chrome.runtime.lastError) done({ok:false,error:chrome.runtime.lastError.message,extensionId});
-    else done({ok:!!(response&&response.ok),response,extensionId});
-  });
-}catch(e){done({ok:false,error:String(e),extensionId});}
-</script>`;
-let finished=false;
-const finish=(obj,code=0)=>{
-  if(finished) return; finished=true;
-  try{fs.writeFileSync(resultPath,JSON.stringify(obj,null,2));}catch{}
-  setTimeout(()=>server.close(()=>process.exit(code)),150);
-};
-const server=http.createServer((req,res)=>{
-  if(req.method==='GET' && req.url==='/'){
-    res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}); res.end(html); return;
-  }
-  if(req.method==='POST' && req.url==='/result'){
-    let body=''; req.on('data',c=>body+=c); req.on('end',()=>{
-      let obj; try{obj=JSON.parse(body||'{}');}catch{obj={ok:false,error:'RESULT_JSON_PARSE_FAILED',raw:body};}
-      res.writeHead(200,{'content-type':'text/plain'});res.end('ok'); finish(obj,obj.ok?0:2);
-    }); return;
-  }
-  res.writeHead(404);res.end('not found');
-});
-server.listen(port,'127.0.0.1');
-setTimeout(()=>finish({ok:false,error:'EXTENSION_PING_TIMEOUT',extensionId},2),__TIMEOUT_MS__);
+const http=require('http'),fs=require('fs');
+const port=__PORT__,resultPath=__RESULT_PATH__,extensionId=__EXTENSION_ID__;
+const html=`<!doctype html><meta charset="utf-8"><title>HomeDesign CFT Bridge Check</title><div id="s">NotebookLM Bridge 확인 중…</div><script>
+const done=o=>fetch('/result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(o)}).then(()=>document.getElementById('s').textContent=o.ok?'연결 정상 — 이 탭은 닫아도 됩니다.':'점검 필요 — '+(o.error||'unknown'));
+try{if(!globalThis.chrome?.runtime?.sendMessage)done({ok:false,error:'CHROME_RUNTIME_UNAVAILABLE'});else chrome.runtime.sendMessage(extensionId,{source:'notebooklm-webapp-bridge',type:'PING'},r=>{if(chrome.runtime.lastError)done({ok:false,error:chrome.runtime.lastError.message,extensionId});else done({ok:!!r?.ok,response:r,extensionId});});}catch(e){done({ok:false,error:String(e),extensionId});}</script>`;
+let finished=false;const finish=(o,c=0)=>{if(finished)return;finished=true;try{fs.writeFileSync(resultPath,JSON.stringify(o,null,2));}catch{}setTimeout(()=>server.close(()=>process.exit(c)),100)};
+const server=http.createServer((req,res)=>{if(req.method==='GET'&&req.url==='/'){res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store'});res.end(html);return;}if(req.method==='POST'&&req.url==='/result'){let b='';req.on('data',c=>b+=c);req.on('end',()=>{let o;try{o=JSON.parse(b||'{}')}catch{o={ok:false,error:'RESULT_JSON_PARSE_FAILED'}}res.writeHead(200);res.end('ok');finish(o,o.ok?0:2)});return;}res.writeHead(404);res.end('not found')});
+server.listen(port,'127.0.0.1');setTimeout(()=>finish({ok:false,error:'EXTENSION_PING_TIMEOUT',extensionId},2),__TIMEOUT_MS__);
 '@
   $server = $server.Replace('__PORT__',[string]$port).Replace('__RESULT_PATH__',$resultJs).Replace('__EXTENSION_ID__',$extJs).Replace('__TIMEOUT_MS__',[string]$timeoutMs)
   Set-Content -LiteralPath $serverPath -Value $server -Encoding UTF8
 
   $proc = Start-Process -FilePath $node.Source -ArgumentList @($serverPath) -WindowStyle Hidden -PassThru
-  Start-Sleep -Milliseconds 600
-  Start-Process -FilePath $ChromePath -ArgumentList "http://127.0.0.1:$port/" | Out-Null
+  Start-Sleep -Milliseconds 500
+  $args = @(
+    "--user-data-dir=$UserData",
+    '--profile-directory=Default',
+    "http://127.0.0.1:$port/"
+  )
+  Start-Process -FilePath $ChromePath -ArgumentList $args | Out-Null
 
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds + 3)
   while ((Get-Date) -lt $deadline -and !(Test-Path -LiteralPath $resultPath)) { Start-Sleep -Milliseconds 300 }
   if (!(Test-Path -LiteralPath $resultPath)) {
     try { if (!$proc.HasExited) { $proc.Kill() } } catch {}
-    return [ordered]@{ ok=$false; error='PING_RESULT_NOT_CREATED'; extensionId=$ExtensionId; port=$port }
+    return [ordered]@{ok=$false;error='PING_RESULT_NOT_CREATED';extensionId=$ExtensionId}
   }
-  try { return Get-Content -Raw -LiteralPath $resultPath -Encoding UTF8 | ConvertFrom-Json }
-  catch { return [ordered]@{ ok=$false; error='PING_RESULT_PARSE_FAILED'; extensionId=$ExtensionId } }
+  try { return Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+  catch { return [ordered]@{ok=$false;error='PING_RESULT_PARSE_FAILED';extensionId=$ExtensionId} }
 }
 
-$checks = New-Object 'System.Collections.Generic.List[object]'
-$inventory = @(Get-ChromeExtensionInventory)
-$known = @(
-  [pscustomobject]@{ name='NotebookLM WebApp Bridge'; expected='0.2.4'; priority='P0_FALLBACK' },
-  [pscustomobject]@{ name='Google AI Local Bridge v1'; expected='1.0.1'; priority='P0' },
-  [pscustomobject]@{ name='Flow Agent Bridge'; expected='0.1.0'; priority='P1' },
-  [pscustomobject]@{ name='AI Studio Bridge'; expected='0.3.2'; priority='P1' },
-  [pscustomobject]@{ name='Front App Test Bridge'; expected='1.0.2'; priority='P1' }
-)
+Log '=== CHROME FLOW HEALTH V2 START ==='
 
-$knownResults = @()
-foreach ($k in $known) {
-  $matches = @($inventory | Where-Object { $_.name -eq $k.name })
-  $ext = $matches | Select-Object -First 1
-  $ok = $null -ne $ext
-  $detail = 'NOT_FOUND'
-  if ($ok) { $detail = "v$($ext.version) id=$($ext.id) profile=$($ext.profile) path=$($ext.path)" }
-  Add-Check $checks "Installed $($k.name)" $ok $detail
-  if ($ext) {
-    Add-Check $checks "Version $($k.name)" ([string]$ext.version -eq [string]$k.expected) "installed=$($ext.version) expected=$($k.expected)"
-    Test-ExtensionFiles $ext $checks
-  }
-  $knownResults += [pscustomobject]@{
-    name=$k.name; expected=$k.expected; priority=$k.priority; found=$ok;
-    version=$(if($ext){$ext.version}else{$null}); id=$(if($ext){$ext.id}else{$null});
-    profile=$(if($ext){$ext.profile}else{$null}); path=$(if($ext){$ext.path}else{$null}); unpacked=$(if($ext){$ext.unpacked}else{$null})
-  }
+$release = $null
+try { $release = Invoke-RestMethod -Uri $StableReleaseUrl -Method Get -TimeoutSec 20 }
+catch { $release = [pscustomobject]@{enabled=$false;version='';healthUrl='';frontUrl='';error=$_.Exception.Message} }
+
+$bootstrapLoopReady = Start-BootstrapLoopIfMissing
+$stateBefore = Read-JsonFile $AgentStatePath
+$manifestBefore = Read-JsonFile $ManifestPath
+$agentCycle = if ($release -and $release.enabled) { Invoke-SafeAgentCycleIfNeeded $release $stateBefore $manifestBefore } else { [ordered]@{attempted=$false;reason='STABLE_RELEASE_UNAVAILABLE'} }
+$state = Read-JsonFile $AgentStatePath
+$manifest = Read-JsonFile $ManifestPath
+$cft = Find-CftChrome
+$dedicatedRunning = @(Get-ProcessRows $UserData).Count -gt 0
+$extIdentity = Resolve-DedicatedExtensionId
+
+$frontHealth = [ordered]@{ok=$false}
+if ($release -and $release.frontUrl) {
+  try {
+    $r = Invoke-WebRequest -UseBasicParsing -Uri ([string]$release.frontUrl) -Method Get -TimeoutSec 15
+    $frontHealth = [ordered]@{ok=($r.StatusCode -ge 200 -and $r.StatusCode -lt 400);status=[int]$r.StatusCode}
+  } catch { $frontHealth=[ordered]@{ok=$false;error=$_.Exception.Message} }
 }
 
-$chromePath = Get-ChromePath
-Add-Check $checks 'Chrome executable' ($null -ne $chromePath) ([string]$chromePath)
-
-$clasp = Get-Command clasp.cmd -ErrorAction SilentlyContinue
-$claspDetail = 'NOT_FOUND'
-if ($clasp) { $claspDetail = [string]$clasp.Source }
-Add-Check $checks 'clasp.cmd' ($null -ne $clasp) $claspDetail
-$claspAuth = $false
-if ($clasp) {
-  & $clasp.Source show-authorized-user --json *> $null
-  if ($LASTEXITCODE -eq 0) { $claspAuth=$true }
-  else {
-    & $clasp.Source show-authorized-user *> $null
-    if ($LASTEXITCODE -eq 0) { $claspAuth=$true }
-  }
+$appsHealth = [ordered]@{ok=$false}
+if ($release -and $release.healthUrl) {
+  try {
+    $body = @{action='health'} | ConvertTo-Json -Compress
+    $appsHealth = Invoke-RestMethod -Uri ([string]$release.healthUrl) -Method Post -ContentType 'text/plain;charset=utf-8' -Body $body -TimeoutSec 20
+  } catch { $appsHealth=[ordered]@{ok=$false;error=$_.Exception.Message} }
 }
-$claspAuthDetail = 'NOT_AVAILABLE'
-if ($claspAuth) { $claspAuthDetail = 'REUSED_NO_NEW_LOGIN' }
-Add-Check $checks 'Existing clasp authorization' $claspAuth $claspAuthDetail
 
-$task = Get-ScheduledTask -TaskName 'Central Apps Script Runner' -ErrorAction SilentlyContinue
-$taskDetail = 'NOT_INSTALLED'
-if ($task) { $taskDetail = "state=$($task.State)" }
-Add-Check $checks 'Central Apps Script Runner scheduled task' ($null -ne $task) $taskDetail
-
-$frontendHealth = $null
-try {
-  $r = Invoke-WebRequest -UseBasicParsing -Uri $FrontendUrl -Method Get -TimeoutSec 12
-  $frontendHealth = [ordered]@{ ok=($r.StatusCode -ge 200 -and $r.StatusCode -lt 400); status=[int]$r.StatusCode }
-} catch { $frontendHealth=[ordered]@{ok=$false;error=$_.Exception.Message} }
-Add-Check $checks 'NotebookLM frontend HTTP' ([bool]$frontendHealth.ok) (($frontendHealth | ConvertTo-Json -Compress))
-
-$appsHealth = $null
-try {
-  $body = @{action='health'} | ConvertTo-Json -Compress
-  $appsHealth = Invoke-RestMethod -Uri $AppsScriptUrl -Method Post -ContentType 'text/plain;charset=utf-8' -Body $body -TimeoutSec 15
-} catch {
-  try { $appsHealth = Invoke-RestMethod -Uri $AppsScriptUrl -Method Get -TimeoutSec 15 }
-  catch { $appsHealth=[ordered]@{ok=$false;error=$_.Exception.Message} }
-}
-Add-Check $checks 'Apps Script health' ([bool]$appsHealth.ok) (($appsHealth | ConvertTo-Json -Depth 6 -Compress))
-
-$notebook = $knownResults | Where-Object { $_.name -eq 'NotebookLM WebApp Bridge' } | Select-Object -First 1
 $ping = [ordered]@{ok=$false;error='NOT_ATTEMPTED'}
-if ($chromePath -and $notebook -and $notebook.found) {
-  try { $ping = Invoke-ExtensionPing -ChromePath $chromePath -ExtensionId ([string]$notebook.id) -TimeoutSeconds $TimeoutSeconds }
+if ($cft -and $dedicatedRunning -and $extIdentity.id) {
+  try { $ping = Invoke-DedicatedExtensionPing -ChromePath $cft.FullName -ExtensionId ([string]$extIdentity.id) }
   catch { $ping=[ordered]@{ok=$false;error=$_.Exception.Message} }
 }
-Add-Check $checks 'NotebookLM extension external PING' ([bool]$ping.ok) (($ping | ConvertTo-Json -Depth 8 -Compress))
 
-$localBridge = $knownResults | Where-Object { $_.name -eq 'Google AI Local Bridge v1' } | Select-Object -First 1
-$routingMode = if ([bool]$ping.ok -and [bool]$appsHealth.ok) {
-  if ($localBridge -and $localBridge.found) { 'NOTEBOOKLM_FALLBACK_READY_LOCAL_BRIDGE_PRESENT' }
-  else { 'NOTEBOOKLM_FALLBACK_READY_LOCAL_BRIDGE_MISSING' }
-} else { 'BLOCKED_NEEDS_REPAIR' }
+$targetVersion = if ($release) { [string]$release.version } else { '' }
+$stateVersion = if ($state) { [string]$state.installedVersion } else { '' }
+$manifestVersion = if ($manifest) { [string]$manifest.version } else { '' }
+$versionReady = $targetVersion -and ($stateVersion -eq $targetVersion) -and ($manifestVersion -eq $targetVersion)
+$agentStatus = if ($state) { [string]$state.status } else { 'NO_STATE' }
+$awaitingE2E = if ($state -and $null -ne $state.awaitingE2E) { [bool]$state.awaitingE2E } else { $false }
+$baseHealthy = $bootstrapLoopReady -and $versionReady -and $dedicatedRunning -and [bool]$appsHealth.ok -and [bool]$frontHealth.ok
+$pingHealthy = [bool]$ping.ok
+$overall = $baseHealthy -and $pingHealthy
+
+$nextAction = if (-not $release.enabled) { 'STABLE_RELEASE_READ_REPAIR' }
+elseif (-not $versionReady) { 'LOCAL_AGENT_STABLE_APPLY_PENDING' }
+elseif (-not $dedicatedRunning) { 'DEDICATED_CFT_RESTART_PENDING' }
+elseif (-not [bool]$appsHealth.ok) { 'APPS_SCRIPT_HEALTH_REPAIR' }
+elseif (-not $pingHealthy) { 'DEDICATED_EXTENSION_PING_REPAIR' }
+elseif ($awaitingE2E) { 'RUN_NOTEBOOKLM_AUTO_E2E_X2_AND_AUDIT_ACK' }
+else { 'NOTEBOOKLM_BRIDGE_HEALTH_READY' }
 
 $report = [ordered]@{
-  ok = ([bool]$ping.ok -and [bool]$appsHealth.ok)
-  version = $Version
-  generatedAt = (Get-Date).ToUniversalTime().ToString('o')
-  computerName = $env:COMPUTERNAME
-  chromePath = $chromePath
-  routingMode = $routingMode
-  extensions = $knownResults
-  checks = $checks
-  frontendHealth = $frontendHealth
-  appsScriptHealth = $appsHealth
-  notebookExtensionPing = $ping
-  policy = [ordered]@{
-    noNewOAuth = $true
-    noNewAppsScriptProject = $true
-    noNewDeployment = $true
-    noChromeExtensionDeletion = $true
-    existingAuthorizationOnly = $true
+  ok=$overall
+  version=$Version
+  generatedAt=(Get-Date).ToUniversalTime().ToString('o')
+  canonical=[ordered]@{
+    mode='HOMEDESIGN_LOCAL_AGENT_DEDICATED_CFT'
+    base=$Base
+    stableReleaseUrl=$StableReleaseUrl
+    targetVersion=$targetVersion
+    extensionId=[string]$extIdentity.id
+    extensionIdSource=[string]$extIdentity.source
+  }
+  localAgent=[ordered]@{
+    root=$AgentRoot
+    bootstrapLoopReady=$bootstrapLoopReady
+    statePath=$AgentStatePath
+    state=$state
+    safeCycle=$agentCycle
+  }
+  dedicatedChrome=[ordered]@{
+    chromePath=$(if($cft){$cft.FullName}else{$null})
+    userData=$UserData
+    running=$dedicatedRunning
+  }
+  extension=[ordered]@{
+    root=$ExtensionRoot
+    manifestVersion=$manifestVersion
+    stateInstalledVersion=$stateVersion
+    targetVersion=$targetVersion
+    versionReady=$versionReady
+  }
+  frontHealth=$frontHealth
+  appsScriptHealth=$appsHealth
+  notebookExtensionPing=$ping
+  awaitingE2E=$awaitingE2E
+  nextAction=$nextAction
+  policy=[ordered]@{
+    noReinstall=$true
+    noNewOAuth=$true
+    noNewAppsScriptProject=$true
+    noNewDeployment=$true
+    normalChatGPTChromeUntouched=$true
+    stableChannelOnly=$true
+    rollbackOwnedByExistingLocalAgent=$true
   }
 }
-$report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $ReportPath -Encoding UTF8
-Log "DONE ok=$($report.ok) routing=$routingMode report=$ReportPath"
+$report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $ReportPath -Encoding UTF8
+Log "DONE ok=$overall status=$agentStatus target=$targetVersion installed=$stateVersion manifest=$manifestVersion ping=$pingHealthy next=$nextAction"
 
 [ordered]@{
-  ok=$report.ok; action='CHROME_FLOW_HEALTH'; version=$Version; routingMode=$routingMode;
-  reportPath=$ReportPath; notebookPingOk=[bool]$ping.ok; appsScriptHealthOk=[bool]$appsHealth.ok;
-  at=(Get-Date).ToUniversalTime().ToString('o')
-} | ConvertTo-Json -Depth 8
-if ($report.ok) { exit 0 } else { exit 2 }
+  ok=$overall
+  action='CHROME_FLOW_HEALTH'
+  version=$Version
+  localAgentStatus=$agentStatus
+  targetVersion=$targetVersion
+  installedVersion=$stateVersion
+  manifestVersion=$manifestVersion
+  dedicatedChromeRunning=$dedicatedRunning
+  notebookPingOk=$pingHealthy
+  appsScriptHealthOk=[bool]$appsHealth.ok
+  awaitingE2E=$awaitingE2E
+  nextAction=$nextAction
+  reportPath=$ReportPath
+} | ConvertTo-Json -Depth 10
+
+if ($overall) { exit 0 } else { exit 2 }
