@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.10",
-  "description": "HomeDesign dedicated Chrome bridge with serialized NotebookLM local task execution, timeout safety, and server-backed stale-claim recovery.",
+  "version": "0.2.11",
+  "description": "HomeDesign dedicated Chrome bridge with serialized local tasks, duplicate-claim conflict protection, timeout safety, and stale-claim recovery support.",
   "permissions": [
     "alarms",
     "identity",
@@ -31,39 +31,10 @@
     "service_worker": "local-powershell-runner.js",
     "type": "module"
   },
-  "action": {
-    "default_title": "NotebookLM WebApp Bridge"
-  },
+  "action": {"default_title": "NotebookLM WebApp Bridge"},
   "content_scripts": [
-    {
-      "matches": [
-        "https://notebooklm.google.com/*",
-        "https://notebook.google.com/*"
-      ],
-      "js": [
-        "content/notebooklm-runner.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://notebooklm-webapp-bridge.vercel.app/*"
-      ],
-      "js": [
-        "front-main.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "https://notebooklm-webapp-bridge.vercel.app/*"
-      ],
-      "js": [
-        "front-extension.js"
-      ],
-      "run_at": "document_start",
-      "world": "ISOLATED"
-    }
+    {"matches":["https://notebooklm.google.com/*","https://notebook.google.com/*"],"js":["content/notebooklm-runner.js"],"run_at":"document_idle"},
+    {"matches":["https://notebooklm-webapp-bridge.vercel.app/*"],"js":["front-main.js"],"run_at":"document_start","world":"MAIN"},
+    {"matches":["https://notebooklm-webapp-bridge.vercel.app/*"],"js":["front-extension.js"],"run_at":"document_start","world":"ISOLATED"}
   ]
 }
