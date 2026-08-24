@@ -14,10 +14,12 @@ Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Source -TimeoutSec 60
 $Code=Get-Content -LiteralPath $Source -Raw -Encoding UTF8
 if(-not $Code.Contains("`$AgentVersion='1.1.12'")){throw 'Agent 1.1.12 version marker missing'}
 if(-not $Code.Contains('function KillTree([int]$Pid)')){throw 'Agent 1.1.12 PID patch target missing'}
+if(-not $Code.Contains('$Video=RunVideoJob $Central')){throw 'Agent 1.1.12 video job patch target missing'}
 $Code=$Code.Replace("`$AgentVersion='1.1.12'","`$AgentVersion='1.1.13'")
 $Code=$Code.Replace('function KillTree([int]$Pid)','function KillTree([int]$ProcessId)')
 $Code=$Code.Replace('& taskkill.exe /PID $Pid /T /F','& taskkill.exe /PID $ProcessId /T /F')
 $Code=$Code.Replace('Stop-Process -Id $Pid -Force','Stop-Process -Id $ProcessId -Force')
+$Code=$Code.Replace('$Video=RunVideoJob $Central',"`$Video=[ordered]@{status='DEFERRED_SEPARATE_WORKFLOW';ok=`$true;attempts=0;jobId=''}")
 Set-Content -LiteralPath $Patched -Value $Code -Encoding UTF8
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Patched
 $Rc=$LASTEXITCODE
