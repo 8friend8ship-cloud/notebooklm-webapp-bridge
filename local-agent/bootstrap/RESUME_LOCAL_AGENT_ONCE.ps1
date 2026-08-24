@@ -19,21 +19,22 @@ function GitBlobSha1([string]$Path){$bytes=[IO.File]::ReadAllBytes($Path);$heade
 function TestHostHealth(){try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3;return [bool]$h.ok}catch{return $false}}
 function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
 
-Write-Host 'HomeDesign Local Agent - IMMEDIATE SAFE RESUME'
+Write-Host 'HomeDesign Local Agent - SAFE DIRECT RESUME'
 Write-Host 'No reinstall / no new OAuth / no Apps Script redeploy / normal Chrome untouched.'
 
+# Only stale governor/readback processes are cleaned. Healthy Host/Bootstrap stay alive.
 StopTarget 'RunChromeGovernorReadback.ps1'
-StopTarget 'HomeDesignLocalCommandHost.ps1'
-StopTarget 'AgentBootstrap.ps1'
-Start-Sleep -Seconds 1
+StopTarget 'ChromeExtensionGovernor.ps1'
+StopTarget 'GovernorDriveSync.ps1'
+Start-Sleep -Milliseconds 500
 
 $nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString()
-Write-Host '[1/5] Refreshing bootstrap...'
+Write-Host '[1/5] Refreshing bootstrap without stopping the current loop...'
 $tmp=$Bootstrap+'.download'
 Invoke-WebRequest -UseBasicParsing -Uri (Bust $BootstrapUrl $nonce) -OutFile $tmp -TimeoutSec 60
 Move-Item -LiteralPath $tmp -Destination $Bootstrap -Force
 
-Write-Host '[2/5] Resolving current stable Agent + Bridge with cache bypass...'
+Write-Host '[2/5] Resolving current stable Agent + Bridge...'
 $meta=Invoke-RestMethod -Uri (Bust $AgentMetaUrl ($nonce+'-agent')) -Method Get -TimeoutSec 30
 $bridge=Invoke-RestMethod -Uri (Bust $BridgeReleaseUrl ($nonce+'-bridge')) -Method Get -TimeoutSec 30
 if(-not $meta.enabled){throw 'Local Agent stable channel disabled.'}
@@ -42,25 +43,24 @@ $targetAgent=[string]$meta.version
 $targetBridge=[string]$bridge.version
 Write-Host ("targetAgent="+$targetAgent+" targetBridge="+$targetBridge)
 
-Write-Host '[3/5] Downloading and verifying stable Agent now...'
+Write-Host '[3/5] Downloading and SHA-verifying stable Agent...'
 $agentTmp=$AgentFile+'.resume.download'
 $expectedSha=([string]$meta.gitBlobSha1).ToLowerInvariant()
-$agentUrl=Bust ("$AgentBaseUrl/$targetAgent/HomeDesignLocalAgent.ps1") $expectedSha
+$agentUrl=Bust ("$AgentBaseUrl/$targetAgent/HomeDesignLocalAgent.ps1") ($expectedSha+'-'+$nonce)
 Invoke-WebRequest -UseBasicParsing -Uri $agentUrl -OutFile $agentTmp -TimeoutSec 60
 $actualSha=GitBlobSha1 $agentTmp
 if($actualSha -ne $expectedSha){Remove-Item $agentTmp -Force -ErrorAction SilentlyContinue;throw "Agent SHA mismatch: actual=$actualSha expected=$expectedSha"}
 Move-Item -LiteralPath $agentTmp -Destination $AgentFile -Force
 
-Write-Host '[4/5] Applying stable Agent immediately...'
+Write-Host '[4/5] Applying stable Agent directly...'
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $AgentFile
 $directExit=$LASTEXITCODE
 Write-Host ("directAgentExit="+$directExit)
 
-Write-Host '[5/5] Starting bootstrap loop for future self-updates...'
+Write-Host '[5/5] Ensuring future bootstrap loop...'
 Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$Bootstrap`"",'-Loop') -WindowStyle Hidden
 
-$deadline=(Get-Date).AddSeconds(150)
-$last=$null
+$deadline=(Get-Date).AddSeconds(180)
 while((Get-Date)-lt $deadline){
   Start-Sleep -Seconds 3
   if(Test-Path -LiteralPath $StateFile){
@@ -68,15 +68,19 @@ while((Get-Date)-lt $deadline){
       $last=Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8|ConvertFrom-Json
       $av=[string]$last.agentVersion;$hv=[string]$last.commandHostVersion;$hr=TestHostHealth;$bv=[string]$last.extensionVersion
       if(-not $bv){$bv=[string]$last.installedVersion}
-      Write-Host ("agent="+$av+" host="+$hv+" hostHealth="+$hr+" bridge="+$bv+" status="+[string]$last.status+" governor="+[string]$last.governorCycleOk+" driveSync="+[string]$last.governorDriveSyncOk)
-      if($av -eq $targetAgent -and $hr -and $bv -eq $targetBridge){
-        Write-Host 'RESUME RESULT: ACTIVE'
-        Write-Host 'Stable Agent, localhost command host, and NotebookLM Bridge are aligned.'
+      $gov=[bool]$last.governorCycleOk;$sync=[bool]$last.governorDriveSyncOk
+      Write-Host ("agent="+$av+" host="+$hv+" hostHealth="+$hr+" bridge="+$bv+" status="+[string]$last.status+" governor="+$gov+" driveSync="+$sync)
+      if($av -eq $targetAgent -and $hr -and $bv -eq $targetBridge -and $gov -and $sync){
+        Write-Host 'RESUME RESULT: ACTIVE + GOVERNOR VERIFIED'
+        exit 0
+      }
+      if($av -eq $targetAgent -and $hr -and $bv -eq $targetBridge -and $directExit -eq 0){
+        Write-Host 'RESUME RESULT: ACTIVE; GOVERNOR READBACK STILL SYNCING'
         exit 0
       }
     }catch{}
   }
 }
 Write-Host 'RESUME RESULT: STARTED, RUNTIME READBACK STILL PENDING'
-Write-Host 'Do not reinstall. The bootstrap loop remains enabled for recovery.'
+Write-Host 'Do not reinstall or reauthorize. Bootstrap remains enabled.'
 exit 2
