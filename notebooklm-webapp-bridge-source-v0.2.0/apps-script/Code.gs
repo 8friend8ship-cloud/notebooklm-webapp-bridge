@@ -1,4 +1,4 @@
-const VERSION = "0.2.1-compat";
+const VERSION = "0.2.9-compat";
 const DEFAULT_SHEET = "NotebookLM_Task_Queue";
 const HEADERS = [
   "TASK_ID","CONTENT_ID","TASK_DATE","TASK_TYPE","TITLE","SOURCE_TEXT","INSTRUCTION","LANGUAGE",
@@ -7,44 +7,20 @@ const HEADERS = [
   "ERROR_MESSAGE","CALLBACK_URL","CALLBACK_TOKEN","CREATED_AT","UPDATED_AT"
 ];
 
-// 기존 WEBAPP_TEMPLATE_03의 GET 송·호출 테스트와 호환을 유지합니다.
 function doGet(e){
-  return json_({
-    ok:true,
-    method:"GET",
-    template:true,
-    legacyCompatible:true,
-    version:VERSION,
-    service:"NotebookLM WebApp Bridge",
-    time:new Date().toISOString()
-  });
+  return json_({ok:true,method:"GET",template:true,legacyCompatible:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});
 }
 
-// action 없는 기존 POST 테스트는 그대로 성공시키고,
-// action이 있는 요청만 NotebookLM 브리지 라우터로 처리합니다.
 function doPost(e){
   try{
     const raw=(e&&e.postData&&e.postData.contents)||"{}";
     let body={};
     try{ body=JSON.parse(raw||"{}"); }catch(_e){ body=(e&&e.parameter)||{}; }
     const action=String(body.action||"").trim();
-
-    if(!action){
-      return json_({
-        ok:true,
-        method:"POST",
-        template:true,
-        legacyCompatible:true,
-        bridgeReady:true,
-        version:VERSION,
-        time:new Date().toISOString()
-      });
-    }
-
+    if(!action){return json_({ok:true,method:"POST",template:true,legacyCompatible:true,bridgeReady:true,version:VERSION,time:new Date().toISOString()});}
     if(action==="health") return json_({ok:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});
     if(action==="login") return json_(login_(body));
     if(action==="enqueueFromWriter") return json_(enqueueFromWriter_(body));
-
     const session=verifySession_(body.sessionToken);
     if(action==="listTasks") return json_(listTasks_(session,body));
     if(action==="claimTask") return json_(claimTask_(session,body));
@@ -52,12 +28,9 @@ function doPost(e){
     if(action==="completeTask") return json_(completeTask_(session,body));
     if(action==="createTask") return json_(createTask_(session,body.task||{}));
     throw new Error("지원되지 않는 action입니다: "+action);
-  }catch(error){
-    return json_({ok:false,error:error&&error.message?error.message:String(error)});
-  }
+  }catch(error){return json_({ok:false,error:error&&error.message?error.message:String(error)});}
 }
 
-// 기존에 권한 승인에 사용한 함수도 그대로 유지합니다.
 function authorizeCore_(){
   const spreadsheetId=SpreadsheetApp.getActiveSpreadsheet().getId();
   const driveRootName=DriveApp.getRootFolder().getName();
@@ -111,30 +84,39 @@ function setTask_(rowNumber,patch){
   const sh=sheet_(); const map=Object.fromEntries(HEADERS.map((h,i)=>[h,i+1])); patch.UPDATED_AT=new Date();
   Object.keys(patch).forEach(key=>{if(map[key]) sh.getRange(rowNumber,map[key]).setValue(patch[key]);});
 }
+function isoOrEmpty_(value){return value instanceof Date?value.toISOString():String(value||"");}
 function taskDto_(data){ return {
   taskId:String(data.TASK_ID||""),contentId:String(data.CONTENT_ID||""),taskDate:fmtDate_(data.TASK_DATE),
   taskType:String(data.TASK_TYPE||"CHAT"),title:String(data.TITLE||""),sourceText:String(data.SOURCE_TEXT||""),
   instruction:String(data.INSTRUCTION||""),language:String(data.LANGUAGE||"ko-KR"),notebookUrl:String(data.NOTEBOOK_URL||"https://notebooklm.google.com/"),
   driveFolderId:String(data.DRIVE_FOLDER_ID||""),autoSubmit:String(data.AUTO_SUBMIT).toUpperCase()!=="FALSE",
-  timeoutSeconds:Number(data.TIMEOUT_SECONDS||180),status:String(data.STATUS||"READY")
+  timeoutSeconds:Number(data.TIMEOUT_SECONDS||180),status:String(data.STATUS||"READY"),ownerEmail:String(data.OWNER_EMAIL||""),
+  claimedAt:isoOrEmpty_(data.CLAIMED_AT),startedAt:isoOrEmpty_(data.STARTED_AT),createdAt:isoOrEmpty_(data.CREATED_AT),updatedAt:isoOrEmpty_(data.UPDATED_AT)
 }; }
 function fmtDate_(value){ return value instanceof Date?Utilities.formatDate(value,"Asia/Seoul","yyyy-MM-dd"):String(value||""); }
 function listTasks_(session,body){
   const date=String(body.date||Utilities.formatDate(new Date(),"Asia/Seoul","yyyy-MM-dd"));
-  const tasks=rows_().filter(item=>["READY","RETRY","ERROR"].indexOf(String(item.data.STATUS||"READY"))>=0)
-    .filter(item=>!date||fmtDate_(item.data.TASK_DATE)===date).map(item=>taskDto_(item.data)); return {ok:true,tasks,user:session.email};
+  const allowed=["READY","RETRY","ERROR"];
+  if(body.includeClaimed===true||String(body.includeClaimed||"").toUpperCase()==="TRUE") allowed.push("CLAIMED");
+  const tasks=rows_().filter(item=>allowed.indexOf(String(item.data.STATUS||"READY"))>=0)
+    .filter(item=>!date||fmtDate_(item.data.TASK_DATE)===date).map(item=>taskDto_(item.data));
+  return {ok:true,tasks,user:session.email,includeClaimed:allowed.indexOf("CLAIMED")>=0};
 }
 function claimTask_(session,body){
   const item=findTask_(body.taskId); const status=String(item.data.STATUS||"READY");
   if(["READY","RETRY","ERROR"].indexOf(status)<0) throw new Error("현재 실행할 수 없는 상태입니다: "+status);
   if(body.chromeProfileEmail&&String(body.chromeProfileEmail).toLowerCase()!==String(session.email).toLowerCase()) throw new Error("프런트앱 Google 계정과 Chrome Google 계정이 다릅니다.");
-  setTask_(item.rowNumber,{STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:new Date(),ERROR_MESSAGE:""});
-  return {ok:true,task:taskDto_({...item.data,STATUS:"CLAIMED"})};
+  const claimedAt=new Date();
+  setTask_(item.rowNumber,{STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:"",ERROR_MESSAGE:""});
+  return {ok:true,task:taskDto_({...item.data,STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:""})};
 }
 function updateTask_(session,body){
   const item=findTask_(body.taskId); if(item.data.OWNER_EMAIL&&String(item.data.OWNER_EMAIL)!==session.email) throw new Error("다른 사용자가 수령한 작업입니다.");
-  const patch=body.patch||{}; setTask_(item.rowNumber,{STATUS:String(body.status||item.data.STATUS),STARTED_AT:item.data.STARTED_AT||new Date(),ERROR_MESSAGE:String(patch.error||"")});
-  return {ok:true,taskId:body.taskId,status:body.status};
+  const patch=body.patch||{}; const status=String(body.status||item.data.STATUS); const write={STATUS:status,ERROR_MESSAGE:String(patch.error||"")};
+  if(status==="RETRY"||patch.clearClaim===true||patch.claimedAt===""){write.CLAIMED_AT="";write.STARTED_AT="";}
+  else if(!item.data.STARTED_AT){write.STARTED_AT=new Date();}
+  setTask_(item.rowNumber,write);
+  return {ok:true,taskId:body.taskId,status};
 }
 function completeTask_(session,body){
   const item=findTask_(body.taskId); const result=body.result||{}; const folder=resolveFolder_(item.data.DRIVE_FOLDER_ID);
@@ -168,11 +150,5 @@ function setupNotebookLMBridge(){
   if(!p.getProperty("SESSION_SECRET")) p.setProperty("SESSION_SECRET",Utilities.getUuid()+Utilities.getUuid());
   if(!p.getProperty("WRITER_SHARED_SECRET")) p.setProperty("WRITER_SHARED_SECRET",Utilities.getUuid()+Utilities.getUuid());
   const sh=sheet_();
-  return {
-    version:VERSION,
-    sheet:sh.getName(),
-    headers:HEADERS,
-    sessionSecretReady:!!p.getProperty("SESSION_SECRET"),
-    writerSecretReady:!!p.getProperty("WRITER_SHARED_SECRET")
-  };
+  return {version:VERSION,sheet:sh.getName(),headers:HEADERS,sessionSecretReady:!!p.getProperty("SESSION_SECRET"),writerSecretReady:!!p.getProperty("WRITER_SHARED_SECRET")};
 }
