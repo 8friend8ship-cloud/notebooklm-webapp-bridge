@@ -11,6 +11,7 @@ $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $GovernorRoot=Join-Path $Base 'ChromeGovernor'
 $GovernorFile=Join-Path $GovernorRoot 'ChromeExtensionGovernor.ps1'
 $GovernorStatus=Join-Path $GovernorRoot 'SHOW_CHROME_EXTENSION_GOVERNOR_STATUS.ps1'
+$GovernorDriveSync=Join-Path $GovernorRoot 'GovernorDriveSync.ps1'
 $GovernorBaseUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor'
 New-Item -ItemType Directory -Force -Path $Root,$GovernorRoot | Out-Null
 
@@ -62,9 +63,18 @@ function Governor-Processes(){
     )
   }catch{return @()}
 }
+function DriveSync-Processes(){
+  try{
+    return @(
+      Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
+      Where-Object{$_.CommandLine -and $_.CommandLine -like '*HomeDesignAutomationV7*ChromeGovernor*GovernorDriveSync.ps1*'}
+    )
+  }catch{return @()}
+}
 function Ensure-Governor(){
   $runnerChanged=Refresh-RemoteFile "$GovernorBaseUrl/ChromeExtensionGovernor.ps1" $GovernorFile
   [void](Refresh-RemoteFile "$GovernorBaseUrl/SHOW_CHROME_EXTENSION_GOVERNOR_STATUS.ps1" $GovernorStatus)
+  $syncChanged=Refresh-RemoteFile "$GovernorBaseUrl/GovernorDriveSync.ps1" $GovernorDriveSync
 
   $ws=New-Object -ComObject WScript.Shell
   $startup=[Environment]::GetFolderPath('Startup')
@@ -101,7 +111,27 @@ function Ensure-Governor(){
     ) -WindowStyle Hidden
     Start-Sleep -Milliseconds 500
   }
-  return @{root=$GovernorRoot;running=((Governor-Processes).Count -gt 0);runnerChanged=$runnerChanged}
+
+  $syncProcs=DriveSync-Processes
+  if($syncChanged -and $syncProcs.Count -gt 0){
+    foreach($p in $syncProcs){Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue}
+    Start-Sleep -Milliseconds 500
+    $syncProcs=@()
+  }
+  if($syncProcs.Count -eq 0){
+    Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+      '-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$GovernorDriveSync`"",'-Loop','-PollSeconds','900'
+    ) -WindowStyle Hidden
+    Start-Sleep -Milliseconds 500
+  }
+
+  return @{
+    root=$GovernorRoot
+    running=((Governor-Processes).Count -gt 0)
+    runnerChanged=$runnerChanged
+    driveSyncRunning=((DriveSync-Processes).Count -gt 0)
+    driveSyncChanged=$syncChanged
+  }
 }
 function Patch-State($GovernorState){
   $state=@{}
@@ -116,6 +146,8 @@ function Patch-State($GovernorState){
   $state.chromeGovernorRunning=[bool]$GovernorState.running
   $state.chromeGovernorRoot=[string]$GovernorState.root
   $state.chromeGovernorUpdatedThisCycle=[bool]$GovernorState.runnerChanged
+  $state.chromeGovernorDriveSyncRunning=[bool]$GovernorState.driveSyncRunning
+  $state.chromeGovernorDriveSyncUpdatedThisCycle=[bool]$GovernorState.driveSyncChanged
   $state.updatedAt=(Get-Date).ToString('o')
   $state|ConvertTo-Json -Depth 20|Set-Content $StateFile -Encoding UTF8
 }
