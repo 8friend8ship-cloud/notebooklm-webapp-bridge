@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "channel": "stable",
-  "updatedAt": "2026-08-24T13:32:00+09:00",
+  "updatedAt": "2026-08-24T13:54:00+09:00",
   "pollSeconds": 900,
   "rules": {
     "noDelete": true,
@@ -14,11 +14,11 @@
   "managedExtensions": [
     {
       "name": "NotebookLM WebApp Bridge",
-      "canonicalVersion": "0.2.6",
+      "canonicalVersion": "0.2.7",
       "mode": "LOCAL_AGENT_STABLE",
       "profile": "HomeDesignAutomationV7 dedicated CFT",
       "canonicalRepo": "8friend8ship-cloud/notebooklm-webapp-bridge",
-      "notes": "Existing Local Agent owns update, backup, dedicated CFT restart, health and rollback."
+      "notes": "Existing Local Agent owns update, backup, dedicated CFT restart, health and rollback. v0.2.7 adds allowlisted LOCAL_POWERSHELL handoff to localhost command host."
     },
     {
       "name": "Flow Agent Bridge",
@@ -63,11 +63,6 @@
       "notes": "Prefer existing local asset bridge; no Chrome replacement unless browser-only need is proven."
     }
   ],
-  "securityHoldNames": [
-    "Save to Google Drive"
-  ],
-  "observeOnlyNames": [
-    "UniConverter 다운로드 확장 프로그램",
-    "ChatGPT"
-  ]
+  "securityHoldNames": ["Save to Google Drive"],
+  "observeOnlyNames": ["UniConverter 다운로드 확장 프로그램","ChatGPT"]
 }
