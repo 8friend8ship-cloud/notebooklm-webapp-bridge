@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "channel": "stable",
-  "updatedAt": "2026-08-24T16:20:00+09:00",
+  "updatedAt": "2026-08-24T16:24:00+09:00",
   "pollSeconds": 900,
   "rules": {
     "noDelete": true,
@@ -41,9 +41,14 @@
     {
       "name": "Front App Test Bridge",
       "canonicalVersion": "1.0.2",
-      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
-      "profile": "actual profile",
-      "notes": "Inventory, service-worker/content-script verification and preview-frame diagnostics only until source is located."
+      "mode": "DRIVE_SOURCE_BOUND_VERIFY_THEN_UPDATE",
+      "profile": "actual installed profile",
+      "sourceType": "GOOGLE_DRIVE_PROJECT_FOLDER",
+      "sourceId": "1ZbjOUlsoVYb7ol46cAC14PMp5sFiKjgG",
+      "sourceName": "front-app-test-bridge-v1.0.2",
+      "extensionFolderId": "18JxATp7osYvfOvt9OSMYR3AXYdvw9rxG",
+      "wrapperFolderId": "1UtKOCLQft_OHw-JyhaEB2KlFfrSyta50",
+      "notes": "Canonical project is nested inside wrapper folder with same name; this is not a deletion duplicate. Verified extension manifest: Front App Test Bridge 1.0.2, background.js module, aistudio-helper.js, options/popup files. Preserve existing permissions; no automatic broadening."
     },
     {
       "name": "Google AI Local Bridge v1",
