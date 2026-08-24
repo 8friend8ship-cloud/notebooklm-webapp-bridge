@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.8",
-  "description": "HomeDesign dedicated Chrome bridge with NotebookLM automation and timeout-safe allowlisted local PowerShell task handoff.",
+  "version": "0.2.9",
+  "description": "HomeDesign dedicated Chrome bridge with NotebookLM automation and server-backed stale-claim recovery for allowlisted local PowerShell tasks.",
   "permissions": [
     "alarms",
     "identity",
