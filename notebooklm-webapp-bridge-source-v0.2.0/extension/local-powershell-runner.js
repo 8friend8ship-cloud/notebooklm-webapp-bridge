@@ -6,6 +6,8 @@ const LP_SESSION_KEYS = ["homeDesignBridgeSessionV7", "nlmPersistentSessionV5"];
 const LP_ALARM = "local-powershell-ready-poll";
 const LP_HOST = "http://127.0.0.1:8765";
 const LP_MAX = 1;
+const LP_DEFAULT_TIMEOUT_SECONDS = 600;
+const LP_STALE_GRACE_SECONDS = 60;
 
 async function lpConfig(){
   const stored=await chrome.storage.local.get(LP_CONFIG_KEY);
@@ -20,6 +22,39 @@ async function lpSession(){
   }
   return "";
 }
+function lpTimeoutSeconds(task){
+  const raw=Number(task?.timeoutSeconds||LP_DEFAULT_TIMEOUT_SECONDS);
+  if(!Number.isFinite(raw)||raw<=0) return LP_DEFAULT_TIMEOUT_SECONDS;
+  return Math.max(30,Math.min(1800,Math.round(raw)));
+}
+function lpParseTime(value){
+  if(value instanceof Date) return value.getTime();
+  if(typeof value==="number"&&Number.isFinite(value)) return value>1e12?value:value*1000;
+  const text=String(value||"").trim();
+  if(!text) return 0;
+  const parsed=Date.parse(text);
+  return Number.isFinite(parsed)?parsed:0;
+}
+function lpTaskTime(task){
+  for(const key of ["claimedAt","startedAt","updatedAt","createdAt"]){
+    const parsed=lpParseTime(task?.[key]);
+    if(parsed) return parsed;
+  }
+  const m=String(task?.taskId||"").match(/_(\d{8})_(\d{4})_/);
+  if(m){
+    const d=m[1],t=m[2];
+    const iso=`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}T${t.slice(0,2)}:${t.slice(2,4)}:00+09:00`;
+    const parsed=Date.parse(iso);
+    if(Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+function lpIsStaleClaim(task){
+  if(String(task?.status||"").toUpperCase()!=="CLAIMED") return false;
+  const started=lpTaskTime(task);
+  if(!started) return false;
+  return Date.now()-started>(lpTimeoutSeconds(task)+LP_STALE_GRACE_SECONDS)*1000;
+}
 async function lpApi(url,payload){
   if(!/^https:\/\/script\.google\.com\/macros\/s\//.test(url||"")) throw new Error("Apps Script URL missing");
   const r=await fetch(url,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
@@ -28,14 +63,39 @@ async function lpApi(url,payload){
   return data;
 }
 async function lpHost(task){
-  const r=await fetch(`${LP_HOST}/run`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({source:LP_SOURCE,task})
-  });
-  const data=await r.json().catch(()=>({ok:false,error:`HTTP ${r.status}`}));
-  if(!r.ok||!data.ok) throw new Error(data.error||`Local host HTTP ${r.status}`);
-  return data;
+  const timeoutSeconds=lpTimeoutSeconds(task);
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),(timeoutSeconds+15)*1000);
+  try{
+    const r=await fetch(`${LP_HOST}/run`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({source:LP_SOURCE,task}),
+      signal:controller.signal
+    });
+    const data=await r.json().catch(()=>({ok:false,error:`HTTP ${r.status}`}));
+    if(!r.ok||!data.ok) throw new Error(data.error||`Local host HTTP ${r.status}`);
+    return data;
+  }catch(error){
+    if(error?.name==="AbortError") throw new Error(`LOCAL_HOST_TIMEOUT_${timeoutSeconds}s`);
+    throw error;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+async function lpRecoverStaleClaims(config,sessionToken,listedTasks){
+  const recovered=[];
+  for(const task of (Array.isArray(listedTasks)?listedTasks:[])){
+    if(String(task?.taskType||"").toUpperCase()!=="LOCAL_POWERSHELL"||!lpIsStaleClaim(task)) continue;
+    try{
+      await lpApi(config.appsScriptUrl,{
+        action:"updateTask",sessionToken,taskId:task.taskId,status:"RETRY",
+        patch:{error:`STALE_CLAIM_RECOVERED_AFTER_${lpTimeoutSeconds(task)}s`,claimedAt:"",startedAt:""}
+      });
+      recovered.push({...task,status:"RETRY",claimedAt:"",startedAt:""});
+    }catch{}
+  }
+  return recovered;
 }
 async function lpPoll(reason="alarm"){
   const config=await lpConfig();
@@ -44,10 +104,15 @@ async function lpPoll(reason="alarm"){
   if(!sessionToken) return {ok:true,skipped:"no_session"};
 
   const listed=await lpApi(config.appsScriptUrl,{action:"listTasks",sessionToken});
-  const tasks=(Array.isArray(listed.tasks)?listed.tasks:[]).filter(t=>
-    String(t.taskType||"").toUpperCase()==="LOCAL_POWERSHELL" &&
-    ["READY","RETRY","ERROR"].includes(String(t.status||"READY").toUpperCase())
-  );
+  const listedTasks=Array.isArray(listed.tasks)?listed.tasks:[];
+  const recovered=await lpRecoverStaleClaims(config,sessionToken,listedTasks);
+  const candidateMap=new Map();
+  for(const task of [...recovered,...listedTasks]){
+    if(String(task.taskType||"").toUpperCase()!=="LOCAL_POWERSHELL") continue;
+    if(!["READY","RETRY","ERROR"].includes(String(task.status||"READY").toUpperCase())) continue;
+    candidateMap.set(String(task.taskId),task);
+  }
+  const tasks=[...candidateMap.values()];
 
   let processed=0;
   for(const task of tasks.slice(0,LP_MAX)){
@@ -72,7 +137,7 @@ async function lpPoll(reason="alarm"){
       }catch{}
     }
   }
-  return {ok:true,reason,processed,available:tasks.length};
+  return {ok:true,reason,processed,available:tasks.length,recoveredStaleClaims:recovered.map(t=>t.taskId)};
 }
 async function lpEnsureAlarm(){
   await chrome.alarms.clear(LP_ALARM);
