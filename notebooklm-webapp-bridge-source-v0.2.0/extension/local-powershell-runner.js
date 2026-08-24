@@ -8,6 +8,7 @@ const LP_HOST = "http://127.0.0.1:8765";
 const LP_MAX = 1;
 const LP_DEFAULT_TIMEOUT_SECONDS = 600;
 const LP_STALE_GRACE_SECONDS = 60;
+let lpBusy=false;
 
 async function lpConfig(){
   const stored=await chrome.storage.local.get(LP_CONFIG_KEY);
@@ -87,12 +88,11 @@ async function lpRecoverStaleClaims(config,sessionToken,listedTasks){
   }
   return recovered;
 }
-async function lpPoll(reason="alarm"){
+async function lpPollCore(reason="alarm"){
   const config=await lpConfig();
   if(!config.appsScriptUrl) return {ok:true,skipped:"api_not_configured"};
   const sessionToken=await lpSession();
   if(!sessionToken) return {ok:true,skipped:"no_session"};
-
   const listed=await lpApi(config.appsScriptUrl,{action:"listTasks",sessionToken,includeClaimed:true});
   const listedTasks=Array.isArray(listed.tasks)?listed.tasks:[];
   const recovered=await lpRecoverStaleClaims(config,sessionToken,listedTasks);
@@ -103,7 +103,6 @@ async function lpPoll(reason="alarm"){
     candidateMap.set(String(task.taskId),task);
   }
   const tasks=[...candidateMap.values()];
-
   let processed=0;
   for(const task of tasks.slice(0,LP_MAX)){
     try{
@@ -117,6 +116,11 @@ async function lpPoll(reason="alarm"){
     }
   }
   return {ok:true,reason,processed,available:tasks.length,recoveredStaleClaims:recovered.map(t=>t.taskId)};
+}
+async function lpPoll(reason="alarm"){
+  if(lpBusy) return {ok:true,skipped:"local_runner_busy",reason};
+  lpBusy=true;
+  try{return await lpPollCore(reason);}finally{lpBusy=false;}
 }
 async function lpEnsureAlarm(){
   await chrome.alarms.clear(LP_ALARM);
