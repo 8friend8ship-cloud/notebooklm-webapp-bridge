@@ -1,4 +1,6 @@
 param(
+  [switch]$Loop,
+  [int]$PollSeconds = 900,
   [string]$ReportPath = "$env:LOCALAPPDATA\HomeDesignAutomationV7\ChromeGovernor\state.json",
   [string]$InventoryPath = "$env:LOCALAPPDATA\HomeDesignAutomationV7\ChromeGovernor\inventory.json"
 )
@@ -6,6 +8,7 @@ param(
 $ErrorActionPreference='Continue'
 $CachePath=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\ChromeGovernor\drive-sync.json'
 $TargetName='00_중앙에이전트'
+$PollSeconds=[Math]::Max(300,$PollSeconds)
 
 function Find-CentralFolder {
   if(Test-Path -LiteralPath $CachePath){
@@ -47,15 +50,29 @@ function Find-CentralFolder {
   return $null
 }
 
-$target=Find-CentralFolder
-if(-not $target){
-  @{ok=$false;status='DRIVE_SYNC_FOLDER_NOT_FOUND';at=(Get-Date).ToString('o')}|ConvertTo-Json|Set-Content -LiteralPath $CachePath -Encoding UTF8
-  exit 2
+function Sync-Once {
+  $target=Find-CentralFolder
+  if(-not $target){
+    @{ok=$false;status='DRIVE_SYNC_FOLDER_NOT_FOUND';at=(Get-Date).ToString('o')}|ConvertTo-Json|Set-Content -LiteralPath $CachePath -Encoding UTF8
+    return $false
+  }
+
+  $outDir=Join-Path $target 'Chrome_Extension_Governor'
+  New-Item -ItemType Directory -Force -Path $outDir|Out-Null
+  if(Test-Path -LiteralPath $ReportPath){Copy-Item -LiteralPath $ReportPath -Destination (Join-Path $outDir 'CHROME_EXTENSION_GOVERNOR_RESULT.json') -Force}
+  if(Test-Path -LiteralPath $InventoryPath){Copy-Item -LiteralPath $InventoryPath -Destination (Join-Path $outDir 'CHROME_EXTENSION_INVENTORY.json') -Force}
+  @{ok=$true;status='SYNCED';path=$target;outDir=$outDir;at=(Get-Date).ToString('o')}|ConvertTo-Json|Set-Content -LiteralPath $CachePath -Encoding UTF8
+  return $true
 }
 
-$outDir=Join-Path $target 'Chrome_Extension_Governor'
-New-Item -ItemType Directory -Force -Path $outDir|Out-Null
-if(Test-Path -LiteralPath $ReportPath){Copy-Item -LiteralPath $ReportPath -Destination (Join-Path $outDir 'CHROME_EXTENSION_GOVERNOR_RESULT.json') -Force}
-if(Test-Path -LiteralPath $InventoryPath){Copy-Item -LiteralPath $InventoryPath -Destination (Join-Path $outDir 'CHROME_EXTENSION_INVENTORY.json') -Force}
-@{ok=$true;status='SYNCED';path=$target;outDir=$outDir;at=(Get-Date).ToString('o')}|ConvertTo-Json|Set-Content -LiteralPath $CachePath -Encoding UTF8
-exit 0
+$mutex=New-Object Threading.Mutex($false,'HomeDesignChromeGovernorDriveSyncV1')
+if(-not $mutex.WaitOne(0,$false)){exit 0}
+try{
+  do{
+    [void](Sync-Once)
+    if($Loop){Start-Sleep -Seconds $PollSeconds}
+  }while($Loop)
+}finally{
+  try{$mutex.ReleaseMutex()}catch{}
+  $mutex.Dispose()
+}
