@@ -25,10 +25,13 @@ function Run-Bounded([string]$ScriptPath,[int]$TimeoutMs=60000){
   $p.WaitForExit();return [ordered]@{attempted=$true;timedOut=$false;exitCode=$p.ExitCode;stdout=$outTask.Result.Trim();stderr=$errTask.Result.Trim();path=$ScriptPath}
 }
 function Find-Central{
-  $names=@(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue|ForEach-Object{[string]$_.Name})
-  foreach($driveName in $names){foreach($candidate in @("$driveName`:\My Drive\00_중앙에이전트","$driveName`:\내 드라이브\00_중앙에이전트","$driveName`:\Google Drive\00_중앙에이전트","$driveName`:\00_중앙에이전트")){if(Test-Path -LiteralPath $candidate){return $candidate}}}
-  foreach($letter in 'D'..'Z'){foreach($candidate in @("$letter`:\My Drive\00_중앙에이전트","$letter`:\내 드라이브\00_중앙에이전트","$letter`:\Google Drive\00_중앙에이전트","$letter`:\00_중앙에이전트")){if(Test-Path -LiteralPath $candidate){return $candidate}}}
-  foreach($candidate in @((Join-Path $env:USERPROFILE 'My Drive\00_중앙에이전트'),(Join-Path $env:USERPROFILE '내 드라이브\00_중앙에이전트'),(Join-Path $env:USERPROFILE 'Google Drive\00_중앙에이전트'))){if(Test-Path -LiteralPath $candidate){return $candidate}}
+  $target=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDDspJHsl5DsnojspITtirjsnIQ='))
+  foreach($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
+    $root=[string]$drive.Root
+    if(-not $root){continue}
+    foreach($candidate in @((Join-Path $root $target),(Join-Path $root ('My Drive\'+$target)),(Join-Path $root ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $candidate){return $candidate}}
+  }
+  foreach($candidate in @((Join-Path $env:USERPROFILE ('My Drive\'+$target)),(Join-Path $env:USERPROFILE ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $candidate){return $candidate}}
   return ''
 }
 
