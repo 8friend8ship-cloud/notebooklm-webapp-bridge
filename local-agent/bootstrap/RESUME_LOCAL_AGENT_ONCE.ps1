@@ -35,8 +35,8 @@ Start-Process -FilePath 'powershell.exe' -ArgumentList @(
   '-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$Bootstrap`"",'-Loop'
 ) -WindowStyle Hidden
 
-Write-Host 'Bootstrap restarted. Waiting for stable v1.1.3 / host v1.1.2...'
-$deadline=(Get-Date).AddSeconds(120)
+Write-Host 'Bootstrap restarted. Waiting for stable v1.1.4 / TcpListener host v1.1.4...'
+$deadline=(Get-Date).AddSeconds(150)
 $last=$null
 while((Get-Date)-lt $deadline){
   Start-Sleep -Seconds 3
@@ -45,9 +45,9 @@ while((Get-Date)-lt $deadline){
       $last=Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8|ConvertFrom-Json
       $av=[string]$last.agentVersion;$hv=[string]$last.commandHostVersion;$hr=[bool]$last.commandHostRunning
       Write-Host ("agent="+$av+" host="+$hv+" hostRunning="+$hr+" bridge="+[string]$last.installedVersion+" status="+[string]$last.status)
-      if($av -eq '1.1.3' -and $hv -eq '1.1.2' -and $hr){
+      if($av -eq '1.1.4' -and $hv -eq '1.1.4' -and $hr){
         Write-Host 'RESUME RESULT: ACTIVE'
-        Write-Host 'The queued Chrome Governor readback will be claimed automatically by bridge v0.2.7.'
+        Write-Host 'The queued Chrome Governor readback will continue automatically through the localhost TcpListener host.'
         exit 0
       }
     }catch{}
