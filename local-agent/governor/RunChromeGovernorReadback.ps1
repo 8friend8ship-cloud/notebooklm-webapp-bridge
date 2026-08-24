@@ -9,6 +9,7 @@ $ExtensionRoot=Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
 $DedicatedUserData=Join-Path $Base 'ChromeUserData'
 $NormalRoot=Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
 $AgentStatePath=Join-Path $AgentRoot 'state.json'
+$VideoJobStatePath=Join-Path $AgentRoot 'video-job-state.json'
 $GovStatePath=Join-Path $GovRoot 'state.json'
 $InventoryPath=Join-Path $GovRoot 'inventory.json'
 $NodeGovPath=Join-Path $GovRoot 'chromeGovernorFast.js'
@@ -54,7 +55,7 @@ function RunNodeGovernor{
   }catch{return [ordered]@{ok=$false;exitCode=1;error=$_.Exception.Message}}
 }
 function RuntimeStatus($GovernorRun=$null){
-  $agentStateObj=ReadJson $AgentStatePath;$bridgeManifest=ReadJson (Join-Path $ExtensionRoot 'manifest.json');$hostInfo=GetHostHealth;$kickInfo=ReadJson $KickStatusPath;$govStateObj=ReadJson $GovStatePath;$central=FindCentral;$copyInfo=CopyGovernorToCentral $central
+  $agentStateObj=ReadJson $AgentStatePath;$videoJobStateObj=ReadJson $VideoJobStatePath;$bridgeManifest=ReadJson (Join-Path $ExtensionRoot 'manifest.json');$hostInfo=GetHostHealth;$kickInfo=ReadJson $KickStatusPath;$govStateObj=ReadJson $GovStatePath;$central=FindCentral;$copyInfo=CopyGovernorToCentral $central
   $managed=@();$issues=@();$dups=@()
   if($govStateObj -and $govStateObj.extensions){$managed=@($govStateObj.extensions|Where-Object{$_.classification -eq 'CENTRAL_MANAGED'}|Select-Object name,id,profile,installedVersion,expectedVersion,action,fileIntegrityOk,path);$issues=@($govStateObj.extensions|Where-Object{$_.action -notin @('CHECK_OK','OWNED_BY_LOCAL_AGENT','NO_AUTO_CHANGE','OBSERVE_ONLY')}|Select-Object name,id,profile,installedVersion,expectedVersion,classification,action,fileIntegrityOk,path)}
   if($govStateObj -and $govStateObj.duplicates){$dups=@($govStateObj.duplicates|Select-Object name,count,ids,profiles)}
@@ -62,6 +63,7 @@ function RuntimeStatus($GovernorRun=$null){
     ok=$true;action='LOCAL_RUNTIME_STATUS_LIGHTWEIGHT';at=(Get-Date).ToString('o')
     agentVersion=$(if($agentStateObj){[string]$agentStateObj.agentVersion}else{'UNKNOWN'});agentStatus=$(if($agentStateObj){[string]$agentStateObj.status}else{'UNKNOWN'})
     bridgeVersion=$(if($bridgeManifest){[string]$bridgeManifest.version}else{'UNKNOWN'});hostHealthy=$(if($hostInfo){[bool]$hostInfo.ok}else{$false});hostVersion=$(if($hostInfo){[string]$hostInfo.version}else{'UNKNOWN'});hostAsyncJobs=$(if($hostInfo){[bool]$hostInfo.asyncJobs}else{$false})
+    videoWorkerInstalled=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerInstalled){[bool]$agentStateObj.videoWorkerInstalled}else{$false});videoWorkerRunning=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerRunning){[bool]$agentStateObj.videoWorkerRunning}else{$false});videoWorkerLaunchedThisCycle=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerLaunchedThisCycle){[bool]$agentStateObj.videoWorkerLaunchedThisCycle}else{$false});videoWorkerStatus=$(if($agentStateObj -and $agentStateObj.videoWorkerStatus){[string]$agentStateObj.videoWorkerStatus}elseif($videoJobStateObj){[string]$videoJobStateObj.status}else{'UNKNOWN'});videoWorkerAttempts=$(if($agentStateObj -and $null -ne $agentStateObj.videoWorkerAttempts){[int]$agentStateObj.videoWorkerAttempts}elseif($videoJobStateObj -and $videoJobStateObj.attempts){[int]$videoJobStateObj.attempts}else{0});videoJobState=$videoJobStateObj
     governorPresent=[bool]$govStateObj;governorRun=$GovernorRun;governorCycleOk=$(if($govStateObj -and $null -ne $govStateObj.ok){[bool]$govStateObj.ok}elseif($agentStateObj -and $null -ne $agentStateObj.governorCycleOk){[bool]$agentStateObj.governorCycleOk}else{$false});governorDriveSyncOk=[bool]$copyInfo.ok;governorCentralPath=$central
     governorSummary=$(if($govStateObj){$govStateObj.summary}else{$null});governorScanEngine=$(if($govStateObj){[string]$govStateObj.scanEngine}else{''});governorScanError=$(if($govStateObj){[string]$govStateObj.scanError}else{''});managedExtensions=$managed;issues=$issues;duplicates=$dups
     kickStatus=$kickInfo;lastError=$(if($agentStateObj){[string]$agentStateObj.lastError}else{''})
