@@ -2,9 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.20",
-  "releasedAt": "2026-08-25T10:44:00+09:00",
-  "gitBlobSha1": "65462cdba943511e5acbf27d554099b4666d110a",
+  "version": "1.1.21",
+  "releasedAt": "2026-08-25T13:29:00+09:00",
+  "gitBlobSha1": "e3b8ba053fdb39518ec8a5bcf857f67c88a25e66",
   "file": "HomeDesignLocalAgent.ps1",
-  "pollSeconds": 300
+  "pollSeconds": 300,
+  "notes": "D25/D26 recovery: preserve Agent 1.1.20 raw cache-bust Bridge self-heal, but terminate only >600s predecessor HomeDesignLocalAgent processes before launch and move the runtime mutex to HomeDesignLocalAgent121 so a stale/abandoned 1.1.20 mutex cannot block independent Bootstrap recovery."
 }
