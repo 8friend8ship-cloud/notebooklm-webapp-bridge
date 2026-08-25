@@ -16,6 +16,31 @@ function GitBlobSha1([string]$Path) {
   $sha = [Security.Cryptography.SHA1]::Create(); try { return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() }
 }
 function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
+function StopStaleAgentProcesses([int]$MaxAgeSeconds=600){
+  $killed=@();$now=Get-Date
+  try{
+    foreach($p in @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue)){
+      $cmd=[string]$p.CommandLine;if(-not $cmd){continue}
+      if($cmd -notmatch '(?i)HomeDesignLocalAgent(?:-1\.1\.\d+-patched)?\.ps1'){continue}
+      $created=$null;try{$created=[datetime]$p.CreationDate}catch{}
+      if(-not $created){continue}
+      $age=[Math]::Floor(($now-$created).TotalSeconds);if($age -le $MaxAgeSeconds){continue}
+      try{& taskkill.exe /PID ([int]$p.ProcessId) /T /F 2>$null|Out-Null;$killed+=[int]$p.ProcessId;BLog "Killed stale Local Agent pid=$($p.ProcessId) ageSec=$age."}catch{}
+    }
+  }catch{}
+  return @($killed)
+}
+function RunAgentBounded([string]$Path,[int]$TimeoutSeconds=180){
+  $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true
+  $psi.Arguments="-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$Path`""
+  $proc=[Diagnostics.Process]::Start($psi)
+  if(-not $proc.WaitForExit($TimeoutSeconds*1000)){
+    try{& taskkill.exe /PID ([int]$proc.Id) /T /F 2>$null|Out-Null}catch{}
+    BLog "Agent cycle timeout after ${TimeoutSeconds}s; killed pid=$($proc.Id)."
+    return 124
+  }
+  try{return [int]$proc.ExitCode}catch{return 1}
+}
 
 $mutex = New-Object System.Threading.Mutex($false,'HomeDesignLocalAgentBootstrapV1')
 if (-not $mutex.WaitOne(0,$false)) { exit 0 }
@@ -42,7 +67,9 @@ try {
           BLog "Agent updated to $($meta.version) sha=$expected."
         }
 
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $AgentFile
+        [void](StopStaleAgentProcesses 600)
+        $rc=RunAgentBounded $AgentFile 180
+        if($rc -ne 0){BLog "Agent cycle exit=$rc."}
       } else { BLog 'Agent stable channel is disabled.' }
     } catch { BLog ("Bootstrap cycle error: " + $_.Exception.Message) }
 
