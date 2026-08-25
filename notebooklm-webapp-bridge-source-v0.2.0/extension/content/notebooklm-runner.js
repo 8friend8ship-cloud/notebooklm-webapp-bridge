@@ -26,6 +26,35 @@
     return null;
   }
 
+  function openRoots() {
+    const roots = [document];
+    const seen = new Set(roots);
+    for (let i = 0; i < roots.length; i++) {
+      const root = roots[i];
+      for (const el of root.querySelectorAll?.("*") || []) {
+        if (el.shadowRoot && !seen.has(el.shadowRoot)) {
+          seen.add(el.shadowRoot);
+          roots.push(el.shadowRoot);
+        }
+      }
+    }
+    return roots;
+  }
+
+  function deepQueryAll(selector) {
+    const out = [];
+    const seen = new Set();
+    for (const root of openRoots()) {
+      for (const el of root.querySelectorAll?.(selector) || []) {
+        if (!seen.has(el)) {
+          seen.add(el);
+          out.push(el);
+        }
+      }
+    }
+    return out;
+  }
+
   function findButton(words, root = document, excludeDialogs = false) {
     return [...root.querySelectorAll("button,[role='button']")]
       .filter(el => visible(el) && (!excludeDialogs || !el.closest("[role='dialog'],dialog")))
@@ -38,6 +67,21 @@
           el.getAttribute("data-testid")
         ].join(" "));
         return words.some(w => t.includes(norm(w)));
+      }) || null;
+  }
+
+  function findDeepControl(words) {
+    return deepQueryAll("button,[role='button'],[role='tab'],a")
+      .filter(el => visible(el) && !el.closest("[role='dialog'],dialog"))
+      .find(el => {
+        const t = norm([
+          el.innerText,
+          el.textContent,
+          el.getAttribute("aria-label"),
+          el.getAttribute("title"),
+          el.getAttribute("data-testid")
+        ].join(" "));
+        return words.some(w => t === norm(w) || t.includes(norm(w)));
       }) || null;
   }
 
@@ -125,11 +169,36 @@
     return {ok:true};
   }
 
+  function loginRequired() {
+    const body = norm(document.body?.innerText || "");
+    if (/sign in to|sign in with google|로그인|google 계정으로/.test(body)) return true;
+    return Boolean(findDeepControl(["sign in","로그인"]));
+  }
+
   function chatEditor() {
     const list = [];
-    for (const sel of ["textarea","[contenteditable='true'][role='textbox']","[contenteditable='true']"]) {
-      for (const el of document.querySelectorAll(sel)) {
-        if (!visible(el) || el.closest("[role='dialog'],dialog")) continue;
+    const seen = new Set();
+    const selectors = [
+      "textarea",
+      "input[type='text']",
+      "input:not([type])",
+      "[role='textbox']",
+      "[contenteditable='true']",
+      "[contenteditable='plaintext-only']",
+      "[aria-multiline='true']"
+    ];
+    for (const sel of selectors) {
+      for (const el of deepQueryAll(sel)) {
+        if (seen.has(el) || !visible(el) || el.closest("[role='dialog'],dialog")) continue;
+        const meta = norm([
+          el.getAttribute("type"),
+          el.getAttribute("placeholder"),
+          el.getAttribute("aria-label"),
+          el.getAttribute("data-placeholder"),
+          el.getAttribute("data-testid")
+        ].join(" "));
+        if (/search|검색/.test(meta)) continue;
+        seen.add(el);
         list.push(el);
       }
     }
@@ -139,10 +208,28 @@
       const h = norm([
         el.getAttribute("placeholder"),
         el.getAttribute("aria-label"),
-        el.getAttribute("data-placeholder")
+        el.getAttribute("data-placeholder"),
+        el.getAttribute("data-testid")
       ].join(" "));
-      return ["질문","메시지","ask","chat","message","prompt"].some(w => h.includes(w));
+      return ["질문","메시지","ask","chat","message","prompt","query","anything","type"].some(w => h.includes(w));
     }) || list.at(-1);
+  }
+
+  async function ensureChatSurface() {
+    let editor = await waitFor(() => chatEditor(), 12000, 500);
+    if (editor) return editor;
+    if (loginRequired()) throw new Error(`NOTEBOOK_LOGIN_REQUIRED: ${location.href}`);
+
+    const chat = findDeepControl(["채팅","chat"]);
+    if (chat) {
+      try { chat.click(); } catch {}
+      await sleep(1800);
+    }
+
+    editor = await waitFor(() => chatEditor(), 58000, 600);
+    if (editor) return editor;
+    if (loginRequired()) throw new Error(`NOTEBOOK_LOGIN_REQUIRED: ${location.href}`);
+    return null;
   }
 
   function buildPrompt(task, sourceAdded) {
@@ -208,11 +295,11 @@
     ];
 
     for (const sel of selectors) {
-      const all = [...document.querySelectorAll(sel)].filter(visible);
+      const all = deepQueryAll(sel).filter(visible);
       if (all.length) return all.at(-1);
     }
 
-    const direct = findButton(["보내기","전송","제출","send","submit"], document, true);
+    const direct = findDeepControl(["보내기","전송","제출","send","submit"]);
     if (direct) return direct;
 
     let root = editor?.parentElement;
@@ -241,8 +328,6 @@
       return {method:"BUTTON"};
     }
 
-    // V7.3 fallback for current Gemini Notebook UI:
-    // the prompt is already inserted, so submit with the same Enter gesture a user would use.
     editor.focus();
 
     const opts = {
@@ -266,7 +351,6 @@
     return {method:"ENTER_FALLBACK"};
   }
 
-
   function exactAssistantMarker(markerText) {
     if (!markerText) return null;
 
@@ -283,8 +367,6 @@
         const t = (el.innerText || el.textContent || "").trim();
         if (!t.includes(markerText) || t.length > markerText.length + 400) continue;
 
-        // NotebookLM can wrap the answer marker with citations/action labels.
-        // Reject prompt copies, then prefer assistant-like and smallest matching nodes.
         let parent = el;
         let looksLikePrompt = false;
         let looksLikeAnswer = false;
@@ -316,10 +398,6 @@
       await sleep(1400);
 
       if (mk) {
-        // V7.5: do NOT use raw marker-count growth. The submitted user prompt itself
-        // contains the marker and can briefly create duplicate DOM copies while NotebookLM
-        // is generating. Accept the smallest visible non-prompt assistant node containing
-        // the requested marker because current NotebookLM may wrap it with UI/citation text.
         const answerNode = exactAssistantMarker(mk);
         if (answerNode) {
           return {
@@ -343,7 +421,6 @@
           .filter(t => !uiOnlyResult(t));
 
         if (fresh.length) {
-          // Prefer the smallest meaningful newly-created result instead of a page-wide container.
           const chosen = [...fresh].sort((a,b) => a.length - b.length)[0];
           return {
             resultText: chosen,
@@ -366,8 +443,8 @@
     if (!task?.taskId) throw new Error("TASK_ID가 없습니다.");
 
     const source = await addSource(task);
-    const editor = await waitFor(() => chatEditor(), 70000, 600);
-    if (!editor) throw new Error("NotebookLM 채팅 입력창을 찾지 못했습니다.");
+    const editor = await ensureChatSurface();
+    if (!editor) throw new Error(`NotebookLM 채팅 입력창을 찾지 못했습니다: ${location.href} | ${document.title}`);
 
     fill(editor, buildPrompt(task, source.ok));
 
