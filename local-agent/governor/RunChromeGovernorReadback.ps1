@@ -31,11 +31,11 @@ if($NeedRefresh){
   }
 }
 
-$Args=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$V2)
-if($KickStableAgent){$Args+='-KickStableAgent'}
-if($StatusOnly){$Args+='-StatusOnly'}
-if($RunGovernor){$Args+='-RunGovernor'}
-if($ApplyStableBridge){$Args+='-ApplyStableBridge'}
-if($BridgeStatusOnly){$Args+='-BridgeStatusOnly'}
-$P=Start-Process powershell.exe -ArgumentList $Args -WindowStyle Hidden -Wait -PassThru
-exit $P.ExitCode
+$ChildArgs=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$V2)
+if($KickStableAgent){$ChildArgs+='-KickStableAgent'}
+if($StatusOnly){$ChildArgs+='-StatusOnly'}
+if($RunGovernor){$ChildArgs+='-RunGovernor'}
+if($ApplyStableBridge){$ChildArgs+='-ApplyStableBridge'}
+if($BridgeStatusOnly){$ChildArgs+='-BridgeStatusOnly'}
+& powershell.exe @ChildArgs
+exit $LASTEXITCODE
