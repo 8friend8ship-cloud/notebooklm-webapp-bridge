@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.23",
-  "description": "HomeDesign dedicated Chrome bridge with immutable stable self-heal, current NotebookLM composer/response guards, worker-load CHAT auto-poll, fail-close local Host handoff, bounded stale LOCAL async recovery, explicit STARTED handoff state, and preserved failure stdout diagnostics.",
+  "version": "0.2.24",
+  "description": "HomeDesign dedicated Chrome bridge with immutable stable self-heal, current NotebookLM composer/response guards, worker-load CHAT auto-poll, fail-close local Host handoff, explicit STARTED state, preserved failure stdout diagnostics, and D18 stale-local-active HOLD recovery even when legacy active state lacks startedAtMs.",
   "permissions": ["alarms","identity","identity.email","scripting","sidePanel","storage","tabs"],
   "host_permissions": ["https://notebooklm.google.com/*","https://notebook.google.com/*","https://script.google.com/*","https://script.googleusercontent.com/*","https://notebooklm-webapp-bridge.vercel.app/*","http://127.0.0.1/*"],
   "externally_connectable": {"matches":["http://localhost/*","http://127.0.0.1/*","https://*.vercel.app/*"]},
