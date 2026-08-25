@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.19",
-  "description": "HomeDesign dedicated Chrome bridge with async local PowerShell jobs, immutable payload updates, recurring stable-agent self-heal, fail-close local-host claim recovery, and current NotebookLM response-DOM guards.",
+  "version": "0.2.20",
+  "description": "HomeDesign dedicated Chrome bridge with async local PowerShell jobs, immutable payload updates, recurring stable-agent self-heal, fail-close local-host claim recovery, current NotebookLM response-DOM guards, and worker-load CHAT auto-poll bootstrap.",
   "permissions": ["alarms","identity","identity.email","scripting","sidePanel","storage","tabs"],
   "host_permissions": ["https://notebooklm.google.com/*","https://notebook.google.com/*","https://script.google.com/*","https://script.googleusercontent.com/*","https://notebooklm-webapp-bridge.vercel.app/*","http://127.0.0.1/*"],
   "externally_connectable": {"matches":["http://localhost/*","http://127.0.0.1/*","https://*.vercel.app/*"]},
