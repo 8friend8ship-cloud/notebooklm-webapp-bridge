@@ -5,6 +5,8 @@ const GUARD_ALARM = "nlm-local-active-stale-guard";
 const GUARD_HOST = "http://127.0.0.1:8765";
 const GUARD_API = "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec";
 const GUARD_DEFAULT_TIMEOUT = 600;
+const GUARD_PENDING_STAGE = "CLAIMED_PENDING_HOST";
+const GUARD_PENDING_GRACE_MS = 120000;
 
 async function guardReadActive() {
   try { return (await chrome.storage.local.get(GUARD_ACTIVE_KEY))[GUARD_ACTIVE_KEY] || null; }
@@ -88,6 +90,8 @@ async function guardStaleActive(reason = "alarm") {
   const timeoutSeconds = Math.max(30, Math.min(1800, Number(active?.timeoutSeconds || GUARD_DEFAULT_TIMEOUT)));
   const hardMs = (timeoutSeconds + 120) * 1000;
   let startedAtMs = Number(active?.startedAtMs || 0);
+  const claimedAtMs = Number(active?.claimedAtMs || 0);
+  const pendingHandoff = String(active?.stage || "") === GUARD_PENDING_STAGE;
   let host = null;
   let hostError = "";
 
@@ -102,10 +106,21 @@ async function guardStaleActive(reason = "alarm") {
     if (startedAtMs) await guardWriteActive({ ...active, startedAtMs, guardRecoveredStartedAt: true });
   }
 
-  const ageMs = startedAtMs ? Date.now() - startedAtMs : 0;
+  const ageBase = startedAtMs || claimedAtMs;
+  const ageMs = ageBase ? Date.now() - ageBase : 0;
   const state = String(host?.state || "").toUpperCase();
 
   if (state === "DONE") return { ok: true, skipped: "done_pending_normal_finalize", taskId, reason };
+
+  if (pendingHandoff && (state === "NOT_FOUND" || hostError)) {
+    if (ageMs && ageMs <= GUARD_PENDING_GRACE_MS) {
+      return { ok: true, skipped: "pending_handoff_wait_runner", taskId, ageMs, hostError, reason };
+    }
+    const detail = `D28_CLAIM_HOST_HANDOFF_STALE_HOLD:${taskId}:ageMs=${ageMs}:host=${state || hostError || "UNKNOWN"}`;
+    await guardHoldQueue(taskId, detail);
+    await guardWriteActive(null);
+    return { ok: true, action: "pending_handoff_held_and_cleared", taskId, ageMs, reason };
+  }
 
   if (["ERROR", "NOT_FOUND"].includes(state)) {
     const detail = `D18_LOCAL_ACTIVE_${state}_HOLD:${taskId}`;
@@ -114,7 +129,7 @@ async function guardStaleActive(reason = "alarm") {
     return { ok: true, action: "held_and_cleared", state, taskId, reason };
   }
 
-  if (startedAtMs && ageMs > hardMs) {
+  if (ageBase && ageMs > hardMs) {
     const detail = `D18_LOCAL_ACTIVE_HARD_TIMEOUT_HOLD:${taskId}:ageMs=${ageMs}:timeoutSeconds=${timeoutSeconds}`;
     await guardCancelHost(taskId);
     await guardHoldQueue(taskId, detail);
@@ -122,7 +137,7 @@ async function guardStaleActive(reason = "alarm") {
     return { ok: true, action: "canceled_held_and_cleared", taskId, ageMs, timeoutSeconds, reason };
   }
 
-  if (!startedAtMs && hostError) {
+  if (!ageBase && hostError) {
     return { ok: true, skipped: "missing_start_time_and_host_unreachable", taskId, hostError, reason };
   }
 
