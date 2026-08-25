@@ -53,6 +53,20 @@ function RefreshV2 {
     return (Test-Path -LiteralPath $V2)
   }
 }
+function StopStaleAgentProcesses([int]$MaxAgeSeconds=600){
+  $Killed=@();$Now=Get-Date
+  try{
+    foreach($P in @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue)){
+      $Cmd=[string]$P.CommandLine;if(-not $Cmd){continue}
+      if($Cmd -notmatch '(?i)HomeDesignLocalAgent(?:-1\.1\.\d+-patched)?\.ps1'){continue}
+      $Created=$null;try{$Created=[datetime]$P.CreationDate}catch{}
+      if(-not $Created){continue}
+      $Age=[Math]::Floor(($Now-$Created).TotalSeconds);if($Age -le $MaxAgeSeconds){continue}
+      try{& taskkill.exe /PID ([int]$P.ProcessId) /T /F 2>$null|Out-Null;$Killed+=[ordered]@{pid=[int]$P.ProcessId;ageSeconds=[int]$Age;commandLine=$Cmd}}catch{}
+    }
+  }catch{}
+  return @($Killed)
+}
 function KickStableAgentRaw {
   $MetaUrl='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/stable/agent.json?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $Meta=((Invoke-WebRequest -UseBasicParsing -Uri $MetaUrl -TimeoutSec 10).Content|ConvertFrom-Json)
@@ -66,8 +80,10 @@ function KickStableAgentRaw {
     $Actual=(GitBlobSha1 $Tmp).ToLowerInvariant();if($Actual -ne $Expected){Remove-Item $Tmp -Force -ErrorAction SilentlyContinue;throw "AGENT_FILE_SHA_MISMATCH actual=$Actual expected=$Expected"}
     Move-Item -LiteralPath $Tmp -Destination $AgentFile -Force;$LocalSha=$Actual
   }
+  $Killed=StopStaleAgentProcesses 600
+  if(@($Killed).Count -gt 0){Start-Sleep -Milliseconds 700}
   Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$AgentFile`"") -WindowStyle Hidden|Out-Null
-  return [ordered]@{ok=$true;action='KICK_STABLE_AGENT_RAW_BACKGROUND';currentAgent=$Current;targetAgent=$Target;expectedSha=$Expected;localSha=$LocalSha;at=(Get-Date).ToString('o')}
+  return [ordered]@{ok=$true;action='KICK_STABLE_AGENT_RAW_BACKGROUND';currentAgent=$Current;targetAgent=$Target;expectedSha=$Expected;localSha=$LocalSha;staleAgentProcessesKilled=$Killed;at=(Get-Date).ToString('o')}
 }
 
 if($BridgeLocalEvidence){
