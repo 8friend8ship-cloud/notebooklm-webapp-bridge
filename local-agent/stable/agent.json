@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.18",
-  "releasedAt": "2026-08-25T09:46:00+09:00",
-  "gitBlobSha1": "225d051b85a1b66d146fa7f384d85529cd5e6a0b",
+  "version": "1.1.19",
+  "releasedAt": "2026-08-25T10:26:00+09:00",
+  "gitBlobSha1": "c911928014f49ed50a91c5461b4c45ee0534e94b",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300
 }
