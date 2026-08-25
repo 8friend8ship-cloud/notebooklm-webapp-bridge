@@ -1,4 +1,4 @@
-param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor)
+param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 
@@ -23,7 +23,7 @@ function RefreshV2 {
   }
 }
 
-$NeedRefresh=($KickStableAgent -or $RunGovernor -or -not(Test-Path -LiteralPath $V2))
+$NeedRefresh=($KickStableAgent -or $RunGovernor -or $ApplyStableBridge -or $BridgeStatusOnly -or -not(Test-Path -LiteralPath $V2))
 if($NeedRefresh){
   if(-not(RefreshV2)){
     [ordered]@{ok=$false;action='V2_FAST_CONTROL_BOOTSTRAP';error='V2_FETCH_FAILED_AND_NO_LOCAL_COPY';at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
@@ -35,5 +35,7 @@ $Args=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$V2)
 if($KickStableAgent){$Args+='-KickStableAgent'}
 if($StatusOnly){$Args+='-StatusOnly'}
 if($RunGovernor){$Args+='-RunGovernor'}
+if($ApplyStableBridge){$Args+='-ApplyStableBridge'}
+if($BridgeStatusOnly){$Args+='-BridgeStatusOnly'}
 $P=Start-Process powershell.exe -ArgumentList $Args -WindowStyle Hidden -Wait -PassThru
 exit $P.ExitCode
