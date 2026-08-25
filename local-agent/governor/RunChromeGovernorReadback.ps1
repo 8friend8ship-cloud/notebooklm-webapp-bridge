@@ -1,4 +1,4 @@
-param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[string]$ExpectedBridge='0.2.18')
+param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[switch]$VideoFailureDiagnostic,[string]$ExpectedBridge='0.2.18')
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 
@@ -12,6 +12,7 @@ $Api="https://api.github.com/repos/$Repo/contents/local-agent/governor/RunChrome
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
 function ReadJson([string]$Path){if(-not(Test-Path -LiteralPath $Path)){return $null};try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}}
+function ReadTail([string]$Path,[int]$Max=12000){if(-not(Test-Path -LiteralPath $Path)){return ''};try{$T=Get-Content -LiteralPath $Path -Raw -Encoding UTF8;if($T.Length -gt $Max){return $T.Substring([Math]::Max(0,$T.Length-$Max))};return $T}catch{return ('READ_ERROR: '+$_.Exception.Message)}}
 function GitBlobSha1([string]$Path){$B=[IO.File]::ReadAllBytes($Path);$H=[Text.Encoding]::ASCII.GetBytes(('blob '+$B.Length+[char]0));$A=New-Object byte[] ($H.Length+$B.Length);[Buffer]::BlockCopy($H,0,$A,0,$H.Length);[Buffer]::BlockCopy($B,0,$A,$H.Length,$B.Length);$S=[Security.Cryptography.SHA1]::Create();try{return (($S.ComputeHash($A)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$S.Dispose()}}
 function GetBridgeReleaseRaw {
   $Url='https://raw.githubusercontent.com/'+$Repo+'/main/runtime/stable/release.json?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
@@ -77,6 +78,12 @@ if($BridgeStatusOnly){
   }catch{
     [ordered]@{ok=$false;transportOk=$true;healthy=$false;action='BRIDGE_STATUS_ONLY';integritySource='RAW_RELEASE_LIVE';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
   }
+  exit 0
+}
+if($VideoFailureDiagnostic){
+  $StatePath=Join-Path $Root 'video-job-state.json';$MetaPath=Join-Path $Root 'video-production-job.json';$ConsolePath=Join-Path $Root 'video-job-console.log';$Prod=Join-Path $Base 'VideoProduction';$Recent=@()
+  if(Test-Path -LiteralPath $Prod){foreach($D in @(Get-ChildItem -LiteralPath $Prod -Directory -Filter 'AUTO_QA_V3_*' -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 4)){$QaLogs=@();foreach($Q in @('QA_PASS_1','QA_PASS_2')){$P=Join-Path $D.FullName ('out\'+$Q+'\qa-console.log');if(Test-Path -LiteralPath $P){$QaLogs+=[ordered]@{pass=$Q;path=$P;text=(ReadTail $P 8000)}}};$Recent+=[ordered]@{path=$D.FullName;lastWrite=$D.LastWriteTime.ToString('o');autoQaLog=(ReadTail (Join-Path $D.FullName 'auto-qa.log') 8000);qaLogs=$QaLogs}}}
+  [ordered]@{ok=$true;action='VIDEO_FAILURE_DIAGNOSTIC';at=(Get-Date).ToString('o');jobState=(ReadJson $StatePath);jobMeta=(ReadJson $MetaPath);workerConsole=(ReadTail $ConsolePath 12000);recentRuns=$Recent}|ConvertTo-Json -Depth 30 -Compress
   exit 0
 }
 
