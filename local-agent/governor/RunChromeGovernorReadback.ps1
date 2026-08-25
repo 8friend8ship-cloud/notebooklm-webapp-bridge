@@ -12,6 +12,29 @@ $Api="https://api.github.com/repos/$Repo/contents/local-agent/governor/RunChrome
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
 function ReadJson([string]$Path){if(-not(Test-Path -LiteralPath $Path)){return $null};try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}}
+function GitBlobSha1([string]$Path){$B=[IO.File]::ReadAllBytes($Path);$H=[Text.Encoding]::ASCII.GetBytes(('blob '+$B.Length+[char]0));$A=New-Object byte[] ($H.Length+$B.Length);[Buffer]::BlockCopy($H,0,$A,0,$H.Length);[Buffer]::BlockCopy($B,0,$A,$H.Length,$B.Length);$S=[Security.Cryptography.SHA1]::Create();try{return (($S.ComputeHash($A)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$S.Dispose()}}
+function GetBridgeReleaseRaw {
+  $Url='https://raw.githubusercontent.com/'+$Repo+'/main/runtime/stable/release.json?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $Text=(Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 10).Content
+  $Rel=$Text|ConvertFrom-Json
+  if(-not $Rel.enabled){throw 'BRIDGE_STABLE_DISABLED'}
+  if([string]$Rel.action -ne 'apply'){throw 'BRIDGE_STABLE_ACTION_NOT_APPLY'}
+  if([bool]$Rel.requiresUserApproval){throw 'BRIDGE_RELEASE_REQUIRES_USER_APPROVAL'}
+  return $Rel
+}
+function TestBridgeRelease($Rel){
+  foreach($F in @($Rel.files)){
+    $Rp=[string]$F.path
+    if($Rp -match '\.\.' -or [IO.Path]::IsPathRooted($Rp)){return $false}
+    $P=Join-Path $ExtensionRoot $Rp.Replace('/','\')
+    if(-not(Test-Path -LiteralPath $P)){return $false}
+    if((GitBlobSha1 $P).ToLowerInvariant() -ne ([string]$F.gitBlobSha1).ToLowerInvariant()){return $false}
+  }
+  return $true
+}
+function DedicatedRunning {
+  try{return (@(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -and $_.CommandLine -like "*$DedicatedUserData*"}).Count -gt 0)}catch{return $false}
+}
 function RefreshV2 {
   try {
     $Headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}
@@ -32,11 +55,28 @@ if($BridgeLocalEvidence){
   $Apply=ReadJson (Join-Path $Root 'NOTEBOOKLM_BRIDGE_APPLY_RESULT.json')
   $State=ReadJson (Join-Path $Root 'state.json')
   $Health=$null;try{$Health=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3}catch{}
-  $Dedicated=$false;try{$Dedicated=(@(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -and $_.CommandLine -like "*$DedicatedUserData*"}).Count -gt 0)}catch{}
+  $Dedicated=DedicatedRunning
   $BridgeVersion=$(if($Manifest){[string]$Manifest.version}else{'UNKNOWN'})
-  $IntegrityEvidence=($Apply -and [bool]$Apply.integrityOk -and [string]$Apply.targetVersion -eq $ExpectedBridge -and [string]$Apply.installedAfter -eq $ExpectedBridge)
-  $Healthy=($BridgeVersion -eq $ExpectedBridge -and $IntegrityEvidence -and $Health -and [bool]$Health.ok -and [bool]$Health.asyncJobs -and $Dedicated)
-  [ordered]@{ok=$true;transportOk=$true;healthy=[bool]$Healthy;action='BRIDGE_LOCAL_EVIDENCE';at=(Get-Date).ToString('o');expectedBridge=$ExpectedBridge;bridgeVersion=$BridgeVersion;integrityEvidence=[bool]$IntegrityEvidence;hostHealthy=$(if($Health){[bool]$Health.ok}else{$false});hostVersion=$(if($Health){[string]$Health.version}else{'UNKNOWN'});hostAsyncJobs=$(if($Health){[bool]$Health.asyncJobs}else{$false});dedicatedChromeRunning=[bool]$Dedicated;agentVersion=$(if($State){[string]$State.agentVersion}else{'UNKNOWN'});agentStatus=$(if($State){[string]$State.status}else{'UNKNOWN'});applyResult=$Apply}|ConvertTo-Json -Depth 30 -Compress
+  $Rel=$null;$ReleaseError='';$IntegrityEvidence=$false
+  try{$Rel=GetBridgeReleaseRaw;$IntegrityEvidence=TestBridgeRelease $Rel}catch{$ReleaseError=$_.Exception.Message}
+  $Target=$(if($Rel){[string]$Rel.version}else{$ExpectedBridge})
+  $Healthy=($BridgeVersion -eq $Target -and $IntegrityEvidence -and $Health -and [bool]$Health.ok -and [bool]$Health.asyncJobs -and $Dedicated)
+  [ordered]@{ok=$true;transportOk=$true;healthy=[bool]$Healthy;action='BRIDGE_LOCAL_EVIDENCE';at=(Get-Date).ToString('o');expectedBridge=$ExpectedBridge;targetBridge=$Target;bridgeVersion=$BridgeVersion;integrityEvidence=[bool]$IntegrityEvidence;integritySource='RAW_RELEASE_LIVE';releaseError=$ReleaseError;hostHealthy=$(if($Health){[bool]$Health.ok}else{$false});hostVersion=$(if($Health){[string]$Health.version}else{'UNKNOWN'});hostAsyncJobs=$(if($Health){[bool]$Health.asyncJobs}else{$false});dedicatedChromeRunning=[bool]$Dedicated;agentVersion=$(if($State){[string]$State.agentVersion}else{'UNKNOWN'});agentStatus=$(if($State){[string]$State.status}else{'UNKNOWN'});applyResult=$Apply}|ConvertTo-Json -Depth 30 -Compress
+  exit 0
+}
+if($BridgeStatusOnly){
+  try{
+    $Rel=GetBridgeReleaseRaw
+    $Manifest=ReadJson (Join-Path $ExtensionRoot 'manifest.json')
+    $Health=$null;try{$Health=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3}catch{}
+    $Integrity=TestBridgeRelease $Rel
+    $Dedicated=DedicatedRunning
+    $Apply=ReadJson (Join-Path $Root 'NOTEBOOKLM_BRIDGE_APPLY_RESULT.json')
+    $Healthy=($Manifest -and [string]$Manifest.version -eq [string]$Rel.version -and $Integrity -and $Health -and [bool]$Health.ok -and [bool]$Health.asyncJobs -and $Dedicated)
+    [ordered]@{ok=[bool]$Healthy;transportOk=$true;healthy=[bool]$Healthy;action='BRIDGE_STATUS_ONLY';at=(Get-Date).ToString('o');targetBridge=[string]$Rel.version;bridgeVersion=$(if($Manifest){[string]$Manifest.version}else{'UNKNOWN'});integrityOk=[bool]$Integrity;integritySource='RAW_RELEASE_LIVE';hostHealthy=$(if($Health){[bool]$Health.ok}else{$false});hostVersion=$(if($Health){[string]$Health.version}else{'UNKNOWN'});hostAsyncJobs=$(if($Health){[bool]$Health.asyncJobs}else{$false});dedicatedChromeRunning=[bool]$Dedicated;applyResult=$Apply}|ConvertTo-Json -Depth 30 -Compress
+  }catch{
+    [ordered]@{ok=$false;transportOk=$true;healthy=$false;action='BRIDGE_STATUS_ONLY';integritySource='RAW_RELEASE_LIVE';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+  }
   exit 0
 }
 
