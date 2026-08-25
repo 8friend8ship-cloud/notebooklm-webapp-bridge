@@ -7,6 +7,7 @@ $Root=Join-Path $Base 'LocalAgent'
 $ExtensionRoot=Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
 $DedicatedUserData=Join-Path $Base 'ChromeUserData'
 $V2=Join-Path $Root 'RunChromeGovernorReadbackV2.ps1'
+$AgentFile=Join-Path $Root 'HomeDesignLocalAgent.ps1'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Api="https://api.github.com/repos/$Repo/contents/local-agent/governor/RunChromeGovernorReadbackV2.ps1?ref=main"
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
@@ -43,17 +44,30 @@ function DedicatedRunning {
 }
 function RefreshV2 {
   try {
-    $Headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}
-    $R=Invoke-RestMethod -Uri $Api -Headers $Headers -Method Get -TimeoutSec 10
-    if(-not $R.content){throw 'V2_CONTENT_EMPTY'}
-    $Bytes=[Convert]::FromBase64String(([string]$R.content -replace '\s',''))
+    $Raw='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/governor/RunChromeGovernorReadbackV2.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $Tmp=$V2+'.download'
-    [IO.File]::WriteAllBytes($Tmp,$Bytes)
+    Invoke-WebRequest -UseBasicParsing -Uri $Raw -OutFile $Tmp -TimeoutSec 10
     Move-Item -LiteralPath $Tmp -Destination $V2 -Force
     return $true
   } catch {
     return (Test-Path -LiteralPath $V2)
   }
+}
+function KickStableAgentRaw {
+  $MetaUrl='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/stable/agent.json?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $Meta=((Invoke-WebRequest -UseBasicParsing -Uri $MetaUrl -TimeoutSec 10).Content|ConvertFrom-Json)
+  if(-not $Meta.enabled){throw 'LOCAL_AGENT_STABLE_DISABLED'}
+  $Target=[string]$Meta.version;$Expected=([string]$Meta.gitBlobSha1).ToLowerInvariant()
+  $State=ReadJson (Join-Path $Root 'state.json');$Current=$(if($State){[string]$State.agentVersion}else{''})
+  $LocalSha=$(if(Test-Path -LiteralPath $AgentFile){(GitBlobSha1 $AgentFile).ToLowerInvariant()}else{''})
+  if($Current -ne $Target -or $LocalSha -ne $Expected){
+    $Url='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/releases/'+$Target+'/HomeDesignLocalAgent.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $Tmp=$AgentFile+'.raw.download';Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Tmp -TimeoutSec 20
+    $Actual=(GitBlobSha1 $Tmp).ToLowerInvariant();if($Actual -ne $Expected){Remove-Item $Tmp -Force -ErrorAction SilentlyContinue;throw "AGENT_FILE_SHA_MISMATCH actual=$Actual expected=$Expected"}
+    Move-Item -LiteralPath $Tmp -Destination $AgentFile -Force;$LocalSha=$Actual
+  }
+  Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$AgentFile`"") -WindowStyle Hidden|Out-Null
+  return [ordered]@{ok=$true;action='KICK_STABLE_AGENT_RAW_BACKGROUND';currentAgent=$Current;targetAgent=$Target;expectedSha=$Expected;localSha=$LocalSha;at=(Get-Date).ToString('o')}
 }
 
 if($BridgeLocalEvidence){
@@ -91,8 +105,11 @@ if($StatusOnly){
   [ordered]@{ok=$true;action='LOCAL_RUNTIME_STATUS_FAST_V2';at=(Get-Date).ToString('o');agentVersion=$(if($A){[string]$A.agentVersion}else{'UNKNOWN'});agentStatus=$(if($A){[string]$A.status}else{'UNKNOWN'});agentMode=$(if($A){[string]$A.agentMode}else{''});hostHealthy=$(if($H){[bool]$H.ok}else{$false});hostVersion=$(if($H){[string]$H.version}else{'UNKNOWN'});hostAsyncJobs=$(if($H){[bool]$H.asyncJobs}else{$false});bridgeVersion=$(if($M){[string]$M.version}else{'UNKNOWN'});videoWorkerVersion=$(if($A -and $A.videoWorkerVersion){[string]$A.videoWorkerVersion}elseif($J -and $J.workerVersion){[string]$J.workerVersion}else{''});videoWorkerInstalled=$(if($A -and $null -ne $A.videoWorkerInstalled){[bool]$A.videoWorkerInstalled}else{$false});videoWorkerRunning=$(if($A -and $null -ne $A.videoWorkerRunning){[bool]$A.videoWorkerRunning}else{$false});videoJobState=$J;governorRun=$null;governorCycleOk=$(if($A -and $null -ne $A.governorCycleOk){[bool]$A.governorCycleOk}elseif($G -and $null -ne $G.ok){[bool]$G.ok}else{$false});governorSummary=$(if($G){$G.summary}else{$null});governorDriveSyncOk=$(if($A -and $null -ne $A.governorDriveSyncOk){[bool]$A.governorDriveSyncOk}else{$false});governorCentralPath=$(if($A){[string]$A.governorCentralPath}else{''});errors=$(if($A){$A.errors}else{$null});lastError=$(if($A){[string]$A.lastError}else{''});videoFailureDiagnostic=(VideoFailureEvidence)}|ConvertTo-Json -Depth 30 -Compress
   exit 0
 }
+if($KickStableAgent){
+  try{(KickStableAgentRaw)|ConvertTo-Json -Depth 10 -Compress;exit 0}catch{[ordered]@{ok=$false;action='KICK_STABLE_AGENT_RAW_BACKGROUND';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 2}
+}
 
-$NeedRefresh=($KickStableAgent -or $RunGovernor -or $ApplyStableBridge -or $BridgeStatusOnly -or -not(Test-Path -LiteralPath $V2))
+$NeedRefresh=($RunGovernor -or $ApplyStableBridge -or $BridgeStatusOnly -or -not(Test-Path -LiteralPath $V2))
 if($NeedRefresh){
   if(-not(RefreshV2)){
     [ordered]@{ok=$false;action='V2_FAST_CONTROL_BOOTSTRAP';error='V2_FETCH_FAILED_AND_NO_LOCAL_COPY';at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
@@ -101,7 +118,6 @@ if($NeedRefresh){
 }
 
 $ChildArgs=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$V2)
-if($KickStableAgent){$ChildArgs+='-KickStableAgent'}
 if($RunGovernor){$ChildArgs+='-RunGovernor'}
 if($ApplyStableBridge){$ChildArgs+='-ApplyStableBridge'}
 if($BridgeStatusOnly){$ChildArgs+='-BridgeStatusOnly'}
