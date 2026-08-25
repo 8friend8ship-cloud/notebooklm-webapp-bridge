@@ -185,6 +185,16 @@
     return out;
   }
 
+  function generationInProgress() {
+    return Boolean(findButton(["stop","중지","생성 중지","stop generating"], document, true));
+  }
+
+  function uiOnlyResult(text) {
+    const t = norm(text);
+    return /^(?:소스\s*\d+개|sources?\s*\d+)(?:\s+(?:stop|중지))?$/.test(t)
+      || /^(?:stop|중지|생성 중지|stop generating)$/.test(t);
+  }
+
   function sendButtonNear(editor) {
     const selectors = [
       "button[type='submit']",
@@ -271,29 +281,31 @@
         if (el.closest("textarea,[contenteditable='true'],[role='textbox'],[role='dialog'],dialog")) continue;
 
         const t = (el.innerText || el.textContent || "").trim();
-        if (t !== markerText) continue;
+        if (!t.includes(markerText) || t.length > markerText.length + 400) continue;
 
-        // Reject an exact marker node if it is nested inside the submitted user prompt.
+        // NotebookLM can wrap the answer marker with citations/action labels.
+        // Reject prompt copies, then prefer assistant-like and smallest matching nodes.
         let parent = el;
         let looksLikePrompt = false;
         let looksLikeAnswer = false;
-        for (let depth = 0; depth < 5 && parent; depth++, parent = parent.parentElement) {
+        for (let depth = 0; depth < 6 && parent; depth++, parent = parent.parentElement) {
           const pt = (parent.innerText || parent.textContent || "").trim();
           if (pt.includes("[TASK_ID]") || pt.includes("[NotebookLM 작업 지시서]") || pt.includes("[원문]")) {
             looksLikePrompt = true;
             break;
           }
-          if (/메모에 저장|keep_pin|copy_all|thumb_up|thumb_down/i.test(pt)) {
+          if (/메모에 저장|keep_pin|copy_all|thumb_up|thumb_down|copy|복사/i.test(pt)) {
             looksLikeAnswer = true;
           }
         }
 
-        if (!looksLikePrompt) candidates.push({el, looksLikeAnswer});
+        if (!looksLikePrompt) candidates.push({el, looksLikeAnswer, exact:t === markerText, length:t.length});
       }
     }
 
     if (!candidates.length) return null;
-    return (candidates.find(x => x.looksLikeAnswer) || candidates.at(-1)).el;
+    return [...candidates]
+      .sort((a,b) => Number(b.exact) - Number(a.exact) || Number(b.looksLikeAnswer) - Number(a.looksLikeAnswer) || a.length - b.length)[0].el;
   }
 
   async function waitResult(task, baselineMarker, baselineCandidates, timeoutMs) {
@@ -304,28 +316,31 @@
       await sleep(1400);
 
       if (mk) {
-        // V7.4: do NOT use raw marker-count growth. The submitted user prompt itself
+        // V7.5: do NOT use raw marker-count growth. The submitted user prompt itself
         // contains the marker and can briefly create duplicate DOM copies while NotebookLM
-        // is generating. Wait for an actual visible assistant-answer node whose text is
-        // exactly the requested marker.
+        // is generating. Accept the smallest visible non-prompt assistant node containing
+        // the requested marker because current NotebookLM may wrap it with UI/citation text.
         const answerNode = exactAssistantMarker(mk);
         if (answerNode) {
           return {
             resultText: mk,
             resultUrls: [],
             verificationMarker: mk,
-            captureMode: "EXACT_ASSISTANT_MARKER",
+            captureMode: "ASSISTANT_MARKER_NODE",
             notebookUrl: location.href,
             pageTitle: document.title,
             capturedAt: new Date().toISOString()
           };
         }
       } else {
+        if (generationInProgress()) continue;
+
         const current = resultCandidates();
         const fresh = current
           .filter(t => !baselineCandidates.includes(t) && t.length >= 3)
           .filter(t => !t.includes("[TASK_ID]") && !t.includes("[NotebookLM 작업 지시서]") && !t.includes("[원문]"))
-          .filter(t => !/페이지 읽는 중|소스 참조 중/i.test(t));
+          .filter(t => !/페이지 읽는 중|소스 참조 중/i.test(t))
+          .filter(t => !uiOnlyResult(t));
 
         if (fresh.length) {
           // Prefer the smallest meaningful newly-created result instead of a page-wide container.
