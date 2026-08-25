@@ -13,6 +13,11 @@ New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
 function ReadJson([string]$Path){if(-not(Test-Path -LiteralPath $Path)){return $null};try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}}
 function ReadTail([string]$Path,[int]$Max=12000){if(-not(Test-Path -LiteralPath $Path)){return ''};try{$T=Get-Content -LiteralPath $Path -Raw -Encoding UTF8;if($T.Length -gt $Max){return $T.Substring([Math]::Max(0,$T.Length-$Max))};return $T}catch{return ('READ_ERROR: '+$_.Exception.Message)}}
+function VideoFailureEvidence {
+  $StatePath=Join-Path $Root 'video-job-state.json';$MetaPath=Join-Path $Root 'video-production-job.json';$ConsolePath=Join-Path $Root 'video-job-console.log';$Prod=Join-Path $Base 'VideoProduction';$Recent=@()
+  if(Test-Path -LiteralPath $Prod){foreach($D in @(Get-ChildItem -LiteralPath $Prod -Directory -Filter 'AUTO_QA_V3_*' -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 4)){$QaLogs=@();foreach($Q in @('QA_PASS_1','QA_PASS_2')){$P=Join-Path $D.FullName ('out\'+$Q+'\qa-console.log');if(Test-Path -LiteralPath $P){$QaLogs+=[ordered]@{pass=$Q;path=$P;text=(ReadTail $P 8000)}}};$Recent+=[ordered]@{path=$D.FullName;lastWrite=$D.LastWriteTime.ToString('o');autoQaLog=(ReadTail (Join-Path $D.FullName 'auto-qa.log') 8000);qaLogs=$QaLogs}}}
+  return [ordered]@{jobState=(ReadJson $StatePath);jobMeta=(ReadJson $MetaPath);workerConsole=(ReadTail $ConsolePath 12000);recentRuns=$Recent}
+}
 function GitBlobSha1([string]$Path){$B=[IO.File]::ReadAllBytes($Path);$H=[Text.Encoding]::ASCII.GetBytes(('blob '+$B.Length+[char]0));$A=New-Object byte[] ($H.Length+$B.Length);[Buffer]::BlockCopy($H,0,$A,0,$H.Length);[Buffer]::BlockCopy($B,0,$A,$H.Length,$B.Length);$S=[Security.Cryptography.SHA1]::Create();try{return (($S.ComputeHash($A)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$S.Dispose()}}
 function GetBridgeReleaseRaw {
   $Url='https://raw.githubusercontent.com/'+$Repo+'/main/runtime/stable/release.json?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
@@ -80,10 +85,10 @@ if($BridgeStatusOnly){
   }
   exit 0
 }
-if($VideoFailureDiagnostic){
-  $StatePath=Join-Path $Root 'video-job-state.json';$MetaPath=Join-Path $Root 'video-production-job.json';$ConsolePath=Join-Path $Root 'video-job-console.log';$Prod=Join-Path $Base 'VideoProduction';$Recent=@()
-  if(Test-Path -LiteralPath $Prod){foreach($D in @(Get-ChildItem -LiteralPath $Prod -Directory -Filter 'AUTO_QA_V3_*' -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 4)){$QaLogs=@();foreach($Q in @('QA_PASS_1','QA_PASS_2')){$P=Join-Path $D.FullName ('out\'+$Q+'\qa-console.log');if(Test-Path -LiteralPath $P){$QaLogs+=[ordered]@{pass=$Q;path=$P;text=(ReadTail $P 8000)}}};$Recent+=[ordered]@{path=$D.FullName;lastWrite=$D.LastWriteTime.ToString('o');autoQaLog=(ReadTail (Join-Path $D.FullName 'auto-qa.log') 8000);qaLogs=$QaLogs}}}
-  [ordered]@{ok=$true;action='VIDEO_FAILURE_DIAGNOSTIC';at=(Get-Date).ToString('o');jobState=(ReadJson $StatePath);jobMeta=(ReadJson $MetaPath);workerConsole=(ReadTail $ConsolePath 12000);recentRuns=$Recent}|ConvertTo-Json -Depth 30 -Compress
+if($VideoFailureDiagnostic){[ordered]@{ok=$true;action='VIDEO_FAILURE_DIAGNOSTIC';at=(Get-Date).ToString('o');videoFailureDiagnostic=(VideoFailureEvidence)}|ConvertTo-Json -Depth 30 -Compress;exit 0}
+if($StatusOnly){
+  $A=ReadJson (Join-Path $Root 'state.json');$J=ReadJson (Join-Path $Root 'video-job-state.json');$G=ReadJson (Join-Path $Base 'ChromeGovernor\state.json');$M=ReadJson (Join-Path $ExtensionRoot 'manifest.json');$H=$null;try{$H=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3}catch{}
+  [ordered]@{ok=$true;action='LOCAL_RUNTIME_STATUS_FAST_V2';at=(Get-Date).ToString('o');agentVersion=$(if($A){[string]$A.agentVersion}else{'UNKNOWN'});agentStatus=$(if($A){[string]$A.status}else{'UNKNOWN'});agentMode=$(if($A){[string]$A.agentMode}else{''});hostHealthy=$(if($H){[bool]$H.ok}else{$false});hostVersion=$(if($H){[string]$H.version}else{'UNKNOWN'});hostAsyncJobs=$(if($H){[bool]$H.asyncJobs}else{$false});bridgeVersion=$(if($M){[string]$M.version}else{'UNKNOWN'});videoWorkerVersion=$(if($A -and $A.videoWorkerVersion){[string]$A.videoWorkerVersion}elseif($J -and $J.workerVersion){[string]$J.workerVersion}else{''});videoWorkerInstalled=$(if($A -and $null -ne $A.videoWorkerInstalled){[bool]$A.videoWorkerInstalled}else{$false});videoWorkerRunning=$(if($A -and $null -ne $A.videoWorkerRunning){[bool]$A.videoWorkerRunning}else{$false});videoJobState=$J;governorRun=$null;governorCycleOk=$(if($A -and $null -ne $A.governorCycleOk){[bool]$A.governorCycleOk}elseif($G -and $null -ne $G.ok){[bool]$G.ok}else{$false});governorSummary=$(if($G){$G.summary}else{$null});governorDriveSyncOk=$(if($A -and $null -ne $A.governorDriveSyncOk){[bool]$A.governorDriveSyncOk}else{$false});governorCentralPath=$(if($A){[string]$A.governorCentralPath}else{''});errors=$(if($A){$A.errors}else{$null});lastError=$(if($A){[string]$A.lastError}else{''});videoFailureDiagnostic=(VideoFailureEvidence)}|ConvertTo-Json -Depth 30 -Compress
   exit 0
 }
 
@@ -97,7 +102,6 @@ if($NeedRefresh){
 
 $ChildArgs=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$V2)
 if($KickStableAgent){$ChildArgs+='-KickStableAgent'}
-if($StatusOnly){$ChildArgs+='-StatusOnly'}
 if($RunGovernor){$ChildArgs+='-RunGovernor'}
 if($ApplyStableBridge){$ChildArgs+='-ApplyStableBridge'}
 if($BridgeStatusOnly){$ChildArgs+='-BridgeStatusOnly'}
