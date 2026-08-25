@@ -8,7 +8,13 @@ const HEADERS = [
 ];
 
 function doGet(e){
-  return json_({ok:true,method:"GET",template:true,legacyCompatible:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});
+  try{
+    const params=(e&&e.parameter)||{};
+    const action=String(params.action||"").trim();
+    if(action==="nextFlowTask") return flowJson_(nextFlowTask_(params));
+    if(action==="flowHealth") return flowJson_(flowHealth_(params));
+    return json_({ok:true,method:"GET",template:true,legacyCompatible:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});
+  }catch(error){return json_({ok:false,error:error&&error.message?error.message:String(error)});}
 }
 
 function doPost(e){
@@ -19,6 +25,7 @@ function doPost(e){
     const action=String(body.action||"").trim();
     if(!action){return json_({ok:true,method:"POST",template:true,legacyCompatible:true,bridgeReady:true,version:VERSION,time:new Date().toISOString()});}
     if(action==="health") return json_({ok:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});
+    if(action==="completeFlowTask") return flowJson_(completeFlowTask_(body));
     if(action==="login") return json_(login_(body));
     if(action==="enqueueFromWriter") return json_(enqueueFromWriter_(body));
     const session=verifySession_(body.sessionToken);
