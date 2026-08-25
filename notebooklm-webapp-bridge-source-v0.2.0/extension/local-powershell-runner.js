@@ -24,6 +24,7 @@ function field(t,...names){for(const n of names){const v=t?.[n];if(v!==undefined
 function taskId(t){return String(field(t,"taskId","TASK_ID")||"");}
 function taskType(t){return String(field(t,"taskType","TASK_TYPE")||"").toUpperCase();}
 function taskStatus(t){return String(field(t,"status","STATUS")||"READY").toUpperCase();}
+function taskOwner(t){return String(field(t,"ownerEmail","OWNER_EMAIL")||"").toLowerCase();}
 function timeoutSeconds(t){const n=Number(field(t,"timeoutSeconds","TIMEOUT_SECONDS","timeout_seconds")??DEFAULT_TIMEOUT);return Number.isFinite(n)&&n>0?Math.max(30,Math.min(1800,Math.round(n))):DEFAULT_TIMEOUT;}
 function parseTime(v){const n=Date.parse(String(v||""));return Number.isFinite(n)?n:0;}
 function taskTime(t){for(const k of ["claimedAt","CLAIMED_AT","startedAt","STARTED_AT","updatedAt","UPDATED_AT","createdAt","CREATED_AT"]){const n=parseTime(t?.[k]);if(n)return n;}return 0;}
@@ -38,7 +39,7 @@ function hostCompatibleTask(t){return {...t,taskType:"LOCAL_POWERSHELL",TASK_TYP
 async function hostStart(t){return hostJson(`${HOST}/run`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:SOURCE,task:hostCompatibleTask(t)})});}
 async function hostResult(id){return hostJson(`${HOST}/result?taskId=${encodeURIComponent(id)}`);}
 async function hostCancel(id){return hostJson(`${HOST}/cancel`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({taskId:id})});}
-async function recoverStale(cfg,token,tasks){const recovered=[];for(const t of tasks){if(!staleClaim(t))continue;const id=taskId(t);try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:`D28_UNOWNED_STALE_CLAIM_HOLD_AFTER_${timeoutSeconds(t)}s`,clearClaim:true,claimedAt:"",startedAt:""}});}catch{} }return recovered;}
+async function recoverStale(cfg,token,tasks){for(const t of tasks){if(!staleClaim(t))continue;const id=taskId(t);try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:`D30_UNOWNED_STALE_CLAIM_HOLD_AFTER_${timeoutSeconds(t)}s`,clearClaim:true,claimedAt:"",startedAt:""}});}catch{}}}
 
 async function markStarted(cfg,token,id){try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"STARTED",patch:{}});return true;}catch(error){if(isSessionError(error))await wakeControlCenter(cfg,String(error?.message||error));return false;}}
 
@@ -60,13 +61,13 @@ async function resumePendingHandoff(cfg,token,active){
   try{
     await hostHealth();
     const started=await hostStart(task);
-    const next={...active,stage:STARTED_STAGE,startedAtMs:Date.now(),hostState:started.state||"STARTED",resumedBy:"D28_PENDING_HANDOFF"};
+    const next={...active,stage:STARTED_STAGE,startedAtMs:Date.now(),hostState:started.state||"STARTED",resumedBy:active.adoptedOrphan?"D30_ORPHAN_CLAIM_ADOPT":"D28_PENDING_HANDOFF"};
     await setActive(next);await markStarted(cfg,token,id);
     return {handled:true,state:String(started.state||"STARTED"),taskId:id};
   }catch(error){
     const age=Date.now()-Number(active.claimedAtMs||Date.now());
     if(age<120000)return {handled:true,state:"WAIT_PENDING_HOST",taskId:id,error:String(error?.message||error)};
-    try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:`D28_CLAIM_HOST_HANDOFF_HOLD:${String(error?.message||error)}`,clearClaim:true,claimedAt:"",startedAt:""}});}catch{}
+    try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:`D30_CLAIM_HOST_HANDOFF_HOLD:${String(error?.message||error)}`,clearClaim:true,claimedAt:"",startedAt:""}});}catch{}
     await setActive(null);
     return {handled:true,state:"HOLD_RECOVERY",taskId:id,error:String(error?.message||error)};
   }
@@ -76,19 +77,42 @@ async function finalize(cfg,token,active){
   const id=String(active?.taskId||"");if(!id){await setActive(null);return {state:"EMPTY"};}
   if(active?.stage===PENDING_STAGE){const resumed=await resumePendingHandoff(cfg,token,active);if(resumed.handled&&!resumed.continueFinalize)return resumed;active=await getActive();if(!active)return resumed;}
   const age=Date.now()-Number(active.startedAtMs||active.claimedAtMs||Date.now());const hard=(Number(active.timeoutSeconds||DEFAULT_TIMEOUT)+120)*1000;let host;
-  try{host=await hostResult(id);}catch(error){if(age<=hard)return {state:"WAIT_HOST",error:String(error?.message||error)};try{await hostCancel(id);}catch{};try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:"D28_LOCAL_ASYNC_HOST_RESULT_TIMEOUT",clearClaim:true,claimedAt:"",startedAt:""}});}catch{};await setActive(null);return {state:"TIMEOUT_HOLD"};}
-  if(["RUNNING","STARTED"].includes(String(host.state||""))){if(age<=hard)return {state:String(host.state),taskId:id};try{await hostCancel(id);}catch{};try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:"D28_LOCAL_ASYNC_HARD_TIMEOUT_HOLD",clearClaim:true,claimedAt:"",startedAt:""}});}catch{};await setActive(null);return {state:"HARD_TIMEOUT_HOLD",taskId:id,ageMs:age};}
-  if(host.state==="DONE"){const result=host.result||{};try{if(result.ok)await api(cfg.appsScriptUrl,{action:"completeTask",sessionToken:token,taskId:id,result:{resultText:JSON.stringify(result,null,2),resultUrls:[],notebookUrl:""}});else{const detail=String(result.stderr||result.error||result.stdout||`LOCAL_EXIT_${result.exitCode??"UNKNOWN"}`);await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"ERROR",patch:{error:detail}});}}catch(error){if(isSessionError(error)){await clearExpiredSessionAndWake(cfg,error);return {state:"WAIT_AUTH",taskId:id};}throw error;}await setActive(null);return {state:result.ok?"COMPLETED":"FAILED",taskId:id};}
-  if(["ERROR","NOT_FOUND"].includes(String(host.state||""))){try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:`D28_LOCAL_HOST_${String(host.error||host.state)}`,clearClaim:true,claimedAt:"",startedAt:""}});}catch{};await setActive(null);return {state:`${String(host.state)}_HOLD`,taskId:id};}
+  try{host=await hostResult(id);}catch(error){if(age<=hard)return {state:"WAIT_HOST",error:String(error?.message||error)};try{await hostCancel(id);}catch{};try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:"D30_LOCAL_ASYNC_HOST_RESULT_TIMEOUT",clearClaim:true,claimedAt:"",startedAt:""}});}catch{};await setActive(null);return {state:"TIMEOUT_HOLD"};}
+  if(["RUNNING","STARTED"].includes(String(host.state||""))){if(age<=hard)return {state:String(host.state),taskId:id};try{await hostCancel(id);}catch{};try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:"D30_LOCAL_ASYNC_HARD_TIMEOUT_HOLD",clearClaim:true,claimedAt:"",startedAt:""}});}catch{};await setActive(null);return {state:"HARD_TIMEOUT_HOLD",taskId:id,ageMs:age};}
+  if(host.state==="DONE"){const result=host.result||{};try{if(result.ok)await api(cfg.appsScriptUrl,{action:"completeTask",sessionToken:token,taskId:id,result:{resultText:JSON.stringify(result,null,2),resultUrls:[],notebookUrl:""}});else{const detail=String(result.stderr||result.error||result.stdout||`LOCAL_EXIT_${result.exitCode??"UNKNOWN"}`);await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"ERROR",patch:{error:detail}});}}catch(error){if(isSessionError(error)){await clearExpiredSessionAndWake(cfg,error);return {state:"WAIT_AUTH",taskId:id};}if(/TASK_ID/i.test(String(error?.message||error))){await setActive(null);return {state:"ORPHAN_RESULT_CLEARED",taskId:id,error:String(error?.message||error)};}throw error;}await setActive(null);return {state:result.ok?"COMPLETED":"FAILED",taskId:id};}
+  if(["ERROR","NOT_FOUND"].includes(String(host.state||""))){try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:`D30_LOCAL_HOST_${String(host.error||host.state)}`,clearClaim:true,claimedAt:"",startedAt:""}});}catch{};await setActive(null);return {state:`${String(host.state)}_HOLD`,taskId:id};}
   return {state:String(host.state||"UNKNOWN"),taskId:id};
 }
 
-async function pollCore(reason="alarm"){const cfg=await config();const token=await sessionToken();if(!token){await wakeControlCenter(cfg,"NO_SESSION");return {ok:true,skipped:"no_session",authRefreshRequested:true};}const active=await getActive();if(active)return {ok:true,reason,active:await finalize(cfg,token,active)};let listed;try{listed=await api(cfg.appsScriptUrl,{action:"listTasks",sessionToken:token,includeClaimed:true});}catch(error){if(isSessionError(error)){await clearExpiredSessionAndWake(cfg,error);return {ok:true,reason,skipped:"session_refresh_requested"};}throw error;}const listedTasks=Array.isArray(listed.tasks)?listed.tasks:[];await recoverStale(cfg,token,listedTasks);const map=new Map();for(const t of listedTasks){if(taskType(t)!==ASYNC_TYPE)continue;if(!["READY","RETRY"].includes(taskStatus(t)))continue;if(taskId(t))map.set(taskId(t),t);}const tasks=[...map.values()];if(!tasks.length)return {ok:true,reason,processed:0,asyncAvailable:0};const t=tasks[0],id=taskId(t);
+async function adoptRecentClaimed(cfg,token,tasks,profileEmail){
+  const email=String(profileEmail||"").toLowerCase();
+  const candidates=tasks.filter(t=>taskType(t)===ASYNC_TYPE&&taskStatus(t)==="CLAIMED"&&!staleClaim(t)&&taskId(t)).filter(t=>!taskOwner(t)||!email||taskOwner(t)===email).sort((a,b)=>(taskTime(a)||0)-(taskTime(b)||0));
+  if(!candidates.length)return null;
+  const t=candidates[0],id=taskId(t),claimedAtMs=taskTime(t)||Date.now();
+  await setActive({taskId:id,timeoutSeconds:timeoutSeconds(t),claimedAtMs,stage:PENDING_STAGE,task:t,adoptedOrphan:true});
+  return finalize(cfg,token,await getActive());
+}
+
+async function pollCore(reason="alarm"){
+  const cfg=await config();const token=await sessionToken();if(!token){await wakeControlCenter(cfg,"NO_SESSION");return {ok:true,skipped:"no_session",authRefreshRequested:true};}
+  const active=await getActive();if(active)return {ok:true,reason,active:await finalize(cfg,token,active)};
+  let listed;try{listed=await api(cfg.appsScriptUrl,{action:"listTasks",sessionToken:token,includeClaimed:true});}catch(error){if(isSessionError(error)){await clearExpiredSessionAndWake(cfg,error);return {ok:true,reason,skipped:"session_refresh_requested"};}throw error;}
+  const listedTasks=Array.isArray(listed.tasks)?listed.tasks:[];
+  await recoverStale(cfg,token,listedTasks);
+  const profile=await chrome.identity.getProfileUserInfo({accountStatus:"ANY"}).catch(()=>({email:""}));
+  const adopted=await adoptRecentClaimed(cfg,token,listedTasks,profile.email||"");
+  if(adopted)return {ok:true,reason,adopted};
+  const map=new Map();for(const t of listedTasks){if(taskType(t)!==ASYNC_TYPE)continue;if(!["READY","RETRY"].includes(taskStatus(t)))continue;if(taskId(t))map.set(taskId(t),t);}const tasks=[...map.values()];
+  if(!tasks.length)return {ok:true,reason,processed:0,asyncAvailable:0};
+  const t=tasks[0],id=taskId(t);
   try{await hostHealth();}catch(error){return {ok:false,reason,skipped:"local_host_unavailable_before_claim",taskId:id,error:String(error?.message||error)};}
-  const profile=await chrome.identity.getProfileUserInfo({accountStatus:"ANY"}).catch(()=>({email:""}));let claimed;try{claimed=await api(cfg.appsScriptUrl,{action:"claimTask",sessionToken:token,taskId:id,chromeProfileEmail:profile.email||""});}catch(error){if(isSessionError(error)){await clearExpiredSessionAndWake(cfg,error);return {ok:true,reason,skipped:"session_refresh_requested"};}throw error;}const claimedTask=claimed.task||t;
+  let claimed;try{claimed=await api(cfg.appsScriptUrl,{action:"claimTask",sessionToken:token,taskId:id,chromeProfileEmail:profile.email||""});}catch(error){if(isSessionError(error)){await clearExpiredSessionAndWake(cfg,error);return {ok:true,reason,skipped:"session_refresh_requested"};}throw error;}
+  const claimedTask=claimed.task||t;
   await setActive({taskId:id,timeoutSeconds:timeoutSeconds(claimedTask),claimedAtMs:Date.now(),stage:PENDING_STAGE,task:claimedTask});
   let started;try{started=await hostStart(claimedTask);}catch(error){return {ok:false,reason,state:"HOST_START_PENDING_RECOVERY",taskId:id,error:String(error?.message||error)};}
-  await setActive({taskId:id,timeoutSeconds:timeoutSeconds(claimedTask),claimedAtMs:Date.now(),startedAtMs:Date.now(),stage:STARTED_STAGE,task:claimedTask,hostState:started.state||"STARTED"});await markStarted(cfg,token,id);return {ok:true,reason,started:id,hostState:started.state||"STARTED",asyncAvailable:tasks.length};}
+  await setActive({taskId:id,timeoutSeconds:timeoutSeconds(claimedTask),claimedAtMs:Date.now(),startedAtMs:Date.now(),stage:STARTED_STAGE,task:claimedTask,hostState:started.state||"STARTED"});await markStarted(cfg,token,id);
+  return {ok:true,reason,started:id,hostState:started.state||"STARTED",asyncAvailable:tasks.length};
+}
 async function poll(reason="alarm"){if(busy)return {ok:true,skipped:"busy"};busy=true;try{return await pollCore(reason);}catch(error){return {ok:false,reason,error:String(error?.message||error)};}finally{busy=false;}}
 async function ensureAlarm(){await chrome.alarms.clear(ALARM);await chrome.alarms.create(ALARM,{delayInMinutes:0.2,periodInMinutes:1});}
 chrome.alarms.onAlarm.addListener(a=>{if(a.name===ALARM)poll("alarm").catch(()=>{});});
