@@ -9,9 +9,10 @@ const NOTEBOOK_HOME = "https://notebook.google.com/";
 const POLL_ALARM = "nlm-auto-ready-poll";
 const DEFAULT_POLL_MINUTES = 1;
 const MAX_TASKS_PER_POLL = 2;
+const CANONICAL_API = "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec";
 
 const DEFAULT_CONFIG = Object.freeze({
-  appsScriptUrl: "",
+  appsScriptUrl: CANONICAL_API,
   frontendOrigin: "https://notebooklm-webapp-bridge.vercel.app",
   notebookHomeUrl: NOTEBOOK_HOME,
   autoRunEnabled: true,
@@ -25,7 +26,8 @@ async function configureSidePanel() {
 
 async function getConfig() {
   const stored = await chrome.storage.local.get(CONFIG_KEY);
-  return { ...DEFAULT_CONFIG, ...(stored[CONFIG_KEY] || {}) };
+  const saved = stored[CONFIG_KEY] || {};
+  return { ...DEFAULT_CONFIG, ...saved, appsScriptUrl: saved.appsScriptUrl || CANONICAL_API };
 }
 
 async function saveConfig(patch) {
@@ -257,7 +259,8 @@ async function pollReadyTasks(reason = "alarm") {
     const tasks = Array.isArray(listed.tasks) ? listed.tasks : [];
     const runnable = tasks.filter((task) =>
       ["READY", "RETRY"].includes(String(task.status || "READY").toUpperCase()) &&
-      task.autoSubmit !== false
+      task.autoSubmit !== false &&
+      !String(task.taskType || "").toUpperCase().startsWith("LOCAL_")
     );
 
     for (const task of runnable.slice(0, MAX_TASKS_PER_POLL)) {
@@ -365,4 +368,6 @@ chrome.runtime.onStartup.addListener(() => {
     .catch(console.error);
 });
 
-ensureAutoAlarm().catch(() => {});
+Promise.all([configureSidePanel(), ensureAutoAlarm()])
+  .then(() => pollReadyTasks("worker-load"))
+  .catch(() => {});
