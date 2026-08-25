@@ -38,4 +38,6 @@ if($RunGovernor){$ChildArgs+='-RunGovernor'}
 if($ApplyStableBridge){$ChildArgs+='-ApplyStableBridge'}
 if($BridgeStatusOnly){$ChildArgs+='-BridgeStatusOnly'}
 & powershell.exe @ChildArgs
-exit $LASTEXITCODE
+$Rc=$LASTEXITCODE
+if($BridgeStatusOnly){exit 0}
+exit $Rc
