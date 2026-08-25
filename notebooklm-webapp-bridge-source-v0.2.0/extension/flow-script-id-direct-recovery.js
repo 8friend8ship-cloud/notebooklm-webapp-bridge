@@ -1,8 +1,8 @@
 const FLOW_RECOVERY_HOST = "http://127.0.0.1:8765";
 const FLOW_RECOVERY_ALARM = "flow-script-id-direct-recovery";
-const FLOW_RECOVERY_KEY = "flowScriptIdDirectRecoveryV1";
-const FLOW_RECOVERY_TASK_ID = "FLOW_SCRIPT_ID_DIRECT_RECOVERY_20260825_01";
-const FLOW_RECOVERY_READBACK = "FLOW_SCRIPT_ID_RECOVERY_RESULT_20260825.json";
+const FLOW_RECOVERY_KEY = "flowScriptIdDirectRecoveryV2";
+const FLOW_RECOVERY_TASK_ID = "FLOW_SCRIPT_ID_DIRECT_RECOVERY_20260825_02";
+const FLOW_RECOVERY_READBACK = "FLOW_SCRIPT_ID_RECOVERY_RESULT_20260825_R2.json";
 
 async function flowRecoveryFetchJson(url, options = {}, timeoutMs = 10000) {
   const controller = new AbortController();
@@ -62,12 +62,12 @@ async function flowRecoveryTick(reason = "alarm") {
     try { existing = await flowRecoveryFetchJson(`${FLOW_RECOVERY_HOST}/result?taskId=${encodeURIComponent(FLOW_RECOVERY_TASK_ID)}`, {}, 8000); } catch {}
     const existingState = String(existing?.state || "").toUpperCase();
     if (existingState === "DONE") {
-      await flowRecoveryWriteState({ done: true, taskId: FLOW_RECOVERY_TASK_ID, hostState: "DONE", reason, resultOk: Boolean(existing?.result?.ok) });
+      await flowRecoveryWriteState({ done: true, taskId: FLOW_RECOVERY_TASK_ID, hostState: "DONE", reason, resultOk: Boolean(existing?.result?.ok), resultExitCode: existing?.result?.exitCode ?? null, generation: "V2" });
       await chrome.alarms.clear(FLOW_RECOVERY_ALARM).catch(() => {});
-      return { ok: true, state: "DONE", taskId: FLOW_RECOVERY_TASK_ID };
+      return { ok: true, state: "DONE", taskId: FLOW_RECOVERY_TASK_ID, resultOk: Boolean(existing?.result?.ok) };
     }
     if (["RUNNING", "STARTED"].includes(existingState)) {
-      await flowRecoveryWriteState({ started: true, taskId: FLOW_RECOVERY_TASK_ID, hostState: existingState, reason });
+      await flowRecoveryWriteState({ started: true, taskId: FLOW_RECOVERY_TASK_ID, hostState: existingState, reason, generation: "V2" });
       return { ok: true, state: existingState, taskId: FLOW_RECOVERY_TASK_ID };
     }
     const started = await flowRecoveryFetchJson(`${FLOW_RECOVERY_HOST}/run`, {
@@ -75,10 +75,10 @@ async function flowRecoveryTick(reason = "alarm") {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: "notebooklm-webapp-bridge", task: flowRecoveryTask() })
     }, 12000);
-    await flowRecoveryWriteState({ started: true, taskId: FLOW_RECOVERY_TASK_ID, hostState: started.state || "STARTED", reason, lastError: "" });
+    await flowRecoveryWriteState({ started: true, taskId: FLOW_RECOVERY_TASK_ID, hostState: started.state || "STARTED", reason, lastError: "", generation: "V2" });
     return { ok: true, state: started.state || "STARTED", taskId: FLOW_RECOVERY_TASK_ID };
   } catch (error) {
-    await flowRecoveryWriteState({ lastAttemptAt: new Date().toISOString(), reason, lastError: String(error?.message || error) });
+    await flowRecoveryWriteState({ lastAttemptAt: new Date().toISOString(), reason, lastError: String(error?.message || error), generation: "V2" });
     return { ok: false, error: String(error?.message || error), reason };
   }
 }
