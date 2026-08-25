@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "enabled": true,
-  "jobId": "VIDEO_AGENT_DASHBOARD_FIRST_MP4_QA_RECOVERY_20260824_003",
-  "description": "V3 root-cause repair: reuse the completed V11 MP4, patch Frame-QA ffmpeg calls with -nostdin, use nonblocking timeout handling so a child timeout cannot deadlock the outer worker, run QA pass 1 and 2, then find central Drive with the robust recursive method and copy MP4/manifest/QA/result. Animation Apps Script E2E remains a separate follow-up gate. Completion-learning guard: after two identical V3 failures stop in DIAGNOSTIC_HOLD; do not perform a third blind retry.",
-  "scriptRepo": "8friend8ship-cloud/animation",
-  "scriptRef": "codex/video-promo-agent-workflow-20260823",
-  "scriptPath": "tools/Run-AgentDashboardPromoAutoRecoveryV3.ps1",
-  "scriptBlobSha1": "77ced19ec8ed9e31da06f960b15c931fea3e9dc4",
-  "timeoutSeconds": 420,
-  "maxAttempts": 2,
-  "retryEveryAgentCycle": true,
-  "successReadback": "Video_Production/2026/08/AGENT_DASHBOARD_PROMO_FIRST_MP4_20260824/VIDEO_AUTO_RECOVERY_RESULT.json",
-  "approvalBoundary": "EXISTING_APPROVAL_ONLY_NO_NEW_OAUTH_NO_NEW_COST_NO_PUBLIC_PUBLISH"
+  "jobId": "VIDEO_FAILURE_SNAPSHOT_DIAG_20260825_01",
+  "description": "Bounded read-only diagnostic after V3 reached max attempts. Preserve prior worker console, inspect recent AUTO_QA_V3 logs, and write VIDEO_FAILURE_SNAPSHOT_V1.json to central Drive Runtime_Readback. No production retry, no OAuth, no deploy, no publish, no paid action.",
+  "scriptRepo": "8friend8ship-cloud/notebooklm-webapp-bridge",
+  "scriptRef": "main",
+  "scriptPath": "local-agent/jobs/ReadVideoFailureSnapshotV1.ps1",
+  "scriptBlobSha1": "51a40388b7ec64e35353434ee834d06e23bd3a8c",
+  "timeoutSeconds": 60,
+  "maxAttempts": 1,
+  "retryEveryAgentCycle": false,
+  "successReadback": "Runtime_Readback/VIDEO_FAILURE_SNAPSHOT_V1.json",
+  "approvalBoundary": "READ_ONLY_DIAGNOSTIC_NO_NEW_OAUTH_NO_NEW_COST_NO_PUBLIC_PUBLISH"
 }
