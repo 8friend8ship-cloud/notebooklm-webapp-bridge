@@ -15,98 +15,49 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Patch remaining Studio artifact state machines and publish stable 0.2.39
+      - name: Harden Studio artifact detector and publish stable 0.2.40
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           import json
-          runner = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
-          text = runner.read_text(encoding='utf-8')
-          if 'async function runStudioArtifact(task, spec)' in text:
-              raise SystemExit('studio artifact patch already present')
-          anchor = '  async function runTask(task) {\n'
-          if anchor not in text:
-              raise SystemExit('runTask anchor missing')
-          code = "\n".join([
-              '  function studioArtifactCandidates(words) {',
-              '    const out = []; const seen = new Set();',
-              '    for (const el of deepQueryAll("section,article,div,[role=group],[role=region],button,[role=button]").filter(visible)) {',
-              '      const t = (el.innerText || el.textContent || "").trim();',
-              '      if (!t || t.length < 8 || t.length > 12000 || seen.has(t)) continue;',
-              '      const n = norm(t);',
-              '      if (!words.some(w => n.includes(norm(w)))) continue;',
-              '      if (/생성 중|generating|creating|만드는 중|준비 중|preparing/.test(n)) continue;',
-              '      if (/소스\\s*\\d+개|sources?\\s*\\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|cards?|questions?|slides?|pages?/.test(n) || t.length > 40) { seen.add(t); out.push(t); }',
-              '    }',
-              '    return out;',
-              '  }',
-              '',
-              '  async function runStudioArtifact(task, spec) {',
-              '    const source = await addSource(task);',
-              '    const sourceFallback = !source.ok && Boolean(task.sourceText);',
-              '    const studio = findDeepControl(["studio","스튜디오"]);',
-              '    if (studio) { try { studio.click(); } catch {} await sleep(1000); }',
-              '    const baseline = new Set(studioArtifactCandidates(spec.evidenceWords));',
-              '    const control = await waitFor(() => findDeepControl(spec.controlWords), 30000, 500);',
-              '    if (!control) throw new Error(`${spec.code}_CONTROL_NOT_FOUND: ${location.href}`);',
-              '    try { control.click(); } catch {} await sleep(1000);',
-              '    let generate = null;',
-              '    for (const d of dialogs()) { generate = findButton(["생성","만들기","generate","create"], d); if (generate) break; }',
-              '    if (!generate) generate = findDeepControl(["생성","만들기","generate","create"]);',
-              '    if (generate) { try { generate.click(); } catch {} await sleep(900); }',
-              '    const timeoutMs = Math.max(spec.minTimeoutMs, Number(task.timeoutSeconds || spec.defaultTimeoutSec) * 1000);',
-              '    const ready = await waitFor(() => studioArtifactCandidates(spec.evidenceWords).find(t => !baseline.has(t)) || null, timeoutMs, spec.pollMs);',
-              '    if (!ready) throw new Error(`${spec.code}_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND`);',
-              '    return {resultText:ready,resultUrls:[location.href],captureMode:`${spec.code}_READY`,artifactType:spec.code,notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||spec.code,source:{...source,existingNotebookFallback:sourceFallback}};',
-              '  }',
-              '',
-              '  const STUDIO_ARTIFACT_SPECS = Object.freeze({',
-              '    SLIDES:{code:"SLIDES",controlWords:["슬라이드 자료","slide deck","slides"],evidenceWords:["슬라이드 자료","slide deck","slides"],defaultTimeoutSec:300,minTimeoutMs:120000,pollMs:1800},',
-              '    MIND_MAP:{code:"MIND_MAP",controlWords:["마인드맵","mind map"],evidenceWords:["마인드맵","mind map"],defaultTimeoutSec:180,minTimeoutMs:60000,pollMs:1200},',
-              '    FLASHCARDS:{code:"FLASHCARDS",controlWords:["플래시카드","flashcards","flash cards"],evidenceWords:["플래시카드","flashcards","flash cards"],defaultTimeoutSec:180,minTimeoutMs:60000,pollMs:1200},',
-              '    QUIZ:{code:"QUIZ",controlWords:["퀴즈","quiz"],evidenceWords:["퀴즈","quiz"],defaultTimeoutSec:180,minTimeoutMs:60000,pollMs:1200},',
-              '    INFOGRAPHIC:{code:"INFOGRAPHIC",controlWords:["인포그래픽","infographic"],evidenceWords:["인포그래픽","infographic"],defaultTimeoutSec:300,minTimeoutMs:120000,pollMs:1800}',
-              '  });',
-              ''
-          ]) + '\n'
-          text = text.replace(anchor, code + anchor, 1)
-          gate = '    if (["DATA_TABLE","NOTEBOOKLM_DATA_TABLE"].includes(normalizedTaskType)) return runDataTable(task);\n\n'
-          if gate not in text:
-              raise SystemExit('data table gate missing')
-          gates = gate + '    if (["SLIDES","SLIDE_DECK","NOTEBOOKLM_SLIDES"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.SLIDES);\n\n    if (["MIND_MAP","MINDMAP","NOTEBOOKLM_MIND_MAP"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.MIND_MAP);\n\n    if (["FLASHCARDS","FLASHCARD","NOTEBOOKLM_FLASHCARDS"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.FLASHCARDS);\n\n    if (["QUIZ","NOTEBOOKLM_QUIZ"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.QUIZ);\n\n    if (["INFOGRAPHIC","NOTEBOOKLM_INFOGRAPHIC"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.INFOGRAPHIC);\n\n'
-          text = text.replace(gate, gates, 1)
-          runner.write_text(text, encoding='utf-8')
-          manifest = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
-          m = json.loads(manifest.read_text(encoding='utf-8'))
-          m['version'] = '0.2.39'
-          m['description'] = 'D42 adds shared Studio state-machine support for Slides, Mind Map, Flashcards, Quiz, and Infographic with type-specific artifact evidence before DONE. Preserves Chat, Audio, Video, Report, and Data Table paths. No new permissions or approvals.'
-          manifest.write_text(json.dumps(m, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          s=p.read_text(encoding='utf-8')
+          old='''      if (!words.some(w => n.includes(norm(w)))) continue;\n      if (/생성 중|generating|creating|만드는 중|준비 중|preparing/.test(n)) continue;\n      if (/소스\\s*\\d+개|sources?\\s*\\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|cards?|questions?|slides?|pages?/.test(n) || t.length > 40) { seen.add(t); out.push(t); }'''
+          new='''      if (!words.some(w => n.includes(norm(w)))) continue;\n      if (/생성 중|generating|creating|만드는 중|준비 중|preparing/.test(n)) continue;\n      const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(x => n.includes(x)).length;\n      if (studioMenuHits >= 4) continue;\n      const artifactSignal = /소스\\s*\\d+개|sources?\\s*\\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|cards?|questions?|slides?|pages?/.test(n);\n      if (artifactSignal) { seen.add(t); out.push(t); }'''
+          if old not in s: raise SystemExit('studio artifact detector target missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
+          m=json.loads(mpath.read_text(encoding='utf-8'))
+          m['version']='0.2.40'
+          m['description']='D43 hardens Studio artifact detection: whole-Studio containers are rejected and type label plus artifact-card evidence is required before DONE. No new permissions.'
+          mpath.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'feat: add remaining NotebookLM Studio artifact state machines'
+          git commit -m 'fix: require real Studio artifact-card evidence'
           git push
           RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
           SOURCE_COMMIT=$(git rev-parse HEAD)
           python - "$RUNNER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
           from pathlib import Path
-          import json, sys
-          runner_sha, manifest_sha, source_commit = sys.argv[1:4]
-          p = Path('runtime/stable/release.json')
-          d = json.loads(p.read_text(encoding='utf-8'))
-          d['actionId'] = 'APPLY_NOTEBOOKLM_0.2.39_D42_STUDIO_ARTIFACT_MATRIX_20260826'
-          d['version'] = '0.2.39'
-          d['releasedAt'] = '2026-08-26T20:22:00+09:00'
-          d['description'] = 'D42 adds Slides, Mind Map, Flashcards, Quiz, and Infographic Studio state machines with artifact-type evidence before DONE. Existing approved runtime only.'
-          d['sourceCommit'] = source_commit
+          import json,sys
+          rsha,msha,commit=sys.argv[1:4]
+          p=Path('runtime/stable/release.json')
+          d=json.loads(p.read_text(encoding='utf-8'))
+          d['actionId']='APPLY_NOTEBOOKLM_0.2.40_D43_ARTIFACT_CARD_GUARD_20260826'
+          d['version']='0.2.40'
+          d['releasedAt']='2026-08-26T20:38:00+09:00'
+          d['description']='D43 rejects whole-Studio false matches and requires actual artifact-card evidence.'
+          d['sourceCommit']=commit
           for f in d['files']:
-              if f['path'] == 'manifest.json': f['gitBlobSha1'] = manifest_sha
-              if f['path'] == 'content/notebooklm-runner.js': f['gitBlobSha1'] = runner_sha
-          p.write_text(json.dumps(d, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+              if f['path']=='manifest.json': f['gitBlobSha1']=msha
+              if f['path']=='content/notebooklm-runner.js': f['gitBlobSha1']=rsha
+          p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.39'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.40'
           git push
