@@ -234,8 +234,11 @@ async function pollReadyTasks(reason = "alarm") {
   if (!config.appsScriptUrl) return { ok: true, skipped: "api_not_configured" };
 
   const state = await getAutoState();
-  if (Number(state.busyUntil || 0) > Date.now()) {
+  if (Number(state.busyUntil || 0) > Date.now() && state.runningTaskId) {
     return { ok: true, skipped: "busy", runningTaskId: state.runningTaskId || "" };
+  }
+  if (Number(state.busyUntil || 0) > Date.now() && !state.runningTaskId) {
+    await saveAutoState({ busyUntil: 0, lastError: "STALE_BUSY_CLEARED_D45" });
   }
 
   const sessionToken = await getPersistedSessionToken();
