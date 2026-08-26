@@ -15,49 +15,77 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Route artifact mirror message and publish stable 0.2.46
+      - name: Find Audio card from menu ancestry and publish stable 0.2.47
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           import json
-          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/background.js')
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
           s=p.read_text(encoding='utf-8')
-          old='''chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {\n  (async () => {'''
-          new='''chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {\n  if (message?.source === SOURCE && message?.type === "MIRROR_ARTIFACT_TO_DRIVE") return false;\n  (async () => {'''
-          if old not in s: raise SystemExit('background onMessage target missing')
-          s=s.replace(old,new,1)
+          start=s.index('  function audioArtifactCardRoot(readyNode) {')
+          end=s.index('  async function requestNotebookArtifactDownload', start)
+          new=r'''  function audioArtifactCardRoot(readyNode) {
+    const score = [];
+    const menus = deepQueryAll("button,[role='button'],a").filter(visible).filter(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
+    for (const menu of menus) {
+      let cur = menu.parentElement;
+      for (let depth=0; depth<12 && cur; depth++, cur=cur.parentElement) {
+        const raw = (cur.innerText || cur.textContent || "").trim();
+        const t = norm(raw);
+        if (raw.length < 8 || raw.length > 3000) continue;
+        const duration = /\b\d{1,2}:\d{2}\b/.test(t);
+        const sourceSignal = /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t);
+        const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
+        if (duration && sourceSignal && studioMenuHits < 5) {
+          score.push({el:cur,menu,text:raw,depth,len:raw.length});
+          break;
+        }
+      }
+    }
+    if (score.length) return score.sort((a,b)=>a.len-b.len || a.depth-b.depth)[0].el;
+    let cur = readyNode instanceof HTMLElement ? readyNode : null;
+    for (let depth=0; depth<12 && cur; depth++, cur=cur.parentElement) {
+      const raw=(cur.innerText || cur.textContent || "").trim();
+      const t=norm(raw);
+      if (/\b\d{1,2}:\d{2}\b/.test(t) && /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t)) return cur;
+    }
+    return null;
+  }
+
+'''
+          s=s[:start]+new+s[end:]
           p.write_text(s,encoding='utf-8')
           mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m=json.loads(mpath.read_text(encoding='utf-8'))
-          m['version']='0.2.46'
-          m['description']='D49 lets MIRROR_ARTIFACT_TO_DRIVE pass to its dedicated worker listener instead of the generic background unsupported-message response.'
+          m['version']='0.2.47'
+          m['description']='D50 finds the real Audio artifact card by walking upward from each visible menu button and matching duration plus source/deep-dive evidence. Preserves Drive mirror routing.'
           mpath.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add notebooklm-webapp-bridge-source-v0.2.0/extension/background.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'fix: route NotebookLM artifact mirror message'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
+          git commit -m 'fix: find NotebookLM audio card from menu ancestry'
           git push
-          BG_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/background.js)
+          RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
           SOURCE_COMMIT=$(git rev-parse HEAD)
-          python - "$BG_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
+          python - "$RUNNER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
           from pathlib import Path
           import json,sys
-          bgsha,msha,commit=sys.argv[1:4]
+          rsha,msha,commit=sys.argv[1:4]
           p=Path('runtime/stable/release.json')
           d=json.loads(p.read_text(encoding='utf-8'))
-          d['actionId']='APPLY_NOTEBOOKLM_0.2.46_D49_ARTIFACT_MIRROR_MESSAGE_ROUTE_20260826'
-          d['version']='0.2.46'
-          d['releasedAt']='2026-08-26T22:14:00+09:00'
-          d['description']='D49 routes MIRROR_ARTIFACT_TO_DRIVE to the dedicated mirror listener.'
+          d['actionId']='APPLY_NOTEBOOKLM_0.2.47_D50_AUDIO_MENU_ANCESTRY_20260826'
+          d['version']='0.2.47'
+          d['releasedAt']='2026-08-26T22:20:00+09:00'
+          d['description']='D50 resolves the real Audio card from its menu-button ancestry and retains D49 mirror routing.'
           d['sourceCommit']=commit
           for f in d['files']:
               if f['path']=='manifest.json': f['gitBlobSha1']=msha
-              if f['path']=='background.js': f['gitBlobSha1']=bgsha
+              if f['path']=='content/notebooklm-runner.js': f['gitBlobSha1']=rsha
           p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.46'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.47'
           git push
