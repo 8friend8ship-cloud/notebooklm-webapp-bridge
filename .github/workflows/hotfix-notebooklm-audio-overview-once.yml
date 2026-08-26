@@ -174,3 +174,5 @@ jobs:
           git add runtime/stable/release.json
           git commit -m 'chore: promote NotebookLM bridge stable 0.2.33 audio overview'
           git push
+
+# trigger-existing-workflow: 2026-08-26T18:51+09:00
