@@ -246,7 +246,7 @@
   }
 
   function marker(task) {
-    const m = String(task?.instruction || "").match(/\bNLM_E2E_PASS_[A-Z0-9_-]+\b/i);
+    const m = String(task?.instruction || "").match(/\bNLM_[A-Z0-9_-]*PASS[A-Z0-9_-]*\b/i);
     return m ? m[0] : "";
   }
 
@@ -261,7 +261,7 @@
     const seen = new Set();
 
     for (const sel of ["article","[role='article']","[class*='answer']","[class*='response']","[class*='message']","[class*='chat']"]) {
-      for (const el of document.querySelectorAll(sel)) {
+      for (const el of deepQueryAll(sel)) {
         if (!visible(el) || el.closest("nav,[role='dialog'],dialog")) continue;
         const t = (el.innerText || el.textContent || "").trim();
         if (t.length < 2 || t.length > 30000 || seen.has(t)) continue;
@@ -360,7 +360,7 @@
     const candidates = [];
 
     for (const sel of selectors) {
-      for (const el of document.querySelectorAll(sel)) {
+      for (const el of deepQueryAll(sel)) {
         if (!visible(el)) continue;
         if (el.closest("textarea,[contenteditable='true'],[role='textbox'],[role='dialog'],dialog")) continue;
 

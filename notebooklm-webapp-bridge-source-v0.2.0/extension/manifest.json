@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.30",
-  "description": "Preserve 0.2.29 behavior and permissions. D33 hardens localhost stable-agent self-heal: poll Host async result, retry once with a fresh task ID on failure, and retain success/failure evidence in extension local storage. No permission, OAuth, Apps Script, normal-Chrome, publish, or paid changes.",
+  "version": "0.2.31",
+  "description": "D34 fixes NotebookLM result readback for current UI by scanning open shadow roots and accepting central PASS marker variants. No permission, OAuth, Apps Script, Host, normal-Chrome, publish, or paid changes.",
   "permissions": [
     "alarms",
     "identity",
