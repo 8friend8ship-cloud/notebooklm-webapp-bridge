@@ -1,16 +1,19 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "updatedAt": "2026-08-26T15:18:00+09:00",
   "policy": {
-    "maxActivePerProject": 1,
     "allowParallelAcrossProjects": true,
+    "allowParallelWithinProjectAcrossOutputTypes": true,
+    "maxActivePerProjectOutputType": 1,
+    "sameProjectSameOutputTypeWhenActive": "QUEUE_WAIT",
+    "sameProjectDifferentOutputTypeWhenCapacityAvailable": "DISPATCH_NOW",
     "activeStates": ["CLAIMED", "STARTED", "RUNNING", "PROGRESSING"],
-    "sameProjectWhenActive": "QUEUE_WAIT",
-    "differentProjectWhenCapacityAvailable": "DISPATCH_NOW",
     "startAckDeadlineSeconds": 60,
     "longRunningTimeoutMode": "MEDIA_LENGTH_AWARE",
-    "doNotUseGlobalSerialLock": true
+    "doNotUseGlobalSerialLock": true,
+    "sharedResourceSerialization": true
   },
+  "outputTypes": ["AUDIO", "VIDEO", "REPORT_PDF", "MIND_MAP", "TEXT", "IMAGE"],
   "projectKeyPriority": [
     "source.repo",
     "projectId",
@@ -19,10 +22,13 @@
     "workflowProject"
   ],
   "rules": [
-    "At most one active task per project key.",
     "Different project keys may run in parallel on the same Host.",
+    "Within one NotebookLM project, different output types may be dispatched in parallel when they do not share a conflicting resource.",
+    "At most one active task per project plus outputType key by default.",
+    "Same-project duplicate tasks of the same output type must wait until the earlier task is terminal.",
     "A claimed task must show START/RUNNING evidence within 60 seconds or enter immediate handoff diagnosis.",
     "Audio/video jobs are not declared stale by a fixed 10-minute rule after START; use media-duration-aware time budgets and file-progress evidence.",
-    "Never create a duplicate task for the same project while an earlier task is active unless the earlier task is explicitly canceled or terminal."
-  ]
+    "If tasks compete for the same dedicated Chrome tab/session, GPU renderer, download target, or output filename, serialize only that shared resource instead of the whole project."
+  ],
+  "evidenceNote": "Google documents Studio as supporting multiple outputs in one notebook and multitasking, but does not explicitly document backend simultaneous generation guarantees for every output pair. This policy therefore allows cross-output parallel dispatch while verifying actual START/progress per output and serializing only observed shared-resource conflicts."
 }
