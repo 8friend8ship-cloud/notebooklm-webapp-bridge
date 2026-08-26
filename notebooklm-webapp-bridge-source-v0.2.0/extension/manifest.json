@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.40",
-  "description": "D43 hardens Studio artifact detection: whole-Studio containers are rejected and type label plus artifact-card evidence is required before DONE. No new permissions.",
+  "version": "0.2.41",
+  "description": "D44 removes icon/menu tokens from Studio artifact success evidence. Requires source/unread/download/more/play/duration evidence with the expected artifact label. No new permissions.",
   "permissions": [
     "alarms",
     "identity",

@@ -693,7 +693,7 @@
       if (/생성 중|generating|creating|만드는 중|준비 중|preparing/.test(n)) continue;
       const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(x => n.includes(x)).length;
       if (studioMenuHits >= 4) continue;
-      const artifactSignal = /소스\s*\d+개|sources?\s*\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|cards?|questions?|slides?|pages?/.test(n);
+      const artifactSignal = /소스\s*\d+개|sources?\s*\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|\b\d{1,2}:\d{2}\b/.test(n);
       if (artifactSignal) { seen.add(t); out.push(t); }
     }
     return out;
