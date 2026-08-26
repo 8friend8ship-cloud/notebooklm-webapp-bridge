@@ -1,9 +1,9 @@
 {
-  "version": "1.0.1",
-  "purpose": "Convert one high-level central-agent instruction into validated NotebookLM and Flow fanout tasks with consistent queue/output/readback fields.",
+  "version": "1.1.0",
+  "purpose": "Normalize one project command into validated NotebookLM/Gemini Notebook and Flow tasks using the actual Studio UI type, customization fields, source policy, completion evidence, and Drive readback contract.",
   "inputContract": {
     "required": ["projectKey", "goal", "sourceRefs"],
-    "optional": ["language", "audience", "tone", "durationSec", "outputChecklist", "variants", "driveFolderId", "notebookUrl", "flowUrl", "deadline", "priority"],
+    "optional": ["language", "audience", "tone", "focus", "durationSec", "outputChecklist", "variants", "driveFolderId", "notebookUrl", "flowUrl", "deadline", "priority", "projectTemplate"],
     "defaults": {
       "language": "ko-KR",
       "audience": "general",
@@ -11,7 +11,7 @@
       "priority": "NORMAL",
       "parallelMode": "PROJECT_OUTPUT_TYPE",
       "startAckDeadlineSeconds": 60,
-      "completionPolicy": "RESULT_SAVED_AND_READBACK"
+      "completionPolicy": "TYPE_SPECIFIC_ARTIFACT_EVIDENCE_AND_READBACK"
     }
   },
   "normalize": {
@@ -20,28 +20,121 @@
     "dedupeSameProjectOutputVariant": true,
     "preserveUserExplicitSettings": true,
     "expandOneCommandIntoChecklist": true,
-    "lockCurrentSourceInChatInstruction": true
+    "lockCurrentSourceInChatInstruction": true,
+    "routeStudioOutputsByActualUiType": true,
+    "longMediaRunsInBackground": true
+  },
+  "projectTemplate": {
+    "requiredFields": ["projectKey", "goal", "sourceRefs", "outputChecklist"],
+    "recommendedFields": ["audience", "language", "focus", "driveFolderId", "notebookUrl"],
+    "outputItemFields": ["outputType", "variantKey", "settings", "successCriteria", "timeoutMode", "savePolicy", "readbackPolicy"],
+    "sourcePolicy": "SELECT_OR_ADD_ONLY_THE_SOURCES_REQUIRED_FOR_THIS_PROJECT_OUTPUT",
+    "collisionKey": "projectKey+outputType+variantKey+sourceFingerprint"
   },
   "outputTypes": {
     "NOTEBOOKLM_CHAT": {
+      "taskType": "CHAT",
+      "uiRoute": ["Notebook", "Sources", "Chat"],
       "settings": ["language", "audience", "tone", "focus"],
-      "defaultTimeoutMode": "SHORT_ARTIFACT",
-      "sourceContextPolicy": "COPY_CURRENT_SOURCE_TEXT_INTO_INSTRUCTION_AND_IGNORE_STALE_NOTEBOOK_CONTEXT"
+      "sourceContextPolicy": "COPY_CURRENT_SOURCE_TEXT_INTO_INSTRUCTION_AND_IGNORE_STALE_NOTEBOOK_CONTEXT",
+      "completionEvidence": "ASSISTANT_RESULT_OR_MARKER_NODE",
+      "defaultTimeoutMode": "SHORT_ARTIFACT"
     },
     "NOTEBOOKLM_AUDIO": {
-      "settings": ["language", "style", "durationSec", "focus", "persona"],
+      "taskType": "AUDIO_OVERVIEW",
+      "uiRoute": ["Notebook", "Sources", "Studio", "AI Audio Overview", "Customize(optional)", "Generate"],
+      "settings": {
+        "format": ["deep_dive", "brief", "critique", "debate"],
+        "language": "supported_output_language",
+        "length": ["short", "default", "long_english_only"],
+        "prompt": "focus_or_expertise_instruction"
+      },
+      "defaults": {"format": "deep_dive", "language": "ko-KR"},
+      "completionEvidence": "AUDIO_PLAYER_READY",
       "defaultTimeoutMode": "MEDIA_LENGTH_AWARE"
     },
     "NOTEBOOKLM_VIDEO": {
-      "settings": ["language", "durationSec", "focus", "visualEmphasis", "persona"],
-      "defaultTimeoutMode": "MEDIA_LENGTH_AWARE"
+      "taskType": "VIDEO_OVERVIEW",
+      "uiRoute": ["Notebook", "Sources", "Studio", "AI Video Overview", "Customize(optional)", "Generate", "Background"],
+      "settings": {
+        "format": ["cinematic", "explainer", "short_video"],
+        "language": "supported_narration_language",
+        "visualStyle": ["auto", "classic", "whiteboard", "watercolor", "retro", "heritage", "papercraft", "kawaii", "anime", "custom"],
+        "prompt": "focus_or_custom_topic"
+      },
+      "defaults": {"format": "explainer", "language": "ko-KR", "visualStyle": "auto"},
+      "completionEvidence": "VIDEO_PLAYER_READY",
+      "executionPolicy": "START_GENERATION_THEN_RELEASE_BRIDGE_SLOT_AND_WATCH_BACKGROUND",
+      "defaultTimeoutMode": "LONG_BACKGROUND_MEDIA"
     },
-    "NOTEBOOKLM_REPORT_PDF": {
-      "settings": ["reportType", "depth", "language", "audience"],
+    "NOTEBOOKLM_SLIDES": {
+      "taskType": "SLIDES",
+      "uiRoute": ["Notebook", "Sources", "Studio", "Slide Deck", "Customize(optional)", "Generate"],
+      "settings": {
+        "format": ["detailed_deck", "presenter_slides"],
+        "language": "output_language",
+        "length": ["short", "default", "long"],
+        "prompt": "outline_audience_style_emphasis"
+      },
+      "defaults": {"format": "presenter_slides", "language": "ko-KR", "length": "default"},
+      "completionEvidence": "SLIDES_READY",
+      "defaultTimeoutMode": "MEDIUM_ARTIFACT"
+    },
+    "NOTEBOOKLM_REPORT": {
+      "taskType": "REPORT",
+      "uiRoute": ["Notebook", "Sources", "Studio", "Report", "Report Type", "Generate"],
+      "settings": {
+        "reportType": ["briefing_document", "study_guide", "faq", "ai_suggested_or_custom"],
+        "language": "output_language",
+        "prompt": "report_focus_or_custom_instruction"
+      },
+      "defaults": {"reportType": "briefing_document", "language": "ko-KR"},
+      "completionEvidence": "REPORT_RESULT_READY_OR_VISIBLE_BRIEFING_DOC_ARTIFACT",
       "defaultTimeoutMode": "DOCUMENT_COMPLETION_AWARE"
     },
     "NOTEBOOKLM_MIND_MAP": {
-      "settings": ["depth", "focus"],
+      "taskType": "MIND_MAP",
+      "uiRoute": ["Notebook", "Sources", "Studio_or_MindMap_chip", "Mind Map", "Generate"],
+      "settings": {"focus": "optional_focus", "depth": "implementation_defined_if_ui_available"},
+      "completionEvidence": "MIND_MAP_READY",
+      "defaultTimeoutMode": "SHORT_ARTIFACT"
+    },
+    "NOTEBOOKLM_FLASHCARDS": {
+      "taskType": "FLASHCARDS",
+      "uiRoute": ["Notebook", "Sources", "Studio", "Flashcards", "Customize(optional)", "Generate"],
+      "settings": {"difficulty": ["easy", "medium", "hard"], "prompt": "flashcard_scope_instruction"},
+      "defaults": {"difficulty": "medium"},
+      "completionEvidence": "FLASHCARDS_READY",
+      "defaultTimeoutMode": "SHORT_ARTIFACT"
+    },
+    "NOTEBOOKLM_QUIZ": {
+      "taskType": "QUIZ",
+      "uiRoute": ["Notebook", "Sources", "Studio", "Quiz", "Customize(optional)", "Generate"],
+      "settings": {"difficulty": ["easy", "medium", "hard"], "prompt": "quiz_scope_instruction"},
+      "defaults": {"difficulty": "medium"},
+      "completionEvidence": "QUIZ_READY",
+      "defaultTimeoutMode": "SHORT_ARTIFACT"
+    },
+    "NOTEBOOKLM_INFOGRAPHIC": {
+      "taskType": "INFOGRAPHIC",
+      "uiRoute": ["Notebook", "Sources", "Studio", "Infographic", "Customize(optional)", "Generate"],
+      "settings": {
+        "language": "output_language",
+        "detailLevel": ["concise", "standard", "detailed"],
+        "orientation": ["square", "portrait", "landscape"],
+        "visualStyle": "ui_supported_or_custom",
+        "prompt": "visual_focus_instruction"
+      },
+      "defaults": {"language": "ko-KR", "detailLevel": "standard"},
+      "completionEvidence": "INFOGRAPHIC_READY",
+      "defaultTimeoutMode": "MEDIUM_ARTIFACT"
+    },
+    "NOTEBOOKLM_DATA_TABLE": {
+      "taskType": "DATA_TABLE",
+      "uiRoute": ["Notebook", "Sources", "Studio", "Data Table", "Customize(optional)", "Generate"],
+      "settings": {"language": "output_language", "prompt": "describe_rows_columns_and_focus"},
+      "completionEvidence": "DATA_TABLE_READY_WITH_TABLE_OR_DOWNLOADABLE_ARTIFACT",
+      "exportOptions": ["Google Sheets"],
       "defaultTimeoutMode": "SHORT_ARTIFACT"
     },
     "FLOW_SCENE": {
@@ -54,34 +147,35 @@
     }
   },
   "fanoutRules": [
-    "A single parent command may create multiple child tasks within the same project.",
-    "Different output types in the same project may dispatch in parallel when no shared resource conflict is detected.",
-    "Same project plus same output type plus same variant key is deduplicated.",
-    "Different settings within one output type become explicit variants, not overwritten defaults.",
-    "Serialize only shared Chrome session, renderer, download filename, or other proven conflicting resources.",
-    "For NotebookLM CHAT, current task source text must also be embedded in INSTRUCTION so a stale notebook source cannot silently become the answer context."
+    "A single parent project command may create multiple output-type child tasks.",
+    "Same project/output/variant/source fingerprint is deduplicated.",
+    "Different output types may run in parallel only when they do not share an actively blocking browser interaction.",
+    "Long NotebookLM media generation must release the bridge slot after confirmed generation start and be monitored separately.",
+    "Never classify a generic chat result as a Studio artifact success.",
+    "Each Studio output must match its type-specific captureMode or visible artifact evidence before DONE."
   ],
   "queueMapping": {
     "sheet": "NotebookLM_Task_Queue",
     "columns": ["TASK_ID", "CONTENT_ID", "TASK_DATE", "TASK_TYPE", "TITLE", "SOURCE_TEXT", "INSTRUCTION", "LANGUAGE", "NOTEBOOK_URL", "DRIVE_FOLDER_ID", "AUTO_SUBMIT", "TIMEOUT_SECONDS", "STATUS", "OWNER_EMAIL", "CLAIMED_AT", "STARTED_AT", "COMPLETED_AT", "RESULT_TYPE", "RESULT_URL", "RESULT_FILE_ID", "RESULT_TEXT", "ERROR_MESSAGE", "CALLBACK_URL", "CALLBACK_TOKEN", "CREATED_AT", "UPDATED_AT"],
     "taskIdPattern": "{projectKey}_{outputType}_{variantKey}_{yyyyMMdd_HHmmss}",
-    "sourceTextMustContain": ["parentCommandId", "projectKey", "outputType", "variantKey", "settings", "sourceRefs"],
-    "instructionMustContain": ["goal", "successCriteria", "savePolicy", "readbackPolicy"],
+    "instructionMustContain": ["goal", "sourceScope", "settings", "successCriteria", "savePolicy", "readbackPolicy"],
     "chatInstructionMustAlsoContain": ["CURRENT_TASK_SOURCE", "ignoreStaleNotebookContext"]
   },
   "verification": {
-    "start": ["CLAIMED", "STARTED_OR_RUNNING_WITHIN_60S"],
-    "progress": ["PROGRESSING_OR_FILE_CHANGE_EVIDENCE"],
-    "complete": ["RESULT_SAVED", "RESULT_READBACK", "EXPECTED_OUTPUT_TYPE_MATCH", "NO_DUPLICATE_COLLISION", "CURRENT_SOURCE_SEMANTIC_MATCH"],
+    "start": ["CLAIMED", "STARTED_OR_NOTEBOOK_OPENED"],
+    "progress": ["TYPE_SPECIFIC_GENERATING_STATE_OR_BACKGROUND_EVIDENCE"],
+    "complete": ["EXPECTED_CAPTURE_MODE_OR_ARTIFACT_EVIDENCE", "RESULT_SAVED", "RESULT_READBACK", "EXPECTED_OUTPUT_TYPE_MATCH", "NO_DUPLICATE_COLLISION"],
     "captureCleanup": ["STRIP_UI_ONLY_PREFIXES_SUCH_AS_THOUGHTS_EXPAND_MORE_BEFORE_REUSE"],
-    "failure": ["ROOT_CAUSE", "MINIMUM_FIX", "SAME_FIXTURE_RETEST"]
+    "falseDoneGuards": ["SMALLEST_NEW_RESULT_IS_NOT_STUDIO_SUCCESS", "PAGE_TITLE_STALE_PROMPT_IS_NOT_TYPE_EVIDENCE", "OLD_ARTIFACT_IS_NOT_NEW_RESULT"],
+    "failure": ["ROOT_CAUSE", "MINIMUM_FIX", "SAME_FIXTURE_RETEST", "LESSON_CHECKED"]
   },
   "centralAgentBehavior": {
-    "onUserCommand": "NORMALIZE_THEN_FANOUT",
+    "onUserCommand": "NORMALIZE_PROJECT_TEMPLATE_THEN_FANOUT",
     "onMissingNonCriticalSetting": "APPLY_SAFE_DEFAULT_AND_RECORD",
     "onMissingCriticalSource": "HOLD_MISSING_SOURCE",
-    "onConflict": "SERIALIZE_SHARED_RESOURCE_ONLY",
-    "onResult": "WRITE_HISTORY_LIBRARY_TASK_INSTRUCTION_AND_WORKFLOW_EVIDENCE",
+    "onConflict": "SERIALIZE_BROWSER_INTERACTION_ONLY",
+    "onLongMedia": "START_AND_BACKGROUND_WATCH",
+    "onResult": "WRITE_HISTORY_LIBRARY_TASK_INSTRUCTION_WORKFLOW_AND_TYPE_EVIDENCE",
     "onNotebookChat": "LOCK_CURRENT_SOURCE_IN_INSTRUCTION_BEFORE_DISPATCH"
   }
 }
