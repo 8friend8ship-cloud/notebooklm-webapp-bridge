@@ -1,19 +1,31 @@
 {
-  "version":"1.0.0",
-  "purpose":"Judge whether a generated result is actually usable for the intended ContentOS workflow, not merely whether generation completed.",
+  "version":"1.1.0",
+  "purpose":"Judge every produced or test artifact for actual ContentOS usability, learn from the outcome, and feed repeatable improvements back into code, functions, templates and future PRE_CHECK.",
+  "artifactTypes":["VIDEO","IMAGE","AUDIO","TEXT","SUBTITLE","MOTION","PDF_REPORT","MIND_MAP","FLOW_SCENE","FLOW_VARIANT","COMPOSITE"],
   "statuses":["PASS","NEEDS_FIX","REJECT","HOLD_MISSING_EVIDENCE"],
   "requiredDimensions":[
-    {"id":"GOAL_ALIGNMENT","weight":25,"minimum":85},
-    {"id":"PRACTICAL_USABILITY","weight":20,"minimum":80},
+    {"id":"GOAL_ALIGNMENT","weight":20,"minimum":85},
+    {"id":"PRACTICAL_USABILITY","weight":15,"minimum":80},
     {"id":"QUALITY_LEVEL","weight":15,"minimum":80},
     {"id":"SOURCE_TRACEABILITY","weight":10,"minimum":90},
     {"id":"OUTPUT_COMPLETENESS","weight":10,"minimum":90},
     {"id":"FRONTAPP_FIT","weight":10,"minimum":80},
-    {"id":"TECHNICAL_READBACK","weight":10,"minimum":100}
+    {"id":"TECHNICAL_READBACK","weight":10,"minimum":100},
+    {"id":"REUSABILITY_LEARNING_VALUE","weight":10,"minimum":75}
   ],
-  "hardFails":["MISSING_RESULT","READBACK_FAILED","WRONG_OUTPUT_TYPE","CRITICAL_SOURCE_MISMATCH","UNUSABLE_FOR_TARGET_FRONT","DUPLICATE_COLLISION"],
+  "artifactSpecificChecks":{
+    "VIDEO":["duration","visualContinuity","sceneOrder","captionSync","audioSync","motionQuality","platformFit"],
+    "IMAGE":["composition","readability","brandFit","cropSafety","resolution","assetReusability"],
+    "AUDIO":["voiceClarity","personaFit","pacing","pronunciation","noise","durationFit"],
+    "TEXT":["intentMatch","accuracy","structure","tone","frontSchemaFit","ctaOrNextActionWhenRequired"],
+    "SUBTITLE":["timing","lineBreak","readingSpeed","speakerMatch","languageAccuracy","safeArea"],
+    "MOTION":["timing","easing","intentMatch","visualHierarchy","loopOrTransitionQuality","renderStability"],
+    "PDF_REPORT":["structure","completeness","readability","evidenceTraceability","exportIntegrity"],
+    "COMPOSITE":["crossModalConsistency","audioVideoCaptionAlignment","sharedPersonaConsistency","finalUseCaseFit"]
+  },
+  "hardFails":["MISSING_RESULT","READBACK_FAILED","WRONG_OUTPUT_TYPE","CRITICAL_SOURCE_MISMATCH","UNUSABLE_FOR_TARGET_FRONT","DUPLICATE_COLLISION","CROSS_MODAL_CONFLICT"],
   "promotionRules":{
-    "PASS":{"overallMinimum":82,"route":"SEED_OR_TEMPLATE","writeLearning":true},
+    "PASS":{"overallMinimum":82,"route":"SEED_OR_TEMPLATE_AND_REUSABLE_PATTERN","writeLearning":true},
     "NEEDS_FIX":{"overallMinimum":60,"route":"ROOT_CAUSE_MINIMUM_FIX_RETEST","writeLearning":true},
     "REJECT":{"route":"QUEENS_FAILURE_CASE_OR_ARCHIVE","writeLearning":true},
     "HOLD_MISSING_EVIDENCE":{"route":"READBACK_OR_EVIDENCE_RECOVERY","writeLearning":false}
@@ -24,9 +36,25 @@
     "recordRootCause":true,
     "recordWrongAssumption":true,
     "recordEffectiveFix":true,
+    "recordCodeOrFunctionPatchCandidate":true,
+    "recordTemplateAdjustment":true,
+    "recordPrecheckBlockRule":true,
     "updateCommandTemplateWhenRepeatable":true,
-    "requireSameFixtureRetestBeforeFixPromotion":true
+    "requireSameFixtureRetestBeforeFixPromotion":true,
+    "crossCheckNewTasksAgainstPriorLessons":true,
+    "blockRepeatedMistakeWhenSameSignatureFound":true
   },
-  "targetSheets":["84_OPENAI_CENTRAL_AUDIT","80_DATA_RUNTIME_QA_LOG","71_MULTIMODAL_QA_HISTORY","35_INTERNAL_SEED_REGISTRY","37_QUEENS_RESEARCH_RESULTS","77_TEMPLATE_EVOLUTION_FACTORY"],
-  "completionRule":"A generated artifact is not COMPLETE until readback and purpose-fit audit are PASS."
+  "codeFeedbackLoop":{
+    "applyAutomaticallyOnlyWhen":"SAFE_INTERNAL_MINIMUM_CHANGE_AND_EVIDENCE_BACKED",
+    "otherwise":"WRITE_PATCH_CANDIDATE_AND_HOLD_FOR_REQUIRED_APPROVAL",
+    "afterPatch":"SAME_FIXTURE_RETEST_AND_RESULT_AUDIT",
+    "successfulPatch":"WRITE_EVOLUTION_CHANGELOG_AND_TEMPLATE_EVOLUTION"
+  },
+  "precheck":{
+    "beforeEveryNewTask":["recentLessons","sameProjectErrors","sameArtifactTypeErrors","lastGood","effectiveFixes","activeTemplateVersion"],
+    "sameSignatureRepeatWithoutNewEvidence":"DIAGNOSTIC_HOLD",
+    "requiredLessonFields":["expected","actual","rootCause","wrongAssumption","effectiveFix","preventionRule","evidence","templateOrCodeChange"]
+  },
+  "targetSheets":["84_OPENAI_CENTRAL_AUDIT","80_DATA_RUNTIME_QA_LOG","71_MULTIMODAL_QA_HISTORY","35_INTERNAL_SEED_REGISTRY","37_QUEENS_RESEARCH_RESULTS","63_EVOLUTION_CHANGELOG","77_TEMPLATE_EVOLUTION_FACTORY","83_TASK_PRECHECK_ASSET_MAP"],
+  "completionRule":"A generated or test artifact is not COMPLETE until readback, purpose-fit audit, problem/regression check and lesson writeback are complete."
 }
