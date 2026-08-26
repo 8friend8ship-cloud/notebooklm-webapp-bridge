@@ -3,19 +3,19 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.36_D39_VIDEO_OVERVIEW_STATE_MACHINE_20260826",
-  "version": "0.2.36",
-  "releasedAt": "2026-08-26T19:25:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.37_D40_REPORT_STATE_MACHINE_20260826",
+  "version": "0.2.37",
+  "releasedAt": "2026-08-26T19:52:00+09:00",
   "requiresUserApproval": false,
-  "description": "D39 adds Video Overview generation via Studio and requires VIDEO_PLAYER_READY evidence before DONE. Existing approved runtime only.",
-  "sourceCommit": "294aa84cf4f63397366b285e133dcfe0ea9696db",
+  "description": "D40 adds Studio Report generation with briefing-document default and actual new-report evidence before DONE. Existing approved runtime only.",
+  "sourceCommit": "a09d447b070ec815ab15b3cd8d7e166594ea59fb",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "ba817b327735efcee27a8d07d5a9447e80f33cc8"
+      "gitBlobSha1": "74901e91d866dab2e5e818e16383909049e98e6d"
     },
     {
       "path": "worker.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "e93921ef39ed2183fca83e7e27b9c08a7ecc57ee"
+      "gitBlobSha1": "c8a10e8b4e0843f662040644ddecd47f2a027ec3"
     }
   ]
 }
