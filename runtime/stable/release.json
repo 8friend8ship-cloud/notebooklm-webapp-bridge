@@ -3,19 +3,19 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.45_D48_REAL_AUDIO_CARD_DOWNLOAD_20260826",
-  "version": "0.2.45",
-  "releasedAt": "2026-08-26T22:08:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.46_D49_ARTIFACT_MIRROR_MESSAGE_ROUTE_20260826",
+  "version": "0.2.46",
+  "releasedAt": "2026-08-26T22:14:00+09:00",
   "requiresUserApproval": false,
-  "description": "D48 targets the real Audio artifact card before Download and retains Drive Desktop mirror.",
-  "sourceCommit": "cd3f0d09c0994f6b566414fcd21548830e1b5e8d",
+  "description": "D49 routes MIRROR_ARTIFACT_TO_DRIVE to the dedicated mirror listener.",
+  "sourceCommit": "67386187e86f18cc0ebb25f4aa0854eb9b31714c",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "9e0474ea0a1331ce4c19ae6a34b0fa61dd8de7fc"
+      "gitBlobSha1": "b91cc58fa95b11c21ededd06738e3d768dcf54e7"
     },
     {
       "path": "worker.js",
@@ -35,7 +35,7 @@
     },
     {
       "path": "background.js",
-      "gitBlobSha1": "26263dac783eb2b8faf84eafe4127f6e32df3503"
+      "gitBlobSha1": "4972cb3fc0de321c3208fe4a0a84af9353fdb23a"
     },
     {
       "path": "local-powershell-runner.js",
