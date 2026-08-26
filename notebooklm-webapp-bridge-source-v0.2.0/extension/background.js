@@ -336,6 +336,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.source === SOURCE && message?.type === "MIRROR_ARTIFACT_TO_DRIVE") return false;
   (async () => {
     if (message?.source !== SOURCE) return { ok: false, error: "잘못된 메시지입니다." };
     if (message.type === "GET_CONFIG") return { ok: true, config: await getConfig(), profile: await getChromeProfile(), autoState: await getAutoState() };

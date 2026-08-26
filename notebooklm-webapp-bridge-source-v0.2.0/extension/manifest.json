@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.45",
-  "description": "D48 targets the real Audio artifact card by duration/source/deep-dive evidence before opening its menu and downloading. Preserves D47 Drive mirror.",
+  "version": "0.2.46",
+  "description": "D49 lets MIRROR_ARTIFACT_TO_DRIVE pass to its dedicated worker listener instead of the generic background unsupported-message response.",
   "permissions": [
     "alarms",
     "identity",
