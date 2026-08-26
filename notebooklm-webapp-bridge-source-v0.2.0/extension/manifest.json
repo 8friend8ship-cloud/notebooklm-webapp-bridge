@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.43",
-  "description": "D46 detects real report artifact cards and preserves strict Studio UI serialization. Includes D44/D45 guards. No new permissions.",
+  "version": "0.2.44",
+  "description": "D47 requires real Audio download and Google Drive Desktop mirror before Audio DONE. Uses approved local Host; no new OAuth.",
   "permissions": [
     "alarms",
     "identity",

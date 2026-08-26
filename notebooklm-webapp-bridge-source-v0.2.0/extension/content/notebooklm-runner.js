@@ -460,7 +460,51 @@
     return null;
   }
 
-  async function runAudioOverview(task) {
+  
+  function artifactActionRoot(node) {
+    let cur = node instanceof HTMLElement ? node : null;
+    for (let i=0; i<8 && cur; i++, cur=cur.parentElement) {
+      const t = norm(cur.innerText || cur.textContent || "");
+      const menuCount = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
+      if (menuCount < 5 && /more_vert|play|재생|download|다운로드|share|공유/.test(t)) return cur;
+    }
+    return null;
+  }
+  
+  function actionLabel(el) {
+    return norm([el?.innerText,el?.textContent,el?.getAttribute?.("aria-label"),el?.getAttribute?.("title"),el?.getAttribute?.("data-testid")].join(" "));
+  }
+  
+  async function requestNotebookArtifactDownload(readyNode) {
+    const startedAtEpochMs = Date.now();
+    const root = artifactActionRoot(readyNode) || readyNode?.parentElement || document;
+    const localButtons = [...(root.querySelectorAll?.("button,[role='button'],a") || [])].filter(visible);
+    const direct = localButtons.find(el => /(^|\s)(download|다운로드)(\s|$)/.test(actionLabel(el)));
+    if (direct) {
+      try { direct.click(); } catch {}
+      await sleep(1200);
+      return {requested:true, method:"DIRECT", startedAtEpochMs};
+    }
+    const menu = localButtons.find(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
+    if (!menu) return {requested:false, reason:"artifact menu/download control not found", startedAtEpochMs};
+    try { menu.click(); } catch {}
+    await sleep(700);
+    const download = await waitFor(() => findDeepControl(["다운로드","download"]), 8000, 250);
+    if (!download) return {requested:false, reason:"download action not found after menu", startedAtEpochMs};
+    try { download.click(); } catch {}
+    await sleep(1200);
+    return {requested:true, method:"MENU_DOWNLOAD", startedAtEpochMs};
+  }
+  
+  async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {
+    try {
+      return await chrome.runtime.sendMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE",taskId:task.taskId,artifactType,startedAtEpochMs});
+    } catch (error) {
+      return {ok:false,error:String(error?.message || error)};
+    }
+  }
+  
+    async function runAudioOverview(task) {
     const source = await addSource(task);
     const sourceFallback = !source.ok && Boolean(task.sourceText);
 
@@ -494,6 +538,11 @@
     const ready = await waitFor(() => audioOverviewReady(), timeoutMs, 2500);
     if (!ready) throw new Error("AUDIO_OVERVIEW_GENERATION_TIMEOUT_OR_PLAYER_NOT_FOUND");
 
+    const download = await requestNotebookArtifactDownload(ready);
+    if (!download?.requested) throw new Error(`AUDIO_ARTIFACT_DOWNLOAD_NOT_TRIGGERED: ${download?.reason || "unknown"}`);
+    const mirror = await mirrorNotebookArtifactToDrive(task, "AUDIO_OVERVIEW", download.startedAtEpochMs);
+    if (!mirror?.ok || !mirror?.mirror?.ok) throw new Error(`AUDIO_DRIVE_MIRROR_FAILED: ${mirror?.error || mirror?.raw?.stderr || "unknown"}`);
+
     return {
       resultText:"AUDIO_OVERVIEW_READY",
       resultUrls:[location.href],
@@ -505,6 +554,7 @@
       taskId:task.taskId,
       contentId:task.contentId || "",
       taskType:task.taskType || "AUDIO_OVERVIEW",
+      actualArtifact:{download,mirror:mirror.mirror,localTaskId:mirror.localTaskId},
       source: {...source, existingNotebookFallback: sourceFallback}
     };
   }
