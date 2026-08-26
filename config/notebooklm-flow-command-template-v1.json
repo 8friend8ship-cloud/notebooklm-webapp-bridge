@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "purpose": "Convert one high-level central-agent instruction into validated NotebookLM and Flow fanout tasks with consistent queue/output/readback fields.",
   "inputContract": {
     "required": ["projectKey", "goal", "sourceRefs"],
@@ -19,9 +19,15 @@
     "neverInventSourceFacts": true,
     "dedupeSameProjectOutputVariant": true,
     "preserveUserExplicitSettings": true,
-    "expandOneCommandIntoChecklist": true
+    "expandOneCommandIntoChecklist": true,
+    "lockCurrentSourceInChatInstruction": true
   },
   "outputTypes": {
+    "NOTEBOOKLM_CHAT": {
+      "settings": ["language", "audience", "tone", "focus"],
+      "defaultTimeoutMode": "SHORT_ARTIFACT",
+      "sourceContextPolicy": "COPY_CURRENT_SOURCE_TEXT_INTO_INSTRUCTION_AND_IGNORE_STALE_NOTEBOOK_CONTEXT"
+    },
     "NOTEBOOKLM_AUDIO": {
       "settings": ["language", "style", "durationSec", "focus", "persona"],
       "defaultTimeoutMode": "MEDIA_LENGTH_AWARE"
@@ -52,19 +58,22 @@
     "Different output types in the same project may dispatch in parallel when no shared resource conflict is detected.",
     "Same project plus same output type plus same variant key is deduplicated.",
     "Different settings within one output type become explicit variants, not overwritten defaults.",
-    "Serialize only shared Chrome session, renderer, download filename, or other proven conflicting resources."
+    "Serialize only shared Chrome session, renderer, download filename, or other proven conflicting resources.",
+    "For NotebookLM CHAT, current task source text must also be embedded in INSTRUCTION so a stale notebook source cannot silently become the answer context."
   ],
   "queueMapping": {
     "sheet": "NotebookLM_Task_Queue",
     "columns": ["TASK_ID", "CONTENT_ID", "TASK_DATE", "TASK_TYPE", "TITLE", "SOURCE_TEXT", "INSTRUCTION", "LANGUAGE", "NOTEBOOK_URL", "DRIVE_FOLDER_ID", "AUTO_SUBMIT", "TIMEOUT_SECONDS", "STATUS", "OWNER_EMAIL", "CLAIMED_AT", "STARTED_AT", "COMPLETED_AT", "RESULT_TYPE", "RESULT_URL", "RESULT_FILE_ID", "RESULT_TEXT", "ERROR_MESSAGE", "CALLBACK_URL", "CALLBACK_TOKEN", "CREATED_AT", "UPDATED_AT"],
     "taskIdPattern": "{projectKey}_{outputType}_{variantKey}_{yyyyMMdd_HHmmss}",
     "sourceTextMustContain": ["parentCommandId", "projectKey", "outputType", "variantKey", "settings", "sourceRefs"],
-    "instructionMustContain": ["goal", "successCriteria", "savePolicy", "readbackPolicy"]
+    "instructionMustContain": ["goal", "successCriteria", "savePolicy", "readbackPolicy"],
+    "chatInstructionMustAlsoContain": ["CURRENT_TASK_SOURCE", "ignoreStaleNotebookContext"]
   },
   "verification": {
     "start": ["CLAIMED", "STARTED_OR_RUNNING_WITHIN_60S"],
     "progress": ["PROGRESSING_OR_FILE_CHANGE_EVIDENCE"],
-    "complete": ["RESULT_SAVED", "RESULT_READBACK", "EXPECTED_OUTPUT_TYPE_MATCH", "NO_DUPLICATE_COLLISION"],
+    "complete": ["RESULT_SAVED", "RESULT_READBACK", "EXPECTED_OUTPUT_TYPE_MATCH", "NO_DUPLICATE_COLLISION", "CURRENT_SOURCE_SEMANTIC_MATCH"],
+    "captureCleanup": ["STRIP_UI_ONLY_PREFIXES_SUCH_AS_THOUGHTS_EXPAND_MORE_BEFORE_REUSE"],
     "failure": ["ROOT_CAUSE", "MINIMUM_FIX", "SAME_FIXTURE_RETEST"]
   },
   "centralAgentBehavior": {
@@ -72,6 +81,7 @@
     "onMissingNonCriticalSetting": "APPLY_SAFE_DEFAULT_AND_RECORD",
     "onMissingCriticalSource": "HOLD_MISSING_SOURCE",
     "onConflict": "SERIALIZE_SHARED_RESOURCE_ONLY",
-    "onResult": "WRITE_HISTORY_LIBRARY_TASK_INSTRUCTION_AND_WORKFLOW_EVIDENCE"
+    "onResult": "WRITE_HISTORY_LIBRARY_TASK_INSTRUCTION_AND_WORKFLOW_EVIDENCE",
+    "onNotebookChat": "LOCK_CURRENT_SOURCE_IN_INSTRUCTION_BEFORE_DISPATCH"
   }
 }
