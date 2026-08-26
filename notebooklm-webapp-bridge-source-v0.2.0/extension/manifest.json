@@ -1,69 +1,16 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.31",
-  "description": "D34 fixes NotebookLM result readback for current UI by scanning open shadow roots and accepting central PASS marker variants. No permission, OAuth, Apps Script, Host, normal-Chrome, publish, or paid changes.",
-  "permissions": [
-    "alarms",
-    "identity",
-    "identity.email",
-    "scripting",
-    "sidePanel",
-    "storage",
-    "tabs"
-  ],
-  "host_permissions": [
-    "https://notebooklm.google.com/*",
-    "https://notebook.google.com/*",
-    "https://script.google.com/*",
-    "https://script.googleusercontent.com/*",
-    "https://notebooklm-webapp-bridge.vercel.app/*",
-    "http://127.0.0.1/*"
-  ],
-  "externally_connectable": {
-    "matches": [
-      "http://localhost/*",
-      "http://127.0.0.1/*",
-      "https://*.vercel.app/*"
-    ]
-  },
-  "background": {
-    "service_worker": "worker.js",
-    "type": "module"
-  },
-  "action": {
-    "default_title": "NotebookLM WebApp Bridge"
-  },
+  "version": "0.2.32",
+  "description": "D35 clears stale NotebookLM CHAT active state when the queue task is already terminal, allowing the next READY task to continue automatically. Preserves D34 shadow-root result readback and existing permissions. No OAuth, Apps Script, Host, normal-Chrome, publish, or paid changes.",
+  "permissions": ["alarms","identity","identity.email","scripting","sidePanel","storage","tabs"],
+  "host_permissions": ["https://notebooklm.google.com/*","https://notebook.google.com/*","https://script.google.com/*","https://script.googleusercontent.com/*","https://notebooklm-webapp-bridge.vercel.app/*","http://127.0.0.1/*"],
+  "externally_connectable": {"matches":["http://localhost/*","http://127.0.0.1/*","https://*.vercel.app/*"]},
+  "background": {"service_worker":"worker.js","type":"module"},
+  "action": {"default_title":"NotebookLM WebApp Bridge"},
   "content_scripts": [
-    {
-      "matches": [
-        "https://notebooklm.google.com/*",
-        "https://notebook.google.com/*"
-      ],
-      "js": [
-        "content/notebooklm-runner.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://notebooklm-webapp-bridge.vercel.app/*"
-      ],
-      "js": [
-        "front-main.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "https://notebooklm-webapp-bridge.vercel.app/*"
-      ],
-      "js": [
-        "front-extension.js"
-      ],
-      "run_at": "document_start",
-      "world": "ISOLATED"
-    }
+    {"matches":["https://notebooklm.google.com/*","https://notebook.google.com/*"],"js":["content/notebooklm-runner.js"],"run_at":"document_idle"},
+    {"matches":["https://notebooklm-webapp-bridge.vercel.app/*"],"js":["front-main.js"],"run_at":"document_start","world":"MAIN"},
+    {"matches":["https://notebooklm-webapp-bridge.vercel.app/*"],"js":["front-extension.js"],"run_at":"document_start","world":"ISOLATED"}
   ]
 }
