@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.35",
-  "description": "D38 updates Audio Overview selectors for the current Korean Gemini Notebook labels AI 오디오 오버뷰/오디오 오버뷰. Keeps existing-source fallback and requires actual ready-player evidence before DONE. No new permissions or approvals.",
+  "version": "0.2.36",
+  "description": "D39 adds NotebookLM/Gemini Notebook Video Overview state-machine generation and requires actual ready video-player evidence before DONE. Preserves validated Audio Overview and current Korean UI labels. No new permissions or approvals.",
   "permissions": [
     "alarms",
     "identity",
