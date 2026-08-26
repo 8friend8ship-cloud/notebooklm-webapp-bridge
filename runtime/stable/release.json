@@ -3,19 +3,19 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.41_D44_REAL_ARTIFACT_SIGNALS_20260826",
-  "version": "0.2.41",
-  "releasedAt": "2026-08-26T20:48:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.42_D45_STALE_BUSY_CLEAR_20260826",
+  "version": "0.2.42",
+  "releasedAt": "2026-08-26T21:10:00+09:00",
   "requiresUserApproval": false,
-  "description": "D44 removes icon-only false matches and requires real artifact-card signals.",
-  "sourceCommit": "b237a4085405794fce6b3f8f33c82c42853dfdd1",
+  "description": "D45 clears stale auto-poll busy state when runningTaskId is empty.",
+  "sourceCommit": "f3763b0079e1cbba78fae27a9f921c37a71d793b",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "b69fa12ca5627305a792381dc7d0f74a12413306"
+      "gitBlobSha1": "aa7543b593c602cefb94a96e36438181536916d1"
     },
     {
       "path": "worker.js",
@@ -35,7 +35,7 @@
     },
     {
       "path": "background.js",
-      "gitBlobSha1": "81b70db182fdd1b9986e56a17d650370dc43f06d"
+      "gitBlobSha1": "26263dac783eb2b8faf84eafe4127f6e32df3503"
     },
     {
       "path": "local-powershell-runner.js",
