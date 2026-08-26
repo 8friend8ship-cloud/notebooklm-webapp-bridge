@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Find Audio card from menu ancestry and publish stable 0.2.47
+      - name: Find Audio card from Play/menu ancestry and publish stable 0.2.48
         shell: bash
         run: |
           python - <<'PY'
@@ -25,20 +25,20 @@ jobs:
           s=p.read_text(encoding='utf-8')
           start=s.index('  function audioArtifactCardRoot(readyNode) {')
           end=s.index('  async function requestNotebookArtifactDownload', start)
-          payload='ICBmdW5jdGlvbiBhdWRpb0FydGlmYWN0Q2FyZFJvb3QocmVhZHlOb2RlKSB7CiAgICBjb25zdCBzY29yZSA9IFtdOwogICAgY29uc3QgbWVudXMgPSBkZWVwUXVlcnlBbGwoImJ1dHRvbixbcm9sZT0nYnV0dG9uJ10sYSIpLmZpbHRlcih2aXNpYmxlKS5maWx0ZXIoZWwgPT4gL21vcmVfdmVydHxtb3JlIG9wdGlvbnN8bW9yZSBhY3Rpb25zfOuNlOuztOq4sHzsmLXshZh866mU64m0Ly50ZXN0KGFjdGlvbkxhYmVsKGVsKSkpOwogICAgZm9yIChjb25zdCBtZW51IG9mIG1lbnVzKSB7CiAgICAgIGxldCBjdXIgPSBtZW51LnBhcmVudEVsZW1lbnQ7CiAgICAgIGZvciAobGV0IGRlcHRoPTA7IGRlcHRoPDEyICYmIGN1cjsgZGVwdGgrKywgY3VyPWN1ci5wYXJlbnRFbGVtZW50KSB7CiAgICAgICAgY29uc3QgcmF3ID0gKGN1ci5pbm5lclRleHQgfHwgY3VyLnRleHRDb250ZW50IHx8ICIiKS50cmltKCk7CiAgICAgICAgY29uc3QgdCA9IG5vcm0ocmF3KTsKICAgICAgICBpZiAocmF3Lmxlbmd0aCA8IDggfHwgcmF3Lmxlbmd0aCA+IDMwMDApIGNvbnRpbnVlOwogICAgICAgIGNvbnN0IGR1cmF0aW9uID0gL1xiXGR7MSwyfTpcZHsyfVxiLy50ZXN0KHQpOwogICAgICAgIGNvbnN0IHNvdXJjZVNpZ25hbCA9IC/shozsiqRccypcZCvqsJx8c291cmNlcz9ccypcZCt865SlIOuLpOydtOu4jHxkZWVwIGRpdmUvLnRlc3QodCk7CiAgICAgICAgY29uc3Qgc3R1ZGlvTWVudUhpdHMgPSBbImFpIOyYpOuUlOyYpCDsmKTrsoTrt7AiLCLsiqzrnbzsnbTrk5wg7J6Q66OMIiwi64+Z7JiB7IOBIOqwnOyalCIsIuuniOyduOuTnOuntSIsIuuztOqzoOyEnCIsIu2UjOuemOyLnOy5tOuTnCIsIu2AtOymiCIsIuyduO2PrOq3uOuemO2UvSIsIuuNsOydtO2EsCDtkZwiXS5maWx0ZXIodyA9PiB0LmluY2x1ZGVzKHcpKS5sZW5ndGg7CiAgICAgICAgaWYgKGR1cmF0aW9uICYmIHNvdXJjZVNpZ25hbCAmJiBzdHVkaW9NZW51SGl0cyA8IDUpIHsKICAgICAgICAgIHNjb3JlLnB1c2goe2VsOmN1cixtZW51LHRleHQ6cmF3LGRlcHRoLGxlbjpyYXcubGVuZ3RofSk7CiAgICAgICAgICBicmVhazsKICAgICAgICB9CiAgICAgIH0KICAgIH0KICAgIGlmIChzY29yZS5sZW5ndGgpIHJldHVybiBzY29yZS5zb3J0KChhLGIpPT5hLmxlbi1iLmxlbiB8fCBhLmRlcHRoLWIuZGVwdGgpWzBdLmVsOwogICAgbGV0IGN1ciA9IHJlYWR5Tm9kZSBpbnN0YW5jZW9mIEhUTUxFbGVtZW50ID8gcmVhZHlOb2RlIDogbnVsbDsKICAgIGZvciAobGV0IGRlcHRoPTA7IGRlcHRoPDEyICYmIGN1cjsgZGVwdGgrKywgY3VyPWN1ci5wYXJlbnRFbGVtZW50KSB7CiAgICAgIGNvbnN0IHJhdz0oY3VyLmlubmVyVGV4dCB8fCBjdXIudGV4dENvbnRlbnQgfHwgIiIpLnRyaW0oKTsKICAgICAgY29uc3QgdD1ub3JtKHJhdyk7CiAgICAgIGlmICgvXGJcZHsxLDJ9OlxkezJ9XGIvLnRlc3QodCkgJiYgL+yGjOyKpFxzKlxkK+qwnHxzb3VyY2VzP1xzKlxkK3zrlKUg64uk7J2067iMfGRlZXAgZGl2ZS8udGVzdCh0KSkgcmV0dXJuIGN1cjsKICAgIH0KICAgIHJldHVybiBudWxsOwogIH0KCg=='
+          payload='ICBmdW5jdGlvbiBhdWRpb0FydGlmYWN0Q2FyZFJvb3QocmVhZHlOb2RlKSB7CiAgICBjb25zdCBjYW5kaWRhdGVzID0gW107CiAgICBjb25zdCBtZW51cyA9IGRlZXBRdWVyeUFsbCgiYnV0dG9uLFtyb2xlPSdidXR0b24nXSxhIikKICAgICAgLmZpbHRlcih2aXNpYmxlKQogICAgICAuZmlsdGVyKGVsID0+IC9tb3JlX3ZlcnR8bW9yZSBvcHRpb25zfG1vcmUgYWN0aW9uc3zrjZTrs7TquLB87Ji17IWYfOuplOuJtC8udGVzdChhY3Rpb25MYWJlbChlbCkpKTsKCiAgICBmb3IgKGNvbnN0IG1lbnUgb2YgbWVudXMpIHsKICAgICAgbGV0IGN1ciA9IG1lbnUucGFyZW50RWxlbWVudDsKICAgICAgZm9yIChsZXQgZGVwdGggPSAwOyBkZXB0aCA8IDEyICYmIGN1cjsgZGVwdGgrKywgY3VyID0gY3VyLnBhcmVudEVsZW1lbnQpIHsKICAgICAgICBjb25zdCByYXcgPSAoY3VyLmlubmVyVGV4dCB8fCBjdXIudGV4dENvbnRlbnQgfHwgIiIpLnRyaW0oKTsKICAgICAgICBjb25zdCB0ID0gbm9ybShyYXcpOwogICAgICAgIGlmIChyYXcubGVuZ3RoIDwgNCB8fCByYXcubGVuZ3RoID4gMzAwMCkgY29udGludWU7CgogICAgICAgIGNvbnN0IGJ1dHRvbkxhYmVscyA9IFsuLi5jdXIucXVlcnlTZWxlY3RvckFsbD8uKCJidXR0b24sW3JvbGU9J2J1dHRvbiddLGEiKSB8fCBbXV0KICAgICAgICAgIC5maWx0ZXIodmlzaWJsZSkKICAgICAgICAgIC5tYXAoYWN0aW9uTGFiZWwpCiAgICAgICAgICAuam9pbigiICIpOwogICAgICAgIGNvbnN0IGhhc1BsYXkgPSAvKF58XHMpKHBsYXl87J6s7IOdKShcc3wkKXxwbGF5X2Fycm93fHBhdXNlfOydvOyLnOygleyngC8udGVzdChidXR0b25MYWJlbHMpOwogICAgICAgIGNvbnN0IGR1cmF0aW9uID0gL1xiXGR7MSwyfTpcZHsyfVxiLy50ZXN0KHQpIHx8IC9cYlxkezEsMn06XGR7Mn1cYi8udGVzdChidXR0b25MYWJlbHMpOwogICAgICAgIGNvbnN0IHNvdXJjZVNpZ25hbCA9IC/shozsiqRccypcZCvqsJx8c291cmNlcz9ccypcZCt865SlIOuLpOydtOu4jHxkZWVwIGRpdmUvLnRlc3QodCk7CiAgICAgICAgY29uc3Qgc3R1ZGlvTWVudUhpdHMgPSBbImFpIOyYpOuUlOyYpCDsmKTrsoTrt7AiLCLsiqzrnbzsnbTrk5wg7J6Q66OMIiwi64+Z7JiB7IOBIOqwnOyalCIsIuuniOyduOuTnOuntSIsIuuztOqzoOyEnCIsIu2UjOuemOyLnOy5tOuTnCIsIu2AtOymiCIsIuyduO2PrOq3uOuemO2UvSIsIuuNsOydtO2EsCDtkZwiXQogICAgICAgICAgLmZpbHRlcih3ID0+IHQuaW5jbHVkZXModykpLmxlbmd0aDsKCiAgICAgICAgaWYgKGhhc1BsYXkgJiYgc3R1ZGlvTWVudUhpdHMgPCA1KSB7CiAgICAgICAgICBjb25zdCBzY29yZSA9IChkdXJhdGlvbiA/IDQgOiAwKSArIChzb3VyY2VTaWduYWwgPyAzIDogMCkgKyBNYXRoLm1heCgwLCAzIC0gZGVwdGgpOwogICAgICAgICAgY2FuZGlkYXRlcy5wdXNoKHtlbDpjdXIsIHNjb3JlLCBsZW46cmF3Lmxlbmd0aCwgZGVwdGgsIHRleHQ6cmF3fSk7CiAgICAgICAgICBicmVhazsKICAgICAgICB9CiAgICAgIH0KICAgIH0KCiAgICBpZiAoY2FuZGlkYXRlcy5sZW5ndGgpIHsKICAgICAgcmV0dXJuIGNhbmRpZGF0ZXMuc29ydCgoYSxiKSA9PiBiLnNjb3JlIC0gYS5zY29yZSB8fCBhLmxlbiAtIGIubGVuIHx8IGEuZGVwdGggLSBiLmRlcHRoKVswXS5lbDsKICAgIH0KCiAgICBsZXQgY3VyID0gcmVhZHlOb2RlIGluc3RhbmNlb2YgSFRNTEVsZW1lbnQgPyByZWFkeU5vZGUgOiBudWxsOwogICAgZm9yIChsZXQgZGVwdGggPSAwOyBkZXB0aCA8IDEyICYmIGN1cjsgZGVwdGgrKywgY3VyID0gY3VyLnBhcmVudEVsZW1lbnQpIHsKICAgICAgY29uc3QgcmF3ID0gKGN1ci5pbm5lclRleHQgfHwgY3VyLnRleHRDb250ZW50IHx8ICIiKS50cmltKCk7CiAgICAgIGNvbnN0IGxhYmVscyA9IFsuLi5jdXIucXVlcnlTZWxlY3RvckFsbD8uKCJidXR0b24sW3JvbGU9J2J1dHRvbiddLGEiKSB8fCBbXV0KICAgICAgICAuZmlsdGVyKHZpc2libGUpCiAgICAgICAgLm1hcChhY3Rpb25MYWJlbCkKICAgICAgICAuam9pbigiICIpOwogICAgICBpZiAoLyhefFxzKShwbGF5fOyerOyDnSkoXHN8JCl8cGxheV9hcnJvd3xwYXVzZXzsnbzsi5zsoJXsp4AvLnRlc3QobGFiZWxzKSAmJiBhcnRpZmFjdE1lbnVCdXR0b25XaXRoaW4oY3VyKSkgcmV0dXJuIGN1cjsKICAgIH0KICAgIHJldHVybiBudWxsOwogIH0KCg=='
           new=base64.b64decode(payload).decode('utf-8')
           s=s[:start]+new+s[end:]
           p.write_text(s,encoding='utf-8')
           mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m=json.loads(mpath.read_text(encoding='utf-8'))
-          m['version']='0.2.47'
-          m['description']='D50 finds the real Audio artifact card by walking upward from each visible menu button and matching duration plus source/deep-dive evidence. Preserves Drive mirror routing.'
+          m['version']='0.2.48'
+          m['description']='D51 finds the real Audio artifact card from its menu ancestry using Play/Pause controls first, with duration/source as supporting evidence. Preserves actual file Drive mirror.'
           mpath.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'fix: find NotebookLM audio card from menu ancestry'
+          git commit -m 'fix: identify NotebookLM audio card by play control'
           git push
           RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
@@ -49,10 +49,10 @@ jobs:
           rsha,msha,commit=sys.argv[1:4]
           p=Path('runtime/stable/release.json')
           d=json.loads(p.read_text(encoding='utf-8'))
-          d['actionId']='APPLY_NOTEBOOKLM_0.2.47_D50_AUDIO_MENU_ANCESTRY_20260826'
-          d['version']='0.2.47'
-          d['releasedAt']='2026-08-26T22:24:00+09:00'
-          d['description']='D50 resolves the real Audio card from its menu-button ancestry and retains D49 mirror routing.'
+          d['actionId']='APPLY_NOTEBOOKLM_0.2.48_D51_AUDIO_PLAY_ANCESTRY_20260826'
+          d['version']='0.2.48'
+          d['releasedAt']='2026-08-26T23:02:00+09:00'
+          d['description']='D51 resolves Audio card from Play/Pause + menu ancestry and retains actual-file Drive mirror.'
           d['sourceCommit']=commit
           for f in d['files']:
               if f['path']=='manifest.json': f['gitBlobSha1']=msha
@@ -60,5 +60,5 @@ jobs:
           p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.47'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.48'
           git push
