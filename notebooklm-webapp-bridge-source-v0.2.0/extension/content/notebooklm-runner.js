@@ -650,6 +650,39 @@
     };
   }
 
+  function dataTableEvidence() {
+    for (const el of deepQueryAll("table,[role=table],[role=grid]").filter(visible)) {
+      const t = (el.innerText || el.textContent || "").trim();
+      if (t.length > 20) return t;
+    }
+    const nodes = deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);
+    for (const el of nodes) {
+      const t = (el.innerText || el.textContent || "").trim();
+      const n = norm(t);
+      if ((n.includes("데이터 표") || n.includes("data table")) && t.length > 60 && !/생성 중|generating|만드는 중/.test(n)) return t;
+    }
+    return null;
+  }
+
+  async function runDataTable(task) {
+    const source = await addSource(task);
+    const sourceFallback = !source.ok && Boolean(task.sourceText);
+    const studio = findDeepControl(["studio","스튜디오"]);
+    if (studio) { try { studio.click(); } catch {} await sleep(1200); }
+    const before = dataTableEvidence();
+    const control = await waitFor(() => findDeepControl(["데이터 표","data table","데이터 테이블"]), 30000, 500);
+    if (!control) throw new Error(`DATA_TABLE_CONTROL_NOT_FOUND: ${location.href}`);
+    try { control.click(); } catch {}
+    await sleep(1000);
+    let generate = null;
+    for (const d of dialogs()) { generate = findButton(["생성","만들기","generate","create"], d); if (generate) break; }
+    if (generate) { try { generate.click(); } catch {} }
+    const timeoutMs = Math.max(90000, Number(task.timeoutSeconds || 180) * 1000);
+    const ready = await waitFor(() => { const x = dataTableEvidence(); return x && x !== before ? x : null; }, timeoutMs, 1500);
+    if (!ready) throw new Error("DATA_TABLE_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND");
+    return { resultText:ready, resultUrls:[location.href], captureMode:"DATA_TABLE_READY", notebookUrl:location.href, pageTitle:document.title, capturedAt:new Date().toISOString(), status:"DONE", taskId:task.taskId, contentId:task.contentId || "", taskType:task.taskType || "DATA_TABLE", source:{...source, existingNotebookFallback:sourceFallback} };
+  }
+
   async function runTask(task) {
     if (!HOSTS.has(location.hostname)) throw new Error("NotebookLM 페이지가 아닙니다.");
     if (!task?.taskId) throw new Error("TASK_ID가 없습니다.");
@@ -660,6 +693,8 @@
     if (["VIDEO","VIDEO_OVERVIEW","NOTEBOOKLM_VIDEO"].includes(normalizedTaskType)) return runVideoOverview(task);
 
     if (["REPORT","NOTEBOOKLM_REPORT","NOTEBOOKLM_REPORT_PDF"].includes(normalizedTaskType)) return runReport(task);
+
+    if (["DATA_TABLE","NOTEBOOKLM_DATA_TABLE"].includes(normalizedTaskType)) return runDataTable(task);
 
     const source = await addSource(task);
     const editor = await ensureChatSurface();
