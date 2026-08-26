@@ -3,19 +3,19 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.48_D51_AUDIO_PLAY_ANCESTRY_20260826",
-  "version": "0.2.48",
-  "releasedAt": "2026-08-26T23:02:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.49_D52_SERIAL_ARTIFACT_MIRROR_20260826",
+  "version": "0.2.49",
+  "releasedAt": "2026-08-26T23:12:00+09:00",
   "requiresUserApproval": false,
-  "description": "D51 resolves Audio card from Play/Pause + menu ancestry and retains actual-file Drive mirror.",
-  "sourceCommit": "2c1b6a4854142ec21dcb22186a8e15ca88a26746",
+  "description": "D52 removes competing mirror message responses by routing through one background listener.",
+  "sourceCommit": "cb9aac1e7abecb82fc72d66eaf4b38578b98d334",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "6d44e200b2ae132e30c5fd3621dabcab22cf8c6d"
+      "gitBlobSha1": "c0818cec7695a8585351171f9be01e3f1ecd1296"
     },
     {
       "path": "worker.js",
@@ -35,7 +35,7 @@
     },
     {
       "path": "background.js",
-      "gitBlobSha1": "4972cb3fc0de321c3208fe4a0a84af9353fdb23a"
+      "gitBlobSha1": "7cb65a9ede25e673946201bd6c0865574bbc51ca"
     },
     {
       "path": "local-powershell-runner.js",
@@ -59,7 +59,7 @@
     },
     {
       "path": "artifact-drive-mirror.js",
-      "gitBlobSha1": "1ebbb6f99d2cf22e17e8e62fae503cab01bf1011"
+      "gitBlobSha1": "212319a98e01fb6c7a6b145ab893e21ebee9e95b"
     }
   ]
 }
