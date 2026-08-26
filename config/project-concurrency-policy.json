@@ -1,34 +1,44 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "updatedAt": "2026-08-26T15:18:00+09:00",
   "policy": {
+    "singleCommandFanout": true,
     "allowParallelAcrossProjects": true,
     "allowParallelWithinProjectAcrossOutputTypes": true,
-    "maxActivePerProjectOutputType": 1,
-    "sameProjectSameOutputTypeWhenActive": "QUEUE_WAIT",
-    "sameProjectDifferentOutputTypeWhenCapacityAvailable": "DISPATCH_NOW",
+    "allowMultipleConfiguredVariantsPerOutputType": true,
+    "maxActivePerProjectOutputVariant": 1,
+    "sameProjectSameOutputVariantWhenActive": "QUEUE_WAIT",
+    "sameProjectDifferentOutputVariantWhenCapacityAvailable": "DISPATCH_NOW",
     "activeStates": ["CLAIMED", "STARTED", "RUNNING", "PROGRESSING"],
     "startAckDeadlineSeconds": 60,
     "longRunningTimeoutMode": "MEDIA_LENGTH_AWARE",
     "doNotUseGlobalSerialLock": true,
     "sharedResourceSerialization": true
   },
-  "outputTypes": ["AUDIO", "VIDEO", "REPORT_PDF", "MIND_MAP", "TEXT", "IMAGE"],
-  "projectKeyPriority": [
-    "source.repo",
-    "projectId",
-    "appId",
-    "contentProject",
-    "workflowProject"
-  ],
+  "commandModel": {
+    "parentCommand": "ONE_PROJECT_MULTI_OUTPUT",
+    "fanoutKey": ["projectId", "outputType", "variantId"],
+    "childOutputs": ["AUDIO", "VIDEO", "REPORT_PDF", "MIND_MAP", "TEXT", "IMAGE", "FLOW_SCENE", "FLOW_VARIANT"],
+    "requiredChecksPerChild": ["CLAIMED", "START_ACK", "PROGRESS", "RESULT_SAVED", "RESULT_READBACK"],
+    "parentCompleteOnlyWhen": "ALL_REQUIRED_CHILDREN_TERMINAL_AND_READBACK_VERIFIED"
+  },
+  "variantExamples": {
+    "AUDIO": ["language", "format", "length", "persona", "focusPrompt"],
+    "VIDEO": ["language", "style", "length", "focusPrompt", "visualFormat"],
+    "REPORT_PDF": ["reportType", "audience", "depth", "focusPrompt"],
+    "FLOW_SCENE": ["prompt", "ingredients", "startFrame", "endFrame", "extend", "sceneOrder", "style"],
+    "FLOW_VARIANT": ["camera", "motion", "lighting", "character", "object", "styleReference"]
+  },
   "rules": [
-    "Different project keys may run in parallel on the same Host.",
-    "Within one NotebookLM project, different output types may be dispatched in parallel when they do not share a conflicting resource.",
-    "At most one active task per project plus outputType key by default.",
-    "Same-project duplicate tasks of the same output type must wait until the earlier task is terminal.",
-    "A claimed task must show START/RUNNING evidence within 60 seconds or enter immediate handoff diagnosis.",
-    "Audio/video jobs are not declared stale by a fixed 10-minute rule after START; use media-duration-aware time budgets and file-progress evidence.",
-    "If tasks compete for the same dedicated Chrome tab/session, GPU renderer, download target, or output filename, serialize only that shared resource instead of the whole project."
+    "One high-level command may fan out into multiple checked outputs inside the same project.",
+    "Each requested output is represented as a child checklist item rather than a separate user command.",
+    "Different output types and configured variants may run in parallel when they do not share a conflicting resource.",
+    "At most one active task per project + outputType + variantId key by default.",
+    "Parent command is not complete until every required child has a verified saved result or an explicit terminal failure/hold with evidence.",
+    "A claimed child must show START/RUNNING evidence within 60 seconds or enter immediate handoff diagnosis.",
+    "Audio/video jobs use media-duration-aware budgets and file-progress evidence after START.",
+    "If tasks compete for the same dedicated Chrome tab/session, GPU renderer, download target, or output filename, serialize only that shared resource instead of the whole project.",
+    "NotebookLM Studio outputs and Flow scene/variant generation are treated as fanout children under the same parent command when they belong to one content project."
   ],
-  "evidenceNote": "Google documents Studio as supporting multiple outputs in one notebook and multitasking, but does not explicitly document backend simultaneous generation guarantees for every output pair. This policy therefore allows cross-output parallel dispatch while verifying actual START/progress per output and serializing only observed shared-resource conflicts."
+  "evidenceNote": "NotebookLM officially supports background Audio Overview generation while other artifacts are generated, multiple outputs of the same type in one notebook, and Studio multitasking. Flow supports controlled scene generation using Ingredients, Frames, Extend and SceneBuilder-style workflows. Backend simultaneous guarantees can vary, so actual START/progress/readback evidence remains authoritative."
 }
