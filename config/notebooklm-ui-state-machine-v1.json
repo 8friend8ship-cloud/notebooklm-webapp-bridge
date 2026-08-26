@@ -1,0 +1,138 @@
+{
+  "version": "1.0.0",
+  "purpose": "Canonical NotebookLM/Gemini Notebook UI routing, selection order, settings entry, and completion verification for Bridge/PowerShell automation.",
+  "locale": "ko-KR",
+  "globalSequence": [
+    "NOTEBOOK_OPEN",
+    "NOTEBOOK_IDENTITY_CHECK",
+    "SOURCE_STATE_CHECK",
+    "TARGET_MODE_ROUTE",
+    "TARGET_CONTROL_VISIBLE_CHECK",
+    "CUSTOMIZE_IF_SUPPORTED",
+    "GENERATE_OR_SUBMIT",
+    "GENERATION_PROGRESS_CHECK",
+    "OUTPUT_TYPE_SPECIFIC_READY_CHECK",
+    "PURPOSE_FIT_CHECK",
+    "RESULT_SAVE",
+    "RESULT_READBACK",
+    "LESSON_CHECK"
+  ],
+  "tabs": {
+    "SOURCE": ["출처", "소스", "Sources"],
+    "CHAT": ["채팅", "Chat"],
+    "STUDIO": ["스튜디오", "Studio"]
+  },
+  "studioOutputLabels": {
+    "NOTEBOOKLM_AUDIO": ["AI 오디오 오버뷰", "오디오 오버뷰", "Audio Overview"],
+    "NOTEBOOKLM_SLIDES": ["슬라이드 자료", "Slide Deck", "Slides"],
+    "NOTEBOOKLM_VIDEO": ["동영상 개요", "Video Overview"],
+    "NOTEBOOKLM_MIND_MAP": ["마인드맵", "Mind Map"],
+    "NOTEBOOKLM_REPORT": ["보고서", "Report"],
+    "NOTEBOOKLM_FLASHCARDS": ["플래시카드", "Flashcards"],
+    "NOTEBOOKLM_QUIZ": ["퀴즈", "Quiz"],
+    "NOTEBOOKLM_INFOGRAPHIC": ["인포그래픽", "Infographic"],
+    "NOTEBOOKLM_DATA_TABLE": ["데이터 표", "Data Table"]
+  },
+  "sourcePolicy": {
+    "checkSourceCountBeforeGenerate": true,
+    "preferExplicitCurrentTaskSource": true,
+    "allowExistingNotebookFallback": true,
+    "fallbackRequiresNotebookPurposeMatch": true,
+    "neverTreatSourceAddFailureAsOutputSuccess": true
+  },
+  "audioOverview": {
+    "route": [
+      "NOTEBOOK_OPEN",
+      "SOURCE_STATE_CHECK",
+      "STUDIO_TAB_SELECT",
+      "AI_AUDIO_OVERVIEW_CONTROL_SELECT",
+      "CUSTOMIZE_PANEL_CHECK",
+      "FORMAT_SELECT_IF_REQUESTED",
+      "LANGUAGE_SELECT_IF_REQUESTED",
+      "LENGTH_SELECT_IF_SUPPORTED",
+      "FOCUS_PROMPT_FILL_IF_REQUESTED",
+      "GENERATE",
+      "WAIT_BACKGROUND_GENERATION",
+      "NEW_AUDIO_ITEM_CHECK",
+      "PLAY_CONTROL_CHECK",
+      "DURATION_CHECK",
+      "TITLE_OR_ITEM_CONTEXT_CHECK",
+      "AUDIO_PLAYER_READY",
+      "RESULT_SAVE_READBACK"
+    ],
+    "settings": {
+      "format": {
+        "default": "DEEP_DIVE",
+        "knownValues": ["DEEP_DIVE", "BRIEF", "CRITIQUE", "DEBATE"]
+      },
+      "language": {
+        "default": "ko-KR"
+      },
+      "length": {
+        "default": "DEFAULT",
+        "knownValues": ["SHORT", "DEFAULT", "LONG"],
+        "availabilityMayVaryByLanguage": true
+      },
+      "focusPrompt": {
+        "optional": true
+      }
+    },
+    "completionEvidence": {
+      "required": [
+        "AUDIO_PLAYER_READY",
+        "PLAY_CONTROL_VISIBLE",
+        "AUDIO_ITEM_VISIBLE"
+      ],
+      "recommended": [
+        "DURATION_VISIBLE",
+        "TITLE_OR_CONTEXT_MATCH"
+      ],
+      "forbiddenFalsePositiveModes": [
+        "SMALLEST_NEW_RESULT",
+        "CHAT_TEXT_ONLY",
+        "SOURCE_COUNT_TEXT_ONLY"
+      ]
+    }
+  },
+  "chat": {
+    "route": [
+      "NOTEBOOK_OPEN",
+      "SOURCE_STATE_CHECK",
+      "CHAT_TAB_SELECT",
+      "CURRENT_TASK_SOURCE_LOCK",
+      "PROMPT_FILL",
+      "SUBMIT",
+      "NEW_ASSISTANT_RESULT_CHECK",
+      "PURPOSE_FIT_CHECK",
+      "RESULT_SAVE_READBACK"
+    ],
+    "currentTaskSourceLockRequired": true
+  },
+  "stateFields": [
+    "CURRENT_TAB",
+    "NOTEBOOK_TITLE",
+    "SOURCE_COUNT",
+    "SOURCE_SELECTION_STATE",
+    "STUDIO_VISIBLE",
+    "AVAILABLE_OUTPUT_TYPES",
+    "SELECTED_OUTPUT_TYPE",
+    "CUSTOMIZE_AVAILABLE",
+    "GENERATE_AVAILABLE",
+    "GENERATION_STATE",
+    "NEW_RESULT_DETECTED",
+    "PLAY_BUTTON_VISIBLE",
+    "DURATION_VISIBLE",
+    "TITLE_MATCH",
+    "RESULT_TYPE_MATCH",
+    "CAPTURE_MODE",
+    "RESULT_SAVED",
+    "RESULT_READBACK"
+  ],
+  "failureRouting": {
+    "controlMissing": "UI_LABEL_OR_STATE_DRIFT",
+    "sourceMismatch": "SOURCE_CONTEXT_HOLD",
+    "claimedNoStarted60s": "DIAGNOSTIC_HOLD",
+    "falseDone": "PURPOSE_FIT_FAIL",
+    "retryPolicy": "ROOT_CAUSE_THEN_SAME_FIXTURE_RETEST"
+  }
+}
