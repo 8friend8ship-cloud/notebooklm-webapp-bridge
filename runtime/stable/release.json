@@ -3,19 +3,19 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.47_D50_AUDIO_MENU_ANCESTRY_20260826",
-  "version": "0.2.47",
-  "releasedAt": "2026-08-26T22:24:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.48_D51_AUDIO_PLAY_ANCESTRY_20260826",
+  "version": "0.2.48",
+  "releasedAt": "2026-08-26T23:02:00+09:00",
   "requiresUserApproval": false,
-  "description": "D50 resolves the real Audio card from its menu-button ancestry and retains D49 mirror routing.",
-  "sourceCommit": "15bab13383bffe513f3a55664a83c8b870d03d44",
+  "description": "D51 resolves Audio card from Play/Pause + menu ancestry and retains actual-file Drive mirror.",
+  "sourceCommit": "2c1b6a4854142ec21dcb22186a8e15ca88a26746",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "903e820ab4a1c0df3ad43c8deec919a222082d3f"
+      "gitBlobSha1": "6d44e200b2ae132e30c5fd3621dabcab22cf8c6d"
     },
     {
       "path": "worker.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "5440fa5f3cfce903197a062afae5e52ada081180"
+      "gitBlobSha1": "ca533d4c61631d49fec886003618ae61fb60c525"
     },
     {
       "path": "artifact-drive-mirror.js",
