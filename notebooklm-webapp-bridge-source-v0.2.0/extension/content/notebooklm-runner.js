@@ -585,7 +585,10 @@
       const t = (el.innerText || el.textContent || "").trim();
       const n = norm(t);
       if (!t || t.length > 12000 || seen.has(t)) continue;
-      if (/보고서|report|브리핑 문서|briefing document|학습 가이드|study guide|faq|자주 묻는 질문/.test(n)) {
+      const reportLabel = /보고서|report|브리핑 문서|briefing document|briefing doc|학습 가이드|study guide|faq|자주 묻는 질문/.test(n);
+      const reportArtifactSignal = /소스\s*\d+개|sources?\s*\d+|읽지 않음|unread|more_vert|다운로드|download|briefing doc/.test(n);
+      const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => n.includes(w)).length;
+      if (reportLabel && reportArtifactSignal && studioMenuHits < 5) {
         seen.add(t); out.push(t);
       }
     }
@@ -597,7 +600,7 @@
     const fresh = current.filter(t => !baseline.has(t));
     return fresh.find(t => {
       const n = norm(t);
-      return t.length > 40 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);
+      return t.length > 20 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);
     }) || null;
   }
 

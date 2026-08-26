@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.42",
-  "description": "D45 clears stale auto-poll busy state when no task is actually running. Preserves D44 artifact guards. No new permissions.",
+  "version": "0.2.43",
+  "description": "D46 detects real report artifact cards and preserves strict Studio UI serialization. Includes D44/D45 guards. No new permissions.",
   "permissions": [
     "alarms",
     "identity",
