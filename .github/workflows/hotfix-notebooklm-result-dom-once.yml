@@ -15,49 +15,66 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Clear stale poll busy state and publish stable 0.2.42
+      - name: Harden report cards and Studio serialization, publish stable 0.2.43
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           import json
-          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/background.js')
-          s=p.read_text(encoding='utf-8')
-          old='''  const state = await getAutoState();\n  if (Number(state.busyUntil || 0) > Date.now()) {\n    return { ok: true, skipped: "busy", runningTaskId: state.runningTaskId || "" };\n  }\n'''
-          new='''  const state = await getAutoState();\n  if (Number(state.busyUntil || 0) > Date.now() && state.runningTaskId) {\n    return { ok: true, skipped: "busy", runningTaskId: state.runningTaskId || "" };\n  }\n  if (Number(state.busyUntil || 0) > Date.now() && !state.runningTaskId) {\n    await saveAutoState({ busyUntil: 0, lastError: "STALE_BUSY_CLEARED_D45" });\n  }\n'''
-          if old not in s: raise SystemExit('busy-state target missing')
+
+          runner=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          s=runner.read_text(encoding='utf-8')
+          old='''      if (/보고서|report|브리핑 문서|briefing document|학습 가이드|study guide|faq|자주 묻는 질문/.test(n)) {\n        seen.add(t); out.push(t);\n      }'''
+          new='''      const reportLabel = /보고서|report|브리핑 문서|briefing document|briefing doc|학습 가이드|study guide|faq|자주 묻는 질문/.test(n);\n      const reportArtifactSignal = /소스\\s*\\d+개|sources?\\s*\\d+|읽지 않음|unread|more_vert|다운로드|download|briefing doc/.test(n);\n      const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => n.includes(w)).length;\n      if (reportLabel && reportArtifactSignal && studioMenuHits < 5) {\n        seen.add(t); out.push(t);\n      }'''
+          if old not in s: raise SystemExit('report candidate target missing')
           s=s.replace(old,new,1)
-          p.write_text(s,encoding='utf-8')
+          old2='return t.length > 40 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);'
+          new2='return t.length > 20 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);'
+          if old2 not in s: raise SystemExit('report ready target missing')
+          s=s.replace(old2,new2,1)
+          runner.write_text(s,encoding='utf-8')
+
+          cfg=Path('config/notebooklm-flow-command-template-v1.json')
+          d=json.loads(cfg.read_text(encoding='utf-8'))
+          d['version']='1.1.1'
+          d.setdefault('projectTemplate',{})['studioInteractionPolicy']='SERIALIZE_SAME_NOTEBOOK_STUDIO_UI_CLICKS'
+          rule='Same Notebook Studio UI interactions are always serialized; only background generation/monitoring may overlap after the UI interaction has safely released.'
+          if rule not in d.setdefault('fanoutRules',[]): d['fanoutRules'].append(rule)
+          d.setdefault('centralAgentBehavior',{})['onNotebookStudio']='SERIALIZE_UI_INTERACTION_THEN_RELEASE_BACKGROUND_SAFE_TASKS'
+          cfg.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+
           mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m=json.loads(mpath.read_text(encoding='utf-8'))
-          m['version']='0.2.42'
-          m['description']='D45 clears stale auto-poll busy state when no task is actually running. Preserves D44 artifact guards. No new permissions.'
+          m['version']='0.2.43'
+          m['description']='D46 detects real report artifact cards and preserves strict Studio UI serialization. Includes D44/D45 guards. No new permissions.'
           mpath.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add notebooklm-webapp-bridge-source-v0.2.0/extension/background.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'fix: clear stale NotebookLM poll busy state'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json config/notebooklm-flow-command-template-v1.json
+          git commit -m 'fix: detect report artifact cards and serialize Studio UI'
           git push
-          BG_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/background.js)
+
+          RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
           SOURCE_COMMIT=$(git rev-parse HEAD)
-          python - "$BG_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
+          python - "$RUNNER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
           from pathlib import Path
           import json,sys
-          bgsha,msha,commit=sys.argv[1:4]
+          rsha,msha,commit=sys.argv[1:4]
           p=Path('runtime/stable/release.json')
           d=json.loads(p.read_text(encoding='utf-8'))
-          d['actionId']='APPLY_NOTEBOOKLM_0.2.42_D45_STALE_BUSY_CLEAR_20260826'
-          d['version']='0.2.42'
-          d['releasedAt']='2026-08-26T21:10:00+09:00'
-          d['description']='D45 clears stale auto-poll busy state when runningTaskId is empty.'
+          d['actionId']='APPLY_NOTEBOOKLM_0.2.43_D46_REPORT_SERIAL_STUDIO_20260826'
+          d['version']='0.2.43'
+          d['releasedAt']='2026-08-26T21:12:00+09:00'
+          d['description']='D46 detects real Report/Briefing Doc artifact cards and serializes same-Notebook Studio UI interactions.'
           d['sourceCommit']=commit
           for f in d['files']:
               if f['path']=='manifest.json': f['gitBlobSha1']=msha
-              if f['path']=='background.js': f['gitBlobSha1']=bgsha
+              if f['path']=='content/notebooklm-runner.js': f['gitBlobSha1']=rsha
           p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.42'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.43'
           git push
