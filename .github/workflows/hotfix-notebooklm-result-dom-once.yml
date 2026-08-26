@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Patch Report state machine and publish stable 0.2.37
+      - name: Patch Data Table state machine and publish stable 0.2.38
         shell: bash
         run: |
           python - <<'PY'
@@ -24,56 +24,50 @@ jobs:
 
           runner = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
           text = runner.read_text(encoding='utf-8')
-          if 'async function runReport(task)' in text:
-              raise SystemExit('report patch already present')
+          if 'async function runDataTable(task)' in text:
+              raise SystemExit('data table patch already present')
 
           anchor = '  async function runTask(task) {\n'
-          if anchor not in text:
-              raise SystemExit('runTask anchor missing')
-
-          report_code = '''  function reportCandidates() {\n    const out = [];\n    const seen = new Set();\n    for (const el of deepQueryAll("section,article,div,[role=group],[role=region],button,[role=button]").filter(visible)) {\n      const t = (el.innerText || el.textContent || "").trim();\n      const n = norm(t);\n      if (!t || t.length > 12000 || seen.has(t)) continue;\n      if (/보고서|report|브리핑 문서|briefing document|학습 가이드|study guide|faq|자주 묻는 질문/.test(n)) {\n        seen.add(t); out.push(t);\n      }\n    }\n    return out;\n  }\n\n  function reportReady(baseline) {\n    const current = reportCandidates();\n    const fresh = current.filter(t => !baseline.has(t));\n    return fresh.find(t => {\n      const n = norm(t);\n      return t.length > 40 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);\n    }) || null;\n  }\n\n  async function runReport(task) {\n    const source = await addSource(task);\n    const sourceFallback = !source.ok && Boolean(task.sourceText);\n\n    const studio = findDeepControl(["studio","스튜디오"]);\n    if (studio) { try { studio.click(); } catch {} await sleep(1200); }\n\n    const baseline = new Set(reportCandidates());\n    const reportControl = await waitFor(() => findDeepControl(["보고서","reports","report"]), 30000, 500);\n    if (!reportControl) throw new Error(`REPORT_CONTROL_NOT_FOUND: ${location.href}`);\n    try { reportControl.click(); } catch {}\n    await sleep(1000);\n\n    let typeControl = null;\n    for (const d of dialogs()) {\n      typeControl = findButton(["브리핑 문서","briefing document","브리핑","briefing"], d);\n      if (typeControl) break;\n    }\n    if (!typeControl) typeControl = findDeepControl(["브리핑 문서","briefing document","브리핑","briefing"]);\n    if (typeControl) { try { typeControl.click(); } catch {} await sleep(900); }\n\n    let generate = null;\n    for (const d of dialogs()) {\n      generate = findButton(["생성","만들기","generate","create"], d);\n      if (generate) break;\n    }\n    if (!generate) generate = findDeepControl(["생성","만들기","generate","create"]);\n    if (generate) { try { generate.click(); } catch {} await sleep(1000); }\n\n    const timeoutMs = Math.max(120000, Number(task.timeoutSeconds || 300) * 1000);\n    const ready = await waitFor(() => reportReady(baseline), timeoutMs, 1800);\n    if (!ready) throw new Error("REPORT_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND");\n\n    return {\n      resultText:ready,\n      resultUrls:[location.href],\n      captureMode:"REPORT_RESULT_READY",\n      reportType:"BRIEFING_DOCUMENT",\n      notebookUrl:location.href,\n      pageTitle:document.title,\n      capturedAt:new Date().toISOString(),\n      status:"DONE",\n      taskId:task.taskId,\n      contentId:task.contentId || "",\n      taskType:task.taskType || "REPORT",\n      source:{...source, existingNotebookFallback: sourceFallback}\n    };\n  }\n\n'''
-          text = text.replace(anchor, report_code + anchor, 1)
-
-          gate = '    if (["VIDEO","VIDEO_OVERVIEW","NOTEBOOKLM_VIDEO"].includes(normalizedTaskType)) return runVideoOverview(task);\n\n'
-          if gate not in text:
-              raise SystemExit('video task gate missing')
-          text = text.replace(gate, gate + '    if (["REPORT","NOTEBOOKLM_REPORT","NOTEBOOKLM_REPORT_PDF"].includes(normalizedTaskType)) return runReport(task);\n\n', 1)
+          data_code = '''  function dataTableEvidence() {\n    for (const el of deepQueryAll("table,[role=table],[role=grid]").filter(visible)) {\n      const t = (el.innerText || el.textContent || "").trim();\n      if (t.length > 20) return t;\n    }\n    const nodes = deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);\n    for (const el of nodes) {\n      const t = (el.innerText || el.textContent || "").trim();\n      const n = norm(t);\n      if ((n.includes("데이터 표") || n.includes("data table")) && t.length > 60 && !/생성 중|generating|만드는 중/.test(n)) return t;\n    }\n    return null;\n  }\n\n  async function runDataTable(task) {\n    const source = await addSource(task);\n    const sourceFallback = !source.ok && Boolean(task.sourceText);\n    const studio = findDeepControl(["studio","스튜디오"]);\n    if (studio) { try { studio.click(); } catch {} await sleep(1200); }\n    const before = dataTableEvidence();\n    const control = await waitFor(() => findDeepControl(["데이터 표","data table","데이터 테이블"]), 30000, 500);\n    if (!control) throw new Error(`DATA_TABLE_CONTROL_NOT_FOUND: ${location.href}`);\n    try { control.click(); } catch {}\n    await sleep(1000);\n    let generate = null;\n    for (const d of dialogs()) { generate = findButton(["생성","만들기","generate","create"], d); if (generate) break; }\n    if (generate) { try { generate.click(); } catch {} }\n    const timeoutMs = Math.max(90000, Number(task.timeoutSeconds || 180) * 1000);\n    const ready = await waitFor(() => { const x = dataTableEvidence(); return x && x !== before ? x : null; }, timeoutMs, 1500);\n    if (!ready) throw new Error("DATA_TABLE_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND");\n    return { resultText:ready, resultUrls:[location.href], captureMode:"DATA_TABLE_READY", notebookUrl:location.href, pageTitle:document.title, capturedAt:new Date().toISOString(), status:"DONE", taskId:task.taskId, contentId:task.contentId || "", taskType:task.taskType || "DATA_TABLE", source:{...source, existingNotebookFallback:sourceFallback} };\n  }\n\n'''
+          if anchor not in text: raise SystemExit('runTask anchor missing')
+          text = text.replace(anchor, data_code + anchor, 1)
+          gate = '    if (["REPORT","NOTEBOOKLM_REPORT","NOTEBOOKLM_REPORT_PDF"].includes(normalizedTaskType)) return runReport(task);\n\n'
+          if gate not in text: raise SystemExit('report gate missing')
+          text = text.replace(gate, gate + '    if (["DATA_TABLE","NOTEBOOKLM_DATA_TABLE"].includes(normalizedTaskType)) return runDataTable(task);\n\n', 1)
           runner.write_text(text, encoding='utf-8')
 
           manifest = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m = json.loads(manifest.read_text(encoding='utf-8'))
-          m['version'] = '0.2.37'
-          m['description'] = 'D40 adds NotebookLM/Gemini Notebook Report state-machine generation using the current Studio report flow and briefing-document default. Preserves Audio/Video state machines. No new permissions or approvals.'
+          m['version'] = '0.2.38'
+          m['description'] = 'D41 adds current Studio Data Table generation with actual table/grid evidence before DONE. Preserves Audio, Video, and Report state machines. No new permissions or approvals.'
           manifest.write_text(json.dumps(m, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'feat: add NotebookLM Report state machine'
+          git commit -m 'feat: add NotebookLM Data Table state machine'
           git push
 
           RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
           SOURCE_COMMIT=$(git rev-parse HEAD)
-
           python - "$RUNNER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
           from pathlib import Path
           import json, sys
           runner_sha, manifest_sha, source_commit = sys.argv[1:4]
           p = Path('runtime/stable/release.json')
           d = json.loads(p.read_text(encoding='utf-8'))
-          d['actionId'] = 'APPLY_NOTEBOOKLM_0.2.37_D40_REPORT_STATE_MACHINE_20260826'
-          d['version'] = '0.2.37'
-          d['releasedAt'] = '2026-08-26T19:52:00+09:00'
-          d['description'] = 'D40 adds Studio Report generation with briefing-document default and actual new-report evidence before DONE. Existing approved runtime only.'
+          d['actionId'] = 'APPLY_NOTEBOOKLM_0.2.38_D41_DATA_TABLE_20260826'
+          d['version'] = '0.2.38'
+          d['releasedAt'] = '2026-08-26T19:58:00+09:00'
+          d['description'] = 'D41 adds Studio Data Table generation with actual table/grid evidence before DONE. Existing approved runtime only.'
           d['sourceCommit'] = source_commit
           for f in d['files']:
               if f['path'] == 'manifest.json': f['gitBlobSha1'] = manifest_sha
               if f['path'] == 'content/notebooklm-runner.js': f['gitBlobSha1'] = runner_sha
           p.write_text(json.dumps(d, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
-
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.37'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.38'
           git push
