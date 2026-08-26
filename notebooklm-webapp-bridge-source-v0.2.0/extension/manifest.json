@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.44",
-  "description": "D47 requires real Audio download and Google Drive Desktop mirror before Audio DONE. Uses approved local Host; no new OAuth.",
+  "version": "0.2.45",
+  "description": "D48 targets the real Audio artifact card by duration/source/deep-dive evidence before opening its menu and downloading. Preserves D47 Drive mirror.",
   "permissions": [
     "alarms",
     "identity",

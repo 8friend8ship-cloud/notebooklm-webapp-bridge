@@ -461,41 +461,58 @@
   }
 
   
-  function artifactActionRoot(node) {
-    let cur = node instanceof HTMLElement ? node : null;
-    for (let i=0; i<8 && cur; i++, cur=cur.parentElement) {
-      const t = norm(cur.innerText || cur.textContent || "");
-      const menuCount = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
-      if (menuCount < 5 && /more_vert|play|재생|download|다운로드|share|공유/.test(t)) return cur;
-    }
-    return null;
-  }
-  
   function actionLabel(el) {
     return norm([el?.innerText,el?.textContent,el?.getAttribute?.("aria-label"),el?.getAttribute?.("title"),el?.getAttribute?.("data-testid")].join(" "));
   }
-  
+
+  function artifactMenuButtonWithin(root) {
+    if (!root?.querySelectorAll) return null;
+    return [...root.querySelectorAll("button,[role='button'],a")]
+      .filter(visible)
+      .find(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el))) || null;
+  }
+
+  function audioArtifactCardRoot(readyNode) {
+    let cur = readyNode instanceof HTMLElement ? readyNode : null;
+    for (let i=0; i<10 && cur; i++, cur=cur.parentElement) {
+      const t = norm(cur.innerText || cur.textContent || "");
+      const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
+      if (studioMenuHits < 5 && /\b\d{1,2}:\d{2}\b/.test(t) && /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t) && artifactMenuButtonWithin(cur)) return cur;
+    }
+    const candidates = deepQueryAll("section,article,div,[role='group'],[role='region']")
+      .filter(visible)
+      .map(el => ({el,text:(el.innerText || el.textContent || "").trim()}))
+      .filter(x => x.text.length >= 10 && x.text.length <= 2500)
+      .filter(x => /\b\d{1,2}:\d{2}\b/.test(norm(x.text)))
+      .filter(x => /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(norm(x.text)))
+      .filter(x => ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => norm(x.text).includes(w)).length < 5)
+      .filter(x => artifactMenuButtonWithin(x.el))
+      .sort((a,b) => a.text.length - b.text.length);
+    return candidates[0]?.el || null;
+  }
+
   async function requestNotebookArtifactDownload(readyNode) {
     const startedAtEpochMs = Date.now();
-    const root = artifactActionRoot(readyNode) || readyNode?.parentElement || document;
-    const localButtons = [...(root.querySelectorAll?.("button,[role='button'],a") || [])].filter(visible);
+    const root = audioArtifactCardRoot(readyNode);
+    if (!root) return {requested:false, reason:"real audio artifact card not found", startedAtEpochMs};
+    const localButtons = [...root.querySelectorAll("button,[role='button'],a")].filter(visible);
     const direct = localButtons.find(el => /(^|\s)(download|다운로드)(\s|$)/.test(actionLabel(el)));
     if (direct) {
       try { direct.click(); } catch {}
       await sleep(1200);
-      return {requested:true, method:"DIRECT", startedAtEpochMs};
+      return {requested:true, method:"DIRECT", startedAtEpochMs, cardText:(root.innerText || root.textContent || "").trim().slice(0,500)};
     }
-    const menu = localButtons.find(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
-    if (!menu) return {requested:false, reason:"artifact menu/download control not found", startedAtEpochMs};
+    const menu = artifactMenuButtonWithin(root);
+    if (!menu) return {requested:false, reason:"real audio card menu not found", startedAtEpochMs};
     try { menu.click(); } catch {}
     await sleep(700);
     const download = await waitFor(() => findDeepControl(["다운로드","download"]), 8000, 250);
-    if (!download) return {requested:false, reason:"download action not found after menu", startedAtEpochMs};
+    if (!download) return {requested:false, reason:"download action not found after real audio card menu", startedAtEpochMs};
     try { download.click(); } catch {}
     await sleep(1200);
-    return {requested:true, method:"MENU_DOWNLOAD", startedAtEpochMs};
+    return {requested:true, method:"MENU_DOWNLOAD", startedAtEpochMs, cardText:(root.innerText || root.textContent || "").trim().slice(0,500)};
   }
-  
+
   async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {
     try {
       return await chrome.runtime.sendMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE",taskId:task.taskId,artifactType,startedAtEpochMs});
