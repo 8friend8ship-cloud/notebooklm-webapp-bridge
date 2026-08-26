@@ -14,6 +14,9 @@ $Actual=(GitBlobSha1 $Source).ToLowerInvariant();if($Actual -ne $Expected){throw
 $Code=Get-Content -LiteralPath $Source -Raw -Encoding UTF8
 $OldVersion="`$HostVersion='1.2.0'";$NewVersion="`$HostVersion='1.2.2'";if(-not $Code.Contains($OldVersion)){throw 'HOST_VERSION_PATCH_TARGET_MISSING'};$Code=$Code.Replace($OldVersion,$NewVersion)
 $AllowOld="'tools/Run-VideoFrameQA.ps1')";$AllowNew="'tools/Run-VideoFrameQA.ps1','tools/Run-AgentDashboardPromoProductionE2E.ps1')";if($Code.Contains($AllowOld)){$Code=$Code.Replace($AllowOld,$AllowNew)}
+$NotebookAllowOld="scripts=@('local-agent/governor/RunChromeGovernorReadback.ps1')"
+$NotebookAllowNew="scripts=@('local-agent/governor/RunChromeGovernorReadback.ps1','local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1')"
+if(-not $Code.Contains($NotebookAllowOld)){throw 'HOST_NOTEBOOK_ALLOWLIST_PATCH_TARGET_MISSING'};$Code=$Code.Replace($NotebookAllowOld,$NotebookAllowNew)
 $DownloadOld='Invoke-WebRequest -UseBasicParsing -Uri $rawUrl -OutFile $localScript -TimeoutSec 60'
 $DownloadNew='Invoke-WebRequest -UseBasicParsing -Uri ($rawUrl+''?hdcb=''+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -OutFile $localScript -TimeoutSec 8'
 if(-not $Code.Contains($DownloadOld)){throw 'HOST_RAW_DOWNLOAD_PATCH_TARGET_MISSING'};$Code=$Code.Replace($DownloadOld,$DownloadNew)
