@@ -15,106 +15,103 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Mirror real Audio artifact to Drive and publish stable 0.2.44
+      - name: Target real Audio artifact card and publish stable 0.2.45
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           import json, textwrap
-          runner=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
-          s=runner.read_text(encoding='utf-8')
-          marker='  async function runAudioOverview(task) {'
-          if marker not in s: raise SystemExit('audio runner marker missing')
-          helper=textwrap.dedent(r'''
-            function artifactActionRoot(node) {
-              let cur = node instanceof HTMLElement ? node : null;
-              for (let i=0; i<8 && cur; i++, cur=cur.parentElement) {
-                const t = norm(cur.innerText || cur.textContent || "");
-                const menuCount = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
-                if (menuCount < 5 && /more_vert|play|재생|download|다운로드|share|공유/.test(t)) return cur;
-              }
-              return null;
-            }
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          s=p.read_text(encoding='utf-8')
+          start=s.index('  function artifactActionRoot(node) {')
+          end=s.index('  async function mirrorNotebookArtifactToDrive', start)
+          replacement=textwrap.indent(textwrap.dedent(r'''
+          function actionLabel(el) {
+            return norm([el?.innerText,el?.textContent,el?.getAttribute?.("aria-label"),el?.getAttribute?.("title"),el?.getAttribute?.("data-testid")].join(" "));
+          }
 
-            function actionLabel(el) {
-              return norm([el?.innerText,el?.textContent,el?.getAttribute?.("aria-label"),el?.getAttribute?.("title"),el?.getAttribute?.("data-testid")].join(" "));
-            }
+          function artifactMenuButtonWithin(root) {
+            if (!root?.querySelectorAll) return null;
+            return [...root.querySelectorAll("button,[role='button'],a")]
+              .filter(visible)
+              .find(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el))) || null;
+          }
 
-            async function requestNotebookArtifactDownload(readyNode) {
-              const startedAtEpochMs = Date.now();
-              const root = artifactActionRoot(readyNode) || readyNode?.parentElement || document;
-              const localButtons = [...(root.querySelectorAll?.("button,[role='button'],a") || [])].filter(visible);
-              const direct = localButtons.find(el => /(^|\s)(download|다운로드)(\s|$)/.test(actionLabel(el)));
-              if (direct) {
-                try { direct.click(); } catch {}
-                await sleep(1200);
-                return {requested:true, method:"DIRECT", startedAtEpochMs};
-              }
-              const menu = localButtons.find(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
-              if (!menu) return {requested:false, reason:"artifact menu/download control not found", startedAtEpochMs};
-              try { menu.click(); } catch {}
-              await sleep(700);
-              const download = await waitFor(() => findDeepControl(["다운로드","download"]), 8000, 250);
-              if (!download) return {requested:false, reason:"download action not found after menu", startedAtEpochMs};
-              try { download.click(); } catch {}
+          function audioArtifactCardRoot(readyNode) {
+            let cur = readyNode instanceof HTMLElement ? readyNode : null;
+            for (let i=0; i<10 && cur; i++, cur=cur.parentElement) {
+              const t = norm(cur.innerText || cur.textContent || "");
+              const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
+              if (studioMenuHits < 5 && /\b\d{1,2}:\d{2}\b/.test(t) && /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t) && artifactMenuButtonWithin(cur)) return cur;
+            }
+            const candidates = deepQueryAll("section,article,div,[role='group'],[role='region']")
+              .filter(visible)
+              .map(el => ({el,text:(el.innerText || el.textContent || "").trim()}))
+              .filter(x => x.text.length >= 10 && x.text.length <= 2500)
+              .filter(x => /\b\d{1,2}:\d{2}\b/.test(norm(x.text)))
+              .filter(x => /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(norm(x.text)))
+              .filter(x => ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => norm(x.text).includes(w)).length < 5)
+              .filter(x => artifactMenuButtonWithin(x.el))
+              .sort((a,b) => a.text.length - b.text.length);
+            return candidates[0]?.el || null;
+          }
+
+          async function requestNotebookArtifactDownload(readyNode) {
+            const startedAtEpochMs = Date.now();
+            const root = audioArtifactCardRoot(readyNode);
+            if (!root) return {requested:false, reason:"real audio artifact card not found", startedAtEpochMs};
+            const localButtons = [...root.querySelectorAll("button,[role='button'],a")].filter(visible);
+            const direct = localButtons.find(el => /(^|\s)(download|다운로드)(\s|$)/.test(actionLabel(el)));
+            if (direct) {
+              try { direct.click(); } catch {}
               await sleep(1200);
-              return {requested:true, method:"MENU_DOWNLOAD", startedAtEpochMs};
+              return {requested:true, method:"DIRECT", startedAtEpochMs, cardText:(root.innerText || root.textContent || "").trim().slice(0,500)};
             }
+            const menu = artifactMenuButtonWithin(root);
+            if (!menu) return {requested:false, reason:"real audio card menu not found", startedAtEpochMs};
+            try { menu.click(); } catch {}
+            await sleep(700);
+            const download = await waitFor(() => findDeepControl(["다운로드","download"]), 8000, 250);
+            if (!download) return {requested:false, reason:"download action not found after real audio card menu", startedAtEpochMs};
+            try { download.click(); } catch {}
+            await sleep(1200);
+            return {requested:true, method:"MENU_DOWNLOAD", startedAtEpochMs, cardText:(root.innerText || root.textContent || "").trim().slice(0,500)};
+          }
 
-            async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {
-              try {
-                return await chrome.runtime.sendMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE",taskId:task.taskId,artifactType,startedAtEpochMs});
-              } catch (error) {
-                return {ok:false,error:String(error?.message || error)};
-              }
-            }
-
-          ''')
-          s=s.replace(marker,'  '+helper.replace('\n','\n  ')+marker,1)
-          old='    const ready = await waitFor(() => audioOverviewReady(), timeoutMs, 2500);\n    if (!ready) throw new Error("AUDIO_OVERVIEW_GENERATION_TIMEOUT_OR_PLAYER_NOT_FOUND");\n\n    return {'
-          new='    const ready = await waitFor(() => audioOverviewReady(), timeoutMs, 2500);\n    if (!ready) throw new Error("AUDIO_OVERVIEW_GENERATION_TIMEOUT_OR_PLAYER_NOT_FOUND");\n\n    const download = await requestNotebookArtifactDownload(ready);\n    if (!download?.requested) throw new Error(`AUDIO_ARTIFACT_DOWNLOAD_NOT_TRIGGERED: ${download?.reason || "unknown"}`);\n    const mirror = await mirrorNotebookArtifactToDrive(task, "AUDIO_OVERVIEW", download.startedAtEpochMs);\n    if (!mirror?.ok || !mirror?.mirror?.ok) throw new Error(`AUDIO_DRIVE_MIRROR_FAILED: ${mirror?.error || mirror?.raw?.stderr || "unknown"}`);\n\n    return {'
-          if old not in s: raise SystemExit('audio ready return target missing')
-          s=s.replace(old,new,1)
-          old2='      taskType:task.taskType || "AUDIO_OVERVIEW",\n      source: {...source, existingNotebookFallback: sourceFallback}\n    };'
-          new2='      taskType:task.taskType || "AUDIO_OVERVIEW",\n      actualArtifact:{download,mirror:mirror.mirror,localTaskId:mirror.localTaskId},\n      source: {...source, existingNotebookFallback: sourceFallback}\n    };'
-          if old2 not in s: raise SystemExit('audio result target missing')
-          s=s.replace(old2,new2,1)
-          runner.write_text(s,encoding='utf-8')
+          ''').strip('\n')+'\n\n','  ')
+          s=s[:start]+replacement+s[end:]
+          p.write_text(s,encoding='utf-8')
 
           mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m=json.loads(mpath.read_text(encoding='utf-8'))
-          m['version']='0.2.44'
-          m['description']='D47 requires real Audio download and Google Drive Desktop mirror before Audio DONE. Uses approved local Host; no new OAuth.'
+          m['version']='0.2.45'
+          m['description']='D48 targets the real Audio artifact card by duration/source/deep-dive evidence before opening its menu and downloading. Preserves D47 Drive mirror.'
           mpath.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1
-          git commit -m 'feat: mirror NotebookLM Audio artifact to Drive sync' || true
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
+          git commit -m 'fix: target real NotebookLM audio artifact card'
           git push
           RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
-          WORKER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js)
-          MIRROR_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js)
           SOURCE_COMMIT=$(git rev-parse HEAD)
-          python - "$RUNNER_SHA" "$MANIFEST_SHA" "$WORKER_SHA" "$MIRROR_SHA" "$SOURCE_COMMIT" <<'PY'
+          python - "$RUNNER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
           from pathlib import Path
           import json,sys
-          rsha,msha,wsha,ash,commit=sys.argv[1:6]
+          rsha,msha,commit=sys.argv[1:4]
           p=Path('runtime/stable/release.json')
           d=json.loads(p.read_text(encoding='utf-8'))
-          d['actionId']='APPLY_NOTEBOOKLM_0.2.44_D47_AUDIO_DRIVE_MIRROR_20260826'
-          d['version']='0.2.44'
-          d['releasedAt']='2026-08-26T21:58:00+09:00'
-          d['description']='D47 Audio success requires actual Notebook download mirrored into Google Drive Desktop NotebookLM_Artifacts/Audio.'
+          d['actionId']='APPLY_NOTEBOOKLM_0.2.45_D48_REAL_AUDIO_CARD_DOWNLOAD_20260826'
+          d['version']='0.2.45'
+          d['releasedAt']='2026-08-26T22:08:00+09:00'
+          d['description']='D48 targets the real Audio artifact card before Download and retains Drive Desktop mirror.'
           d['sourceCommit']=commit
-          wanted={'manifest.json':msha,'worker.js':wsha,'content/notebooklm-runner.js':rsha,'artifact-drive-mirror.js':ash}
-          existing={f.get('path'):f for f in d.get('files',[])}
-          for path,sha in wanted.items():
-              if path in existing: existing[path]['gitBlobSha1']=sha
-              else: d.setdefault('files',[]).append({'path':path,'gitBlobSha1':sha})
+          for f in d['files']:
+              if f['path']=='manifest.json': f['gitBlobSha1']=msha
+              if f['path']=='content/notebooklm-runner.js': f['gitBlobSha1']=rsha
           p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.44'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.45'
           git push
