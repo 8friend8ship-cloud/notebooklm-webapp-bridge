@@ -473,22 +473,31 @@
   }
 
   function audioArtifactCardRoot(readyNode) {
-    let cur = readyNode instanceof HTMLElement ? readyNode : null;
-    for (let i=0; i<10 && cur; i++, cur=cur.parentElement) {
-      const t = norm(cur.innerText || cur.textContent || "");
-      const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
-      if (studioMenuHits < 5 && /\b\d{1,2}:\d{2}\b/.test(t) && /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t) && artifactMenuButtonWithin(cur)) return cur;
+    const score = [];
+    const menus = deepQueryAll("button,[role='button'],a").filter(visible).filter(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
+    for (const menu of menus) {
+      let cur = menu.parentElement;
+      for (let depth=0; depth<12 && cur; depth++, cur=cur.parentElement) {
+        const raw = (cur.innerText || cur.textContent || "").trim();
+        const t = norm(raw);
+        if (raw.length < 8 || raw.length > 3000) continue;
+        const duration = /\b\d{1,2}:\d{2}\b/.test(t);
+        const sourceSignal = /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t);
+        const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
+        if (duration && sourceSignal && studioMenuHits < 5) {
+          score.push({el:cur,menu,text:raw,depth,len:raw.length});
+          break;
+        }
+      }
     }
-    const candidates = deepQueryAll("section,article,div,[role='group'],[role='region']")
-      .filter(visible)
-      .map(el => ({el,text:(el.innerText || el.textContent || "").trim()}))
-      .filter(x => x.text.length >= 10 && x.text.length <= 2500)
-      .filter(x => /\b\d{1,2}:\d{2}\b/.test(norm(x.text)))
-      .filter(x => /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(norm(x.text)))
-      .filter(x => ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => norm(x.text).includes(w)).length < 5)
-      .filter(x => artifactMenuButtonWithin(x.el))
-      .sort((a,b) => a.text.length - b.text.length);
-    return candidates[0]?.el || null;
+    if (score.length) return score.sort((a,b)=>a.len-b.len || a.depth-b.depth)[0].el;
+    let cur = readyNode instanceof HTMLElement ? readyNode : null;
+    for (let depth=0; depth<12 && cur; depth++, cur=cur.parentElement) {
+      const raw=(cur.innerText || cur.textContent || "").trim();
+      const t=norm(raw);
+      if (/\b\d{1,2}:\d{2}\b/.test(t) && /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t)) return cur;
+    }
+    return null;
   }
 
   async function requestNotebookArtifactDownload(readyNode) {
