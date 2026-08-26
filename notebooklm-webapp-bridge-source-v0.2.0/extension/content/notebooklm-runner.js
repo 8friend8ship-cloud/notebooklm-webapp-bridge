@@ -442,7 +442,7 @@
     const nodes = deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);
     return nodes.find(el => {
       const t = norm(el.innerText || el.textContent || "");
-      return t.includes("audio overview") || t.includes("오디오 개요") || t.includes("음성 개요");
+      return t.includes("audio overview") || t.includes("ai 오디오 오버뷰") || t.includes("오디오 오버뷰") || t.includes("오디오 개요") || t.includes("음성 개요");
     }) || null;
   }
 
@@ -467,7 +467,7 @@
     const studio = findDeepControl(["studio","스튜디오"]);
     if (studio) { try { studio.click(); } catch {} await sleep(1200); }
 
-    const audioControl = await waitFor(() => findDeepControl(["audio overview","오디오 개요","음성 개요"]), 30000, 500);
+    const audioControl = await waitFor(() => findDeepControl(["audio overview","ai 오디오 오버뷰","오디오 오버뷰","오디오 개요","음성 개요"]), 30000, 500);
     if (!audioControl) throw new Error(`AUDIO_OVERVIEW_CONTROL_NOT_FOUND: ${location.href}`);
 
     const before = audioOverviewReady();
