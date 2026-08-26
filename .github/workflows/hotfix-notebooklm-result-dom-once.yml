@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Patch Data Table state machine and publish stable 0.2.38
+      - name: Patch remaining Studio artifact state machines and publish stable 0.2.39
         shell: bash
         run: |
           python - <<'PY'
@@ -24,29 +24,115 @@ jobs:
 
           runner = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
           text = runner.read_text(encoding='utf-8')
-          if 'async function runDataTable(task)' in text:
-              raise SystemExit('data table patch already present')
+          if 'async function runStudioArtifact(task, spec)' in text:
+              raise SystemExit('studio artifact patch already present')
 
           anchor = '  async function runTask(task) {\n'
-          data_code = '''  function dataTableEvidence() {\n    for (const el of deepQueryAll("table,[role=table],[role=grid]").filter(visible)) {\n      const t = (el.innerText || el.textContent || "").trim();\n      if (t.length > 20) return t;\n    }\n    const nodes = deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);\n    for (const el of nodes) {\n      const t = (el.innerText || el.textContent || "").trim();\n      const n = norm(t);\n      if ((n.includes("데이터 표") || n.includes("data table")) && t.length > 60 && !/생성 중|generating|만드는 중/.test(n)) return t;\n    }\n    return null;\n  }\n\n  async function runDataTable(task) {\n    const source = await addSource(task);\n    const sourceFallback = !source.ok && Boolean(task.sourceText);\n    const studio = findDeepControl(["studio","스튜디오"]);\n    if (studio) { try { studio.click(); } catch {} await sleep(1200); }\n    const before = dataTableEvidence();\n    const control = await waitFor(() => findDeepControl(["데이터 표","data table","데이터 테이블"]), 30000, 500);\n    if (!control) throw new Error(`DATA_TABLE_CONTROL_NOT_FOUND: ${location.href}`);\n    try { control.click(); } catch {}\n    await sleep(1000);\n    let generate = null;\n    for (const d of dialogs()) { generate = findButton(["생성","만들기","generate","create"], d); if (generate) break; }\n    if (generate) { try { generate.click(); } catch {} }\n    const timeoutMs = Math.max(90000, Number(task.timeoutSeconds || 180) * 1000);\n    const ready = await waitFor(() => { const x = dataTableEvidence(); return x && x !== before ? x : null; }, timeoutMs, 1500);\n    if (!ready) throw new Error("DATA_TABLE_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND");\n    return { resultText:ready, resultUrls:[location.href], captureMode:"DATA_TABLE_READY", notebookUrl:location.href, pageTitle:document.title, capturedAt:new Date().toISOString(), status:"DONE", taskId:task.taskId, contentId:task.contentId || "", taskType:task.taskType || "DATA_TABLE", source:{...source, existingNotebookFallback:sourceFallback} };\n  }\n\n'''
-          if anchor not in text: raise SystemExit('runTask anchor missing')
-          text = text.replace(anchor, data_code + anchor, 1)
-          gate = '    if (["REPORT","NOTEBOOKLM_REPORT","NOTEBOOKLM_REPORT_PDF"].includes(normalizedTaskType)) return runReport(task);\n\n'
-          if gate not in text: raise SystemExit('report gate missing')
-          text = text.replace(gate, gate + '    if (["DATA_TABLE","NOTEBOOKLM_DATA_TABLE"].includes(normalizedTaskType)) return runDataTable(task);\n\n', 1)
+          if anchor not in text:
+              raise SystemExit('runTask anchor missing')
+
+          code = r'''  function studioArtifactCandidates(words) {
+    const out = [];
+    const seen = new Set();
+    for (const el of deepQueryAll("section,article,div,[role=group],[role=region],button,[role=button]").filter(visible)) {
+      const t = (el.innerText || el.textContent || "").trim();
+      if (!t || t.length < 8 || t.length > 12000 || seen.has(t)) continue;
+      const n = norm(t);
+      const labelHit = words.some(w => n.includes(norm(w)));
+      if (!labelHit) continue;
+      if (/생성 중|generating|creating|만드는 중|준비 중|preparing/.test(n)) continue;
+      if (/소스\s*\d+개|sources?\s*\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|개 카드|questions?|slides?|pages?/.test(n) || t.length > 40) {
+        seen.add(t);
+        out.push(t);
+      }
+    }
+    return out;
+  }
+
+  function studioArtifactFresh(words, baseline) {
+    const now = studioArtifactCandidates(words);
+    return now.find(t => !baseline.has(t)) || null;
+  }
+
+  async function clickGenerateIfPresent() {
+    let generate = null;
+    for (const d of dialogs()) {
+      generate = findButton(["생성","만들기","generate","create"], d);
+      if (generate) break;
+    }
+    if (!generate) {
+      generate = findDeepControl(["생성","만들기","generate","create"]);
+    }
+    if (generate) {
+      try { generate.click(); } catch {}
+      await sleep(900);
+      return true;
+    }
+    return false;
+  }
+
+  async function runStudioArtifact(task, spec) {
+    const source = await addSource(task);
+    const sourceFallback = !source.ok && Boolean(task.sourceText);
+    const studio = findDeepControl(["studio","스튜디오"]);
+    if (studio) { try { studio.click(); } catch {} await sleep(1000); }
+
+    const baseline = new Set(studioArtifactCandidates(spec.evidenceWords));
+    const control = await waitFor(() => findDeepControl(spec.controlWords), 30000, 500);
+    if (!control) throw new Error(`${spec.code}_CONTROL_NOT_FOUND: ${location.href}`);
+    try { control.click(); } catch {}
+    await sleep(1000);
+    await clickGenerateIfPresent();
+
+    const timeoutMs = Math.max(spec.minTimeoutMs || 90000, Number(task.timeoutSeconds || spec.defaultTimeoutSec || 180) * 1000);
+    const ready = await waitFor(() => studioArtifactFresh(spec.evidenceWords, baseline), timeoutMs, spec.pollMs || 1500);
+    if (!ready) throw new Error(`${spec.code}_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND`);
+
+    return {
+      resultText: ready,
+      resultUrls:[location.href],
+      captureMode:`${spec.code}_READY`,
+      artifactType:spec.code,
+      notebookUrl:location.href,
+      pageTitle:document.title,
+      capturedAt:new Date().toISOString(),
+      status:"DONE",
+      taskId:task.taskId,
+      contentId:task.contentId || "",
+      taskType:task.taskType || spec.code,
+      source:{...source, existingNotebookFallback:sourceFallback}
+    };
+  }
+
+  const STUDIO_ARTIFACT_SPECS = Object.freeze({
+    SLIDES:{code:"SLIDES",controlWords:["슬라이드 자료","slide deck","slides"],evidenceWords:["슬라이드 자료","slide deck","slides"],defaultTimeoutSec:300,minTimeoutMs:120000,pollMs:1800},
+    MIND_MAP:{code:"MIND_MAP",controlWords:["마인드맵","mind map"],evidenceWords:["마인드맵","mind map"],defaultTimeoutSec:180,minTimeoutMs:60000,pollMs:1200},
+    FLASHCARDS:{code:"FLASHCARDS",controlWords:["플래시카드","flashcards","flash cards"],evidenceWords:["플래시카드","flashcards","flash cards"],defaultTimeoutSec:180,minTimeoutMs:60000,pollMs:1200},
+    QUIZ:{code:"QUIZ",controlWords:["퀴즈","quiz"],evidenceWords:["퀴즈","quiz"],defaultTimeoutSec:180,minTimeoutMs:60000,pollMs:1200},
+    INFOGRAPHIC:{code:"INFOGRAPHIC",controlWords:["인포그래픽","infographic"],evidenceWords:["인포그래픽","infographic"],defaultTimeoutSec:300,minTimeoutMs:120000,pollMs:1800}
+  });
+
+'''
+          text = text.replace(anchor, code + anchor, 1)
+
+          gate = '    if (["DATA_TABLE","NOTEBOOKLM_DATA_TABLE"].includes(normalizedTaskType)) return runDataTable(task);\n\n'
+          if gate not in text:
+              raise SystemExit('data table gate missing')
+          new_gate = gate + '''    if (["SLIDES","SLIDE_DECK","NOTEBOOKLM_SLIDES"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.SLIDES);\n\n    if (["MIND_MAP","MINDMAP","NOTEBOOKLM_MIND_MAP"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.MIND_MAP);\n\n    if (["FLASHCARDS","FLASHCARD","NOTEBOOKLM_FLASHCARDS"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.FLASHCARDS);\n\n    if (["QUIZ","NOTEBOOKLM_QUIZ"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.QUIZ);\n\n    if (["INFOGRAPHIC","NOTEBOOKLM_INFOGRAPHIC"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.INFOGRAPHIC);\n\n'''
+          text = text.replace(gate, new_gate, 1)
           runner.write_text(text, encoding='utf-8')
 
           manifest = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m = json.loads(manifest.read_text(encoding='utf-8'))
-          m['version'] = '0.2.38'
-          m['description'] = 'D41 adds current Studio Data Table generation with actual table/grid evidence before DONE. Preserves Audio, Video, and Report state machines. No new permissions or approvals.'
+          m['version'] = '0.2.39'
+          m['description'] = 'D42 adds shared Studio state-machine support for Slides, Mind Map, Flashcards, Quiz, and Infographic with type-specific artifact evidence before DONE. Preserves Chat, Audio, Video, Report, and Data Table paths. No new permissions or approvals.'
           manifest.write_text(json.dumps(m, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'feat: add NotebookLM Data Table state machine'
+          git commit -m 'feat: add remaining NotebookLM Studio artifact state machines'
           git push
 
           RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
@@ -58,10 +144,10 @@ jobs:
           runner_sha, manifest_sha, source_commit = sys.argv[1:4]
           p = Path('runtime/stable/release.json')
           d = json.loads(p.read_text(encoding='utf-8'))
-          d['actionId'] = 'APPLY_NOTEBOOKLM_0.2.38_D41_DATA_TABLE_20260826'
-          d['version'] = '0.2.38'
-          d['releasedAt'] = '2026-08-26T19:58:00+09:00'
-          d['description'] = 'D41 adds Studio Data Table generation with actual table/grid evidence before DONE. Existing approved runtime only.'
+          d['actionId'] = 'APPLY_NOTEBOOKLM_0.2.39_D42_STUDIO_ARTIFACT_MATRIX_20260826'
+          d['version'] = '0.2.39'
+          d['releasedAt'] = '2026-08-26T20:20:00+09:00'
+          d['description'] = 'D42 adds Slides, Mind Map, Flashcards, Quiz, and Infographic Studio state machines with artifact-type evidence before DONE. Existing approved runtime only.'
           d['sourceCommit'] = source_commit
           for f in d['files']:
               if f['path'] == 'manifest.json': f['gitBlobSha1'] = manifest_sha
@@ -69,5 +155,5 @@ jobs:
           p.write_text(json.dumps(d, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.38'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.39'
           git push
