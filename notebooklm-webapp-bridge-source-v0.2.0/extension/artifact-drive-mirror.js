@@ -73,10 +73,4 @@ async function nlmMirrorArtifact(message) {
   return { ok:true, localTaskId:prepared.localTaskId, started, finalState:final?.state || "DONE", mirror, raw:inner };
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.source !== NLM_ARTIFACT_SOURCE || message?.type !== "MIRROR_ARTIFACT_TO_DRIVE") return;
-  nlmMirrorArtifact(message)
-    .then(result => sendResponse(result))
-    .catch(error => sendResponse({ ok:false, error:String(error?.message || error) }));
-  return true;
-});
+globalThis.__NLM_MIRROR_ARTIFACT_TO_DRIVE__ = nlmMirrorArtifact;

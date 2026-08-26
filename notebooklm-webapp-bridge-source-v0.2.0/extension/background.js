@@ -336,9 +336,13 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.source === SOURCE && message?.type === "MIRROR_ARTIFACT_TO_DRIVE") return false;
   (async () => {
     if (message?.source !== SOURCE) return { ok: false, error: "잘못된 메시지입니다." };
+    if (message.type === "MIRROR_ARTIFACT_TO_DRIVE") {
+      const handler = globalThis.__NLM_MIRROR_ARTIFACT_TO_DRIVE__;
+      if (typeof handler !== "function") return { ok:false, error:"ARTIFACT_MIRROR_HANDLER_NOT_READY" };
+      return await handler(message);
+    }
     if (message.type === "GET_CONFIG") return { ok: true, config: await getConfig(), profile: await getChromeProfile(), autoState: await getAutoState() };
     if (message.type === "SAVE_CONFIG") return { ok: true, config: await saveConfig(message.config || {}) };
     if (message.type === "GET_LOGS") {

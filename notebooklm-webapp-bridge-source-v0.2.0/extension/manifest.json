@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.48",
-  "description": "D51 finds the real Audio artifact card from its menu ancestry using Play/Pause controls first, with duration/source as supporting evidence. Preserves actual file Drive mirror.",
+  "version": "0.2.49",
+  "description": "D52 serializes MIRROR_ARTIFACT_TO_DRIVE through the primary background listener to remove response races. Preserves D51 audio-card detection and actual-file Drive mirror.",
   "permissions": [
     "alarms",
     "identity",
