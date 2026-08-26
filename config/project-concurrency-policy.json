@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-08-26T15:18:00+09:00",
+  "policy": {
+    "maxActivePerProject": 1,
+    "allowParallelAcrossProjects": true,
+    "activeStates": ["CLAIMED", "STARTED", "RUNNING", "PROGRESSING"],
+    "sameProjectWhenActive": "QUEUE_WAIT",
+    "differentProjectWhenCapacityAvailable": "DISPATCH_NOW",
+    "startAckDeadlineSeconds": 60,
+    "longRunningTimeoutMode": "MEDIA_LENGTH_AWARE",
+    "doNotUseGlobalSerialLock": true
+  },
+  "projectKeyPriority": [
+    "source.repo",
+    "projectId",
+    "appId",
+    "contentProject",
+    "workflowProject"
+  ],
+  "rules": [
+    "At most one active task per project key.",
+    "Different project keys may run in parallel on the same Host.",
+    "A claimed task must show START/RUNNING evidence within 60 seconds or enter immediate handoff diagnosis.",
+    "Audio/video jobs are not declared stale by a fixed 10-minute rule after START; use media-duration-aware time budgets and file-progress evidence.",
+    "Never create a duplicate task for the same project while an earlier task is active unless the earlier task is explicitly canceled or terminal."
+  ]
+}
