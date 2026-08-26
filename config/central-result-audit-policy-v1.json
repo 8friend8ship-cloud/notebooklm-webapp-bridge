@@ -1,0 +1,32 @@
+{
+  "version":"1.0.0",
+  "purpose":"Judge whether a generated result is actually usable for the intended ContentOS workflow, not merely whether generation completed.",
+  "statuses":["PASS","NEEDS_FIX","REJECT","HOLD_MISSING_EVIDENCE"],
+  "requiredDimensions":[
+    {"id":"GOAL_ALIGNMENT","weight":25,"minimum":85},
+    {"id":"PRACTICAL_USABILITY","weight":20,"minimum":80},
+    {"id":"QUALITY_LEVEL","weight":15,"minimum":80},
+    {"id":"SOURCE_TRACEABILITY","weight":10,"minimum":90},
+    {"id":"OUTPUT_COMPLETENESS","weight":10,"minimum":90},
+    {"id":"FRONTAPP_FIT","weight":10,"minimum":80},
+    {"id":"TECHNICAL_READBACK","weight":10,"minimum":100}
+  ],
+  "hardFails":["MISSING_RESULT","READBACK_FAILED","WRONG_OUTPUT_TYPE","CRITICAL_SOURCE_MISMATCH","UNUSABLE_FOR_TARGET_FRONT","DUPLICATE_COLLISION"],
+  "promotionRules":{
+    "PASS":{"overallMinimum":82,"route":"SEED_OR_TEMPLATE","writeLearning":true},
+    "NEEDS_FIX":{"overallMinimum":60,"route":"ROOT_CAUSE_MINIMUM_FIX_RETEST","writeLearning":true},
+    "REJECT":{"route":"QUEENS_FAILURE_CASE_OR_ARCHIVE","writeLearning":true},
+    "HOLD_MISSING_EVIDENCE":{"route":"READBACK_OR_EVIDENCE_RECOVERY","writeLearning":false}
+  },
+  "learningWriteback":{
+    "recordSuccessPatterns":true,
+    "recordFailurePatterns":true,
+    "recordRootCause":true,
+    "recordWrongAssumption":true,
+    "recordEffectiveFix":true,
+    "updateCommandTemplateWhenRepeatable":true,
+    "requireSameFixtureRetestBeforeFixPromotion":true
+  },
+  "targetSheets":["84_OPENAI_CENTRAL_AUDIT","80_DATA_RUNTIME_QA_LOG","71_MULTIMODAL_QA_HISTORY","35_INTERNAL_SEED_REGISTRY","37_QUEENS_RESEARCH_RESULTS","77_TEMPLATE_EVOLUTION_FACTORY"],
+  "completionRule":"A generated artifact is not COMPLETE until readback and purpose-fit audit are PASS."
+}
