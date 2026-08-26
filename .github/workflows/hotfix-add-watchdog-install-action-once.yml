@@ -1,0 +1,51 @@
+name: hotfix-add-watchdog-install-action-once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hotfix-add-watchdog-install-action-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add allowlisted watchdog install switch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('local-agent/governor/RunChromeGovernorReadback.ps1')
+          s = p.read_text(encoding='utf-8')
+          old = "param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[switch]$VideoFailureDiagnostic,[switch]$FlowDirectRecoveryDiagnostic,[switch]$CaptureBridgeSmoke,[string]$CentralRelativePath='',[string]$SmokeFile='',[string]$ExpectedBridge='0.2.18')"
+          new = "param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[switch]$VideoFailureDiagnostic,[switch]$FlowDirectRecoveryDiagnostic,[switch]$CaptureBridgeSmoke,[switch]$InstallAutoResumeWatchdog,[string]$CentralRelativePath='',[string]$SmokeFile='',[string]$ExpectedBridge='0.2.18')"
+          if old not in s:
+              raise SystemExit('param patch target missing')
+          s = s.replace(old, new, 1)
+          anchor = "if($FlowDirectRecoveryDiagnostic){"
+          if anchor not in s:
+              raise SystemExit('action insert anchor missing')
+          block = r'''if($InstallAutoResumeWatchdog){
+  try{
+    $url='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $local=Join-Path $Root 'INSTALL_AUTO_RESUME_TASK.ps1'
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $local -TimeoutSec 20
+    & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $local | Out-Null
+    $rc=$LASTEXITCODE
+    $query=& schtasks.exe /Query /TN 'HomeDesignAutomation-AutoResume' /V /FO LIST 2>&1 | Out-String
+    [ordered]@{ok=($rc -eq 0);action='INSTALL_AUTO_RESUME_WATCHDOG';exitCode=$rc;taskQuery=$query.Trim();at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress
+    exit $(if($rc -eq 0){0}else{2})
+  }catch{[ordered]@{ok=$false;action='INSTALL_AUTO_RESUME_WATCHDOG';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 2}
+}
+'''
+          s = s.replace(anchor, block + anchor, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add local-agent/governor/RunChromeGovernorReadback.ps1
+          git commit -m 'fix: add allowlisted auto-resume watchdog installer action'
+          git push
