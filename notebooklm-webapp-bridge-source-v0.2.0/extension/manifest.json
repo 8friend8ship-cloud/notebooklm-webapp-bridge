@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.39",
-  "description": "D42 adds shared Studio state-machine support for Slides, Mind Map, Flashcards, Quiz, and Infographic with type-specific artifact evidence before DONE. Preserves Chat, Audio, Video, Report, and Data Table paths. No new permissions or approvals.",
+  "version": "0.2.40",
+  "description": "D43 hardens Studio artifact detection: whole-Studio containers are rejected and type label plus artifact-card evidence is required before DONE. No new permissions.",
   "permissions": [
     "alarms",
     "identity",
