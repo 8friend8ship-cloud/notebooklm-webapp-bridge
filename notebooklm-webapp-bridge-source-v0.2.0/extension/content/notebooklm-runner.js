@@ -578,6 +578,78 @@
     };
   }
 
+  function reportCandidates() {
+    const out = [];
+    const seen = new Set();
+    for (const el of deepQueryAll("section,article,div,[role=group],[role=region],button,[role=button]").filter(visible)) {
+      const t = (el.innerText || el.textContent || "").trim();
+      const n = norm(t);
+      if (!t || t.length > 12000 || seen.has(t)) continue;
+      if (/보고서|report|브리핑 문서|briefing document|학습 가이드|study guide|faq|자주 묻는 질문/.test(n)) {
+        seen.add(t); out.push(t);
+      }
+    }
+    return out;
+  }
+
+  function reportReady(baseline) {
+    const current = reportCandidates();
+    const fresh = current.filter(t => !baseline.has(t));
+    return fresh.find(t => {
+      const n = norm(t);
+      return t.length > 40 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);
+    }) || null;
+  }
+
+  async function runReport(task) {
+    const source = await addSource(task);
+    const sourceFallback = !source.ok && Boolean(task.sourceText);
+
+    const studio = findDeepControl(["studio","스튜디오"]);
+    if (studio) { try { studio.click(); } catch {} await sleep(1200); }
+
+    const baseline = new Set(reportCandidates());
+    const reportControl = await waitFor(() => findDeepControl(["보고서","reports","report"]), 30000, 500);
+    if (!reportControl) throw new Error(`REPORT_CONTROL_NOT_FOUND: ${location.href}`);
+    try { reportControl.click(); } catch {}
+    await sleep(1000);
+
+    let typeControl = null;
+    for (const d of dialogs()) {
+      typeControl = findButton(["브리핑 문서","briefing document","브리핑","briefing"], d);
+      if (typeControl) break;
+    }
+    if (!typeControl) typeControl = findDeepControl(["브리핑 문서","briefing document","브리핑","briefing"]);
+    if (typeControl) { try { typeControl.click(); } catch {} await sleep(900); }
+
+    let generate = null;
+    for (const d of dialogs()) {
+      generate = findButton(["생성","만들기","generate","create"], d);
+      if (generate) break;
+    }
+    if (!generate) generate = findDeepControl(["생성","만들기","generate","create"]);
+    if (generate) { try { generate.click(); } catch {} await sleep(1000); }
+
+    const timeoutMs = Math.max(120000, Number(task.timeoutSeconds || 300) * 1000);
+    const ready = await waitFor(() => reportReady(baseline), timeoutMs, 1800);
+    if (!ready) throw new Error("REPORT_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND");
+
+    return {
+      resultText:ready,
+      resultUrls:[location.href],
+      captureMode:"REPORT_RESULT_READY",
+      reportType:"BRIEFING_DOCUMENT",
+      notebookUrl:location.href,
+      pageTitle:document.title,
+      capturedAt:new Date().toISOString(),
+      status:"DONE",
+      taskId:task.taskId,
+      contentId:task.contentId || "",
+      taskType:task.taskType || "REPORT",
+      source:{...source, existingNotebookFallback: sourceFallback}
+    };
+  }
+
   async function runTask(task) {
     if (!HOSTS.has(location.hostname)) throw new Error("NotebookLM 페이지가 아닙니다.");
     if (!task?.taskId) throw new Error("TASK_ID가 없습니다.");
@@ -586,6 +658,8 @@
     if (["AUDIO","AUDIO_OVERVIEW","NOTEBOOKLM_AUDIO"].includes(normalizedTaskType)) return runAudioOverview(task);
 
     if (["VIDEO","VIDEO_OVERVIEW","NOTEBOOKLM_VIDEO"].includes(normalizedTaskType)) return runVideoOverview(task);
+
+    if (["REPORT","NOTEBOOKLM_REPORT","NOTEBOOKLM_REPORT_PDF"].includes(normalizedTaskType)) return runReport(task);
 
     const source = await addSource(task);
     const editor = await ensureChatSurface();

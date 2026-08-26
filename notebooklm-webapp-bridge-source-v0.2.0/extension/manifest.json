@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.36",
-  "description": "D39 adds NotebookLM/Gemini Notebook Video Overview state-machine generation and requires actual ready video-player evidence before DONE. Preserves validated Audio Overview and current Korean UI labels. No new permissions or approvals.",
+  "version": "0.2.37",
+  "description": "D40 adds NotebookLM/Gemini Notebook Report state-machine generation using the current Studio report flow and briefing-document default. Preserves Audio/Video state machines. No new permissions or approvals.",
   "permissions": [
     "alarms",
     "identity",
