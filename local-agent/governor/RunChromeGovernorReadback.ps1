@@ -1,4 +1,4 @@
-param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[switch]$VideoFailureDiagnostic,[switch]$FlowDirectRecoveryDiagnostic,[string]$ExpectedBridge='0.2.18')
+param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[switch]$VideoFailureDiagnostic,[switch]$FlowDirectRecoveryDiagnostic,[switch]$CaptureBridgeSmoke,[string]$CentralRelativePath='',[string]$SmokeFile='',[string]$ExpectedBridge='0.2.18')
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 
@@ -50,6 +50,23 @@ if($FlowDirectRecoveryDiagnostic){
   if($central){$candidate=Join-Path (Join-Path $central 'Runtime_Readback') 'FLOW_SCRIPT_ID_RECOVERY_RESULT_20260825_R2.json';if(Test-Path -LiteralPath $candidate){$readbackPath=$candidate;$readback=ReadJson $candidate}}
   [ordered]@{ok=$true;action='FLOW_DIRECT_RECOVERY_DIAGNOSTIC';at=(Get-Date).ToString('o');taskId=$taskId;hostResult=$hostResult;hostError=$hostError;centralRoot=$central;readbackPath=$readbackPath;readback=$readback}|ConvertTo-Json -Depth 40 -Compress
   exit 0
+}
+if($CaptureBridgeSmoke){
+  try{
+    $central=FindCentralRoot;if(-not $central){throw 'CENTRAL_DRIVE_ROOT_NOT_FOUND'}
+    $rel=[string]$CentralRelativePath;$rel=$rel.Trim().TrimStart('\','/')
+    $prefix='00_중앙에이전트\';if($rel.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){$rel=$rel.Substring($prefix.Length)}
+    $rel=$rel.Replace('/','\')
+    if(-not $rel.StartsWith('CaptureBridge\',[StringComparison]::OrdinalIgnoreCase)){throw 'CAPTUREBRIDGE_PATH_NOT_ALLOWLISTED'}
+    if($rel -match '(^|\\)\.\.(\\|$)' -or [IO.Path]::IsPathRooted($rel)){throw 'CAPTUREBRIDGE_PATH_INVALID'}
+    $name=[string]$SmokeFile;if([string]::IsNullOrWhiteSpace($name)){throw 'SMOKE_FILE_REQUIRED'}
+    if($name -ne [IO.Path]::GetFileName($name) -or $name -notmatch '^_SMOKE_CAPTUREBRIDGE_[A-Za-z0-9_.-]+\.txt$'){throw 'SMOKE_FILE_NOT_ALLOWLISTED'}
+    $dir=Join-Path $central $rel;New-Item -ItemType Directory -Force -Path $dir|Out-Null
+    $path=Join-Path $dir $name;$body=('CAPTUREBRIDGE_SMOKE_PASS '+(Get-Date).ToString('o'));Set-Content -LiteralPath $path -Value $body -Encoding UTF8
+    $exists=Test-Path -LiteralPath $path;$len=$(if($exists){(Get-Item -LiteralPath $path).Length}else{0})
+    [ordered]@{ok=[bool]$exists;action='CAPTUREBRIDGE_SMOKE_WRITE';at=(Get-Date).ToString('o');centralRoot=$central;relativePath=$rel;localPath=$path;fileName=$name;exists=[bool]$exists;size=[int64]$len}|ConvertTo-Json -Depth 10 -Compress
+    exit $(if($exists){0}else{2})
+  }catch{[ordered]@{ok=$false;action='CAPTUREBRIDGE_SMOKE_WRITE';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress;exit 2}
 }
 if($BridgeLocalEvidence){$Manifest=ReadJson (Join-Path $ExtensionRoot 'manifest.json');$Apply=ReadJson (Join-Path $Root 'NOTEBOOKLM_BRIDGE_APPLY_RESULT.json');$State=ReadJson (Join-Path $Root 'state.json');$Health=$null;try{$Health=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3}catch{};$Dedicated=DedicatedRunning;$BridgeVersion=$(if($Manifest){[string]$Manifest.version}else{'UNKNOWN'});$Rel=$null;$ReleaseError='';$IntegrityEvidence=$false;try{$Rel=GetBridgeReleaseRaw;$IntegrityEvidence=TestBridgeRelease $Rel}catch{$ReleaseError=$_.Exception.Message};$Target=$(if($Rel){[string]$Rel.version}else{$ExpectedBridge});$Healthy=($BridgeVersion -eq $Target -and $IntegrityEvidence -and $Health -and [bool]$Health.ok -and [bool]$Health.asyncJobs -and $Dedicated);[ordered]@{ok=$true;transportOk=$true;healthy=[bool]$Healthy;action='BRIDGE_LOCAL_EVIDENCE';at=(Get-Date).ToString('o');expectedBridge=$ExpectedBridge;targetBridge=$Target;bridgeVersion=$BridgeVersion;integrityEvidence=[bool]$IntegrityEvidence;integritySource='RAW_RELEASE_LIVE';releaseError=$ReleaseError;hostHealthy=$(if($Health){[bool]$Health.ok}else{$false});hostVersion=$(if($Health){[string]$Health.version}else{'UNKNOWN'});hostAsyncJobs=$(if($Health){[bool]$Health.asyncJobs}else{$false});dedicatedChromeRunning=[bool]$Dedicated;agentVersion=$(if($State){[string]$State.agentVersion}else{'UNKNOWN'});agentStatus=$(if($State){[string]$State.status}else{'UNKNOWN'});applyResult=$Apply}|ConvertTo-Json -Depth 30 -Compress;exit 0}
 if($BridgeStatusOnly){try{$Rel=GetBridgeReleaseRaw;$Manifest=ReadJson (Join-Path $ExtensionRoot 'manifest.json');$Health=$null;try{$Health=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3}catch{};$Integrity=TestBridgeRelease $Rel;$Dedicated=DedicatedRunning;$Apply=ReadJson (Join-Path $Root 'NOTEBOOKLM_BRIDGE_APPLY_RESULT.json');$Healthy=($Manifest -and [string]$Manifest.version -eq [string]$Rel.version -and $Integrity -and $Health -and [bool]$Health.ok -and [bool]$Health.asyncJobs -and $Dedicated);[ordered]@{ok=[bool]$Healthy;transportOk=$true;healthy=[bool]$Healthy;action='BRIDGE_STATUS_ONLY';at=(Get-Date).ToString('o');targetBridge=[string]$Rel.version;bridgeVersion=$(if($Manifest){[string]$Manifest.version}else{'UNKNOWN'});integrityOk=[bool]$Integrity;integritySource='RAW_RELEASE_LIVE';hostHealthy=$(if($Health){[bool]$Health.ok}else{$false});hostVersion=$(if($Health){[string]$Health.version}else{'UNKNOWN'});hostAsyncJobs=$(if($Health){[bool]$Health.asyncJobs}else{$false});dedicatedChromeRunning=[bool]$Dedicated;applyResult=$Apply}|ConvertTo-Json -Depth 30 -Compress}catch{[ordered]@{ok=$false;transportOk=$true;healthy=$false;action='BRIDGE_STATUS_ONLY';integritySource='RAW_RELEASE_LIVE';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress};exit 0}
