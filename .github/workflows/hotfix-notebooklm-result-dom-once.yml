@@ -15,49 +15,49 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Harden artifact card signals and publish stable 0.2.41
+      - name: Clear stale poll busy state and publish stable 0.2.42
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           import json
-          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/background.js')
           s=p.read_text(encoding='utf-8')
-          old='const artifactSignal = /소스\\s*\\d+개|sources?\\s*\\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|cards?|questions?|slides?|pages?/.test(n);'
-          new='const artifactSignal = /소스\\s*\\d+개|sources?\\s*\\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|\\b\\d{1,2}:\\d{2}\\b/.test(n);'
-          if old not in s: raise SystemExit('artifact signal target missing')
+          old='''  const state = await getAutoState();\n  if (Number(state.busyUntil || 0) > Date.now()) {\n    return { ok: true, skipped: "busy", runningTaskId: state.runningTaskId || "" };\n  }\n'''
+          new='''  const state = await getAutoState();\n  if (Number(state.busyUntil || 0) > Date.now() && state.runningTaskId) {\n    return { ok: true, skipped: "busy", runningTaskId: state.runningTaskId || "" };\n  }\n  if (Number(state.busyUntil || 0) > Date.now() && !state.runningTaskId) {\n    await saveAutoState({ busyUntil: 0, lastError: "STALE_BUSY_CLEARED_D45" });\n  }\n'''
+          if old not in s: raise SystemExit('busy-state target missing')
           s=s.replace(old,new,1)
           p.write_text(s,encoding='utf-8')
           mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m=json.loads(mpath.read_text(encoding='utf-8'))
-          m['version']='0.2.41'
-          m['description']='D44 removes icon/menu tokens from Studio artifact success evidence. Requires source/unread/download/more/play/duration evidence with the expected artifact label. No new permissions.'
+          m['version']='0.2.42'
+          m['description']='D45 clears stale auto-poll busy state when no task is actually running. Preserves D44 artifact guards. No new permissions.'
           mpath.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'fix: require real artifact-card signals'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/background.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
+          git commit -m 'fix: clear stale NotebookLM poll busy state'
           git push
-          RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
+          BG_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/background.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
           SOURCE_COMMIT=$(git rev-parse HEAD)
-          python - "$RUNNER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
+          python - "$BG_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
           from pathlib import Path
           import json,sys
-          rsha,msha,commit=sys.argv[1:4]
+          bgsha,msha,commit=sys.argv[1:4]
           p=Path('runtime/stable/release.json')
           d=json.loads(p.read_text(encoding='utf-8'))
-          d['actionId']='APPLY_NOTEBOOKLM_0.2.41_D44_REAL_ARTIFACT_SIGNALS_20260826'
-          d['version']='0.2.41'
-          d['releasedAt']='2026-08-26T20:48:00+09:00'
-          d['description']='D44 removes icon-only false matches and requires real artifact-card signals.'
+          d['actionId']='APPLY_NOTEBOOKLM_0.2.42_D45_STALE_BUSY_CLEAR_20260826'
+          d['version']='0.2.42'
+          d['releasedAt']='2026-08-26T21:10:00+09:00'
+          d['description']='D45 clears stale auto-poll busy state when runningTaskId is empty.'
           d['sourceCommit']=commit
           for f in d['files']:
               if f['path']=='manifest.json': f['gitBlobSha1']=msha
-              if f['path']=='content/notebooklm-runner.js': f['gitBlobSha1']=rsha
+              if f['path']=='background.js': f['gitBlobSha1']=bgsha
           p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.41'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.42'
           git push
