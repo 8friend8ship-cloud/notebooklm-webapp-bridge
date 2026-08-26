@@ -1,0 +1,61 @@
+{
+  "version":"1.0.0",
+  "purpose":"Minimize wasted Google Flow credits by requiring asset-grounded preflight, continuity checks, and low-risk validation before paid/high-cost video generation.",
+  "generationPrinciple":"IMAGE_AND_ASSET_FIRST_THEN_VIDEO",
+  "mandatoryPreflight":[
+    "GOAL_DEFINED",
+    "TARGET_APP_OR_FRONT_DEFINED",
+    "COMMON_PERSONA_LOCKED",
+    "BACKDATA_ASSETS_SELECTED",
+    "PROMPT_STRUCTURED",
+    "START_FRAME_READY_WHEN_CONTINUITY_REQUIRED",
+    "END_FRAME_READY_WHEN_CONTINUITY_REQUIRED",
+    "PREVIOUS_CLIP_LAST_FRAME_CAPTURED_FOR_NEXT_CLIP",
+    "ASPECT_RATIO_LOCKED",
+    "DURATION_LOCKED",
+    "OUTPUT_COUNT_MINIMIZED",
+    "MODEL_COST_CHECKED",
+    "NEGATIVE_FAILURE_CONDITIONS_REVIEWED"
+  ],
+  "promptTemplate":{
+    "subject":"who/what appears; bind to persona/ingredient asset ids",
+    "action":"single clear action per clip",
+    "environment":"location/background from approved asset or explicit description",
+    "camera":"shot size, angle, movement",
+    "lighting":"time-of-day/key light/mood",
+    "style":"approved style reference or template id",
+    "continuity":"what must remain identical to previous clip",
+    "transition":"how start frame moves toward end frame",
+    "audioIntent":"dialogue/ambience/music intent if used downstream",
+    "avoid":"identity drift, object mutation, extra fingers/limbs, text artifacts, camera discontinuity, abrupt pose jumps"
+  },
+  "personaRules":[
+    "Use one canonical persona asset pack per project unless the variant explicitly requests a different persona.",
+    "Lock face, hair, clothing, body proportions, key props and style references before first video generation.",
+    "Reuse project ingredients or named project assets instead of re-describing identity from text alone.",
+    "Store approved persona images, reference frames and asset ids in central registry and task payload."
+  ],
+  "continuityBridge":[
+    "Save previous clip final frame as an image.",
+    "Use that saved frame as next clip start frame when continuity matters.",
+    "Where a planned endpoint is known, create or approve an explicit end-frame image before generation.",
+    "Describe only the motion/transition between the locked frames; do not re-invent subject identity.",
+    "After generation compare first/last frames, persona identity, object positions and camera direction with the storyboard contract."
+  ],
+  "creditGuard":[
+    "Do not generate video from text-only when persona/reference assets can be prepared first.",
+    "Default outputCount to 1 for validation passes.",
+    "Use lower-cost supported model/generation for prompt validation before high-cost Quality generation when final quality does not yet need to be judged.",
+    "Do not request multiple variants until the base prompt and continuity bridge pass.",
+    "Do not regenerate to fix a problem that can be corrected in prompt, ingredient, frame or asset selection first.",
+    "Record credits/model/generation count per attempt and calculate waste caused by failed attempts."
+  ],
+  "imageBeforeVideoGate":{
+    "required":true,
+    "checks":["PERSONA_MATCH","COMPOSITION_MATCH","OBJECT_ASSET_MATCH","STYLE_MATCH","TEXT_OR_SIGNAGE_CLEAN","START_FRAME_CONTINUITY","END_FRAME_CONTINUITY"],
+    "videoAllowedOnlyWhen":"ALL_REQUIRED_IMAGE_CHECKS_PASS"
+  },
+  "postGenerationAudit":["PERSONA_CONSISTENCY","START_END_CONTINUITY","MOTION_QUALITY","CAMERA_CONTINUITY","OBJECT_INTEGRITY","STYLE_MATCH","TARGET_APP_USABILITY","CREDIT_EFFICIENCY","RESULT_READBACK"],
+  "learningWriteback":["PROMPT_PATTERN","FAILED_PROMPT_PATTERN","ASSET_COMBINATION","PERSONA_PACK","FRAME_BRIDGE_PATTERN","MODEL_AND_CREDIT_COST","ROOT_CAUSE","EFFECTIVE_FIX","PREVENTION_RULE","TEMPLATE_ADJUSTMENT"],
+  "completionRule":"FLOW generation is not COMPLETE until result readback, purpose-fit audit, continuity audit and credit-efficiency review are recorded."
+}
