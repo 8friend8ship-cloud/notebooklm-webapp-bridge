@@ -15,58 +15,44 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Serialize artifact mirror handling and publish stable 0.2.49
+      - name: Load artifact mirror first and publish stable 0.2.50
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
-          import json,base64
-          art=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js')
-          s=art.read_text(encoding='utf-8')
-          old=base64.b64decode('Y2hyb21lLnJ1bnRpbWUub25NZXNzYWdlLmFkZExpc3RlbmVyKChtZXNzYWdlLCBfc2VuZGVyLCBzZW5kUmVzcG9uc2UpID0+IHsKICBpZiAobWVzc2FnZT8uc291cmNlICE9PSBOTE1fQVJUSUZBQ1RfU09VUkNFIHx8IG1lc3NhZ2U/LnR5cGUgIT09ICJNSVJST1JfQVJUSUZBQ1RfVE9fRFJJVkUiKSByZXR1cm47CiAgbmxtTWlycm9yQXJ0aWZhY3QobWVzc2FnZSkKICAgIC50aGVuKHJlc3VsdCA9PiBzZW5kUmVzcG9uc2UocmVzdWx0KSkKICAgIC5jYXRjaChlcnJvciA9PiBzZW5kUmVzcG9uc2UoeyBvazpmYWxzZSwgZXJyb3I6U3RyaW5nKGVycm9yPy5tZXNzYWdlIHx8IGVycm9yKSB9KSk7CiAgcmV0dXJuIHRydWU7Cn0pOw==').decode()
-          new=base64.b64decode('Z2xvYmFsVGhpcy5fX05MTV9NSVJST1JfQVJUSUZBQ1RfVE9fRFJJVkVfXyA9IG5sbU1pcnJvckFydGlmYWN0Ow==').decode()
-          if old not in s: raise SystemExit('artifact listener target missing')
-          art.write_text(s.replace(old,new,1),encoding='utf-8')
-
-          bg=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/background.js')
-          s=bg.read_text(encoding='utf-8')
-          old=base64.b64decode('Y2hyb21lLnJ1bnRpbWUub25NZXNzYWdlLmFkZExpc3RlbmVyKChtZXNzYWdlLCBfc2VuZGVyLCBzZW5kUmVzcG9uc2UpID0+IHsKICBpZiAobWVzc2FnZT8uc291cmNlID09PSBTT1VSQ0UgJiYgbWVzc2FnZT8udHlwZSA9PT0gIk1JUlJPUl9BUlRJRkFDVF9UT19EUklWRSIpIHJldHVybiBmYWxzZTsKICAoYXN5bmMgKCkgPT4gewogICAgaWYgKG1lc3NhZ2U/LnNvdXJjZSAhPT0gU09VUkNFKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAi7J6Y66q765CcIOuplOyLnOyngOyeheuLiOuLpC4iIH07').decode()
-          new=base64.b64decode('Y2hyb21lLnJ1bnRpbWUub25NZXNzYWdlLmFkZExpc3RlbmVyKChtZXNzYWdlLCBfc2VuZGVyLCBzZW5kUmVzcG9uc2UpID0+IHsKICAoYXN5bmMgKCkgPT4gewogICAgaWYgKG1lc3NhZ2U/LnNvdXJjZSAhPT0gU09VUkNFKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAi7J6Y66q765CcIOuplOyLnOyngOyeheuLiOuLpC4iIH07CiAgICBpZiAobWVzc2FnZS50eXBlID09PSAiTUlSUk9SX0FSVElGQUNUX1RPX0RSSVZFIikgewogICAgICBjb25zdCBoYW5kbGVyID0gZ2xvYmFsVGhpcy5fX05MTV9NSVJST1JfQVJUSUZBQ1RfVE9fRFJJVkVfXzsKICAgICAgaWYgKHR5cGVvZiBoYW5kbGVyICE9PSAiZnVuY3Rpb24iKSByZXR1cm4geyBvazpmYWxzZSwgZXJyb3I6IkFSVElGQUNUX01JUlJPUl9IQU5ETEVSX05PVF9SRUFEWSIgfTsKICAgICAgcmV0dXJuIGF3YWl0IGhhbmRsZXIobWVzc2FnZSk7CiAgICB9').decode()
-          if old not in s: raise SystemExit('background listener target missing')
-          bg.write_text(s.replace(old,new,1),encoding='utf-8')
-
+          import json
+          worker=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js')
+          worker.write_text('import "./artifact-drive-mirror.js";\nimport "./local-stable-self-heal.js";\nimport "./local-active-guard.js";\nimport "./local-powershell-runner.js";\nimport "./flow-script-id-direct-recovery.js";\nimport "./chat-active-guard.js";\n',encoding='utf-8')
           mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m=json.loads(mpath.read_text(encoding='utf-8'))
-          m['version']='0.2.49'
-          m['description']='D52 serializes MIRROR_ARTIFACT_TO_DRIVE through the primary background listener to remove response races. Preserves D51 audio-card detection and actual-file Drive mirror.'
+          m['version']='0.2.50'
+          m['description']='D53 loads artifact-drive-mirror before Local/background polling so MIRROR_ARTIFACT_TO_DRIVE handler is ready before any task can run. Worker reload also reconciles stale Local active state.'
           mpath.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js notebooklm-webapp-bridge-source-v0.2.0/extension/background.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'fix: serialize NotebookLM artifact mirror listener'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
+          git commit -m 'fix: initialize artifact mirror before background poll'
           git push
-          ART_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js)
-          BG_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/background.js)
+          WORKER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
           SOURCE_COMMIT=$(git rev-parse HEAD)
-          python - "$ART_SHA" "$BG_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
+          python - "$WORKER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
           from pathlib import Path
           import json,sys
-          asha,bgsha,msha,commit=sys.argv[1:5]
+          wsha,msha,commit=sys.argv[1:4]
           p=Path('runtime/stable/release.json')
           d=json.loads(p.read_text(encoding='utf-8'))
-          d['actionId']='APPLY_NOTEBOOKLM_0.2.49_D52_SERIAL_ARTIFACT_MIRROR_20260826'
-          d['version']='0.2.49'
-          d['releasedAt']='2026-08-26T23:12:00+09:00'
-          d['description']='D52 removes competing mirror message responses by routing through one background listener.'
+          d['actionId']='APPLY_NOTEBOOKLM_0.2.50_D53_MIRROR_IMPORT_ORDER_20260827'
+          d['version']='0.2.50'
+          d['releasedAt']='2026-08-27T01:00:00+09:00'
+          d['description']='D53 initializes artifact mirror before Local/background poll and lets worker reload reconcile stale Local active state.'
           d['sourceCommit']=commit
           for f in d['files']:
               if f['path']=='manifest.json': f['gitBlobSha1']=msha
-              if f['path']=='background.js': f['gitBlobSha1']=bgsha
-              if f['path']=='artifact-drive-mirror.js': f['gitBlobSha1']=asha
+              if f['path']=='worker.js': f['gitBlobSha1']=wsha
           p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.49'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.50'
           git push
