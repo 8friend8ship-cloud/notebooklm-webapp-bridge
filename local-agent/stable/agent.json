@@ -3,9 +3,9 @@
   "channel": "stable",
   "enabled": true,
   "version": "1.1.22",
-  "releasedAt": "2026-08-26T11:35:00+09:00",
-  "gitBlobSha1": "b66eb371a231803dd559c2e16b2bfe1460079f20",
+  "releasedAt": "2026-08-26T11:47:00+09:00",
+  "gitBlobSha1": "8eb558717939ea6ecb95725dfbaa2656692d8e58",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Autonomous recovery: reuse proven 1.1.21/1.1.19 self-heal path, verify state, run existing Governor V2 and stable Bridge repair once if needed, then re-run and persist bounded recovery result. Replaces manual V3-V6 installer loop."
+  "notes": "Autonomous recovery with bounded retry and explicit final state/readback promotion to agentVersion 1.1.22. Reuses proven 1.1.21/1.1.19 self-heal path, verifies Host/Dedicated Chrome/Governor/Drive sync, repairs Governor/Bridge once if needed, and writes central Runtime_Readback directly. Manual V3-V6 installer loop retired."
 }
