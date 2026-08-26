@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Harden report cards and Studio serialization, publish stable 0.2.43
+      - name: Mirror real Audio artifact to Drive and publish stable 0.2.44
         shell: bash
         run: |
           python - <<'PY'
@@ -24,57 +24,110 @@ jobs:
 
           runner=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
           s=runner.read_text(encoding='utf-8')
-          old='''      if (/보고서|report|브리핑 문서|briefing document|학습 가이드|study guide|faq|자주 묻는 질문/.test(n)) {\n        seen.add(t); out.push(t);\n      }'''
-          new='''      const reportLabel = /보고서|report|브리핑 문서|briefing document|briefing doc|학습 가이드|study guide|faq|자주 묻는 질문/.test(n);\n      const reportArtifactSignal = /소스\\s*\\d+개|sources?\\s*\\d+|읽지 않음|unread|more_vert|다운로드|download|briefing doc/.test(n);\n      const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => n.includes(w)).length;\n      if (reportLabel && reportArtifactSignal && studioMenuHits < 5) {\n        seen.add(t); out.push(t);\n      }'''
-          if old not in s: raise SystemExit('report candidate target missing')
+          marker='  async function runAudioOverview(task) {'
+          if marker not in s: raise SystemExit('audio runner marker missing')
+          helper=r'''  function artifactActionRoot(node) {
+    let cur = node instanceof HTMLElement ? node : null;
+    for (let i=0; i<8 && cur; i++, cur=cur.parentElement) {
+      const t = norm(cur.innerText || cur.textContent || "");
+      const menuCount = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
+      if (menuCount < 5 && /more_vert|play|재생|download|다운로드|share|공유/.test(t)) return cur;
+    }
+    return null;
+  }
+
+  function actionLabel(el) {
+    return norm([el?.innerText,el?.textContent,el?.getAttribute?.("aria-label"),el?.getAttribute?.("title"),el?.getAttribute?.("data-testid")].join(" "));
+  }
+
+  async function requestNotebookArtifactDownload(readyNode) {
+    const startedAtEpochMs = Date.now();
+    const root = artifactActionRoot(readyNode) || readyNode?.parentElement || document;
+    const localButtons = [...root.querySelectorAll?.("button,[role='button'],a") || []].filter(visible);
+    const direct = localButtons.find(el => /(^|\s)(download|다운로드)(\s|$)/.test(actionLabel(el)));
+    if (direct) {
+      try { direct.click(); } catch {}
+      await sleep(1200);
+      return {requested:true, method:"DIRECT", startedAtEpochMs};
+    }
+    const menu = localButtons.find(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
+    if (!menu) return {requested:false, reason:"artifact menu/download control not found", startedAtEpochMs};
+    try { menu.click(); } catch {}
+    await sleep(700);
+    const download = await waitFor(() => findDeepControl(["다운로드","download"]), 8000, 250);
+    if (!download) return {requested:false, reason:"download action not found after menu", startedAtEpochMs};
+    try { download.click(); } catch {}
+    await sleep(1200);
+    return {requested:true, method:"MENU_DOWNLOAD", startedAtEpochMs};
+  }
+
+  async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {
+    try {
+      return await chrome.runtime.sendMessage({
+        source:SOURCE,
+        type:"MIRROR_ARTIFACT_TO_DRIVE",
+        taskId:task.taskId,
+        artifactType,
+        startedAtEpochMs
+      });
+    } catch (error) {
+      return {ok:false,error:String(error?.message || error)};
+    }
+  }
+
+'''
+          s=s.replace(marker,helper+marker,1)
+          old='''    const ready = await waitFor(() => audioOverviewReady(), timeoutMs, 2500);\n    if (!ready) throw new Error("AUDIO_OVERVIEW_GENERATION_TIMEOUT_OR_PLAYER_NOT_FOUND");\n\n    return {'''
+          new='''    const ready = await waitFor(() => audioOverviewReady(), timeoutMs, 2500);\n    if (!ready) throw new Error("AUDIO_OVERVIEW_GENERATION_TIMEOUT_OR_PLAYER_NOT_FOUND");\n\n    const download = await requestNotebookArtifactDownload(ready);\n    if (!download?.requested) throw new Error(`AUDIO_ARTIFACT_DOWNLOAD_NOT_TRIGGERED: ${download?.reason || "unknown"}`);\n    const mirror = await mirrorNotebookArtifactToDrive(task, "AUDIO_OVERVIEW", download.startedAtEpochMs);\n    if (!mirror?.ok || !mirror?.mirror?.ok) throw new Error(`AUDIO_DRIVE_MIRROR_FAILED: ${mirror?.error || mirror?.raw?.stderr || "unknown"}`);\n\n    return {'''
+          if old not in s: raise SystemExit('audio ready return target missing')
           s=s.replace(old,new,1)
-          old2='return t.length > 40 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);'
-          new2='return t.length > 20 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);'
-          if old2 not in s: raise SystemExit('report ready target missing')
+          old2='''      taskType:task.taskType || "AUDIO_OVERVIEW",\n      source: {...source, existingNotebookFallback: sourceFallback}\n    };'''
+          new2='''      taskType:task.taskType || "AUDIO_OVERVIEW",\n      actualArtifact:{download,mirror:mirror.mirror,localTaskId:mirror.localTaskId},\n      source: {...source, existingNotebookFallback: sourceFallback}\n    };'''
+          if old2 not in s: raise SystemExit('audio result target missing')
           s=s.replace(old2,new2,1)
           runner.write_text(s,encoding='utf-8')
 
-          cfg=Path('config/notebooklm-flow-command-template-v1.json')
-          d=json.loads(cfg.read_text(encoding='utf-8'))
-          d['version']='1.1.1'
-          d.setdefault('projectTemplate',{})['studioInteractionPolicy']='SERIALIZE_SAME_NOTEBOOK_STUDIO_UI_CLICKS'
-          rule='Same Notebook Studio UI interactions are always serialized; only background generation/monitoring may overlap after the UI interaction has safely released.'
-          if rule not in d.setdefault('fanoutRules',[]): d['fanoutRules'].append(rule)
-          d.setdefault('centralAgentBehavior',{})['onNotebookStudio']='SERIALIZE_UI_INTERACTION_THEN_RELEASE_BACKGROUND_SAFE_TASKS'
-          cfg.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-
           mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m=json.loads(mpath.read_text(encoding='utf-8'))
-          m['version']='0.2.43'
-          m['description']='D46 detects real report artifact cards and preserves strict Studio UI serialization. Includes D44/D45 guards. No new permissions.'
+          m['version']='0.2.44'
+          m['description']='D47 requires real Audio download and Google Drive Desktop mirror before Audio DONE. Uses approved local Host; no new OAuth.'
           mpath.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json config/notebooklm-flow-command-template-v1.json
-          git commit -m 'fix: detect report artifact cards and serialize Studio UI'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1
+          git commit -m 'feat: mirror NotebookLM Audio artifact to Drive sync' || true
           git push
 
           RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
+          WORKER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js)
+          MIRROR_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js)
           SOURCE_COMMIT=$(git rev-parse HEAD)
-          python - "$RUNNER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
+          python - "$RUNNER_SHA" "$MANIFEST_SHA" "$WORKER_SHA" "$MIRROR_SHA" "$SOURCE_COMMIT" <<'PY'
           from pathlib import Path
           import json,sys
-          rsha,msha,commit=sys.argv[1:4]
+          rsha,msha,wsha,ash,commit=sys.argv[1:6]
           p=Path('runtime/stable/release.json')
           d=json.loads(p.read_text(encoding='utf-8'))
-          d['actionId']='APPLY_NOTEBOOKLM_0.2.43_D46_REPORT_SERIAL_STUDIO_20260826'
-          d['version']='0.2.43'
-          d['releasedAt']='2026-08-26T21:12:00+09:00'
-          d['description']='D46 detects real Report/Briefing Doc artifact cards and serializes same-Notebook Studio UI interactions.'
+          d['actionId']='APPLY_NOTEBOOKLM_0.2.44_D47_AUDIO_DRIVE_MIRROR_20260826'
+          d['version']='0.2.44'
+          d['releasedAt']='2026-08-26T21:40:00+09:00'
+          d['description']='D47 Audio success requires actual Notebook download mirrored into Google Drive Desktop NotebookLM_Artifacts/Audio.'
           d['sourceCommit']=commit
-          for f in d['files']:
-              if f['path']=='manifest.json': f['gitBlobSha1']=msha
-              if f['path']=='content/notebooklm-runner.js': f['gitBlobSha1']=rsha
+          wanted={
+            'manifest.json':msha,
+            'worker.js':wsha,
+            'content/notebooklm-runner.js':rsha,
+            'artifact-drive-mirror.js':ash
+          }
+          existing={f.get('path'):f for f in d.get('files',[])}
+          for path,sha in wanted.items():
+              if path in existing: existing[path]['gitBlobSha1']=sha
+              else: d.setdefault('files',[]).append({'path':path,'gitBlobSha1':sha})
           p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.43'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.44'
           git push
