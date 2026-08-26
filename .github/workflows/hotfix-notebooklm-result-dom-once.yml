@@ -20,40 +20,13 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import json
+          import json,base64
           p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
           s=p.read_text(encoding='utf-8')
           start=s.index('  function audioArtifactCardRoot(readyNode) {')
           end=s.index('  async function requestNotebookArtifactDownload', start)
-          new=r'''  function audioArtifactCardRoot(readyNode) {
-    const score = [];
-    const menus = deepQueryAll("button,[role='button'],a").filter(visible).filter(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
-    for (const menu of menus) {
-      let cur = menu.parentElement;
-      for (let depth=0; depth<12 && cur; depth++, cur=cur.parentElement) {
-        const raw = (cur.innerText || cur.textContent || "").trim();
-        const t = norm(raw);
-        if (raw.length < 8 || raw.length > 3000) continue;
-        const duration = /\b\d{1,2}:\d{2}\b/.test(t);
-        const sourceSignal = /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t);
-        const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => t.includes(w)).length;
-        if (duration && sourceSignal && studioMenuHits < 5) {
-          score.push({el:cur,menu,text:raw,depth,len:raw.length});
-          break;
-        }
-      }
-    }
-    if (score.length) return score.sort((a,b)=>a.len-b.len || a.depth-b.depth)[0].el;
-    let cur = readyNode instanceof HTMLElement ? readyNode : null;
-    for (let depth=0; depth<12 && cur; depth++, cur=cur.parentElement) {
-      const raw=(cur.innerText || cur.textContent || "").trim();
-      const t=norm(raw);
-      if (/\b\d{1,2}:\d{2}\b/.test(t) && /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t)) return cur;
-    }
-    return null;
-  }
-
-'''
+          payload='ICBmdW5jdGlvbiBhdWRpb0FydGlmYWN0Q2FyZFJvb3QocmVhZHlOb2RlKSB7CiAgICBjb25zdCBzY29yZSA9IFtdOwogICAgY29uc3QgbWVudXMgPSBkZWVwUXVlcnlBbGwoImJ1dHRvbixbcm9sZT0nYnV0dG9uJ10sYSIpLmZpbHRlcih2aXNpYmxlKS5maWx0ZXIoZWwgPT4gL21vcmVfdmVydHxtb3JlIG9wdGlvbnN8bW9yZSBhY3Rpb25zfOuNlOuztOq4sHzsmLXshZh866mU64m0Ly50ZXN0KGFjdGlvbkxhYmVsKGVsKSkpOwogICAgZm9yIChjb25zdCBtZW51IG9mIG1lbnVzKSB7CiAgICAgIGxldCBjdXIgPSBtZW51LnBhcmVudEVsZW1lbnQ7CiAgICAgIGZvciAobGV0IGRlcHRoPTA7IGRlcHRoPDEyICYmIGN1cjsgZGVwdGgrKywgY3VyPWN1ci5wYXJlbnRFbGVtZW50KSB7CiAgICAgICAgY29uc3QgcmF3ID0gKGN1ci5pbm5lclRleHQgfHwgY3VyLnRleHRDb250ZW50IHx8ICIiKS50cmltKCk7CiAgICAgICAgY29uc3QgdCA9IG5vcm0ocmF3KTsKICAgICAgICBpZiAocmF3Lmxlbmd0aCA8IDggfHwgcmF3Lmxlbmd0aCA+IDMwMDApIGNvbnRpbnVlOwogICAgICAgIGNvbnN0IGR1cmF0aW9uID0gL1xiXGR7MSwyfTpcZHsyfVxiLy50ZXN0KHQpOwogICAgICAgIGNvbnN0IHNvdXJjZVNpZ25hbCA9IC/shozsiqRccypcZCvqsJx8c291cmNlcz9ccypcZCt865SlIOuLpOydtOu4jHxkZWVwIGRpdmUvLnRlc3QodCk7CiAgICAgICAgY29uc3Qgc3R1ZGlvTWVudUhpdHMgPSBbImFpIOyYpOuUlOyYpCDsmKTrsoTrt7AiLCLsiqzrnbzsnbTrk5wg7J6Q66OMIiwi64+Z7JiB7IOBIOqwnOyalCIsIuuniOyduOuTnOuntSIsIuuztOqzoOyEnCIsIu2UjOuemOyLnOy5tOuTnCIsIu2AtOymiCIsIuyduO2PrOq3uOuemO2UvSIsIuuNsOydtO2EsCDtkZwiXS5maWx0ZXIodyA9PiB0LmluY2x1ZGVzKHcpKS5sZW5ndGg7CiAgICAgICAgaWYgKGR1cmF0aW9uICYmIHNvdXJjZVNpZ25hbCAmJiBzdHVkaW9NZW51SGl0cyA8IDUpIHsKICAgICAgICAgIHNjb3JlLnB1c2goe2VsOmN1cixtZW51LHRleHQ6cmF3LGRlcHRoLGxlbjpyYXcubGVuZ3RofSk7CiAgICAgICAgICBicmVhazsKICAgICAgICB9CiAgICAgIH0KICAgIH0KICAgIGlmIChzY29yZS5sZW5ndGgpIHJldHVybiBzY29yZS5zb3J0KChhLGIpPT5hLmxlbi1iLmxlbiB8fCBhLmRlcHRoLWIuZGVwdGgpWzBdLmVsOwogICAgbGV0IGN1ciA9IHJlYWR5Tm9kZSBpbnN0YW5jZW9mIEhUTUxFbGVtZW50ID8gcmVhZHlOb2RlIDogbnVsbDsKICAgIGZvciAobGV0IGRlcHRoPTA7IGRlcHRoPDEyICYmIGN1cjsgZGVwdGgrKywgY3VyPWN1ci5wYXJlbnRFbGVtZW50KSB7CiAgICAgIGNvbnN0IHJhdz0oY3VyLmlubmVyVGV4dCB8fCBjdXIudGV4dENvbnRlbnQgfHwgIiIpLnRyaW0oKTsKICAgICAgY29uc3QgdD1ub3JtKHJhdyk7CiAgICAgIGlmICgvXGJcZHsxLDJ9OlxkezJ9XGIvLnRlc3QodCkgJiYgL+yGjOyKpFxzKlxkK+qwnHxzb3VyY2VzP1xzKlxkK3zrlKUg64uk7J2067iMfGRlZXAgZGl2ZS8udGVzdCh0KSkgcmV0dXJuIGN1cjsKICAgIH0KICAgIHJldHVybiBudWxsOwogIH0KCg=='
+          new=base64.b64decode(payload).decode('utf-8')
           s=s[:start]+new+s[end:]
           p.write_text(s,encoding='utf-8')
           mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
@@ -78,7 +51,7 @@ jobs:
           d=json.loads(p.read_text(encoding='utf-8'))
           d['actionId']='APPLY_NOTEBOOKLM_0.2.47_D50_AUDIO_MENU_ANCESTRY_20260826'
           d['version']='0.2.47'
-          d['releasedAt']='2026-08-26T22:20:00+09:00'
+          d['releasedAt']='2026-08-26T22:24:00+09:00'
           d['description']='D50 resolves the real Audio card from its menu-button ancestry and retains D49 mirror routing.'
           d['sourceCommit']=commit
           for f in d['files']:
