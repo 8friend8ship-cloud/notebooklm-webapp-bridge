@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.33",
-  "description": "D36 adds Audio Overview generation through Studio and verifies actual ready-player evidence. Preserves D34 result readback and D35 stale-state guard. No new permissions, OAuth, Apps Script, Host, normal Chrome, publish, or paid changes.",
+  "version": "0.2.34",
+  "description": "D37 allows Audio Overview to reuse existing notebook sources when current Gemini Notebook source-add control is unavailable, while still requiring actual ready-player evidence before DONE. No new permissions, OAuth, Apps Script, Host, normal Chrome, publish, or paid changes.",
   "permissions": [
     "alarms",
     "identity",

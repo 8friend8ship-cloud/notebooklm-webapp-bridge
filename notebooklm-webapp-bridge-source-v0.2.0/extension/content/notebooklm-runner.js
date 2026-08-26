@@ -462,7 +462,7 @@
 
   async function runAudioOverview(task) {
     const source = await addSource(task);
-    if (!source.ok && task.sourceText) throw new Error(`AUDIO_SOURCE_ADD_FAILED: ${source.reason || "unknown"}`);
+    const sourceFallback = !source.ok && Boolean(task.sourceText);
 
     const studio = findDeepControl(["studio","스튜디오"]);
     if (studio) { try { studio.click(); } catch {} await sleep(1200); }
@@ -505,7 +505,7 @@
       taskId:task.taskId,
       contentId:task.contentId || "",
       taskType:task.taskType || "AUDIO_OVERVIEW",
-      source
+      source: {...source, existingNotebookFallback: sourceFallback}
     };
   }
 
