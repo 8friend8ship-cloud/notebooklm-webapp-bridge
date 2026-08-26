@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Patch current Korean Audio Overview labels and publish stable 0.2.35
+      - name: Patch Video Overview state machine and publish stable 0.2.36
         shell: bash
         run: |
           python - <<'PY'
@@ -24,29 +24,33 @@ jobs:
 
           runner = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
           text = runner.read_text(encoding='utf-8')
-          old1 = 'return t.includes("audio overview") || t.includes("오디오 개요") || t.includes("음성 개요");'
-          new1 = 'return t.includes("audio overview") || t.includes("ai 오디오 오버뷰") || t.includes("오디오 오버뷰") || t.includes("오디오 개요") || t.includes("음성 개요");'
-          if old1 not in text:
-              raise SystemExit('audio container label target missing')
-          text = text.replace(old1, new1, 1)
-          old2 = 'findDeepControl(["audio overview","오디오 개요","음성 개요"])'
-          new2 = 'findDeepControl(["audio overview","ai 오디오 오버뷰","오디오 오버뷰","오디오 개요","음성 개요"])'
-          if old2 not in text:
-              raise SystemExit('audio control label target missing')
-          text = text.replace(old2, new2, 1)
+          if 'async function runVideoOverview(task)' in text:
+              raise SystemExit('video overview patch already present')
+
+          anchor = '  async function runTask(task) {\n'
+          if anchor not in text:
+              raise SystemExit('runTask anchor missing')
+
+          video_code = '''  function videoOverviewContainer() {\n    const nodes = deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);\n    return nodes.find(el => {\n      const t = norm(el.innerText || el.textContent || "");\n      return t.includes("video overview") || t.includes("동영상 개요") || t.includes("비디오 개요");\n    }) || null;\n  }\n\n  function videoOverviewReady() {\n    for (const el of deepQueryAll("video")) {\n      try { if (el.currentSrc || el.src || Number.isFinite(el.duration)) return el; } catch {}\n    }\n    const c = videoOverviewContainer();\n    if (!c) return null;\n    const t = norm(c.innerText || c.textContent || "");\n    const labels = [...c.querySelectorAll("button,[role=button]")].filter(visible).map(b => norm([b.innerText,b.textContent,b.getAttribute("aria-label"),b.getAttribute("title")].join(" "))).join(" ");\n    if (/play|재생|download|다운로드|share|공유/.test(labels) && !/generating|생성 중|creating|만드는 중/.test(t)) return c;\n    return null;\n  }\n\n  async function runVideoOverview(task) {\n    const source = await addSource(task);\n    const sourceFallback = !source.ok && Boolean(task.sourceText);\n\n    const studio = findDeepControl(["studio","스튜디오"]);\n    if (studio) { try { studio.click(); } catch {} await sleep(1200); }\n\n    const videoControl = await waitFor(() => findDeepControl(["video overview","동영상 개요","비디오 개요"]), 30000, 500);\n    if (!videoControl) throw new Error(`VIDEO_OVERVIEW_CONTROL_NOT_FOUND: ${location.href}`);\n\n    const before = videoOverviewReady();\n    if (!before) {\n      try { videoControl.click(); } catch {}\n      await sleep(1200);\n\n      const generate = await waitFor(() => {\n        for (const d of dialogs()) {\n          const b = findButton(["생성","만들기","generate","create"], d);\n          if (b) return b;\n        }\n        const c = videoOverviewContainer();\n        if (!c) return null;\n        return [...c.querySelectorAll("button,[role=button]")].filter(visible).find(el => {\n          const t = norm([el.innerText,el.textContent,el.getAttribute("aria-label"),el.getAttribute("title")].join(" "));\n          return /generate|create|생성|만들기/.test(t);\n        }) || null;\n      }, 15000, 400);\n      if (generate) { try { generate.click(); } catch {} await sleep(1000); }\n    }\n\n    const timeoutMs = Math.max(300000, Number(task.timeoutSeconds || 900) * 1000);\n    const ready = await waitFor(() => videoOverviewReady(), timeoutMs, 3000);\n    if (!ready) throw new Error("VIDEO_OVERVIEW_GENERATION_TIMEOUT_OR_PLAYER_NOT_FOUND");\n\n    return {\n      resultText:"VIDEO_OVERVIEW_READY",\n      resultUrls:[location.href],\n      captureMode:"VIDEO_PLAYER_READY",\n      notebookUrl:location.href,\n      pageTitle:document.title,\n      capturedAt:new Date().toISOString(),\n      status:"DONE",\n      taskId:task.taskId,\n      contentId:task.contentId || "",\n      taskType:task.taskType || "VIDEO_OVERVIEW",\n      source:{...source, existingNotebookFallback: sourceFallback}\n    };\n  }\n\n'''
+          text = text.replace(anchor, video_code + anchor, 1)
+
+          gate = '    if (["AUDIO","AUDIO_OVERVIEW","NOTEBOOKLM_AUDIO"].includes(normalizedTaskType)) return runAudioOverview(task);\n\n'
+          if gate not in text:
+              raise SystemExit('audio task gate missing')
+          text = text.replace(gate, gate + '    if (["VIDEO","VIDEO_OVERVIEW","NOTEBOOKLM_VIDEO"].includes(normalizedTaskType)) return runVideoOverview(task);\n\n', 1)
           runner.write_text(text, encoding='utf-8')
 
           manifest = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m = json.loads(manifest.read_text(encoding='utf-8'))
-          m['version'] = '0.2.35'
-          m['description'] = 'D38 updates Audio Overview selectors for the current Korean Gemini Notebook labels AI 오디오 오버뷰/오디오 오버뷰. Keeps existing-source fallback and requires actual ready-player evidence before DONE. No new permissions or approvals.'
+          m['version'] = '0.2.36'
+          m['description'] = 'D39 adds NotebookLM/Gemini Notebook Video Overview state-machine generation and requires actual ready video-player evidence before DONE. Preserves validated Audio Overview and current Korean UI labels. No new permissions or approvals.'
           manifest.write_text(json.dumps(m, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'fix: support current Korean Audio Overview labels'
+          git commit -m 'feat: add NotebookLM Video Overview state machine'
           git push
 
           RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
@@ -59,10 +63,10 @@ jobs:
           runner_sha, manifest_sha, source_commit = sys.argv[1:4]
           p = Path('runtime/stable/release.json')
           d = json.loads(p.read_text(encoding='utf-8'))
-          d['actionId'] = 'APPLY_NOTEBOOKLM_0.2.35_D38_KO_AUDIO_OVERVIEW_LABELS_20260826'
-          d['version'] = '0.2.35'
-          d['releasedAt'] = '2026-08-26T19:08:00+09:00'
-          d['description'] = 'D38 updates current Korean Gemini Notebook Audio Overview UI labels and preserves actual ready-player verification. Existing approved runtime only.'
+          d['actionId'] = 'APPLY_NOTEBOOKLM_0.2.36_D39_VIDEO_OVERVIEW_STATE_MACHINE_20260826'
+          d['version'] = '0.2.36'
+          d['releasedAt'] = '2026-08-26T19:25:00+09:00'
+          d['description'] = 'D39 adds Video Overview generation via Studio and requires VIDEO_PLAYER_READY evidence before DONE. Existing approved runtime only.'
           d['sourceCommit'] = source_commit
           for f in d['files']:
               if f['path'] == 'manifest.json': f['gitBlobSha1'] = manifest_sha
@@ -71,5 +75,5 @@ jobs:
           PY
 
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.35'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.36'
           git push
