@@ -438,9 +438,83 @@
     throw new Error("실제 NotebookLM 답변 텍스트가 생성되지 않았습니다.");
   }
 
+  function audioOverviewContainer() {
+    const nodes = deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);
+    return nodes.find(el => {
+      const t = norm(el.innerText || el.textContent || "");
+      return t.includes("audio overview") || t.includes("오디오 개요") || t.includes("음성 개요");
+    }) || null;
+  }
+
+  function audioOverviewReady() {
+    for (const el of deepQueryAll("audio")) {
+      try {
+        if (el.currentSrc || el.src || Number.isFinite(el.duration)) return el;
+      } catch {}
+    }
+    const c = audioOverviewContainer();
+    if (!c) return null;
+    const t = norm(c.innerText || c.textContent || "");
+    const labels = [...c.querySelectorAll("button,[role=button]")].filter(visible).map(b => norm([b.innerText,b.textContent,b.getAttribute("aria-label"),b.getAttribute("title")].join(" "))).join(" ");
+    if (/play|재생|download|다운로드|share|공유/.test(labels) && !/generating|생성 중|creating|만드는 중/.test(t)) return c;
+    return null;
+  }
+
+  async function runAudioOverview(task) {
+    const source = await addSource(task);
+    if (!source.ok && task.sourceText) throw new Error(`AUDIO_SOURCE_ADD_FAILED: ${source.reason || "unknown"}`);
+
+    const studio = findDeepControl(["studio","스튜디오"]);
+    if (studio) { try { studio.click(); } catch {} await sleep(1200); }
+
+    const audioControl = await waitFor(() => findDeepControl(["audio overview","오디오 개요","음성 개요"]), 30000, 500);
+    if (!audioControl) throw new Error(`AUDIO_OVERVIEW_CONTROL_NOT_FOUND: ${location.href}`);
+
+    const before = audioOverviewReady();
+    if (!before) {
+      try { audioControl.click(); } catch {}
+      await sleep(1200);
+
+      const generate = await waitFor(() => {
+        for (const d of dialogs()) {
+          const b = findButton(["생성","만들기","generate","create"], d);
+          if (b) return b;
+        }
+        const c = audioOverviewContainer();
+        if (!c) return null;
+        return [...c.querySelectorAll("button,[role=button]")].filter(visible).find(el => {
+          const t = norm([el.innerText,el.textContent,el.getAttribute("aria-label"),el.getAttribute("title")].join(" "));
+          return /generate|create|생성|만들기/.test(t);
+        }) || null;
+      }, 12000, 400);
+      if (generate) { try { generate.click(); } catch {} await sleep(1000); }
+    }
+
+    const timeoutMs = Math.max(180000, Number(task.timeoutSeconds || 600) * 1000);
+    const ready = await waitFor(() => audioOverviewReady(), timeoutMs, 2500);
+    if (!ready) throw new Error("AUDIO_OVERVIEW_GENERATION_TIMEOUT_OR_PLAYER_NOT_FOUND");
+
+    return {
+      resultText:"AUDIO_OVERVIEW_READY",
+      resultUrls:[location.href],
+      captureMode:"AUDIO_PLAYER_READY",
+      notebookUrl:location.href,
+      pageTitle:document.title,
+      capturedAt:new Date().toISOString(),
+      status:"DONE",
+      taskId:task.taskId,
+      contentId:task.contentId || "",
+      taskType:task.taskType || "AUDIO_OVERVIEW",
+      source
+    };
+  }
+
   async function runTask(task) {
     if (!HOSTS.has(location.hostname)) throw new Error("NotebookLM 페이지가 아닙니다.");
     if (!task?.taskId) throw new Error("TASK_ID가 없습니다.");
+
+    const normalizedTaskType = String(task.taskType || "CHAT").toUpperCase();
+    if (["AUDIO","AUDIO_OVERVIEW","NOTEBOOKLM_AUDIO"].includes(normalizedTaskType)) return runAudioOverview(task);
 
     const source = await addSource(task);
     const editor = await ensureChatSurface();
