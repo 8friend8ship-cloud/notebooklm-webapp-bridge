@@ -683,6 +683,46 @@
     return { resultText:ready, resultUrls:[location.href], captureMode:"DATA_TABLE_READY", notebookUrl:location.href, pageTitle:document.title, capturedAt:new Date().toISOString(), status:"DONE", taskId:task.taskId, contentId:task.contentId || "", taskType:task.taskType || "DATA_TABLE", source:{...source, existingNotebookFallback:sourceFallback} };
   }
 
+  function studioArtifactCandidates(words) {
+    const out = []; const seen = new Set();
+    for (const el of deepQueryAll("section,article,div,[role=group],[role=region],button,[role=button]").filter(visible)) {
+      const t = (el.innerText || el.textContent || "").trim();
+      if (!t || t.length < 8 || t.length > 12000 || seen.has(t)) continue;
+      const n = norm(t);
+      if (!words.some(w => n.includes(norm(w)))) continue;
+      if (/생성 중|generating|creating|만드는 중|준비 중|preparing/.test(n)) continue;
+      if (/소스\s*\d+개|sources?\s*\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|cards?|questions?|slides?|pages?/.test(n) || t.length > 40) { seen.add(t); out.push(t); }
+    }
+    return out;
+  }
+
+  async function runStudioArtifact(task, spec) {
+    const source = await addSource(task);
+    const sourceFallback = !source.ok && Boolean(task.sourceText);
+    const studio = findDeepControl(["studio","스튜디오"]);
+    if (studio) { try { studio.click(); } catch {} await sleep(1000); }
+    const baseline = new Set(studioArtifactCandidates(spec.evidenceWords));
+    const control = await waitFor(() => findDeepControl(spec.controlWords), 30000, 500);
+    if (!control) throw new Error(`${spec.code}_CONTROL_NOT_FOUND: ${location.href}`);
+    try { control.click(); } catch {} await sleep(1000);
+    let generate = null;
+    for (const d of dialogs()) { generate = findButton(["생성","만들기","generate","create"], d); if (generate) break; }
+    if (!generate) generate = findDeepControl(["생성","만들기","generate","create"]);
+    if (generate) { try { generate.click(); } catch {} await sleep(900); }
+    const timeoutMs = Math.max(spec.minTimeoutMs, Number(task.timeoutSeconds || spec.defaultTimeoutSec) * 1000);
+    const ready = await waitFor(() => studioArtifactCandidates(spec.evidenceWords).find(t => !baseline.has(t)) || null, timeoutMs, spec.pollMs);
+    if (!ready) throw new Error(`${spec.code}_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND`);
+    return {resultText:ready,resultUrls:[location.href],captureMode:`${spec.code}_READY`,artifactType:spec.code,notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||spec.code,source:{...source,existingNotebookFallback:sourceFallback}};
+  }
+
+  const STUDIO_ARTIFACT_SPECS = Object.freeze({
+    SLIDES:{code:"SLIDES",controlWords:["슬라이드 자료","slide deck","slides"],evidenceWords:["슬라이드 자료","slide deck","slides"],defaultTimeoutSec:300,minTimeoutMs:120000,pollMs:1800},
+    MIND_MAP:{code:"MIND_MAP",controlWords:["마인드맵","mind map"],evidenceWords:["마인드맵","mind map"],defaultTimeoutSec:180,minTimeoutMs:60000,pollMs:1200},
+    FLASHCARDS:{code:"FLASHCARDS",controlWords:["플래시카드","flashcards","flash cards"],evidenceWords:["플래시카드","flashcards","flash cards"],defaultTimeoutSec:180,minTimeoutMs:60000,pollMs:1200},
+    QUIZ:{code:"QUIZ",controlWords:["퀴즈","quiz"],evidenceWords:["퀴즈","quiz"],defaultTimeoutSec:180,minTimeoutMs:60000,pollMs:1200},
+    INFOGRAPHIC:{code:"INFOGRAPHIC",controlWords:["인포그래픽","infographic"],evidenceWords:["인포그래픽","infographic"],defaultTimeoutSec:300,minTimeoutMs:120000,pollMs:1800}
+  });
+
   async function runTask(task) {
     if (!HOSTS.has(location.hostname)) throw new Error("NotebookLM 페이지가 아닙니다.");
     if (!task?.taskId) throw new Error("TASK_ID가 없습니다.");
@@ -695,6 +735,16 @@
     if (["REPORT","NOTEBOOKLM_REPORT","NOTEBOOKLM_REPORT_PDF"].includes(normalizedTaskType)) return runReport(task);
 
     if (["DATA_TABLE","NOTEBOOKLM_DATA_TABLE"].includes(normalizedTaskType)) return runDataTable(task);
+
+    if (["SLIDES","SLIDE_DECK","NOTEBOOKLM_SLIDES"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.SLIDES);
+
+    if (["MIND_MAP","MINDMAP","NOTEBOOKLM_MIND_MAP"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.MIND_MAP);
+
+    if (["FLASHCARDS","FLASHCARD","NOTEBOOKLM_FLASHCARDS"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.FLASHCARDS);
+
+    if (["QUIZ","NOTEBOOKLM_QUIZ"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.QUIZ);
+
+    if (["INFOGRAPHIC","NOTEBOOKLM_INFOGRAPHIC"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.INFOGRAPHIC);
 
     const source = await addSource(task);
     const editor = await ensureChatSurface();

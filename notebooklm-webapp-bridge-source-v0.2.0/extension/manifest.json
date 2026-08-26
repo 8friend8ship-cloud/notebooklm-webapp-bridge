@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.38",
-  "description": "D41 adds current Studio Data Table generation with actual table/grid evidence before DONE. Preserves Audio, Video, and Report state machines. No new permissions or approvals.",
+  "version": "0.2.39",
+  "description": "D42 adds shared Studio state-machine support for Slides, Mind Map, Flashcards, Quiz, and Infographic with type-specific artifact evidence before DONE. Preserves Chat, Audio, Video, Report, and Data Table paths. No new permissions or approvals.",
   "permissions": [
     "alarms",
     "identity",
