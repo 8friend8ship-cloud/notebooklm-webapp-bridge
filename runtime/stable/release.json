@@ -3,19 +3,19 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.34_D37_AUDIO_EXISTING_SOURCE_FALLBACK_20260826",
-  "version": "0.2.34",
-  "releasedAt": "2026-08-26T19:03:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.35_D38_KO_AUDIO_OVERVIEW_LABELS_20260826",
+  "version": "0.2.35",
+  "releasedAt": "2026-08-26T19:08:00+09:00",
   "requiresUserApproval": false,
-  "description": "D37 Audio Overview can reuse existing notebook sources when source-add UI is unavailable, but DONE still requires an actual ready audio player. Existing approved runtime only.",
-  "sourceCommit": "cf4e1b880213b0e6d44501c5e68d7c3ca81922f1",
+  "description": "D38 updates current Korean Gemini Notebook Audio Overview UI labels and preserves actual ready-player verification. Existing approved runtime only.",
+  "sourceCommit": "9d9f16dcd408c0a7f038e7cbe68db179819afa6d",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "82d61e5aed5314346a9ea9bfee6e98085bf71478"
+      "gitBlobSha1": "9f2eaa555a0794a3135dd2804a7e1c7b7338a4f3"
     },
     {
       "path": "worker.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "18dee73e0fe45ee3b361cb9adbfd0de61dc96ef9"
+      "gitBlobSha1": "65a2e4116a588b3bd6f36dc8b817b21e232d1962"
     }
   ]
 }
