@@ -1,0 +1,59 @@
+name: test-download-handoff
+
+on:
+  push:
+    branches:
+      - 'fix/notebooklm-exact-download-sync-20260828-r2'
+    paths:
+      - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
+      - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
+      - 'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1'
+      - 'tests/download-handoff.test.mjs'
+      - '.github/workflows/test-download-handoff.yml'
+  pull_request:
+    paths:
+      - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
+      - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
+      - 'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1'
+      - 'tests/download-handoff.test.mjs'
+      - '.github/workflows/test-download-handoff.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: JavaScript syntax
+        run: node --check notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js
+
+      - name: Download handoff regression tests
+        run: npm test
+
+      - name: PowerShell syntax
+        shell: pwsh
+        run: |
+          $files = @(
+            'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1',
+            'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1'
+          )
+          $failed = $false
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "PowerShell parse errors in $file"
+              $errors | ForEach-Object { Write-Host $_.Message }
+            }
+          }
+          if ($failed) { exit 1 }
