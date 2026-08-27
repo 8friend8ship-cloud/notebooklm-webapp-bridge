@@ -1,0 +1,59 @@
+name: simplify-download-click-only-0265-once
+on:
+  push:
+    paths:
+      - '.github/workflows/simplify-download-click-only-0265-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Simplify NotebookLM artifact download to click-only
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, subprocess
+          root=Path('notebooklm-webapp-bridge-source-v0.2.0/extension')
+          runner=root/'content/notebooklm-runner.js'
+          manifest=root/'manifest.json'
+          r=runner.read_text(encoding='utf-8')
+
+          old1='''    const mirrored=await mirrorNotebookArtifactToDrive(task,spec.code,startedAtEpochMs);\n    if (!mirrored?.ok) return {ok:false,error:`${spec.code}_REAL_FILE_NOT_FOUND_OR_MIRROR_FAILED:${mirrored?.error||'unknown'}`,mirror:mirrored};\n    return {ok:true,method:`${spec.code}_FINAL_CARD_MENU_DOWNLOAD`,startedAtEpochMs,mirror:mirrored};\n'''
+          new1='''    return {ok:true,method:`${spec.code}_FINAL_CARD_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs};\n'''
+          if old1 not in r: raise SystemExit('requestStudioArtifactDownload mirror block missing')
+          r=r.replace(old1,new1,1)
+
+          old2='''    const mirrored=await mirrorNotebookArtifactToDrive(task,spec.code,startedAtEpochMs);\n    if (!mirrored?.ok || !mirrored?.mirror?.ok) {\n      throw new Error(`${spec.code}_EXISTING_REAL_FILE_NOT_FOUND_OR_MIRROR_FAILED:${mirrored?.error||mirrored?.mirror?.error||mirrored?.raw?.stderr||"unknown"}`);\n    }\n    return {\n      resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),\n      resultUrls:[location.href],\n      captureMode:`${spec.code}_EXISTING_REAL_FILE_MIRRORED`,\n      artifactType:spec.code,\n      actualArtifact:{mirror:mirrored.mirror,localTaskId:mirrored.localTaskId},\n      notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),\n      status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||`${spec.code}_EXISTING_DOWNLOAD`\n    };\n'''
+          new2='''    return {\n      resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),\n      resultUrls:[location.href],\n      captureMode:`${spec.code}_EXISTING_DOWNLOAD_CLICKED`,\n      artifactType:spec.code,\n      actualArtifact:{requested:true,method:`${spec.code}_EXISTING_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs},\n      notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),\n      status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||`${spec.code}_EXISTING_DOWNLOAD`\n    };\n'''
+          if old2 not in r: raise SystemExit('runExistingStudioArtifactDownload mirror block missing')
+          r=r.replace(old2,new2,1)
+          runner.write_text(r,encoding='utf-8')
+
+          m=json.loads(manifest.read_text(encoding='utf-8'))
+          m['version']='0.2.65'
+          m['description']='D71 simplifies NotebookLM artifact handling to UI download-click only. No download path override, file move, or Drive mirror gate in the click action.'
+          manifest.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+
+          relp=Path('runtime/stable/release.json')
+          rel=json.loads(relp.read_text(encoding='utf-8'))
+          rel['version']='0.2.65'
+          rel['actionId']='APPLY_NOTEBOOKLM_0.2.65_D71_DOWNLOAD_CLICK_ONLY_20260827'
+          rel['releasedAt']='2026-08-27T17:05:00+09:00'
+          rel['description']='D71 makes NotebookLM artifact actions only open the artifact menu and click Download. Existing browser download settings are left untouched; file verification is a separate step.'
+          rel['requiresUserApproval']=False
+          for entry in rel['files']:
+            p=root/entry['path']
+            if not p.exists(): raise SystemExit(f'missing release file {p}')
+            entry['gitBlobSha1']=subprocess.check_output(['git','hash-object',str(p)],text=True).strip()
+          relp.write_text(json.dumps(rel,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Commit patched runtime
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json runtime/stable/release.json
+          git commit -m 'Bridge 0.2.65 download click only' || exit 0
+          git push
