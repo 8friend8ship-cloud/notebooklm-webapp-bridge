@@ -3,19 +3,19 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.67_D77_STALE_DONE_ACTIVE_LOCK_RECOVERY_20260827",
-  "version": "0.2.67",
-  "releasedAt": "2026-08-27T19:25:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.68_D78_REAL_DOWNLOAD_EVIDENCE_20260827",
+  "version": "0.2.68",
+  "releasedAt": "2026-08-27T19:50:00+09:00",
   "requiresUserApproval": false,
-  "description": "D77 clears a stale completed Local PowerShell active lock after 60s so the existing allowlisted governor can run actual Windows Downloads readback. It does not change the Chrome download path, move files, create NotebookLM artifacts, or add permissions.",
-  "sourceCommit": "2e6090b810ca14f49644b59cff663043d813720b",
+  "description": "D78 existing-artifact downloads are successful only when Chrome downloads API confirms state=complete, exists=true, and nonzero bytes. No download-path change, file move, Drive mirror, or new NotebookLM generation.",
+  "sourceCommit": "df3d99558ce7581c7f2bbe9d16eec7c6e991632c",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "09337c4c7ed232685cb5a9caf2273434769f94ae"
+      "gitBlobSha1": "65552de2a3f956435bd5a11b629a0ff1231d1d69"
     },
     {
       "path": "worker.js",
@@ -43,7 +43,7 @@
     },
     {
       "path": "background.js",
-      "gitBlobSha1": "fcdd472432c0af3b15d672b6acfd0f98de917dd1"
+      "gitBlobSha1": "c3ed4826e97b1ba22aa6925ca55b51070d06ff31"
     },
     {
       "path": "local-powershell-runner.js",
@@ -63,7 +63,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "eb9de7264d921bf681aa238f80780469dcedb12c"
+      "gitBlobSha1": "78957804138b81d5c010ff16ee336666bea83b18"
     },
     {
       "path": "artifact-drive-mirror.js",

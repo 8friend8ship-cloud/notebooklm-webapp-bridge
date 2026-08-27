@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.67",
-  "description": "D77 clears a stale completed Local PowerShell active lock after its finalize grace period, while preserving the existing-artifact download-click behavior and existing download path.",
+  "version": "0.2.68",
+  "description": "D78 verifies that an existing NotebookLM Download click produced a real completed Chrome download with a nonzero file. It does not change the download path or move/mirror files.",
   "permissions": [
     "alarms",
+    "downloads",
     "identity",
     "identity.email",
     "scripting",

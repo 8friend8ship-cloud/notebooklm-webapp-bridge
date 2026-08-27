@@ -122,6 +122,24 @@ async function getChromeProfile() {
   }
 }
 
+async function verifyDownloadAfterClick(startedAtEpochMs, timeoutMs = 30000) {
+  if (!chrome.downloads?.search) return { ok: false, error: 'CHROME_DOWNLOADS_API_UNAVAILABLE' };
+  const startMs = Math.max(0, Number(startedAtEpochMs || Date.now()) - 3000);
+  const startedAfter = new Date(startMs).toISOString();
+  const deadline = Date.now() + Math.max(5000, Number(timeoutMs || 30000));
+  let last = [];
+  while (Date.now() < deadline) {
+    const items = await chrome.downloads.search({ startedAfter, orderBy: ['-startTime'], limit: 20 });
+    last = (items || []).map((item) => ({ id:item.id, filename:item.filename||'', state:item.state||'', exists:item.exists !== false, fileSize:Number(item.fileSize||0), totalBytes:Number(item.totalBytes||0), startTime:item.startTime||'', endTime:item.endTime||'', error:item.error||'', url:item.url||'' }));
+    const complete = last.find((item) => item.state === 'complete' && item.exists && Math.max(item.fileSize, item.totalBytes) > 0);
+    if (complete) return { ok:true, action:'CHROME_DOWNLOAD_VERIFIED', download:complete, recent:last.slice(0,5) };
+    const interrupted = last.find((item) => item.state === 'interrupted');
+    if (interrupted) return { ok:false, error:'CHROME_DOWNLOAD_INTERRUPTED', download:interrupted, recent:last.slice(0,5) };
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return { ok:false, error:'CHROME_DOWNLOAD_NOT_FOUND_OR_INCOMPLETE', recent:last.slice(0,5) };
+}
+
 async function getPersistedSessionToken() {
   const stored = await chrome.storage.local.get(SESSION_STORE_KEYS);
   for (const key of SESSION_STORE_KEYS) {
@@ -357,6 +375,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (typeof handler !== "function") return { ok:false, error:"ARTIFACT_MIRROR_HANDLER_NOT_READY" };
       return await handler(message);
     }
+    if (message.type === "VERIFY_DOWNLOAD_AFTER_CLICK") return await verifyDownloadAfterClick(message.startedAtEpochMs, message.timeoutMs || 30000);
     if (message.type === "GET_CONFIG") return { ok: true, config: await getConfig(), profile: await getChromeProfile(), autoState: await getAutoState() };
     if (message.type === "SAVE_CONFIG") return { ok: true, config: await saveConfig(message.config || {}) };
     if (message.type === "GET_LOGS") {

@@ -972,13 +972,14 @@
     const download=await waitFor(()=>openArtifactDownloadAction(),8000,250);
     if (!download) throw new Error(`${spec.code}_EXISTING_DOWNLOAD_ACTION_NOT_FOUND`);
     try { download.click(); } catch {}
-    await sleep(1200);
+    const downloadEvidence = await chrome.runtime.sendMessage({ source: SOURCE, type: "VERIFY_DOWNLOAD_AFTER_CLICK", startedAtEpochMs, timeoutMs: Math.min(45000, Math.max(15000, Number(task.timeoutSeconds || 30) * 1000)) });
+    if (!downloadEvidence?.ok) throw new Error(`${spec.code}_REAL_DOWNLOAD_NOT_VERIFIED:${downloadEvidence?.error || "UNKNOWN"}`);
     return {
       resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),
       resultUrls:[location.href],
       captureMode:`${spec.code}_EXISTING_DOWNLOAD_CLICKED`,
       artifactType:spec.code,
-      actualArtifact:{requested:true,method:`${spec.code}_EXISTING_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs},
+      actualArtifact:{requested:true,method:`${spec.code}_EXISTING_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs,downloadEvidence},
       notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),
       status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||`${spec.code}_EXISTING_DOWNLOAD`
     };
