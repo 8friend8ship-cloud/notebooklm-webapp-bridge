@@ -59,7 +59,8 @@ foreach($f in @(Get-ChildItem -LiteralPath $Inbox -File -ErrorAction SilentlyCon
   }
 }
 $health=[ordered]@{ok=$true;at=(Get-Date).ToString('o');localInbox=$Inbox;driveInbox=$Dest;copiedCount=$copied.Count;copied=$copied}
-$health|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path (Split-Path $Dest -Parent -Parent) 'capture-bridge-health.json') -Encoding UTF8
+$healthRoot=Split-Path (Split-Path $Dest -Parent) -Parent
+$health|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $healthRoot 'capture-bridge-health.json') -Encoding UTF8
 '@
 Set-Content -LiteralPath $Reconcile -Value $reconcileBody -Encoding UTF8
 
