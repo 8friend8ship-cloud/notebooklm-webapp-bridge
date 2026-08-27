@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.53",
-  "description": "D57 aligns LOCAL_POWERSHELL claimed-without-start recovery to the 60-second central handoff rule.",
+  "version": "0.2.54",
+  "description": "D59 fixes LOCAL_POWERSHELL claimed-to-host handoff to release after 60 seconds and preserves direct visible local-save smoke.",
   "permissions": [
     "alarms",
     "identity",
