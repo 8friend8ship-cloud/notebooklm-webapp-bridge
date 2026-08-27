@@ -57,3 +57,78 @@ jobs:
             }
           }
           if ($failed) { exit 1 }
+
+  windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exact SourcePath to CaptureBridge and Drive smoke
+        shell: pwsh
+        run: |
+          $sourceDir = Join-Path $env:RUNNER_TEMP 'nlm-exact-source'
+          New-Item -ItemType Directory -Path $sourceDir -Force | Out-Null
+          $source = Join-Path $sourceDir 'Audio Overview.mp3'
+          [IO.File]::WriteAllBytes($source, [byte[]](1..64))
+
+          $fakeDrive = Join-Path $env:USERPROFILE 'My Drive'
+          New-Item -ItemType Directory -Path $fakeDrive -Force | Out-Null
+
+          $raw = & ./local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1 `
+            -TaskId 'CI_EXACT_PATH' `
+            -ArtifactType 'AUDIO_OVERVIEW' `
+            -SourcePath $source `
+            -TimeoutSeconds 10
+          $result = ($raw | Select-Object -Last 1) | ConvertFrom-Json
+
+          if (-not $result.ok) { throw 'EXACT_PATH_RESULT_NOT_OK' }
+          if ($result.sourceMode -ne 'EXACT_SOURCE_PATH') { throw "BAD_SOURCE_MODE:$($result.sourceMode)" }
+          if (-not (Test-Path -LiteralPath $result.localCapturePath -PathType Leaf)) { throw 'LOCAL_CAPTURE_MISSING' }
+          if (-not (Test-Path -LiteralPath $result.destinationPath -PathType Leaf)) { throw 'DRIVE_COPY_MISSING' }
+          if ([int64]$result.sourceBytes -ne [int64]$result.localCaptureBytes) { throw 'LOCAL_CAPTURE_SIZE_MISMATCH' }
+          if ([int64]$result.sourceBytes -ne [int64]$result.destinationBytes) { throw 'DRIVE_COPY_SIZE_MISMATCH' }
+          Write-Host "EXACT_PATH_SMOKE_PASS sourceMode=$($result.sourceMode) bytes=$($result.sourceBytes)"
+
+      - name: FileSystemWatcher fallback smoke
+        shell: pwsh
+        run: |
+          $download = Join-Path $env:RUNNER_TEMP 'nlm-watcher-downloads'
+          $capture = Join-Path $env:RUNNER_TEMP 'nlm-watcher-capture'
+          New-Item -ItemType Directory -Path $download,$capture -Force | Out-Null
+          $script = (Resolve-Path './local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1').Path
+
+          $job = Start-Job -ScriptBlock {
+            param($scriptPath,$downloadPath,$capturePath)
+            & $scriptPath `
+              -DownloadFolder $downloadPath `
+              -CaptureFolder $capturePath `
+              -FilenamePattern 'NotebookLM_*' `
+              -RunSeconds 8 `
+              -StableChecks 2 `
+              -StableCheckMilliseconds 100
+          } -ArgumentList $script,$download,$capture
+
+          Start-Sleep -Milliseconds 900
+          $partial = Join-Path $download 'NotebookLM_AutoExport.mp3.crdownload'
+          [IO.File]::WriteAllBytes($partial, [byte[]](1..32))
+          Start-Sleep -Milliseconds 300
+          $final = Join-Path $download 'NotebookLM_AutoExport.mp3'
+          Move-Item -LiteralPath $partial -Destination $final -Force
+
+          Wait-Job -Job $job -Timeout 20 | Out-Null
+          if ($job.State -ne 'Completed') {
+            Stop-Job $job -ErrorAction SilentlyContinue
+            throw "WATCHER_JOB_NOT_COMPLETED:$($job.State)"
+          }
+          $raw = Receive-Job -Job $job
+          Remove-Job -Job $job -Force
+          $result = ($raw | Select-Object -Last 1) | ConvertFrom-Json
+
+          if (-not $result.ok) { throw 'WATCHER_RESULT_NOT_OK' }
+          if ($result.mode -ne 'FALLBACK_ONLY') { throw "WATCHER_BAD_MODE:$($result.mode)" }
+          if ([int]$result.copiedCount -lt 1) { throw 'WATCHER_DID_NOT_CAPTURE_FINAL_FILE' }
+          $copied = Join-Path $capture 'NotebookLM_AutoExport.mp3'
+          if (-not (Test-Path -LiteralPath $copied -PathType Leaf)) { throw 'WATCHER_CAPTURE_FILE_MISSING' }
+          if ((Get-Item -LiteralPath $copied).Length -le 0) { throw 'WATCHER_CAPTURE_ZERO_BYTES' }
+          if (-not (Test-Path -LiteralPath $final -PathType Leaf)) { throw 'WATCHER_MOVED_SOURCE_INSTEAD_OF_COPY' }
+          Write-Host "WATCHER_FALLBACK_SMOKE_PASS copiedCount=$($result.copiedCount)"
