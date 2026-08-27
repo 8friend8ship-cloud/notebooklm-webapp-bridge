@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.25",
-  "releasedAt": "2026-08-27T18:55:00+09:00",
-  "gitBlobSha1": "afda8d46a8f582ff01bd3f760a3d7acfc3d1cc4b",
+  "version": "1.1.24",
+  "releasedAt": "2026-08-27T19:23:00+09:00",
+  "gitBlobSha1": "4ce4fb5ccef43fcf71f6fe58f8733c5e72fe1f2c",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Promotes Host 1.2.4 with one narrow NotebookLM allowlist addition only: local-agent/governor/InspectRecentNotebookLMDownloads.ps1. Preserves existing NotebookLM, animation, and ContentOS allowlists. Fixes actual Windows Downloads verification tasks being CLAIMED but not STARTED because the inspection script was not allowlisted."
+  "notes": "Rollback to last-good Agent 1.1.24 / Host 1.2.3 after Agent 1.1.25 / Host 1.2.4 self-heal failed. Actual Windows Downloads inspection now runs through the already allowlisted RunChromeGovernorReadback.ps1 -InspectNotebookLMDownloads action, so Host allowlist expansion is no longer required. Preserve Chrome download path, OAuth, existing files, and Bridge 0.2.66."
 }
