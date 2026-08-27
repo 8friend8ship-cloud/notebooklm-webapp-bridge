@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.23",
-  "releasedAt": "2026-08-27T13:12:00+09:00",
-  "gitBlobSha1": "8d3f2e55e264baf617fc997ab396f6f8072aa3a7",
+  "version": "1.1.24",
+  "releasedAt": "2026-08-27T18:08:00+09:00",
+  "gitBlobSha1": "4ce4fb5ccef43fcf71f6fe58f8733c5e72fe1f2c",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Refreshes the current Host 1.2.2 wrapper SHA and restarts the Host before reusing the proven Agent 1.1.22 recovery/readback loop. Fixes health-pass but /run-fail caused by a stale Host 1.2.2 build after allowlist updates. No new OAuth, reinstall, or user approval."
+  "notes": "Promotes Host 1.2.3 with one narrow new allowlist rule only: 8friend8ship-cloud/contents-os-git main tools/Switch-ContentOS-VercelGit.ps1. Preserves existing animation and NotebookLM allowlists, existing Vercel login, existing project/domain, and no-deploy policy. Fixes ContentOS relink tasks being claimed but not started because repo/script were not allowlisted."
 }
