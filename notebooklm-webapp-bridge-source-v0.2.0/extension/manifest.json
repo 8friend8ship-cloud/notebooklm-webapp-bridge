@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.66",
-  "description": "D72 runs one safe one-shot smoke that only clicks an existing NotebookLM artifact Download action. It does not change download paths or mirror files.",
+  "version": "0.2.67",
+  "description": "D77 clears a stale completed Local PowerShell active lock after its finalize grace period, while preserving the existing-artifact download-click behavior and existing download path.",
   "permissions": [
     "alarms",
     "identity",

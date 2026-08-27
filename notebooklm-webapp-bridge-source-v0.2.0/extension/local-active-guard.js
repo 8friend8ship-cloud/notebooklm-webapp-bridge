@@ -110,7 +110,13 @@ async function guardStaleActive(reason = "alarm") {
   const ageMs = ageBase ? Date.now() - ageBase : 0;
   const state = String(host?.state || "").toUpperCase();
 
-  if (state === "DONE") return { ok: true, skipped: "done_pending_normal_finalize", taskId, reason };
+  if (state === "DONE") {
+    if (ageMs > GUARD_PENDING_GRACE_MS) {
+      await guardWriteActive(null);
+      return { ok: true, action: "stale_done_active_cleared", taskId, ageMs, reason };
+    }
+    return { ok: true, skipped: "done_pending_normal_finalize", taskId, reason };
+  }
 
   if (pendingHandoff && (state === "NOT_FOUND" || hostError)) {
     if (ageMs && ageMs <= GUARD_PENDING_GRACE_MS) {
