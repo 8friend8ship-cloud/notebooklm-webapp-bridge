@@ -18,6 +18,7 @@ function StopTarget([string]$Needle){foreach($procItem in @(Proc $Needle)){KillT
 function GitBlobSha1([string]$Path){$bytes=[IO.File]::ReadAllBytes($Path);$header=[Text.Encoding]::ASCII.GetBytes(("blob "+$bytes.Length+[char]0));$all=New-Object byte[] ($header.Length+$bytes.Length);[Buffer]::BlockCopy($header,0,$all,0,$header.Length);[Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length);$sha=[Security.Cryptography.SHA1]::Create();try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$sha.Dispose()}}
 function TestHostHealth(){try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3;return [bool]$h.ok}catch{return $false}}
 function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
+function SafeKey([string]$Value){return ([string]$Value -replace '[^A-Za-z0-9_.-]','_')}
 
 Write-Host 'HomeDesign Local Agent - SAFE DIRECT RESUME'
 Write-Host 'No reinstall / no new OAuth / no Apps Script redeploy / normal Chrome untouched.'
@@ -57,33 +58,60 @@ Write-Host '[4/5] Applying stable Agent directly...'
 $directExit=$LASTEXITCODE
 Write-Host ("directAgentExit="+$directExit)
 
-
-# D78 one-shot independent download diagnostic. This is deliberately outside the queue/Host active-lock path.
-# It preserves the existing Chrome user-data and download configuration and never generates a new NotebookLM artifact.
-$D78Marker=Join-Path $Root 'D78_CDP_DOWNLOAD_ONCE.attempted'
-$D78Result=Join-Path $Root 'D78_CDP_DOWNLOAD_RESULT.json'
-if(-not(Test-Path -LiteralPath $D78Marker)){
-  $attempt=[ordered]@{ok=$false;action='D78_CDP_DOWNLOAD_ONCE';startedAt=(Get-Date).ToString('o');stdout='';exitCode=$null;error=''}
+# Version-keyed independent CDP download verification.
+# The exact Agent+Bridge condition is attempted at most once, so same-condition blind retry is blocked.
+# A later Agent or Bridge version creates a new key and therefore permits exactly one changed-condition retest.
+# Existing Chrome user data/download configuration is preserved and no NotebookLM artifact is generated.
+$verifyKey='A'+(SafeKey $targetAgent)+'_B'+(SafeKey $targetBridge)
+$verifyMarker=Join-Path $Root ('NOTEBOOKLM_CDP_DOWNLOAD_'+$verifyKey+'.attempted')
+$verifyResult=Join-Path $Root ('NOTEBOOKLM_CDP_DOWNLOAD_'+$verifyKey+'.json')
+if(-not(Test-Path -LiteralPath $verifyMarker)){
+  $attempt=[ordered]@{
+    ok=$false
+    action='NOTEBOOKLM_CDP_DOWNLOAD_VERSIONED_RETEST'
+    changedCondition=$true
+    agentVersion=$targetAgent
+    bridgeVersion=$targetBridge
+    releaseActionId=[string]$bridge.actionId
+    verifyKey=$verifyKey
+    startedAt=(Get-Date).ToString('o')
+    stdout=''
+    exitCode=$null
+    error=''
+  }
   try{
     $helper=Join-Path $Root 'RunNotebookLMExistingDownloadViaCDP.ps1'
     $helperUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/governor/RunNotebookLMExistingDownloadViaCDP.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     Invoke-WebRequest -UseBasicParsing -Uri $helperUrl -OutFile $helper -TimeoutSec 30
     $out=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $helper 2>&1 | Out-String
-    $attempt.stdout=$out.Trim();$attempt.exitCode=$LASTEXITCODE;$attempt.ok=($LASTEXITCODE -eq 0)
-  }catch{$attempt.error=$_.Exception.Message;$attempt.ok=$false}
+    $attempt.stdout=$out.Trim()
+    $attempt.exitCode=$LASTEXITCODE
+    $attempt.ok=($LASTEXITCODE -eq 0)
+  }catch{
+    $attempt.error=$_.Exception.Message
+    $attempt.ok=$false
+  }
   $attempt.completedAt=(Get-Date).ToString('o')
   $json=$attempt|ConvertTo-Json -Depth 30
-  $json|Set-Content -LiteralPath $D78Result -Encoding UTF8
-  Set-Content -LiteralPath $D78Marker -Value $attempt.completedAt -Encoding ASCII
+  $json|Set-Content -LiteralPath $verifyResult -Encoding UTF8
+  Set-Content -LiteralPath $verifyMarker -Value $attempt.completedAt -Encoding ASCII
   try{
     $centralName=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
     foreach($drv in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
-      $rr=[string]$drv.Root;if(-not $rr){continue}
+      $rr=[string]$drv.Root
+      if(-not $rr){continue}
       foreach($cand in @((Join-Path $rr $centralName),(Join-Path $rr ('My Drive\'+$centralName)),(Join-Path $rr ('내 드라이브\'+$centralName)),(Join-Path $rr ('Google Drive\'+$centralName)))){
-        if(Test-Path -LiteralPath $cand){$dest=Join-Path $cand 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $dest|Out-Null;$json|Set-Content -LiteralPath (Join-Path $dest 'NOTEBOOKLM_CDP_DOWNLOAD_D78.json') -Encoding UTF8;break}
+        if(Test-Path -LiteralPath $cand){
+          $dest=Join-Path $cand 'Runtime_Readback'
+          New-Item -ItemType Directory -Force -Path $dest|Out-Null
+          $json|Set-Content -LiteralPath (Join-Path $dest ('NOTEBOOKLM_CDP_DOWNLOAD_'+$verifyKey+'.json')) -Encoding UTF8
+          break
+        }
       }
     }
   }catch{}
+}else{
+  Write-Host ('CDP versioned retest already attempted for '+$verifyKey+'; same-condition retry blocked.')
 }
 
 Write-Host '[5/5] Ensuring future bootstrap loop...'
@@ -95,9 +123,13 @@ while((Get-Date)-lt $deadline){
   if(Test-Path -LiteralPath $StateFile){
     try{
       $last=Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8|ConvertFrom-Json
-      $av=[string]$last.agentVersion;$hv=[string]$last.commandHostVersion;$hr=TestHostHealth;$bv=[string]$last.extensionVersion
+      $av=[string]$last.agentVersion
+      $hv=[string]$last.commandHostVersion
+      $hr=TestHostHealth
+      $bv=[string]$last.extensionVersion
       if(-not $bv){$bv=[string]$last.installedVersion}
-      $gov=[bool]$last.governorCycleOk;$sync=[bool]$last.governorDriveSyncOk
+      $gov=[bool]$last.governorCycleOk
+      $sync=[bool]$last.governorDriveSyncOk
       Write-Host ("agent="+$av+" host="+$hv+" hostHealth="+$hr+" bridge="+$bv+" status="+[string]$last.status+" governor="+$gov+" driveSync="+$sync)
       if($av -eq $targetAgent -and $hr -and $bv -eq $targetBridge -and $gov -and $sync){
         Write-Host 'RESUME RESULT: ACTIVE + GOVERNOR VERIFIED'
