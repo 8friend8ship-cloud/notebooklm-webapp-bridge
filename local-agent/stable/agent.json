@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.27",
-  "releasedAt": "2026-08-28T08:05:00+09:00",
-  "gitBlobSha1": "666d0b68ef416c31203a6ec0376186de9000e1d5",
+  "version": "1.1.28",
+  "releasedAt": "2026-08-28T08:12:00+09:00",
+  "gitBlobSha1": "60b072c8bb5fa1d268684c74108aedaeae37545a",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "No-reapproval recovery. Preserves the existing healthy async Host and persistent ChromeUserData, refreshes the existing AutoResume/Watchdog scripts, verifies HomeDesignAutomation-AutoResume exists and is enabled with the 5-minute watchdog trigger, and idempotently repairs that existing scheduled-task lineage when missing or invalid. Then applies the current verified stable Bridge release dynamically and writes runtime readback. No new CMD, OAuth reset, download-path change, file move, NotebookLM generation, normal-Chrome mutation, or repeated same-condition approval request."
+  "notes": "No-reapproval dual-persistence recovery. Preserves the healthy async Host and persistent ChromeUserData, refreshes the existing AutoResume/Watchdog scripts, verifies or repairs the existing HomeDesignAutomation-AutoResume scheduled task, and also ensures an HKCU logon fallback points to the same watchdog when Task Scheduler is missing or unavailable. Then applies the current stable Bridge dynamically and writes runtime readback. No new CMD, OAuth reset, download-path change, file move, NotebookLM generation, normal-Chrome mutation, or repeated same-condition approval request."
 }
