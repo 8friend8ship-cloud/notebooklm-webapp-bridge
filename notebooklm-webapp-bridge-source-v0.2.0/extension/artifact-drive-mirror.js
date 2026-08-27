@@ -28,7 +28,66 @@ async function nlmArtifactWait(localTaskId, timeoutMs = 150000) {
   throw new Error("LOCAL_ARTIFACT_MIRROR_TIMEOUT");
 }
 
-function nlmArtifactTask(originalTaskId, artifactType, startedAtEpochMs) {
+function nlmArtifactExpectedExtensions(artifactType) {
+  const map = {
+    AUDIO_OVERVIEW: [".mp3", ".wav", ".m4a", ".ogg", ".mp4"],
+    VIDEO_OVERVIEW: [".mp4", ".webm", ".mov"],
+    SLIDES: [".pdf", ".pptx"],
+    REPORT: [".pdf", ".docx", ".txt"],
+    DATA_TABLE: [".xlsx", ".csv"],
+    INFOGRAPHIC: [".png", ".jpg", ".jpeg", ".webp", ".pdf"],
+    MIND_MAP: [".pdf", ".png", ".json"],
+    FLASHCARDS: [".pdf", ".csv", ".txt"],
+    QUIZ: [".pdf", ".txt", ".csv"]
+  };
+  return map[String(artifactType || "OTHER").toUpperCase()] || [".mp3", ".wav", ".m4a", ".mp4", ".webm", ".pdf", ".pptx", ".xlsx", ".csv", ".png", ".jpg", ".jpeg", ".webp", ".docx", ".txt", ".json"];
+}
+
+function nlmArtifactExtension(filename) {
+  const clean = String(filename || "").split(/[?#]/, 1)[0].toLowerCase();
+  const index = clean.lastIndexOf(".");
+  return index >= 0 ? clean.slice(index) : "";
+}
+
+async function nlmFindCompletedDownload(startedAtEpochMs, artifactType, timeoutMs = 120000) {
+  if (!chrome.downloads?.search) return { ok:false, error:"CHROME_DOWNLOADS_API_UNAVAILABLE" };
+  const startMs = Math.max(0, Number(startedAtEpochMs || Date.now()) - 3000);
+  const startedAfter = new Date(startMs).toISOString();
+  const expected = new Set(nlmArtifactExpectedExtensions(artifactType));
+  const deadline = Date.now() + Math.max(5000, Number(timeoutMs || 120000));
+  let recent = [];
+
+  while (Date.now() < deadline) {
+    const items = await chrome.downloads.search({ startedAfter, orderBy:["-startTime"], limit:20 });
+    recent = (items || []).map((item) => ({
+      id:item.id,
+      filename:String(item.filename || ""),
+      state:String(item.state || ""),
+      exists:item.exists !== false,
+      fileSize:Number(item.fileSize || 0),
+      totalBytes:Number(item.totalBytes || 0),
+      startTime:item.startTime || "",
+      endTime:item.endTime || "",
+      error:item.error || ""
+    }));
+
+    const complete = recent.find((item) => {
+      if (item.state !== "complete" || !item.exists || Math.max(item.fileSize, item.totalBytes) <= 0) return false;
+      if (!item.filename || /\.crdownload$|\.tmp$/i.test(item.filename)) return false;
+      const ext = nlmArtifactExtension(item.filename);
+      return expected.has(ext);
+    });
+    if (complete) return { ok:true, sourcePath:complete.filename, download:complete, recent:recent.slice(0,5) };
+
+    const interrupted = recent.find((item) => item.state === "interrupted");
+    if (interrupted) return { ok:false, error:"CHROME_DOWNLOAD_INTERRUPTED", download:interrupted, recent:recent.slice(0,5) };
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  return { ok:false, error:"CHROME_DOWNLOAD_NOT_FOUND_OR_INCOMPLETE", recent:recent.slice(0,5) };
+}
+
+function nlmArtifactTask(originalTaskId, artifactType, startedAtEpochMs, sourcePath = "") {
   const suffix = Date.now();
   const localTaskId = `LOCAL_ARTIFACT_MIRROR_${String(originalTaskId || "TASK").replace(/[^A-Za-z0-9_.-]/g,"_")}_${suffix}`;
   return {
@@ -47,6 +106,7 @@ function nlmArtifactTask(originalTaskId, artifactType, startedAtEpochMs) {
         args: {
           TaskId: String(originalTaskId || ""),
           ArtifactType: String(artifactType || "OTHER"),
+          SourcePath: String(sourcePath || ""),
           StartedAtEpochMs: Number(startedAtEpochMs || Date.now()),
           TimeoutSeconds: 120
         }
@@ -59,7 +119,18 @@ async function nlmMirrorArtifact(message) {
   const originalTaskId = String(message?.taskId || "");
   const artifactType = String(message?.artifactType || "OTHER");
   if (!originalTaskId) throw new Error("ARTIFACT_TASK_ID_REQUIRED");
-  const prepared = nlmArtifactTask(originalTaskId, artifactType, message?.startedAtEpochMs);
+
+  let sourcePath = String(message?.sourcePath || "");
+  let downloadEvidence = null;
+  if (!sourcePath) {
+    downloadEvidence = await nlmFindCompletedDownload(message?.startedAtEpochMs, artifactType, Number(message?.downloadTimeoutMs || 120000));
+    if (!downloadEvidence?.ok || !downloadEvidence?.sourcePath) {
+      throw new Error(downloadEvidence?.error || "ARTIFACT_EXACT_DOWNLOAD_PATH_NOT_FOUND");
+    }
+    sourcePath = downloadEvidence.sourcePath;
+  }
+
+  const prepared = nlmArtifactTask(originalTaskId, artifactType, message?.startedAtEpochMs, sourcePath);
   const started = await nlmArtifactFetchJson(`${NLM_ARTIFACT_HOST}/run`, {
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -70,7 +141,7 @@ async function nlmMirrorArtifact(message) {
   const stdout = String(inner?.stdout || "").trim();
   let mirror = null;
   try { mirror = stdout ? JSON.parse(stdout.split(/\r?\n/).filter(Boolean).at(-1)) : null; } catch {}
-  return { ok:true, localTaskId:prepared.localTaskId, started, finalState:final?.state || "DONE", mirror, raw:inner };
+  return { ok:true, localTaskId:prepared.localTaskId, sourcePath, downloadEvidence, started, finalState:final?.state || "DONE", mirror, raw:inner };
 }
 
 globalThis.__NLM_MIRROR_ARTIFACT_TO_DRIVE__ = nlmMirrorArtifact;
@@ -92,4 +163,3 @@ chrome.runtime.onConnect.addListener((port) => {
     }
   });
 });
-
