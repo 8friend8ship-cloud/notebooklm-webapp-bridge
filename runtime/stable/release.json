@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.61_D67_AUDIO_PLAYER_CARD_DOWNLOAD_20260827",
-  "version": "0.2.61",
-  "releasedAt": "2026-08-27T16:05:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.62_D68_STUDIO_ARTIFACT_REAL_DOWNLOAD_20260827",
+  "version": "0.2.62",
+  "releasedAt": "2026-08-27T16:20:00+09:00",
   "requiresUserApproval": false,
-  "description": "D67 uses a dedicated audio final-player-card kebab-menu download path; video and document-like artifacts remain separate routes.",
+  "description": "D68 requires actual downloaded file >0 and mirror success for infographic/slides/mind-map/flashcards/quiz Studio artifacts.",
   "sourceCommit": "083ce48c88cce0fcfa6349d06ca56100f4dd2cad",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
@@ -15,7 +15,7 @@
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "2122669963ff6b5191300d7883cd171f13ffeb26"
+      "gitBlobSha1": "a6a5601b92875afe01abfb42b7eb86e74bb3da58"
     },
     {
       "path": "worker.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "4cc45ca3d1079bb53a86d4dd126b9d0eb2017b77"
+      "gitBlobSha1": "1d52a005750d8a55ce2d272d259025f5d767a2c5"
     },
     {
       "path": "artifact-drive-mirror.js",

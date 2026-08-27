@@ -894,6 +894,46 @@
     return out;
   }
 
+  function studioArtifactCardRoot(words, readyText) {
+    const target = norm(readyText || "");
+    const nodes = deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);
+    const candidates = [];
+    for (const el of nodes) {
+      const text=(el.innerText || el.textContent || "").trim();
+      if (!text || text.length < 8 || text.length > 5000) continue;
+      const n=norm(text);
+      if (!words.some(w => n.includes(norm(w)))) continue;
+      if (target && !n.includes(target.slice(0,Math.min(80,target.length))) && !target.includes(n.slice(0,Math.min(80,n.length)))) continue;
+      const menu=artifactMenuButtonWithin(el);
+      if (!menu) continue;
+      candidates.push({el,len:text.length});
+    }
+    if (candidates.length) return candidates.sort((a,b)=>a.len-b.len)[0].el;
+    for (const el of nodes) {
+      const n=norm(el.innerText || el.textContent || "");
+      if (!words.some(w => n.includes(norm(w)))) continue;
+      if (artifactMenuButtonWithin(el)) return el;
+    }
+    return null;
+  }
+
+  async function requestStudioArtifactDownload(task, spec, readyText) {
+    const startedAtEpochMs=Date.now();
+    const root=studioArtifactCardRoot(spec.evidenceWords, readyText);
+    if (!root) return {ok:false,error:`${spec.code}_FINAL_CARD_NOT_FOUND`};
+    const menu=artifactMenuButtonWithin(root);
+    if (!menu) return {ok:false,error:`${spec.code}_FINAL_CARD_MENU_NOT_FOUND`};
+    try { menu.click(); } catch {}
+    await sleep(700);
+    const download=await waitFor(()=>openArtifactDownloadAction(),8000,250);
+    if (!download) return {ok:false,error:`${spec.code}_DOWNLOAD_ACTION_NOT_FOUND`};
+    try { download.click(); } catch {}
+    await sleep(1000);
+    const mirrored=await mirrorNotebookArtifactToDrive(task,spec.code,startedAtEpochMs);
+    if (!mirrored?.ok) return {ok:false,error:`${spec.code}_REAL_FILE_NOT_FOUND_OR_MIRROR_FAILED:${mirrored?.error||'unknown'}`,mirror:mirrored};
+    return {ok:true,method:`${spec.code}_FINAL_CARD_MENU_DOWNLOAD`,startedAtEpochMs,mirror:mirrored};
+  }
+
   async function runStudioArtifact(task, spec) {
     const source = await addSource(task);
     const sourceFallback = !source.ok && Boolean(task.sourceText);
@@ -910,7 +950,9 @@
     const timeoutMs = Math.max(spec.minTimeoutMs, Number(task.timeoutSeconds || spec.defaultTimeoutSec) * 1000);
     const ready = await waitFor(() => studioArtifactCandidates(spec.evidenceWords).find(t => !baseline.has(t)) || null, timeoutMs, spec.pollMs);
     if (!ready) throw new Error(`${spec.code}_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND`);
-    return {resultText:ready,resultUrls:[location.href],captureMode:`${spec.code}_READY`,artifactType:spec.code,notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||spec.code,source:{...source,existingNotebookFallback:sourceFallback}};
+    const actualArtifact = await requestStudioArtifactDownload(task, spec, ready);
+    if (!actualArtifact?.ok) throw new Error(actualArtifact?.error || `${spec.code}_ARTIFACT_DOWNLOAD_FAILED`);
+    return {resultText:ready,resultUrls:[location.href],captureMode:`${spec.code}_READY_AND_DOWNLOADED`,artifactType:spec.code,actualArtifact,notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||spec.code,source:{...source,existingNotebookFallback:sourceFallback}};
   }
 
   const STUDIO_ARTIFACT_SPECS = Object.freeze({

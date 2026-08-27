@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.61",
-  "description": "D67 separates audio from other Studio artifact routes: audio uses the final player card kebab menu directly, with real-file verification retained as the completion gate.",
+  "version": "0.2.62",
+  "description": "D68 adds type-specific Studio artifact download with a real Windows file and Drive mirror gate for infographic, slides, mind map, flashcards and quiz.",
   "permissions": [
     "alarms",
     "identity",
