@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.65_D71_DOWNLOAD_CLICK_ONLY_20260827",
-  "version": "0.2.65",
-  "releasedAt": "2026-08-27T17:05:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.66_D72_ONE_SHOT_DOWNLOAD_CLICK_SMOKE_20260827",
+  "version": "0.2.66",
+  "releasedAt": "2026-08-27T17:20:00+09:00",
   "requiresUserApproval": false,
-  "description": "D71 makes NotebookLM artifact actions only open the artifact menu and click Download. Existing browser download settings are left untouched; file verification is a separate step.",
+  "description": "D72 runs one one-shot smoke that only opens an existing NotebookLM artifact menu and clicks Download once. It does not change browser download paths or mirror files.",
   "sourceCommit": "083ce48c88cce0fcfa6349d06ca56100f4dd2cad",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
@@ -15,11 +15,19 @@
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "0a60ca4ed67e3bcc3accda7903e88ce4fc428d4f"
+      "gitBlobSha1": "8a5a04d87559d9f0389c825eb62d971b37e2b089"
     },
     {
       "path": "worker.js",
-      "gitBlobSha1": "625846f04b65e22f72739f36b6f56eccc3f0334f"
+      "gitBlobSha1": "60ef8ec5e387c2a8fd4a504adcb4aeb9804c1d26"
+    },
+    {
+      "path": "download-click-smoke-worker.js",
+      "gitBlobSha1": "e90cd0ed0bc98e73b139547e66834ed525be4d27"
+    },
+    {
+      "path": "content/download-click-smoke.js",
+      "gitBlobSha1": "526509e795923fc0fe330b519802bfc407409420"
     },
     {
       "path": "chat-active-guard.js",
