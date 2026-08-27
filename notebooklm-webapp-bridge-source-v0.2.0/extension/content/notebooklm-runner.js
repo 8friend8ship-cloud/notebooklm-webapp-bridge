@@ -540,10 +540,40 @@
     return null;
   }
 
+  function audioArtifactDomDiagnostic() {
+    const out = [];
+    const seen = new Set();
+    for (const el of deepQueryAll("*").filter(visible)) {
+      const text = (el.innerText || el.textContent || "").trim();
+      const aria = el.getAttribute?.("aria-label") || "";
+      const title = el.getAttribute?.("title") || "";
+      const dataTest = el.getAttribute?.("data-testid") || "";
+      const combined = norm([text, aria, title, dataTest].join(" "));
+      if (!/more|play|pause|재생|일시정지|다운로드|download|\b\d{1,2}:\d{2}\b/.test(combined)) continue;
+      const p1 = (el.parentElement?.innerText || el.parentElement?.textContent || "").trim().slice(0,240);
+      const p2 = (el.parentElement?.parentElement?.innerText || el.parentElement?.parentElement?.textContent || "").trim().slice(0,360);
+      const key = [el.tagName, aria, title, text.slice(0,120), p1].join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        tag: el.tagName,
+        role: el.getAttribute?.("role") || "",
+        aria: aria.slice(0,160),
+        title: title.slice(0,160),
+        dataTest: dataTest.slice(0,160),
+        text: text.slice(0,180),
+        p1,
+        p2
+      });
+      if (out.length >= 24) break;
+    }
+    return out;
+  }
+
   async function requestNotebookArtifactDownload(readyNode) {
     const startedAtEpochMs = Date.now();
     const root = audioArtifactCardRoot(readyNode);
-    if (!root) return {requested:false, reason:"real audio artifact card not found", startedAtEpochMs};
+    if (!root) return {requested:false, reason:`real audio artifact card not found DOM=${JSON.stringify(audioArtifactDomDiagnostic())}`, startedAtEpochMs};
     const localButtons = [...root.querySelectorAll("button,[role='button'],a")].filter(visible);
     const direct = localButtons.find(el => /(^|\s)(download|다운로드)(\s|$)/.test(actionLabel(el)));
     if (direct) {

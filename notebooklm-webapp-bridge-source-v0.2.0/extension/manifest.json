@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.51",
-  "description": "D55 resolves NotebookLM Audio artifact cards from Material icon descendants such as more_vert/play_arrow, then mirrors the real downloaded file to Drive.",
+  "version": "0.2.52",
+  "description": "D56 diagnostic captures real visible Audio DOM evidence when artifact-card detection fails. No false PASS.",
   "permissions": [
     "alarms",
     "identity",
