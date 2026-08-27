@@ -644,7 +644,32 @@
     });
   }
   
-    async function runAudioOverview(task) {
+    async function runExistingAudioArtifactDownload(task) {
+    const studio = findDeepControl(["studio","스튜디오"]);
+    if (studio) { try { studio.click(); } catch {} await sleep(900); }
+    const ready = await waitFor(() => audioOverviewReady(), 30000, 500);
+    if (!ready) throw new Error("AUDIO_EXISTING_ARTIFACT_NOT_FOUND_NO_GENERATION");
+    const download = await requestAudioArtifactDownload(ready);
+    if (!download?.requested) throw new Error(`AUDIO_EXISTING_DOWNLOAD_NOT_TRIGGERED:${download?.reason || "unknown"}`);
+    const downloadEvidence = await chrome.runtime.sendMessage({
+      source: SOURCE,
+      type: "VERIFY_DOWNLOAD_AFTER_CLICK",
+      startedAtEpochMs: download.startedAtEpochMs,
+      timeoutMs: Math.min(45000, Math.max(15000, Number(task.timeoutSeconds || 30) * 1000))
+    });
+    if (!downloadEvidence?.ok) throw new Error(`AUDIO_EXISTING_REAL_DOWNLOAD_NOT_VERIFIED:${downloadEvidence?.error || "UNKNOWN"}`);
+    return {
+      resultText:"AUDIO_EXISTING_DOWNLOAD_VERIFIED",
+      resultUrls:[location.href],
+      captureMode:"AUDIO_EXISTING_DOWNLOAD_VERIFIED",
+      artifactType:"AUDIO_OVERVIEW",
+      actualArtifact:{requested:true,download,downloadEvidence},
+      notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),
+      status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||"AUDIO_EXISTING_DOWNLOAD"
+    };
+  }
+
+  async function runAudioOverview(task) {
     const source = await addSource(task);
     const sourceFallback = !source.ok && Boolean(task.sourceText);
 
@@ -1019,6 +1044,8 @@
     if (!task?.taskId) throw new Error("TASK_ID가 없습니다.");
 
     const normalizedTaskType = String(task.taskType || "CHAT").toUpperCase();
+    if (["AUDIO_EXISTING_DOWNLOAD","NOTEBOOKLM_AUDIO_EXISTING_DOWNLOAD"].includes(normalizedTaskType)) return runExistingAudioArtifactDownload(task);
+
     if (["AUDIO","AUDIO_OVERVIEW","NOTEBOOKLM_AUDIO"].includes(normalizedTaskType)) return runAudioOverview(task);
 
     if (["VIDEO","VIDEO_OVERVIEW","NOTEBOOKLM_VIDEO"].includes(normalizedTaskType)) return runVideoOverview(task);

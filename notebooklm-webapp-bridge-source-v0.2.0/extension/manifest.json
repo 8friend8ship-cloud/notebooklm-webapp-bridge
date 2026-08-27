@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.69",
+  "version": "0.2.70",
   "description": "D79 restores the main queue/background runtime import while retaining D78 real Chrome download evidence. Existing-artifact download succeeds only with a completed nonzero browser download; no path change or file move.",
   "permissions": [
     "alarms",
