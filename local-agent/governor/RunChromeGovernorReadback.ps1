@@ -1,4 +1,4 @@
-param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[switch]$VideoFailureDiagnostic,[switch]$FlowDirectRecoveryDiagnostic,[switch]$CaptureBridgeSmoke,[switch]$InteriorAppsScriptSync,[string]$CentralRelativePath='',[string]$SmokeFile='',[string]$ExpectedBridge='0.2.18')
+param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[switch]$VideoFailureDiagnostic,[switch]$FlowDirectRecoveryDiagnostic,[switch]$CaptureBridgeSmoke,[switch]$InteriorAppsScriptSync,[switch]$InspectNotebookLMDownloads,[string]$CentralRelativePath='',[string]$SmokeFile='',[string]$ExpectedBridge='0.2.18')
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 
@@ -42,6 +42,24 @@ function DedicatedRunning {try{return (@(Get-CimInstance Win32_Process -Filter "
 function RefreshV2 {try{$Raw='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/governor/RunChromeGovernorReadbackV2.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$Tmp=$V2+'.download';Invoke-WebRequest -UseBasicParsing -Uri $Raw -OutFile $Tmp -TimeoutSec 10;Move-Item -LiteralPath $Tmp -Destination $V2 -Force;return $true}catch{return (Test-Path -LiteralPath $V2)}}
 function StopStaleAgentProcesses([int]$MaxAgeSeconds=600){$Killed=@();$Now=Get-Date;try{foreach($P in @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue)){$Cmd=[string]$P.CommandLine;if(-not $Cmd){continue};if($Cmd -notmatch '(?i)HomeDesignLocalAgent(?:-1\\.1\\.\\d+-patched)?\\.ps1'){continue};$Created=$null;try{$Created=[datetime]$P.CreationDate}catch{};if(-not $Created){continue};$Age=[Math]::Floor(($Now-$Created).TotalSeconds);if($Age -le $MaxAgeSeconds){continue};try{& taskkill.exe /PID ([int]$P.ProcessId) /T /F 2>$null|Out-Null;$Killed+=[ordered]@{pid=[int]$P.ProcessId;ageSeconds=[int]$Age;commandLine=$Cmd}}catch{}}}catch{};return @($Killed)}
 function KickStableAgentRaw {$MetaUrl='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/stable/agent.json?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$Meta=((Invoke-WebRequest -UseBasicParsing -Uri $MetaUrl -TimeoutSec 10).Content|ConvertFrom-Json);if(-not $Meta.enabled){throw 'LOCAL_AGENT_STABLE_DISABLED'};$Target=[string]$Meta.version;$Expected=([string]$Meta.gitBlobSha1).ToLowerInvariant();$State=ReadJson (Join-Path $Root 'state.json');$Current=$(if($State){[string]$State.agentVersion}else{''});$LocalSha=$(if(Test-Path -LiteralPath $AgentFile){(GitBlobSha1 $AgentFile).ToLowerInvariant()}else{''});if($Current -ne $Target -or $LocalSha -ne $Expected){$Url='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/releases/'+$Target+'/HomeDesignLocalAgent.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$Tmp=$AgentFile+'.raw.download';Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Tmp -TimeoutSec 20;$Actual=(GitBlobSha1 $Tmp).ToLowerInvariant();if($Actual -ne $Expected){Remove-Item $Tmp -Force -ErrorAction SilentlyContinue;throw "AGENT_FILE_SHA_MISMATCH actual=$Actual expected=$Expected"};Move-Item -LiteralPath $Tmp -Destination $AgentFile -Force;$LocalSha=$Actual};$Killed=StopStaleAgentProcesses 600;if(@($Killed).Count -gt 0){Start-Sleep -Milliseconds 700};Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$AgentFile`"") -WindowStyle Hidden|Out-Null;return [ordered]@{ok=$true;action='KICK_STABLE_AGENT_RAW_BACKGROUND';currentAgent=$Current;targetAgent=$Target;expectedSha=$Expected;localSha=$LocalSha;staleAgentProcessesKilled=$Killed;at=(Get-Date).ToString('o')}}
+
+if($InspectNotebookLMDownloads){
+  try{
+    $dir=Join-Path $env:USERPROFILE 'Downloads'
+    if(-not(Test-Path -LiteralPath $dir)){throw 'WINDOWS_DOWNLOADS_NOT_FOUND'}
+    $ext=@('.xlsx','.xls','.csv','.pdf','.pptx','.ppt','.mp3','.m4a','.wav','.mp4','.webm','.txt','.docx','.doc','.png','.jpg','.jpeg')
+    $now=Get-Date
+    $items=@(Get-ChildItem -LiteralPath $dir -File -ErrorAction Stop | Where-Object {$ext -contains $_.Extension.ToLowerInvariant()} | Sort-Object LastWriteTime -Descending | Select-Object -First 30 | ForEach-Object {
+      [ordered]@{name=$_.Name;fullName=$_.FullName;size=[int64]$_.Length;lastWriteTime=$_.LastWriteTime.ToString('o');ageSeconds=[int][Math]::Max(0,($now-$_.LastWriteTime).TotalSeconds)}
+    })
+    $target=@($items | Where-Object {$_.name -ieq 'contentos-stage-table.xlsx'})
+    [ordered]@{ok=$true;action='NOTEBOOKLM_DOWNLOADS_INSPECT';folder=$dir;targetName='contentos-stage-table.xlsx';targetFound=(@($target).Count -gt 0);target=$target;recent=$items;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 20 -Compress
+    exit 0
+  }catch{
+    [ordered]@{ok=$false;action='NOTEBOOKLM_DOWNLOADS_INSPECT';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    exit 2
+  }
+}
 
 if($InteriorAppsScriptSync){
   try{
