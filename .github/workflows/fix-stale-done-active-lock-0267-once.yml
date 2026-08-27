@@ -1,0 +1,65 @@
+name: fix-stale-done-active-lock-0267-once
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-stale-done-active-lock-0267-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch active guard and manifest
+        shell: python
+        run: |
+          from pathlib import Path
+          guard=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/local-active-guard.js')
+          s=guard.read_text(encoding='utf-8')
+          old='if (state === "DONE") return { ok: true, skipped: "done_pending_normal_finalize", taskId, reason };'
+          new='if (state === "DONE") {\n    if (ageMs > GUARD_PENDING_GRACE_MS) {\n      await guardWriteActive(null);\n      return { ok: true, action: "stale_done_active_cleared", taskId, ageMs, reason };\n    }\n    return { ok: true, skipped: "done_pending_normal_finalize", taskId, reason };\n  }'
+          assert old in s, 'DONE_GUARD_ANCHOR_MISSING'
+          guard.write_text(s.replace(old,new,1),encoding='utf-8')
+          manifest=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
+          m=manifest.read_text(encoding='utf-8')
+          assert '"version": "0.2.66"' in m, 'MANIFEST_VERSION_ANCHOR_MISSING'
+          m=m.replace('"version": "0.2.66"','"version": "0.2.67"',1)
+          old_desc='"description": "D72 runs one safe one-shot smoke that only clicks an existing NotebookLM artifact Download action. It does not change download paths or mirror files."'
+          new_desc='"description": "D77 clears a stale completed Local PowerShell active lock after its finalize grace period, while preserving the existing-artifact download-click behavior and existing download path."'
+          assert old_desc in m, 'MANIFEST_DESC_ANCHOR_MISSING'
+          manifest.write_text(m.replace(old_desc,new_desc,1),encoding='utf-8')
+      - name: Commit source patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/local-active-guard.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
+          git commit -m 'Fix stale completed Local PowerShell active lock for bridge 0.2.67'
+      - name: Update stable release metadata
+        shell: python
+        run: |
+          import hashlib,json,subprocess
+          from pathlib import Path
+          def blob_sha(path):
+              b=Path(path).read_bytes()
+              return hashlib.sha1(f'blob {len(b)}\0'.encode()+b).hexdigest()
+          p=Path('runtime/stable/release.json')
+          r=json.loads(p.read_text(encoding='utf-8'))
+          r['version']='0.2.67'
+          r['actionId']='APPLY_NOTEBOOKLM_0.2.67_D77_STALE_DONE_ACTIVE_LOCK_RECOVERY_20260827'
+          r['releasedAt']='2026-08-27T19:25:00+09:00'
+          r['requiresUserApproval']=False
+          r['description']='D77 clears a stale completed Local PowerShell active lock after 60s so the existing allowlisted governor can run actual Windows Downloads readback. It does not change the Chrome download path, move files, create NotebookLM artifacts, or add permissions.'
+          r['sourceCommit']=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          hashes={
+            'manifest.json':blob_sha('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json'),
+            'local-active-guard.js':blob_sha('notebooklm-webapp-bridge-source-v0.2.0/extension/local-active-guard.js')
+          }
+          for f in r['files']:
+              if f['path'] in hashes:
+                  f['gitBlobSha1']=hashes[f['path']]
+          p.write_text(json.dumps(r,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Commit stable release
+        run: |
+          git add runtime/stable/release.json
+          git commit -m 'Promote NotebookLM Bridge 0.2.67 stale-lock recovery'
+          git push
