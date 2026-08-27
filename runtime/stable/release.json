@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.55_D61_AUDIO_CARD_DRIVE_E2E_20260827",
-  "version": "0.2.55",
-  "releasedAt": "2026-08-27T14:15:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.56_D62_SOURCE_CARD_DRIVE_E2E_20260827",
+  "version": "0.2.56",
+  "releasedAt": "2026-08-27T14:35:00+09:00",
   "requiresUserApproval": false,
-  "description": "D61 adds fallback detection for current NotebookLM Studio AI audio overview card UI and preserves actual download plus Drive mirror gating.",
+  "description": "D62 fixes current NotebookLM card-style source add/pasted text/confirm controls; actual audio download and Drive mirror remain required for DONE.",
   "sourceCommit": "e8337d98e52b69e95b6d33291569b9d4f149ecb8",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
@@ -15,7 +15,7 @@
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "d93fa4b1818d0daf55d75ce37c2ed1c5de332556"
+      "gitBlobSha1": "b0aeea3ffc66b785174872bee973974e33ed82fc"
     },
     {
       "path": "worker.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "9a2f6895e7e798f27e0e6481637b81d723f0f302"
+      "gitBlobSha1": "3e59d1c08ddace6367783394e0f3957f0f68edc7"
     },
     {
       "path": "artifact-drive-mirror.js",

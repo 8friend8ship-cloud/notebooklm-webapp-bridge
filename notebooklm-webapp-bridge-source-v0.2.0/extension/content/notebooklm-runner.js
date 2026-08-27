@@ -85,6 +85,24 @@
       }) || null;
   }
 
+  function findTextControl(words, root = null, excludeDialogs = false) {
+    const selector = "button,[role='button'],[role='tab'],a,[tabindex],div,span";
+    const raw = root ? [...root.querySelectorAll(selector)] : deepQueryAll(selector);
+    const candidates = raw
+      .filter(el => visible(el) && (!excludeDialogs || !el.closest("[role='dialog'],dialog")))
+      .map(el => ({
+        el,
+        text: norm([el.innerText, el.textContent, el.getAttribute?.("aria-label"), el.getAttribute?.("title"), el.getAttribute?.("data-testid")].join(" "))
+      }))
+      .filter(x => x.text && x.text.length <= 500 && words.some(w => x.text === norm(w) || x.text.includes(norm(w))))
+      .sort((a,b) => a.text.length - b.text.length);
+    for (const x of candidates) {
+      const clickable = x.el.closest("button,[role='button'],a,[tabindex]") || x.el;
+      if (visible(clickable)) return clickable;
+    }
+    return null;
+  }
+
   function nativeValue(el, value) {
     const proto = el instanceof HTMLTextAreaElement
       ? HTMLTextAreaElement.prototype
@@ -129,18 +147,18 @@
 
     let choice = null;
     for (const d of dialogs()) {
-      choice = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
+      choice = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d) || findTextControl(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
       if (choice) break;
     }
 
     if (!choice) {
-      const add = findButton(["소스 추가","자료 추가","출처 추가","add source","add sources"]);
+      const add = findButton(["소스 추가","자료 추가","출처 추가","add source","add sources"]) || findTextControl(["소스 추가","자료 추가","출처 추가","add source","add sources"], null, true);
       if (!add) return {ok:false, skipped:true, reason:"add source control not found"};
       add.click();
 
       choice = await waitFor(() => {
         for (const d of dialogs()) {
-          const b = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
+          const b = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d) || findTextControl(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
           if (b) return b;
         }
         return null;
@@ -156,7 +174,7 @@
 
     const confirm = await waitFor(() => {
       for (const d of dialogs()) {
-        const b = findButton(["삽입","추가","저장","완료","insert","add","save","submit"], d);
+        const b = findButton(["삽입","추가","저장","완료","insert","add","save","submit"], d) || findTextControl(["삽입","추가","저장","완료","insert","add","save","submit"], d);
         if (b) return b;
       }
       return null;
