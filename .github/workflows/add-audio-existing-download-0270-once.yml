@@ -1,0 +1,93 @@
+name: add-audio-existing-download-0270-once
+on:
+  push:
+    paths:
+      - '.github/workflows/add-audio-existing-download-0270-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add explicit existing-audio download route
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          s=p.read_text(encoding='utf-8')
+          anchor='  async function runAudioOverview(task) {'
+          assert anchor in s, 'AUDIO_FUNCTION_ANCHOR_MISSING'
+          block=r'''  async function runExistingAudioArtifactDownload(task) {
+    const studio = findDeepControl(["studio","스튜디오"]);
+    if (studio) { try { studio.click(); } catch {} await sleep(900); }
+    const ready = await waitFor(() => audioOverviewReady(), 30000, 500);
+    if (!ready) throw new Error("AUDIO_EXISTING_ARTIFACT_NOT_FOUND_NO_GENERATION");
+    const download = await requestAudioArtifactDownload(ready);
+    if (!download?.requested) throw new Error(`AUDIO_EXISTING_DOWNLOAD_NOT_TRIGGERED:${download?.reason || "unknown"}`);
+    const downloadEvidence = await chrome.runtime.sendMessage({
+      source: SOURCE,
+      type: "VERIFY_DOWNLOAD_AFTER_CLICK",
+      startedAtEpochMs: download.startedAtEpochMs,
+      timeoutMs: Math.min(45000, Math.max(15000, Number(task.timeoutSeconds || 30) * 1000))
+    });
+    if (!downloadEvidence?.ok) throw new Error(`AUDIO_EXISTING_REAL_DOWNLOAD_NOT_VERIFIED:${downloadEvidence?.error || "UNKNOWN"}`);
+    return {
+      resultText:"AUDIO_EXISTING_DOWNLOAD_VERIFIED",
+      resultUrls:[location.href],
+      captureMode:"AUDIO_EXISTING_DOWNLOAD_VERIFIED",
+      artifactType:"AUDIO_OVERVIEW",
+      actualArtifact:{requested:true,download,downloadEvidence},
+      notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),
+      status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||"AUDIO_EXISTING_DOWNLOAD"
+    };
+  }
+
+'''
+          s=s.replace(anchor,block+anchor,1)
+          route='    if (["AUDIO","AUDIO_OVERVIEW","NOTEBOOKLM_AUDIO"].includes(normalizedTaskType)) return runAudioOverview(task);'
+          assert route in s, 'AUDIO_ROUTE_ANCHOR_MISSING'
+          replacement='    if (["AUDIO_EXISTING_DOWNLOAD","NOTEBOOKLM_AUDIO_EXISTING_DOWNLOAD"].includes(normalizedTaskType)) return runExistingAudioArtifactDownload(task);\n\n'+route
+          s=s.replace(route,replacement,1)
+          p.write_text(s,encoding='utf-8')
+
+          m=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
+          ms=m.read_text(encoding='utf-8')
+          assert '"version": "0.2.69"' in ms, 'MANIFEST_VERSION_0269_MISSING'
+          ms=ms.replace('"version": "0.2.69"','"version": "0.2.70"',1)
+          m.write_text(ms,encoding='utf-8')
+      - name: Commit source patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
+          git commit -m 'Add safe existing-audio real-download route for Bridge 0.2.70'
+      - name: Update stable release metadata
+        shell: python
+        run: |
+          import hashlib,json,subprocess
+          from pathlib import Path
+          def blob_sha(path):
+              b=Path(path).read_bytes()
+              return hashlib.sha1(f'blob {len(b)}\0'.encode()+b).hexdigest()
+          p=Path('runtime/stable/release.json')
+          r=json.loads(p.read_text(encoding='utf-8'))
+          r['version']='0.2.70'
+          r['actionId']='APPLY_NOTEBOOKLM_0.2.70_D82_AUDIO_EXISTING_REAL_DOWNLOAD_20260827'
+          r['releasedAt']='2026-08-27T21:09:00+09:00'
+          r['requiresUserApproval']=False
+          r['description']='D82 adds an explicit AUDIO_EXISTING_DOWNLOAD route that never generates a new audio artifact and only completes after Chrome downloads reports a complete existing nonzero file. Existing download path, files, OAuth, normal Chrome, and NotebookLM content are not changed.'
+          r['sourceCommit']=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          hashes={
+            'manifest.json':blob_sha('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json'),
+            'content/notebooklm-runner.js':blob_sha('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          }
+          for f in r['files']:
+              if f['path'] in hashes:
+                  f['gitBlobSha1']=hashes[f['path']]
+          p.write_text(json.dumps(r,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Commit stable release
+        run: |
+          git add runtime/stable/release.json
+          git commit -m 'Promote NotebookLM Bridge 0.2.70 existing-audio verification'
+          git push
