@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.56",
+  "version": "0.2.57",
   "description": "D62 adds card/text fallback for current NotebookLM source-add, pasted-text, and confirm controls, preserving audio download plus Drive mirror gating.",
   "permissions": [
     "alarms",

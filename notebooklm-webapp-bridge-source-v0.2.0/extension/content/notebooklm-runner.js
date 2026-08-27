@@ -465,16 +465,25 @@
   }
 
   function audioOverviewReady() {
+    // D63: only treat a real generated audio artifact as ready.
+    // The Studio catalog itself contains AI 오디오 오버뷰/share/menu text and must never count as an artifact.
     for (const el of deepQueryAll("audio")) {
       try {
-        if (el.currentSrc || el.src || Number.isFinite(el.duration)) return el;
+        if (el.currentSrc || el.src || (Number.isFinite(el.duration) && el.duration > 0)) return el;
       } catch {}
     }
-    const c = audioOverviewContainer();
-    if (!c) return null;
-    const t = norm(c.innerText || c.textContent || "");
-    const labels = [...c.querySelectorAll("button,[role=button]")].filter(visible).map(b => norm([b.innerText,b.textContent,b.getAttribute("aria-label"),b.getAttribute("title")].join(" "))).join(" ");
-    if (/play|재생|download|다운로드|share|공유/.test(labels) && !/generating|생성 중|creating|만드는 중/.test(t)) return c;
+
+    const card = audioArtifactCardRoot(null);
+    if (card) {
+      const text = norm(card.innerText || card.textContent || "");
+      const controls = [...card.querySelectorAll("button,[role='button'],a")].filter(visible)
+        .map(el => actionLabel(el)).join(" ");
+      const hasPlayback = /play_arrow|(^|\s)(play|재생)(\s|$)|pause|일시정지/.test(controls + " " + text);
+      const hasDuration = /\b\d{1,2}:\d{2}\b/.test(text + " " + controls);
+      const catalogHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"]
+        .filter(w => text.includes(w)).length;
+      if ((hasPlayback || hasDuration) && catalogHits < 4 && !/generating|생성 중|creating|만드는 중/.test(text)) return card;
+    }
     return null;
   }
 

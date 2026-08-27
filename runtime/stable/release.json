@@ -3,19 +3,19 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.56_D62_SOURCE_CARD_DRIVE_E2E_20260827",
-  "version": "0.2.56",
-  "releasedAt": "2026-08-27T14:35:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.57_D63_RESULT_CARD_MENU_DOWNLOAD_20260827",
+  "version": "0.2.57",
+  "releasedAt": "2026-08-27T15:20:00+09:00",
   "requiresUserApproval": false,
-  "description": "D62 fixes current NotebookLM card-style source add/pasted text/confirm controls; actual audio download and Drive mirror remain required for DONE.",
-  "sourceCommit": "e8337d98e52b69e95b6d33291569b9d4f149ecb8",
+  "description": "D63 identifies only real generated audio result cards (play/duration), then uses that card menu (more/⋮) and Download; Studio catalog is no longer a false ready signal.",
+  "sourceCommit": "083ce48c88cce0fcfa6349d06ca56100f4dd2cad",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "b0aeea3ffc66b785174872bee973974e33ed82fc"
+      "gitBlobSha1": "7811a3602640dc934f6ad8c193de9a478641cf3b"
     },
     {
       "path": "worker.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "3e59d1c08ddace6367783394e0f3957f0f68edc7"
+      "gitBlobSha1": "802a4eaf1b33c3fc4d9cd4345c30544f98793a3c"
     },
     {
       "path": "artifact-drive-mirror.js",
