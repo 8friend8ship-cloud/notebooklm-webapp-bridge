@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
   "version": "0.2.65",
-  "description": "D71 moves artifact mirror onto a dedicated runtime Port to isolate it from generic internal message routing.",
+  "description": "D71 simplifies NotebookLM artifact handling to UI download-click only. No download path override, file move, or Drive mirror gate in the click action.",
   "permissions": [
     "alarms",
     "identity",

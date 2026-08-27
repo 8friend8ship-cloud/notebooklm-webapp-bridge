@@ -939,9 +939,7 @@
     if (!download) return {ok:false,error:`${spec.code}_DOWNLOAD_ACTION_NOT_FOUND`};
     try { download.click(); } catch {}
     await sleep(1000);
-    const mirrored=await mirrorNotebookArtifactToDrive(task,spec.code,startedAtEpochMs);
-    if (!mirrored?.ok) return {ok:false,error:`${spec.code}_REAL_FILE_NOT_FOUND_OR_MIRROR_FAILED:${mirrored?.error||'unknown'}`,mirror:mirrored};
-    return {ok:true,method:`${spec.code}_FINAL_CARD_MENU_DOWNLOAD`,startedAtEpochMs,mirror:mirrored};
+    return {ok:true,method:`${spec.code}_FINAL_CARD_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs};
   }
 
   function existingArtifactCard(matchWords) {
@@ -975,16 +973,12 @@
     if (!download) throw new Error(`${spec.code}_EXISTING_DOWNLOAD_ACTION_NOT_FOUND`);
     try { download.click(); } catch {}
     await sleep(1200);
-    const mirrored=await mirrorNotebookArtifactToDrive(task,spec.code,startedAtEpochMs);
-    if (!mirrored?.ok || !mirrored?.mirror?.ok) {
-      throw new Error(`${spec.code}_EXISTING_REAL_FILE_NOT_FOUND_OR_MIRROR_FAILED:${mirrored?.error||mirrored?.mirror?.error||mirrored?.raw?.stderr||"unknown"}`);
-    }
     return {
       resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),
       resultUrls:[location.href],
-      captureMode:`${spec.code}_EXISTING_REAL_FILE_MIRRORED`,
+      captureMode:`${spec.code}_EXISTING_DOWNLOAD_CLICKED`,
       artifactType:spec.code,
-      actualArtifact:{mirror:mirrored.mirror,localTaskId:mirrored.localTaskId},
+      actualArtifact:{requested:true,method:`${spec.code}_EXISTING_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs},
       notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),
       status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||`${spec.code}_EXISTING_DOWNLOAD`
     };

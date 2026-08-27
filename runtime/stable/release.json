@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.65_D71_DEDICATED_MIRROR_PORT_20260827",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.65_D71_DOWNLOAD_CLICK_ONLY_20260827",
   "version": "0.2.65",
-  "releasedAt": "2026-08-27T16:58:00+09:00",
+  "releasedAt": "2026-08-27T17:05:00+09:00",
   "requiresUserApproval": false,
-  "description": "D71 isolates artifact mirror traffic on NLM_ARTIFACT_MIRROR_V3 runtime Port; existing artifact DONE still requires actual file mirror.",
+  "description": "D71 makes NotebookLM artifact actions only open the artifact menu and click Download. Existing browser download settings are left untouched; file verification is a separate step.",
   "sourceCommit": "083ce48c88cce0fcfa6349d06ca56100f4dd2cad",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
@@ -15,7 +15,7 @@
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "0a50b364b84d0f19a2bb535dae3107b7c27d0479"
+      "gitBlobSha1": "0a60ca4ed67e3bcc3accda7903e88ce4fc428d4f"
     },
     {
       "path": "worker.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "6af4170688027f096d72f98b4a0327db72d0a918"
+      "gitBlobSha1": "eb9de7264d921bf681aa238f80780469dcedb12c"
     },
     {
       "path": "artifact-drive-mirror.js",
