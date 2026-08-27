@@ -55,20 +55,10 @@ function Wait-StableFile([string]$path) {
   return $null
 }
 
-$queue = [System.Collections.Concurrent.ConcurrentQueue[string]]::new()
 $watcher = [IO.FileSystemWatcher]::new($DownloadFolder)
 $watcher.IncludeSubdirectories = $false
 $watcher.NotifyFilter = [IO.NotifyFilters]'FileName, LastWrite, Size, CreationTime'
 $watcher.EnableRaisingEvents = $true
-
-$enqueue = {
-  $fullPath = [string]$Event.SourceEventArgs.FullPath
-  if ($fullPath) { $queue.Enqueue($fullPath) }
-}.GetNewClosure()
-
-$created = Register-ObjectEvent -InputObject $watcher -EventName Created -Action $enqueue
-$changed = Register-ObjectEvent -InputObject $watcher -EventName Changed -Action $enqueue
-$renamed = Register-ObjectEvent -InputObject $watcher -EventName Renamed -Action $enqueue
 
 $copied = [System.Collections.Generic.List[object]]::new()
 $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -76,12 +66,12 @@ $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(10,$RunSeconds))
 
 try {
   while ([DateTime]::UtcNow -lt $deadline) {
-    $path = $null
-    if (-not $queue.TryDequeue([ref]$path)) {
-      Start-Sleep -Milliseconds 250
-      continue
-    }
-    if (-not $path -or $seen.Contains($path)) { continue }
+    $remainingMs = [int][Math]::Max(50,[Math]::Min(750,($deadline - [DateTime]::UtcNow).TotalMilliseconds))
+    $change = $watcher.WaitForChanged([IO.WatcherChangeTypes]::All,$remainingMs)
+    if ($change.TimedOut -or -not $change.Name) { continue }
+
+    $path = Join-Path $DownloadFolder ([string]$change.Name)
+    if ($seen.Contains($path)) { continue }
     if (-not (Test-NotebookLMCandidate $path)) { continue }
 
     $stable = Wait-StableFile $path
@@ -97,14 +87,12 @@ try {
     $copied.Add([pscustomobject]@{
       sourcePath = $stable.FullName
       destinationPath = $destItem.FullName
+      changeType = [string]$change.ChangeType
       bytes = $destItem.Length
       copiedAt = (Get-Date).ToString('o')
     })
   }
 } finally {
-  foreach ($sub in @($created,$changed,$renamed)) {
-    if ($sub) { Unregister-Event -SubscriptionId $sub.Id -ErrorAction SilentlyContinue }
-  }
   $watcher.Dispose()
 }
 
@@ -112,6 +100,7 @@ try {
   ok = $true
   action = 'WATCH_NOTEBOOKLM_DOWNLOADS_TO_CAPTUREBRIDGE_FALLBACK'
   mode = 'FALLBACK_ONLY'
+  waitMode = 'SYNCHRONOUS_WAIT_FOR_CHANGED'
   downloadFolder = $DownloadFolder
   captureFolder = $CaptureFolder
   filenamePattern = $FilenamePattern
