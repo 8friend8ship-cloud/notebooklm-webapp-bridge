@@ -1,10 +1,10 @@
 param([switch]$SmokeOnly)
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
-$Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
+$Base='C:\HomeDesignAutomationV7'
 $CaptureRoot=Join-Path $Base 'CaptureBridge'
 $Inbox=Join-Path $CaptureRoot 'INBOX\NotebookLM'
-$ScriptDir=Join-Path $Base 'LocalAgent\capture'
+$ScriptDir=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent\capture'
 $Reconcile=Join-Path $ScriptDir 'Reconcile-NotebookLMCaptureBridge.ps1'
 $HealthLocal=Join-Path $CaptureRoot 'capture-bridge-health.json'
 $TaskName='HomeDesign-CaptureBridge-NotebookLM-Reconcile'
@@ -29,8 +29,7 @@ New-Item -ItemType Directory -Force -Path $DriveInbox | Out-Null
 
 $reconcileBody=@'
 $ErrorActionPreference='Continue'
-$Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
-$Inbox=Join-Path $Base 'CaptureBridge\INBOX\NotebookLM'
+$Inbox='C:\HomeDesignAutomationV7\CaptureBridge\INBOX\NotebookLM'
 function Find-CentralRoot {
   $target='00_중앙에이전트'
   foreach($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
