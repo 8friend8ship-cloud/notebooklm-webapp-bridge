@@ -1,0 +1,61 @@
+name: fix-mirror-message-0258-once
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-mirror-message-0258-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch mirror routing and stable release
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, subprocess, datetime
+          root=Path('notebooklm-webapp-bridge-source-v0.2.0/extension')
+          runner=root/'content/notebooklm-runner.js'
+          bg=root/'background.js'
+          manifest=root/'manifest.json'
+          r=runner.read_text(encoding='utf-8')
+          old='type:"MIRROR_ARTIFACT_TO_DRIVE"'
+          new='type:"MIRROR_ARTIFACT_TO_DRIVE_V2"'
+          if old not in r and new not in r:
+              raise SystemExit('runner mirror message marker missing')
+          r=r.replace(old,new)
+          runner.write_text(r,encoding='utf-8')
+          b=bg.read_text(encoding='utf-8')
+          oldb='if (message.type === "MIRROR_ARTIFACT_TO_DRIVE") {'
+          newb='if (["MIRROR_ARTIFACT_TO_DRIVE","MIRROR_ARTIFACT_TO_DRIVE_V2"].includes(message.type)) {'
+          if oldb not in b and newb not in b:
+              raise SystemExit('background mirror branch marker missing')
+          b=b.replace(oldb,newb)
+          bg.write_text(b,encoding='utf-8')
+          m=json.loads(manifest.read_text(encoding='utf-8'))
+          m['version']='0.2.58'
+          m['description']='D64 isolates NotebookLM artifact mirror messaging after result-card menu download and preserves Chrome default Downloads to visible local CaptureBridge routing.'
+          manifest.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          relp=Path('runtime/stable/release.json')
+          rel=json.loads(relp.read_text(encoding='utf-8'))
+          rel['version']='0.2.58'
+          rel['actionId']='APPLY_NOTEBOOKLM_0.2.58_D64_MIRROR_MESSAGE_ROUTE_20260827'
+          rel['releasedAt']='2026-08-27T15:30:00+09:00'
+          rel['description']='D64 uses a dedicated V2 artifact mirror message after real result-card menu download; background accepts legacy and V2 mirror messages.'
+          rel['requiresUserApproval']=False
+          paths=[x['path'] for x in rel['files']]
+          for entry in rel['files']:
+              p=root/entry['path']
+              if not p.exists(): raise SystemExit(f'missing release file {p}')
+              entry['gitBlobSha1']=subprocess.check_output(['git','hash-object',str(p)],text=True).strip()
+          relp.write_text(json.dumps(rel,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Commit patched runtime
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension runtime/stable/release.json
+          git commit -m 'Bridge 0.2.58 isolate artifact mirror message routing' || exit 0
+          git push
