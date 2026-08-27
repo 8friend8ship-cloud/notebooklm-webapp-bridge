@@ -1,0 +1,49 @@
+name: promote-download-click-smoke-0266-once
+on:
+  push:
+    paths:
+      - '.github/workflows/promote-download-click-smoke-0266-once.yml'
+permissions:
+  contents: write
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Promote Bridge 0.2.66 download-click-only smoke
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, subprocess
+          root=Path('notebooklm-webapp-bridge-source-v0.2.0/extension')
+          manifest=root/'manifest.json'
+          m=json.loads(manifest.read_text(encoding='utf-8'))
+          if m.get('version')!='0.2.66':
+              raise SystemExit('manifest version is not 0.2.66')
+          required=['worker.js','download-click-smoke-worker.js','content/download-click-smoke.js']
+          for p in required:
+              if not (root/p).exists(): raise SystemExit(f'missing {p}')
+          relp=Path('runtime/stable/release.json')
+          rel=json.loads(relp.read_text(encoding='utf-8'))
+          rel['version']='0.2.66'
+          rel['actionId']='APPLY_NOTEBOOKLM_0.2.66_D72_ONE_SHOT_DOWNLOAD_CLICK_SMOKE_20260827'
+          rel['releasedAt']='2026-08-27T17:20:00+09:00'
+          rel['requiresUserApproval']=False
+          rel['description']='D72 runs one one-shot smoke that only opens an existing NotebookLM artifact menu and clicks Download once. It does not change browser download paths or mirror files.'
+          wanted=['manifest.json','worker.js','download-click-smoke-worker.js','content/download-click-smoke.js','chat-active-guard.js','local-stable-self-heal.js','local-active-guard.js','background.js','local-powershell-runner.js','flow-script-id-direct-recovery.js','front-main.js','front-extension.js','content/notebooklm-runner.js','artifact-drive-mirror.js']
+          rel['files']=[]
+          for path in wanted:
+              fp=root/path
+              if not fp.exists(): raise SystemExit(f'missing release file {fp}')
+              sha=subprocess.check_output(['git','hash-object',str(fp)],text=True).strip()
+              rel['files'].append({'path':path,'gitBlobSha1':sha})
+          relp.write_text(json.dumps(rel,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Commit stable metadata
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add runtime/stable/release.json
+          git commit -m 'Promote Bridge 0.2.66 download-click-only smoke' || exit 0
+          git push
