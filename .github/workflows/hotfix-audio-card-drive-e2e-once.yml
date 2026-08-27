@@ -1,0 +1,65 @@
+name: hotfix-audio-card-drive-e2e-once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hotfix-audio-card-drive-e2e-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch audio card fallback and stable 0.2.55
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json, hashlib
+
+          runner_path = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          manifest_path = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
+          release_path = Path('runtime/stable/release.json')
+
+          text = runner_path.read_text(encoding='utf-8')
+          old = '''    const audioControl = await waitFor(() => findDeepControl(["audio overview","ai 오디오 오버뷰","오디오 오버뷰","오디오 개요","음성 개요"]), 30000, 500);\n    if (!audioControl) throw new Error(`AUDIO_OVERVIEW_CONTROL_NOT_FOUND: ${location.href}`);\n\n    const before = audioOverviewReady();\n    if (!before) {'''
+          new = '''    const before = audioOverviewReady();\n    let audioControl = null;\n    if (!before) {\n      const audioWords = ["audio overview","ai 오디오 오버뷰","오디오 오버뷰","오디오 개요","음성 개요"];\n      audioControl = await waitFor(() => {\n        const direct = findDeepControl(audioWords);\n        if (direct) return direct;\n        const candidates = deepQueryAll("div,span,[tabindex]")\n          .filter(el => visible(el) && !el.closest("[role='dialog'],dialog"))\n          .map(el => ({el, text:norm([el.innerText,el.textContent,el.getAttribute?.("aria-label"),el.getAttribute?.("title")].join(" "))}))\n          .filter(x => x.text && audioWords.some(w => x.text === norm(w) || x.text.includes(norm(w))))\n          .sort((a,b) => a.text.length - b.text.length);\n        for (const x of candidates) {\n          const clickable = x.el.closest("button,[role='button'],a,[tabindex]") || x.el;\n          if (visible(clickable)) return clickable;\n        }\n        return null;\n      }, 30000, 500);\n      if (!audioControl) throw new Error(`AUDIO_OVERVIEW_CONTROL_NOT_FOUND: ${location.href}`);'''
+          if old not in text:
+              raise SystemExit('AUDIO_PATCH_TARGET_NOT_FOUND')
+          text = text.replace(old, new, 1)
+          runner_path.write_text(text, encoding='utf-8')
+
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          manifest['version'] = '0.2.55'
+          manifest['description'] = 'D61 adds NotebookLM Studio audio-card text fallback so current card UI can generate/download and mirror a real audio artifact to Drive.'
+          manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          def blob_sha(path):
+              data = Path(path).read_bytes()
+              return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+
+          release = json.loads(release_path.read_text(encoding='utf-8'))
+          release['actionId'] = 'APPLY_NOTEBOOKLM_0.2.55_D61_AUDIO_CARD_DRIVE_E2E_20260827'
+          release['version'] = '0.2.55'
+          release['releasedAt'] = '2026-08-27T14:15:00+09:00'
+          release['requiresUserApproval'] = False
+          release['description'] = 'D61 adds fallback detection for current NotebookLM Studio AI audio overview card UI and preserves actual download plus Drive mirror gating.'
+          for f in release['files']:
+              if f['path'] == 'manifest.json':
+                  f['gitBlobSha1'] = blob_sha(manifest_path)
+              elif f['path'] == 'content/notebooklm-runner.js':
+                  f['gitBlobSha1'] = blob_sha(runner_path)
+          release_path.write_text(json.dumps(release, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+      - name: Commit hotfix
+        shell: bash
+        run: |
+          git config user.name 'central-agent'
+          git config user.email 'central-agent@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json runtime/stable/release.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'hotfix: support current NotebookLM audio card and Drive E2E'
+          git push
