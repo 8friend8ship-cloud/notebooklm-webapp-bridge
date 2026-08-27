@@ -7,7 +7,8 @@ param(
   [string]$ExpectedOutputPath='',
   [int]$HostPort=8765,
   [switch]$WriteCentralReadback,
-  [switch]$CreateLocalSaveSmoke
+  [switch]$CreateLocalSaveSmoke,
+  [switch]$SetupCaptureBridgeAutoSync
 )
 
 $ErrorActionPreference='Continue'
@@ -18,6 +19,25 @@ $ResultRoot=Join-Path $Root 'CommandResults'
 $TaskRoot=Join-Path $ResultRoot $TaskId
 $StatusPath=Join-Path $TaskRoot 'status.json'
 $ResultPath=Join-Path $TaskRoot 'result.json'
+
+if($SetupCaptureBridgeAutoSync){
+  try{
+    $setupDir=Join-Path $Root 'capture'
+    New-Item -ItemType Directory -Force -Path $setupDir|Out-Null
+    $setup=Join-Path $setupDir 'Setup-NotebookLMCaptureBridgeAutoSync.ps1'
+    $url='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/capture/Setup-NotebookLMCaptureBridgeAutoSync.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $setup -TimeoutSec 20
+    $output=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $setup 2>&1
+    $rc=$LASTEXITCODE
+    $text=($output|Out-String).Trim()
+    if($rc -ne 0){throw ('CAPTUREBRIDGE_SETUP_FAILED rc='+$rc+' output='+$text)}
+    [ordered]@{ok=$true;action='NOTEBOOKLM_CAPTUREBRIDGE_AUTOSYNC_SETUP';taskId=$TaskId;output=$text;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress
+    exit 0
+  }catch{
+    [ordered]@{ok=$false;action='NOTEBOOKLM_CAPTUREBRIDGE_AUTOSYNC_SETUP';taskId=$TaskId;error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    exit 2
+  }
+}
 
 if($CreateLocalSaveSmoke){
   try{
