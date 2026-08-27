@@ -3,27 +3,63 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.54_D59_HOST_HANDOFF_60S_FIX_20260827",
-  "version": "0.2.54",
-  "releasedAt": "2026-08-27T13:00:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.55_D61_AUDIO_CARD_DRIVE_E2E_20260827",
+  "version": "0.2.55",
+  "releasedAt": "2026-08-27T14:15:00+09:00",
   "requiresUserApproval": false,
-  "description": "D59 fixes LOCAL_POWERSHELL pending host handoff from hardcoded 120 seconds to the central 60-second guard and keeps direct visible local-save smoke support.",
+  "description": "D61 adds fallback detection for current NotebookLM Studio AI audio overview card UI and preserves actual download plus Drive mirror gating.",
   "sourceCommit": "e8337d98e52b69e95b6d33291569b9d4f149ecb8",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
-    {"path":"manifest.json","gitBlobSha1":"2435e1c078a964036ba94129fbdabe72dc6b2895"},
-    {"path":"worker.js","gitBlobSha1":"625846f04b65e22f72739f36b6f56eccc3f0334f"},
-    {"path":"chat-active-guard.js","gitBlobSha1":"ab5a8b94de52580721bbd93302f9de0120cf218b"},
-    {"path":"local-stable-self-heal.js","gitBlobSha1":"7fbc23c25883d38aaefcf1aec5743d9b2c2c4432"},
-    {"path":"local-active-guard.js","gitBlobSha1":"ab4ceee86805bdd01ffca71362616057f1609f04"},
-    {"path":"background.js","gitBlobSha1":"7cb65a9ede25e673946201bd6c0865574bbc51ca"},
-    {"path":"local-powershell-runner.js","gitBlobSha1":"2ddb682d596024f840e7066d795426d4887e720a"},
-    {"path":"flow-script-id-direct-recovery.js","gitBlobSha1":"8e65789b03ccff5e2aefd78f8048f001e8929ef3"},
-    {"path":"front-main.js","gitBlobSha1":"a246bcfe6a199ae7d171d1cf21b19a20d39db42f"},
-    {"path":"front-extension.js","gitBlobSha1":"01590edbfd9eb9d1f0b1271ea7755a49a4a81871"},
-    {"path":"content/notebooklm-runner.js","gitBlobSha1":"acdd362705ccad249b44ffc1f13f1a1d13dcf95b"},
-    {"path":"artifact-drive-mirror.js","gitBlobSha1":"212319a98e01fb6c7a6b145ab893e21ebee9e95b"}
+    {
+      "path": "manifest.json",
+      "gitBlobSha1": "d93fa4b1818d0daf55d75ce37c2ed1c5de332556"
+    },
+    {
+      "path": "worker.js",
+      "gitBlobSha1": "625846f04b65e22f72739f36b6f56eccc3f0334f"
+    },
+    {
+      "path": "chat-active-guard.js",
+      "gitBlobSha1": "ab5a8b94de52580721bbd93302f9de0120cf218b"
+    },
+    {
+      "path": "local-stable-self-heal.js",
+      "gitBlobSha1": "7fbc23c25883d38aaefcf1aec5743d9b2c2c4432"
+    },
+    {
+      "path": "local-active-guard.js",
+      "gitBlobSha1": "ab4ceee86805bdd01ffca71362616057f1609f04"
+    },
+    {
+      "path": "background.js",
+      "gitBlobSha1": "7cb65a9ede25e673946201bd6c0865574bbc51ca"
+    },
+    {
+      "path": "local-powershell-runner.js",
+      "gitBlobSha1": "2ddb682d596024f840e7066d795426d4887e720a"
+    },
+    {
+      "path": "flow-script-id-direct-recovery.js",
+      "gitBlobSha1": "8e65789b03ccff5e2aefd78f8048f001e8929ef3"
+    },
+    {
+      "path": "front-main.js",
+      "gitBlobSha1": "a246bcfe6a199ae7d171d1cf21b19a20d39db42f"
+    },
+    {
+      "path": "front-extension.js",
+      "gitBlobSha1": "01590edbfd9eb9d1f0b1271ea7755a49a4a81871"
+    },
+    {
+      "path": "content/notebooklm-runner.js",
+      "gitBlobSha1": "9a2f6895e7e798f27e0e6481637b81d723f0f302"
+    },
+    {
+      "path": "artifact-drive-mirror.js",
+      "gitBlobSha1": "212319a98e01fb6c7a6b145ab893e21ebee9e95b"
+    }
   ]
 }

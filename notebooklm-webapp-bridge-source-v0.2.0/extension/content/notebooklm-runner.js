@@ -607,11 +607,25 @@
     const studio = findDeepControl(["studio","스튜디오"]);
     if (studio) { try { studio.click(); } catch {} await sleep(1200); }
 
-    const audioControl = await waitFor(() => findDeepControl(["audio overview","ai 오디오 오버뷰","오디오 오버뷰","오디오 개요","음성 개요"]), 30000, 500);
-    if (!audioControl) throw new Error(`AUDIO_OVERVIEW_CONTROL_NOT_FOUND: ${location.href}`);
-
     const before = audioOverviewReady();
+    let audioControl = null;
     if (!before) {
+      const audioWords = ["audio overview","ai 오디오 오버뷰","오디오 오버뷰","오디오 개요","음성 개요"];
+      audioControl = await waitFor(() => {
+        const direct = findDeepControl(audioWords);
+        if (direct) return direct;
+        const candidates = deepQueryAll("div,span,[tabindex]")
+          .filter(el => visible(el) && !el.closest("[role='dialog'],dialog"))
+          .map(el => ({el, text:norm([el.innerText,el.textContent,el.getAttribute?.("aria-label"),el.getAttribute?.("title")].join(" "))}))
+          .filter(x => x.text && audioWords.some(w => x.text === norm(w) || x.text.includes(norm(w))))
+          .sort((a,b) => a.text.length - b.text.length);
+        for (const x of candidates) {
+          const clickable = x.el.closest("button,[role='button'],a,[tabindex]") || x.el;
+          if (visible(clickable)) return clickable;
+        }
+        return null;
+      }, 30000, 500);
+      if (!audioControl) throw new Error(`AUDIO_OVERVIEW_CONTROL_NOT_FOUND: ${location.href}`);
       try { audioControl.click(); } catch {}
       await sleep(1200);
 
