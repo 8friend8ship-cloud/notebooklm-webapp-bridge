@@ -607,26 +607,23 @@
     return null;
   }
 
-  async function requestNotebookArtifactDownload(readyNode) {
+  async function requestAudioArtifactDownload(readyNode) {
     const startedAtEpochMs = Date.now();
     const root = audioArtifactCardRoot(readyNode);
-    if (!root) return {requested:false, reason:`real audio artifact card not found DOM=${JSON.stringify(audioArtifactDomDiagnostic())}`, startedAtEpochMs};
-    const localButtons = [...root.querySelectorAll("button,[role='button'],a")].filter(visible);
-    const direct = localButtons.find(el => /(^|\s)(download|다운로드)(\s|$)/.test(actionLabel(el)));
-    if (direct) {
-      try { direct.click(); } catch {}
-      await sleep(1200);
-      return {requested:true, method:"DIRECT", startedAtEpochMs, cardText:(root.innerText || root.textContent || "").trim().slice(0,500)};
-    }
+    if (!root) return {requested:false, reason:`audio final player card not found DOM=${JSON.stringify(audioArtifactDomDiagnostic())}`, startedAtEpochMs};
+    const cardText=(root.innerText || root.textContent || "").trim().slice(0,500);
+    const controls=[...root.querySelectorAll("button,[role='button'],a")].filter(visible).map(el=>actionLabel(el)).join(" ");
+    const isAudioPlayer=/play_arrow|(^|\s)(play|재생)(\s|$)|pause|일시정지|\b\d{1,2}:\d{2}\b/.test(norm(cardText+" "+controls));
+    if (!isAudioPlayer) return {requested:false, reason:"target card is not an audio player card", startedAtEpochMs};
     const menu = artifactMenuButtonWithin(root);
-    if (!menu) return {requested:false, reason:"real audio card menu not found", startedAtEpochMs};
+    if (!menu) return {requested:false, reason:"audio player card kebab menu not found", startedAtEpochMs};
     try { menu.click(); } catch {}
     await sleep(700);
     const download = await waitFor(() => openArtifactDownloadAction(), 8000, 250);
-    if (!download) return {requested:false, reason:"download action not found inside final artifact card menu", startedAtEpochMs};
+    if (!download) return {requested:false, reason:"download action not found inside audio player card menu", startedAtEpochMs};
     try { download.click(); } catch {}
     await sleep(1200);
-    return {requested:true, method:"MENU_DOWNLOAD", startedAtEpochMs, cardText:(root.innerText || root.textContent || "").trim().slice(0,500)};
+    return {requested:true, method:"AUDIO_PLAYER_CARD_MENU_DOWNLOAD", startedAtEpochMs, cardText};
   }
 
   async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {
@@ -685,7 +682,7 @@
     const ready = await waitFor(() => audioOverviewReady(), timeoutMs, 2500);
     if (!ready) throw new Error("AUDIO_OVERVIEW_GENERATION_TIMEOUT_OR_PLAYER_NOT_FOUND");
 
-    const download = await requestNotebookArtifactDownload(ready);
+    const download = await requestAudioArtifactDownload(ready);
     if (!download?.requested) throw new Error(`AUDIO_ARTIFACT_DOWNLOAD_NOT_TRIGGERED: ${download?.reason || "unknown"}`);
     return {
       resultText:"AUDIO_OVERVIEW_DOWNLOAD_TRIGGERED",

@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.60_D66_FINAL_RESULT_CARD_DOWNLOAD_20260827",
-  "version": "0.2.60",
-  "releasedAt": "2026-08-27T15:58:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.61_D67_AUDIO_PLAYER_CARD_DOWNLOAD_20260827",
+  "version": "0.2.61",
+  "releasedAt": "2026-08-27T16:05:00+09:00",
   "requiresUserApproval": false,
-  "description": "D66 scopes Download to the menu opened from the final generated artifact card and keeps actual Windows download/mirror verification as the DONE gate.",
+  "description": "D67 uses a dedicated audio final-player-card kebab-menu download path; video and document-like artifacts remain separate routes.",
   "sourceCommit": "083ce48c88cce0fcfa6349d06ca56100f4dd2cad",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
@@ -15,7 +15,7 @@
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "4ce6f091a4aef40b5219c1ebc298069b43c3b77d"
+      "gitBlobSha1": "2122669963ff6b5191300d7883cd171f13ffeb26"
     },
     {
       "path": "worker.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "854241a97a1e69693e047c6bb1fdae9a6335d41e"
+      "gitBlobSha1": "4cc45ca3d1079bb53a86d4dd126b9d0eb2017b77"
     },
     {
       "path": "artifact-drive-mirror.js",

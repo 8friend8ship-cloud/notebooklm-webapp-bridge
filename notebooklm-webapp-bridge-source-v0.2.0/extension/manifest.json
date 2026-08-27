@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.60",
-  "description": "D66 targets the final generated artifact card kebab menu, selects Download only inside the opened menu, and retains real-file mirror verification before completion.",
+  "version": "0.2.61",
+  "description": "D67 separates audio from other Studio artifact routes: audio uses the final player card kebab menu directly, with real-file verification retained as the completion gate.",
   "permissions": [
     "alarms",
     "identity",
