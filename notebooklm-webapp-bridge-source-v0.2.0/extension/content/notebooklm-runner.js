@@ -467,54 +467,75 @@
 
   function artifactMenuButtonWithin(root) {
     if (!root?.querySelectorAll) return null;
-    return [...root.querySelectorAll("button,[role='button'],a")]
+    const direct = [...root.querySelectorAll("button,[role='button'],a")]
       .filter(visible)
-      .find(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el))) || null;
+      .find(el => /more_vert|more_horiz|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
+    if (direct) return direct;
+    for (const icon of [...root.querySelectorAll("*")].filter(visible)) {
+      const t = norm([icon.innerText,icon.textContent,icon.getAttribute?.("aria-label"),icon.getAttribute?.("title")].join(" "));
+      if (!/(^|\\s)(more_vert|more_horiz)(\\s|$)|더보기|옵션/.test(t)) continue;
+      const clickable = icon.closest?.("button,[role='button'],a");
+      if (clickable && visible(clickable)) return clickable;
+    }
+    return null;
   }
 
   function audioArtifactCardRoot(readyNode) {
     const candidates = [];
-    const menus = deepQueryAll("button,[role='button'],a")
-      .filter(visible)
-      .filter(el => /more_vert|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
+    const iconNodes = deepQueryAll("*").filter(visible).filter(el => {
+      const t = norm([el.innerText,el.textContent,el.getAttribute?.("aria-label"),el.getAttribute?.("title")].join(" "));
+      return /(^|\\s)(more_vert|more_horiz)(\\s|$)|더보기|옵션/.test(t);
+    });
 
-    for (const menu of menus) {
+    const menuButtons = [];
+    const seen = new Set();
+    for (const icon of iconNodes) {
+      const clickable = icon.closest?.("button,[role='button'],a") || icon;
+      if (!seen.has(clickable)) { seen.add(clickable); menuButtons.push(clickable); }
+    }
+    for (const el of deepQueryAll("button,[role='button'],a").filter(visible)) {
+      if (/more_vert|more_horiz|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)) && !seen.has(el)) {
+        seen.add(el); menuButtons.push(el);
+      }
+    }
+
+    for (const menu of menuButtons) {
       let cur = menu.parentElement;
-      for (let depth = 0; depth < 12 && cur; depth++, cur = cur.parentElement) {
+      for (let depth = 0; depth < 14 && cur; depth++, cur = cur.parentElement) {
         const raw = (cur.innerText || cur.textContent || "").trim();
         const t = norm(raw);
-        if (raw.length < 4 || raw.length > 3000) continue;
-
-        const buttonLabels = [...cur.querySelectorAll?.("button,[role='button'],a") || []]
+        if (raw.length < 4 || raw.length > 4000) continue;
+        const descendants = [...cur.querySelectorAll?.("*") || []]
           .filter(visible)
-          .map(actionLabel)
+          .map(el => norm([el.innerText,el.textContent,el.getAttribute?.("aria-label"),el.getAttribute?.("title")].join(" ")))
           .join(" ");
-        const hasPlay = /(^|\s)(play|재생)(\s|$)|play_arrow|pause|일시정지/.test(buttonLabels);
-        const duration = /\b\d{1,2}:\d{2}\b/.test(t) || /\b\d{1,2}:\d{2}\b/.test(buttonLabels);
-        const sourceSignal = /소스\s*\d+개|sources?\s*\d+|딥 다이브|deep dive/.test(t);
+        const hasPlay = /play_arrow|(^|\\s)(play|재생)(\\s|$)|pause|일시정지/.test(descendants);
+        const duration = /\\b\\d{1,2}:\\d{2}\\b/.test(t) || /\\b\\d{1,2}:\\d{2}\\b/.test(descendants);
+        const sourceSignal = /소스\\s*\\d+개|sources?\\s*\\d+|딥 다이브|deep dive/.test(t);
         const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"]
           .filter(w => t.includes(w)).length;
-
-        if (hasPlay && studioMenuHits < 5) {
-          const score = (duration ? 4 : 0) + (sourceSignal ? 3 : 0) + Math.max(0, 3 - depth);
-          candidates.push({el:cur, score, len:raw.length, depth, text:raw});
+        if ((hasPlay || duration) && studioMenuHits < 5) {
+          const score = (hasPlay ? 5 : 0) + (duration ? 4 : 0) + (sourceSignal ? 2 : 0) + Math.max(0, 3 - depth);
+          candidates.push({el:cur, score, len:raw.length, depth});
           break;
         }
       }
     }
 
-    if (candidates.length) {
-      return candidates.sort((a,b) => b.score - a.score || a.len - b.len || a.depth - b.depth)[0].el;
+    if (candidates.length) return candidates.sort((a,b) => b.score - a.score || a.len - b.len || a.depth - b.depth)[0].el;
+
+    for (const node of deepQueryAll("*").filter(visible)) {
+      const tx = norm([node.innerText,node.textContent,node.getAttribute?.("aria-label"),node.getAttribute?.("title")].join(" "));
+      if (!/play_arrow|(^|\\s)(play|재생)(\\s|$)|pause|일시정지|\\b\\d{1,2}:\\d{2}\\b/.test(tx)) continue;
+      let cur = node.closest?.("button,[role='button'],a") || node;
+      for (let depth = 0; depth < 12 && cur; depth++, cur = cur.parentElement) {
+        if (artifactMenuButtonWithin(cur)) return cur;
+      }
     }
 
     let cur = readyNode instanceof HTMLElement ? readyNode : null;
     for (let depth = 0; depth < 12 && cur; depth++, cur = cur.parentElement) {
-      const raw = (cur.innerText || cur.textContent || "").trim();
-      const labels = [...cur.querySelectorAll?.("button,[role='button'],a") || []]
-        .filter(visible)
-        .map(actionLabel)
-        .join(" ");
-      if (/(^|\s)(play|재생)(\s|$)|play_arrow|pause|일시정지/.test(labels) && artifactMenuButtonWithin(cur)) return cur;
+      if (artifactMenuButtonWithin(cur)) return cur;
     }
     return null;
   }
