@@ -1,0 +1,68 @@
+name: fix-direct-background-mirror-0259-once
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-direct-background-mirror-0259-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch direct background mirror
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, subprocess
+          root=Path('notebooklm-webapp-bridge-source-v0.2.0/extension')
+          runner=root/'content/notebooklm-runner.js'
+          bg=root/'background.js'
+          manifest=root/'manifest.json'
+          r=runner.read_text(encoding='utf-8')
+          old='''    const mirror = await mirrorNotebookArtifactToDrive(task, "AUDIO_OVERVIEW", download.startedAtEpochMs);\n    if (!mirror?.ok || !mirror?.mirror?.ok) throw new Error(`AUDIO_DRIVE_MIRROR_FAILED: ${mirror?.error || mirror?.raw?.stderr || "unknown"}`);\n\n    return {\n      resultText:"AUDIO_OVERVIEW_READY",'''
+          new='''    return {\n      resultText:"AUDIO_OVERVIEW_DOWNLOAD_TRIGGERED",'''
+          if old not in r:
+              raise SystemExit('audio mirror block not found')
+          r=r.replace(old,new)
+          old2='''      actualArtifact:{download,mirror:mirror.mirror,localTaskId:mirror.localTaskId},'''
+          new2='''      artifactMirrorRequest:{artifactType:"AUDIO_OVERVIEW",startedAtEpochMs:download.startedAtEpochMs},\n      actualArtifact:{download},'''
+          if old2 not in r:
+              raise SystemExit('actualArtifact mirror block not found')
+          r=r.replace(old2,new2)
+          runner.write_text(r,encoding='utf-8')
+
+          b=bg.read_text(encoding='utf-8')
+          oldb='''    if (!response?.ok) throw new Error(response?.error || "NotebookLM 실행에 실패했습니다.");\n\n    const completed = await apiPost(apiUrl, {'''
+          newb='''    if (!response?.ok) throw new Error(response?.error || "NotebookLM 실행에 실패했습니다.");\n\n    const mirrorReq = response?.result?.artifactMirrorRequest;\n    if (mirrorReq) {\n      const handler = globalThis.__NLM_MIRROR_ARTIFACT_TO_DRIVE__;\n      if (typeof handler !== "function") throw new Error("ARTIFACT_MIRROR_HANDLER_NOT_READY");\n      const mirror = await handler({\n        taskId,\n        artifactType: mirrorReq.artifactType || task.taskType || "OTHER",\n        startedAtEpochMs: Number(mirrorReq.startedAtEpochMs || Date.now())\n      });\n      if (!mirror?.ok || !mirror?.mirror?.ok) throw new Error(`AUDIO_DRIVE_MIRROR_FAILED: ${mirror?.error || mirror?.raw?.stderr || "unknown"}`);\n      response.result.actualArtifact = { ...(response.result.actualArtifact || {}), mirror: mirror.mirror, localTaskId: mirror.localTaskId };\n      delete response.result.artifactMirrorRequest;\n    }\n\n    const completed = await apiPost(apiUrl, {'''
+          if oldb not in b:
+              raise SystemExit('background response block not found')
+          b=b.replace(oldb,newb)
+          bg.write_text(b,encoding='utf-8')
+
+          m=json.loads(manifest.read_text(encoding='utf-8'))
+          m['version']='0.2.59'
+          m['description']='D65 performs artifact mirror directly inside the service worker after NotebookLM result-card download, removing runtime message routing from content script.'
+          manifest.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+
+          relp=Path('runtime/stable/release.json')
+          rel=json.loads(relp.read_text(encoding='utf-8'))
+          rel['version']='0.2.59'
+          rel['actionId']='APPLY_NOTEBOOKLM_0.2.59_D65_DIRECT_BACKGROUND_MIRROR_20260827'
+          rel['releasedAt']='2026-08-27T15:45:00+09:00'
+          rel['description']='D65 removes content-to-background mirror messaging and invokes the artifact mirror handler directly inside background after download trigger.'
+          rel['requiresUserApproval']=False
+          for entry in rel['files']:
+              p=root/entry['path']
+              if not p.exists(): raise SystemExit(f'missing release file {p}')
+              entry['gitBlobSha1']=subprocess.check_output(['git','hash-object',str(p)],text=True).strip()
+          relp.write_text(json.dumps(rel,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Commit patched runtime
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension runtime/stable/release.json
+          git commit -m 'Bridge 0.2.59 direct background artifact mirror' || exit 0
+          git push
