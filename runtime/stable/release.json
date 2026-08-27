@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.64_D70_EXISTING_INLINE_MIRROR_GATE_20260827",
-  "version": "0.2.64",
-  "releasedAt": "2026-08-27T16:48:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.65_D71_DEDICATED_MIRROR_PORT_20260827",
+  "version": "0.2.65",
+  "releasedAt": "2026-08-27T16:58:00+09:00",
   "requiresUserApproval": false,
-  "description": "D70 makes existing Studio artifact download fail closed until actual Windows file capture and mirror readback succeed.",
+  "description": "D71 isolates artifact mirror traffic on NLM_ARTIFACT_MIRROR_V3 runtime Port; existing artifact DONE still requires actual file mirror.",
   "sourceCommit": "083ce48c88cce0fcfa6349d06ca56100f4dd2cad",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
@@ -15,7 +15,7 @@
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "e294c6755b060a5da00ba4ac4455f2c7fca91d6a"
+      "gitBlobSha1": "0a50b364b84d0f19a2bb535dae3107b7c27d0479"
     },
     {
       "path": "worker.js",
@@ -55,11 +55,11 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "06243737c681fcaed7637349e49385c3e3e17116"
+      "gitBlobSha1": "6af4170688027f096d72f98b4a0327db72d0a918"
     },
     {
       "path": "artifact-drive-mirror.js",
-      "gitBlobSha1": "212319a98e01fb6c7a6b145ab893e21ebee9e95b"
+      "gitBlobSha1": "547bb944a730b5c8ffb2823a5079813cc6c13a22"
     }
   ]
 }

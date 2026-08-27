@@ -74,3 +74,22 @@ async function nlmMirrorArtifact(message) {
 }
 
 globalThis.__NLM_MIRROR_ARTIFACT_TO_DRIVE__ = nlmMirrorArtifact;
+chrome.runtime.onConnect.addListener((port) => {
+  if (port?.name !== "NLM_ARTIFACT_MIRROR_V3") return;
+  let handled=false;
+  port.onMessage.addListener(async (message) => {
+    if (handled) return;
+    handled=true;
+    try {
+      if (message?.source !== NLM_ARTIFACT_SOURCE || message?.type !== "MIRROR_ARTIFACT_TO_DRIVE_V3") {
+        port.postMessage({ok:false,error:`ARTIFACT_MIRROR_PORT_BAD_MESSAGE type=${String(message?.type||"")} source=${String(message?.source||"")}`});
+        return;
+      }
+      const result=await nlmMirrorArtifact(message);
+      port.postMessage(result);
+    } catch (error) {
+      try { port.postMessage({ok:false,error:String(error?.message||error)}); } catch {}
+    }
+  });
+});
+

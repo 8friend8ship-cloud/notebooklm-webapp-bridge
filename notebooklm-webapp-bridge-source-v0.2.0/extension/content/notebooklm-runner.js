@@ -627,11 +627,21 @@
   }
 
   async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {
-    try {
-      return await chrome.runtime.sendMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE_V2",taskId:task.taskId,artifactType,startedAtEpochMs});
-    } catch (error) {
-      return {ok:false,error:String(error?.message || error)};
-    }
+    return await new Promise((resolve) => {
+      let settled=false;
+      let timer=null;
+      try {
+        const port=chrome.runtime.connect({name:"NLM_ARTIFACT_MIRROR_V3"});
+        const finish=(value)=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);try{port.disconnect();}catch{}resolve(value);};
+        timer=setTimeout(()=>finish({ok:false,error:"ARTIFACT_MIRROR_PORT_TIMEOUT"}),165000);
+        port.onMessage.addListener(msg=>finish(msg));
+        port.onDisconnect.addListener(()=>{if(!settled)finish({ok:false,error:chrome.runtime.lastError?.message||"ARTIFACT_MIRROR_PORT_DISCONNECTED"});});
+        port.postMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE_V3",taskId:task.taskId,artifactType,startedAtEpochMs});
+      } catch (error) {
+        if(timer)clearTimeout(timer);
+        resolve({ok:false,error:String(error?.message||error)});
+      }
+    });
   }
   
     async function runAudioOverview(task) {
