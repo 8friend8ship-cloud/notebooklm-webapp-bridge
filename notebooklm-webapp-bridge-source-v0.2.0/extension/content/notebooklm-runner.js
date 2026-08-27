@@ -621,7 +621,7 @@
 
   async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {
     try {
-      return await chrome.runtime.sendMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE",taskId:task.taskId,artifactType,startedAtEpochMs});
+      return await chrome.runtime.sendMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE_V2",taskId:task.taskId,artifactType,startedAtEpochMs});
     } catch (error) {
       return {ok:false,error:String(error?.message || error)};
     }

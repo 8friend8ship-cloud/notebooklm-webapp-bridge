@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.57_D63_RESULT_CARD_MENU_DOWNLOAD_20260827",
-  "version": "0.2.57",
-  "releasedAt": "2026-08-27T15:20:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.58_D64_MIRROR_MESSAGE_ROUTE_20260827",
+  "version": "0.2.58",
+  "releasedAt": "2026-08-27T15:30:00+09:00",
   "requiresUserApproval": false,
-  "description": "D63 identifies only real generated audio result cards (play/duration), then uses that card menu (more/⋮) and Download; Studio catalog is no longer a false ready signal.",
+  "description": "D64 uses a dedicated V2 artifact mirror message after real result-card menu download; background accepts legacy and V2 mirror messages.",
   "sourceCommit": "083ce48c88cce0fcfa6349d06ca56100f4dd2cad",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
@@ -15,7 +15,7 @@
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "7811a3602640dc934f6ad8c193de9a478641cf3b"
+      "gitBlobSha1": "885fb90ccecc8028afb0e5045f7301ff0a4853e7"
     },
     {
       "path": "worker.js",
@@ -35,7 +35,7 @@
     },
     {
       "path": "background.js",
-      "gitBlobSha1": "7cb65a9ede25e673946201bd6c0865574bbc51ca"
+      "gitBlobSha1": "330a8e9ce9465b0d11adfadb44bfd068b0c04629"
     },
     {
       "path": "local-powershell-runner.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "802a4eaf1b33c3fc4d9cd4345c30544f98793a3c"
+      "gitBlobSha1": "35b383596b645445e52714a698798ccd96c3dba7"
     },
     {
       "path": "artifact-drive-mirror.js",

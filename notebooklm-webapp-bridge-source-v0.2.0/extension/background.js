@@ -338,7 +338,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     if (message?.source !== SOURCE) return { ok: false, error: "잘못된 메시지입니다." };
-    if (message.type === "MIRROR_ARTIFACT_TO_DRIVE") {
+    if (["MIRROR_ARTIFACT_TO_DRIVE","MIRROR_ARTIFACT_TO_DRIVE_V2"].includes(message.type)) {
       const handler = globalThis.__NLM_MIRROR_ARTIFACT_TO_DRIVE__;
       if (typeof handler !== "function") return { ok:false, error:"ARTIFACT_MIRROR_HANDLER_NOT_READY" };
       return await handler(message);
