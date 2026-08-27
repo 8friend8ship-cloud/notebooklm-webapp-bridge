@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.22",
-  "releasedAt": "2026-08-26T11:47:00+09:00",
-  "gitBlobSha1": "8eb558717939ea6ecb95725dfbaa2656692d8e58",
+  "version": "1.1.23",
+  "releasedAt": "2026-08-27T13:12:00+09:00",
+  "gitBlobSha1": "8d3f2e55e264baf617fc997ab396f6f8072aa3a7",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Autonomous recovery with bounded retry and explicit final state/readback promotion to agentVersion 1.1.22. Reuses proven 1.1.21/1.1.19 self-heal path, verifies Host/Dedicated Chrome/Governor/Drive sync, repairs Governor/Bridge once if needed, and writes central Runtime_Readback directly. Manual V3-V6 installer loop retired."
+  "notes": "Refreshes the current Host 1.2.2 wrapper SHA and restarts the Host before reusing the proven Agent 1.1.22 recovery/readback loop. Fixes health-pass but /run-fail caused by a stale Host 1.2.2 build after allowlist updates. No new OAuth, reinstall, or user approval."
 }
