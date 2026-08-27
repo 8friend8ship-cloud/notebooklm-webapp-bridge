@@ -11,14 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Patch manifest background runner and stable release
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
           import json, hashlib, subprocess
-
           root=Path('notebooklm-webapp-bridge-source-v0.2.0/extension')
-
-          # Manifest: read-only Chrome download-history permission; no path mutation.
           mp=root/'manifest.json'
           m=json.loads(mp.read_text(encoding='utf-8'))
           m['version']='0.2.68'
@@ -30,61 +28,46 @@ jobs:
           m['permissions']=perms
           mp.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 
-          # Background: independent Chrome download evidence reader.
           bp=root/'background.js'
           b=bp.read_text(encoding='utf-8')
           anchor='async function getPersistedSessionToken() {'
           assert anchor in b, 'BACKGROUND_FUNCTION_ANCHOR_MISSING'
-          helper=r'''async function verifyDownloadAfterClick(startedAtEpochMs, timeoutMs = 30000) {
-  if (!chrome.downloads?.search) return { ok: false, error: "CHROME_DOWNLOADS_API_UNAVAILABLE" };
-  const startMs = Math.max(0, Number(startedAtEpochMs || Date.now()) - 3000);
-  const startedAfter = new Date(startMs).toISOString();
-  const deadline = Date.now() + Math.max(5000, Number(timeoutMs || 30000));
-  let last = [];
-  while (Date.now() < deadline) {
-    const items = await chrome.downloads.search({ startedAfter, orderBy: ["-startTime"], limit: 20 });
-    last = (items || []).map((item) => ({
-      id: item.id,
-      filename: item.filename || "",
-      state: item.state || "",
-      exists: item.exists !== false,
-      fileSize: Number(item.fileSize || 0),
-      totalBytes: Number(item.totalBytes || 0),
-      startTime: item.startTime || "",
-      endTime: item.endTime || "",
-      error: item.error || "",
-      url: item.url || ""
-    }));
-    const complete = last.find((item) =>
-      item.state === "complete" && item.exists && Math.max(item.fileSize, item.totalBytes) > 0
-    );
-    if (complete) return { ok: true, action: "CHROME_DOWNLOAD_VERIFIED", download: complete, recent: last.slice(0, 5) };
-    const interrupted = last.find((item) => item.state === "interrupted");
-    if (interrupted) return { ok: false, error: "CHROME_DOWNLOAD_INTERRUPTED", download: interrupted, recent: last.slice(0, 5) };
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  return { ok: false, error: "CHROME_DOWNLOAD_NOT_FOUND_OR_INCOMPLETE", recent: last.slice(0, 5) };
-}
+          helper="""async function verifyDownloadAfterClick(startedAtEpochMs, timeoutMs = 30000) {
+            if (!chrome.downloads?.search) return { ok: false, error: 'CHROME_DOWNLOADS_API_UNAVAILABLE' };
+            const startMs = Math.max(0, Number(startedAtEpochMs || Date.now()) - 3000);
+            const startedAfter = new Date(startMs).toISOString();
+            const deadline = Date.now() + Math.max(5000, Number(timeoutMs || 30000));
+            let last = [];
+            while (Date.now() < deadline) {
+              const items = await chrome.downloads.search({ startedAfter, orderBy: ['-startTime'], limit: 20 });
+              last = (items || []).map((item) => ({ id:item.id, filename:item.filename||'', state:item.state||'', exists:item.exists !== false, fileSize:Number(item.fileSize||0), totalBytes:Number(item.totalBytes||0), startTime:item.startTime||'', endTime:item.endTime||'', error:item.error||'', url:item.url||'' }));
+              const complete = last.find((item) => item.state === 'complete' && item.exists && Math.max(item.fileSize, item.totalBytes) > 0);
+              if (complete) return { ok:true, action:'CHROME_DOWNLOAD_VERIFIED', download:complete, recent:last.slice(0,5) };
+              const interrupted = last.find((item) => item.state === 'interrupted');
+              if (interrupted) return { ok:false, error:'CHROME_DOWNLOAD_INTERRUPTED', download:interrupted, recent:last.slice(0,5) };
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+            return { ok:false, error:'CHROME_DOWNLOAD_NOT_FOUND_OR_INCOMPLETE', recent:last.slice(0,5) };
+          }
 
-'''
+          """
           if 'async function verifyDownloadAfterClick(' not in b:
               b=b.replace(anchor,helper+anchor,1)
           listener_anchor='if (message.type === "GET_CONFIG") return { ok: true, config: await getConfig(), profile: await getChromeProfile(), autoState: await getAutoState() };'
           assert listener_anchor in b, 'BACKGROUND_LISTENER_ANCHOR_MISSING'
-          branch='''if (message.type === "VERIFY_DOWNLOAD_AFTER_CLICK") return await verifyDownloadAfterClick(message.startedAtEpochMs, message.timeoutMs || 30000);\n    '''
+          branch='if (message.type === "VERIFY_DOWNLOAD_AFTER_CLICK") return await verifyDownloadAfterClick(message.startedAtEpochMs, message.timeoutMs || 30000);\n    '
           if 'message.type === "VERIFY_DOWNLOAD_AFTER_CLICK"' not in b:
               b=b.replace(listener_anchor,branch+listener_anchor,1)
           bp.write_text(b,encoding='utf-8')
 
-          # Existing-artifact path: DONE only after Chrome confirms a real file.
           rp=root/'content/notebooklm-runner.js'
           r=rp.read_text(encoding='utf-8')
-          old='''    try { download.click(); } catch {}\n    await sleep(1200);\n    return {\n      resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),'''
-          new='''    try { download.click(); } catch {}\n    const downloadEvidence = await chrome.runtime.sendMessage({\n      source: SOURCE,\n      type: "VERIFY_DOWNLOAD_AFTER_CLICK",\n      startedAtEpochMs,\n      timeoutMs: Math.min(45000, Math.max(15000, Number(task.timeoutSeconds || 30) * 1000))\n    });\n    if (!downloadEvidence?.ok) throw new Error(`${spec.code}_REAL_DOWNLOAD_NOT_VERIFIED:${downloadEvidence?.error || "UNKNOWN"}`);\n    return {\n      resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),'''
+          old='    try { download.click(); } catch {}\n    await sleep(1200);\n    return {\n      resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),'
+          new='    try { download.click(); } catch {}\n    const downloadEvidence = await chrome.runtime.sendMessage({ source: SOURCE, type: "VERIFY_DOWNLOAD_AFTER_CLICK", startedAtEpochMs, timeoutMs: Math.min(45000, Math.max(15000, Number(task.timeoutSeconds || 30) * 1000)) });\n    if (!downloadEvidence?.ok) throw new Error(`${spec.code}_REAL_DOWNLOAD_NOT_VERIFIED:${downloadEvidence?.error || "UNKNOWN"}`);\n    return {\n      resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),'
           assert old in r, 'RUNNER_EXISTING_DOWNLOAD_ANCHOR_MISSING'
           r=r.replace(old,new,1)
-          old_actual='''      actualArtifact:{requested:true,method:`${spec.code}_EXISTING_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs},'''
-          new_actual='''      actualArtifact:{requested:true,method:`${spec.code}_EXISTING_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs,downloadEvidence},'''
+          old_actual='      actualArtifact:{requested:true,method:`${spec.code}_EXISTING_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs},'
+          new_actual='      actualArtifact:{requested:true,method:`${spec.code}_EXISTING_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs,downloadEvidence},'
           assert old_actual in r, 'RUNNER_ACTUAL_ARTIFACT_ANCHOR_MISSING'
           r=r.replace(old_actual,new_actual,1)
           rp.write_text(r,encoding='utf-8')
@@ -92,7 +75,6 @@ jobs:
           def blob_sha(path):
               data=Path(path).read_bytes()
               return hashlib.sha1(f'blob {len(data)}\0'.encode()+data).hexdigest()
-
           release_path=Path('runtime/stable/release.json')
           rel=json.loads(release_path.read_text(encoding='utf-8'))
           rel['version']='0.2.68'
@@ -101,16 +83,14 @@ jobs:
           rel['requiresUserApproval']=False
           rel['description']='D78 existing-artifact downloads are successful only when Chrome downloads API confirms state=complete, exists=true, and nonzero bytes. No download-path change, file move, Drive mirror, or new NotebookLM generation.'
           rel['sourceCommit']=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
-          changed={
-              'manifest.json':blob_sha(mp),
-              'background.js':blob_sha(bp),
-              'content/notebooklm-runner.js':blob_sha(rp)
-          }
+          changed={'manifest.json':blob_sha(mp),'background.js':blob_sha(bp),'content/notebooklm-runner.js':blob_sha(rp)}
           for f in rel['files']:
               if f['path'] in changed:
                   f['gitBlobSha1']=changed[f['path']]
           release_path.write_text(json.dumps(rel,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
       - name: Commit and push
+        shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
