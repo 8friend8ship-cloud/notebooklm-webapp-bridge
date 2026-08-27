@@ -1,0 +1,52 @@
+name: add-nlm-download-inspect-to-governor-once
+on:
+  push:
+    paths:
+      - '.github/workflows/add-nlm-download-inspect-to-governor-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch governor with Downloads inspection action
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('local-agent/governor/RunChromeGovernorReadback.ps1')
+          s=p.read_text(encoding='utf-8')
+          old="[switch]$CaptureBridgeSmoke,[switch]$InteriorAppsScriptSync,[string]$CentralRelativePath=''"
+          new="[switch]$CaptureBridgeSmoke,[switch]$InteriorAppsScriptSync,[switch]$InspectNotebookLMDownloads,[string]$CentralRelativePath=''"
+          assert old in s, 'PARAM_ANCHOR_MISSING'
+          s=s.replace(old,new,1)
+          marker='if($InteriorAppsScriptSync){'
+          block=r'''if($InspectNotebookLMDownloads){
+  try{
+    $dir=Join-Path $env:USERPROFILE 'Downloads'
+    if(-not(Test-Path -LiteralPath $dir)){throw 'WINDOWS_DOWNLOADS_NOT_FOUND'}
+    $ext=@('.xlsx','.xls','.csv','.pdf','.pptx','.ppt','.mp3','.m4a','.wav','.mp4','.webm','.txt','.docx','.doc','.png','.jpg','.jpeg')
+    $now=Get-Date
+    $items=@(Get-ChildItem -LiteralPath $dir -File -ErrorAction Stop | Where-Object {$ext -contains $_.Extension.ToLowerInvariant()} | Sort-Object LastWriteTime -Descending | Select-Object -First 30 | ForEach-Object {
+      [ordered]@{name=$_.Name;fullName=$_.FullName;size=[int64]$_.Length;lastWriteTime=$_.LastWriteTime.ToString('o');ageSeconds=[int][Math]::Max(0,($now-$_.LastWriteTime).TotalSeconds)}
+    })
+    $target=@($items | Where-Object {$_.name -ieq 'contentos-stage-table.xlsx'})
+    [ordered]@{ok=$true;action='NOTEBOOKLM_DOWNLOADS_INSPECT';folder=$dir;targetName='contentos-stage-table.xlsx';targetFound=(@($target).Count -gt 0);target=$target;recent=$items;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 20 -Compress
+    exit 0
+  }catch{
+    [ordered]@{ok=$false;action='NOTEBOOKLM_DOWNLOADS_INSPECT';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    exit 2
+  }
+}
+
+'''
+          assert marker in s, 'BLOCK_ANCHOR_MISSING'
+          s=s.replace(marker,block+marker,1)
+          p.write_text(s,encoding='utf-8')
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add local-agent/governor/RunChromeGovernorReadback.ps1
+          git commit -m 'Add NotebookLM Downloads inspection governor action' || exit 0
+          git push
