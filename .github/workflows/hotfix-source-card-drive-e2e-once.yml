@@ -1,0 +1,80 @@
+name: hotfix-source-card-drive-e2e-once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hotfix-source-card-drive-e2e-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch current source-card UI and stable 0.2.56
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json, hashlib
+
+          runner_path = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          manifest_path = Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
+          release_path = Path('runtime/stable/release.json')
+          text = runner_path.read_text(encoding='utf-8')
+
+          anchor = '''  function nativeValue(el, value) {'''
+          helper = '''  function findTextControl(words, root = null, excludeDialogs = false) {\n    const selector = "button,[role='button'],[role='tab'],a,[tabindex],div,span";\n    const raw = root ? [...root.querySelectorAll(selector)] : deepQueryAll(selector);\n    const candidates = raw\n      .filter(el => visible(el) && (!excludeDialogs || !el.closest("[role='dialog'],dialog")))\n      .map(el => ({\n        el,\n        text: norm([el.innerText, el.textContent, el.getAttribute?.("aria-label"), el.getAttribute?.("title"), el.getAttribute?.("data-testid")].join(" "))\n      }))\n      .filter(x => x.text && x.text.length <= 500 && words.some(w => x.text === norm(w) || x.text.includes(norm(w))))\n      .sort((a,b) => a.text.length - b.text.length);\n    for (const x of candidates) {\n      const clickable = x.el.closest("button,[role='button'],a,[tabindex]") || x.el;\n      if (visible(clickable)) return clickable;\n    }\n    return null;\n  }\n\n'''
+          if 'function findTextControl(words' not in text:
+              if anchor not in text: raise SystemExit('HELPER_ANCHOR_NOT_FOUND')
+              text = text.replace(anchor, helper + anchor, 1)
+
+          text = text.replace(
+            'choice = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);',
+            'choice = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d) || findTextControl(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);'
+          )
+          text = text.replace(
+            'const add = findButton(["소스 추가","자료 추가","출처 추가","add source","add sources"]);',
+            'const add = findButton(["소스 추가","자료 추가","출처 추가","add source","add sources"]) || findTextControl(["소스 추가","자료 추가","출처 추가","add source","add sources"], null, true);'
+          )
+          text = text.replace(
+            'const b = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);',
+            'const b = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d) || findTextControl(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);'
+          )
+          text = text.replace(
+            'const b = findButton(["삽입","추가","저장","완료","insert","add","save","submit"], d);',
+            'const b = findButton(["삽입","추가","저장","완료","insert","add","save","submit"], d) || findTextControl(["삽입","추가","저장","완료","insert","add","save","submit"], d);'
+          )
+          runner_path.write_text(text, encoding='utf-8')
+
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          manifest['version'] = '0.2.56'
+          manifest['description'] = 'D62 adds card/text fallback for current NotebookLM source-add, pasted-text, and confirm controls, preserving audio download plus Drive mirror gating.'
+          manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          def blob_sha(path):
+              data = Path(path).read_bytes()
+              return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+
+          release = json.loads(release_path.read_text(encoding='utf-8'))
+          release['actionId'] = 'APPLY_NOTEBOOKLM_0.2.56_D62_SOURCE_CARD_DRIVE_E2E_20260827'
+          release['version'] = '0.2.56'
+          release['releasedAt'] = '2026-08-27T14:35:00+09:00'
+          release['requiresUserApproval'] = False
+          release['description'] = 'D62 fixes current NotebookLM card-style source add/pasted text/confirm controls; actual audio download and Drive mirror remain required for DONE.'
+          for f in release['files']:
+              if f['path'] == 'manifest.json': f['gitBlobSha1'] = blob_sha(manifest_path)
+              elif f['path'] == 'content/notebooklm-runner.js': f['gitBlobSha1'] = blob_sha(runner_path)
+          release_path.write_text(json.dumps(release, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+      - name: Commit hotfix
+        shell: bash
+        run: |
+          git config user.name 'central-agent'
+          git config user.email 'central-agent@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json runtime/stable/release.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'hotfix: support current NotebookLM source card UI'
+          git push
