@@ -1,0 +1,36 @@
+name: add-local-capture-to-artifact-mirror-once
+on:
+  push:
+    paths:
+      - '.github/workflows/add-local-capture-to-artifact-mirror-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add visible local CaptureBridge copy before Drive mirror
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1')
+          s=p.read_text(encoding='utf-8')
+          anchor='if (-not $found) { throw "NOTEBOOKLM_ARTIFACT_DOWNLOAD_NOT_FOUND:$ArtifactType" }\n\n$myDrive = Find-GoogleDriveMyDrive'
+          insert='''if (-not $found) { throw "NOTEBOOKLM_ARTIFACT_DOWNLOAD_NOT_FOUND:$ArtifactType" }\n\n# Canonical visible local capture: NotebookLM download result must land here before any Drive routing.\n$localCaptureDir = 'C:\\HomeDesignAutomationV7\\CaptureBridge\\INBOX\\NotebookLM'\nNew-Item -ItemType Directory -Path $localCaptureDir -Force | Out-Null\n$localSafeTask = ($TaskId -replace '[^A-Za-z0-9_.-]','_')\n$localCaptureName = "${localSafeTask}__$($found.Name)"\n$localCapturePath = Join-Path $localCaptureDir $localCaptureName\nCopy-Item -LiteralPath $found.FullName -Destination $localCapturePath -Force\n$localCaptured = Get-Item -LiteralPath $localCapturePath\nif ($localCaptured.Length -le 0) { throw 'LOCAL_CAPTURE_COPY_ZERO_BYTES' }\n\n$myDrive = Find-GoogleDriveMyDrive'''
+          if anchor not in s:
+              raise SystemExit('ANCHOR_NOT_FOUND')
+          s=s.replace(anchor,insert,1)
+          old='''  sourceBytes = $found.Length\n  googleDriveRoot = $myDrive'''
+          new='''  sourceBytes = $found.Length\n  localCapturePath = $localCaptured.FullName\n  localCaptureName = $localCaptured.Name\n  localCaptureBytes = $localCaptured.Length\n  googleDriveRoot = $myDrive'''
+          if old not in s:
+              raise SystemExit('OUTPUT_ANCHOR_NOT_FOUND')
+          p.write_text(s.replace(old,new,1), encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name '8friend8ship-cloud'
+          git config user.email 'homedesigntaedi@gmail.com'
+          git add local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1
+          git commit -m 'Mirror NotebookLM artifacts to visible local CaptureBridge first'
+          git push
