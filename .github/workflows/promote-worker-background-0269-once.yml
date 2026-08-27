@@ -1,0 +1,21 @@
+name: promote-worker-background-0269-once
+on:
+  push:
+    paths:
+      - '.github/workflows/promote-worker-background-0269-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Bridge 0.2.69
+        run: python tools/patch_worker_background_0269.py
+      - name: Commit and push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json runtime/stable/release.json
+          git commit -m 'Restore main background runtime in Bridge 0.2.69' || exit 0
+          git push
