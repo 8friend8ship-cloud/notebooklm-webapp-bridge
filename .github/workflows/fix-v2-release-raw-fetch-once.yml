@@ -1,0 +1,31 @@
+name: fix-v2-release-raw-fetch-once
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-v2-release-raw-fetch-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch V2 release fetch to raw URL
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('local-agent/governor/RunChromeGovernorReadbackV2.ps1')
+          s=p.read_text(encoding='utf-8')
+          old="function GetBridgeRelease{$Resp=GitHubContent 'runtime/stable/release.json' 'main' 10;$Rel=(DecodeGitHubText $Resp)|ConvertFrom-Json;if(-not $Rel.enabled){throw 'BRIDGE_STABLE_DISABLED'};if([string]$Rel.action -ne 'apply'){throw 'BRIDGE_STABLE_ACTION_NOT_APPLY'};if([bool]$Rel.requiresUserApproval){throw 'BRIDGE_RELEASE_REQUIRES_USER_APPROVAL'};return $Rel}"
+          new="function GetBridgeRelease{$Url='https://raw.githubusercontent.com/'+$Repo+'/main/runtime/stable/release.json?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$Text=(Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 10).Content;$Rel=$Text|ConvertFrom-Json;if(-not $Rel.enabled){throw 'BRIDGE_STABLE_DISABLED'};if([string]$Rel.action -ne 'apply'){throw 'BRIDGE_STABLE_ACTION_NOT_APPLY'};if([bool]$Rel.requiresUserApproval){throw 'BRIDGE_RELEASE_REQUIRES_USER_APPROVAL'};return $Rel}"
+          if old not in s:
+              raise SystemExit('TARGET_NOT_FOUND')
+          p.write_text(s.replace(old,new,1), encoding='utf-8')
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name '8friend8ship-cloud'
+          git config user.email 'homedesigntaedi@gmail.com'
+          git add local-agent/governor/RunChromeGovernorReadbackV2.ps1
+          git commit -m 'Fix V2 bridge release fetch to raw URL'
+          git push
