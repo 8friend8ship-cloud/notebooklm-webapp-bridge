@@ -57,6 +57,16 @@ while ([DateTime]::UtcNow -lt $deadline) {
 }
 if (-not $found) { throw "NOTEBOOKLM_ARTIFACT_DOWNLOAD_NOT_FOUND:$ArtifactType" }
 
+# Canonical visible local capture: NotebookLM download result must land here before any Drive routing.
+$localCaptureDir = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX\NotebookLM'
+New-Item -ItemType Directory -Path $localCaptureDir -Force | Out-Null
+$localSafeTask = ($TaskId -replace '[^A-Za-z0-9_.-]','_')
+$localCaptureName = "${localSafeTask}__$($found.Name)"
+$localCapturePath = Join-Path $localCaptureDir $localCaptureName
+Copy-Item -LiteralPath $found.FullName -Destination $localCapturePath -Force
+$localCaptured = Get-Item -LiteralPath $localCapturePath
+if ($localCaptured.Length -le 0) { throw 'LOCAL_CAPTURE_COPY_ZERO_BYTES' }
+
 $myDrive = Find-GoogleDriveMyDrive
 $typeFolder = switch ($ArtifactType.ToUpperInvariant()) {
   'AUDIO_OVERVIEW' { 'Audio' }
@@ -89,6 +99,9 @@ if ($copied.Length -le 0) { throw 'DRIVE_SYNC_COPY_ZERO_BYTES' }
   sourcePath = $found.FullName
   sourceName = $found.Name
   sourceBytes = $found.Length
+  localCapturePath = $localCaptured.FullName
+  localCaptureName = $localCaptured.Name
+  localCaptureBytes = $localCaptured.Length
   googleDriveRoot = $myDrive
   destinationPath = $copied.FullName
   destinationName = $copied.Name
