@@ -6,7 +6,7 @@ const GUARD_HOST = "http://127.0.0.1:8765";
 const GUARD_API = "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec";
 const GUARD_DEFAULT_TIMEOUT = 600;
 const GUARD_PENDING_STAGE = "CLAIMED_PENDING_HOST";
-const GUARD_PENDING_GRACE_MS = 120000;
+const GUARD_PENDING_GRACE_MS = 60000;
 
 async function guardReadActive() {
   try { return (await chrome.storage.local.get(GUARD_ACTIVE_KEY))[GUARD_ACTIVE_KEY] || null; }
