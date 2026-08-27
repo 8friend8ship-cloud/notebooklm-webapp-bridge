@@ -23,12 +23,13 @@ test('PowerShell mirror prefers exact SourcePath but retains legacy scan fallbac
   assert.doesNotMatch(mirrorPs, /Move-Item/);
 });
 
-test('FileSystemWatcher route is fallback-only and waits for a stable complete file', () => {
+test('FileSystemWatcher route is fallback-only and waits synchronously for a stable complete file', () => {
   assert.match(watcherPs, /FALLBACK_ONLY/);
-  assert.match(watcherPs, /Register-ObjectEvent/);
+  assert.match(watcherPs, /WaitForChanged/);
+  assert.match(watcherPs, /SYNCHRONOUS_WAIT_FOR_CHANGED/);
   assert.match(watcherPs, /Wait-StableFile/);
-  assert.match(watcherPs, /\$Event\.SourceEventArgs\.FullPath/);
   assert.match(watcherPs, /\.crdownload/);
   assert.match(watcherPs, /Copy-Item/);
+  assert.doesNotMatch(watcherPs, /Register-ObjectEvent/);
   assert.doesNotMatch(watcherPs, /Move-Item/);
 });
