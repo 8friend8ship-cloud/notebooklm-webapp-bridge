@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.24",
-  "releasedAt": "2026-08-27T19:23:00+09:00",
-  "gitBlobSha1": "4ce4fb5ccef43fcf71f6fe58f8733c5e72fe1f2c",
+  "version": "1.1.26",
+  "releasedAt": "2026-08-27T19:38:00+09:00",
+  "gitBlobSha1": "4f650ed61e8d66b6aef248e49bfd4986e625a2bc",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Rollback to last-good Agent 1.1.24 / Host 1.2.3 after Agent 1.1.25 / Host 1.2.4 self-heal failed. Actual Windows Downloads inspection now runs through the already allowlisted RunChromeGovernorReadback.ps1 -InspectNotebookLMDownloads action, so Host allowlist expansion is no longer required. Preserve Chrome download path, OAuth, existing files, and Bridge 0.2.66."
+  "notes": "Direct bridge recovery only. Preserves the existing healthy async Host instead of recursively replacing it. Applies verified stable Bridge 0.2.67 to the dedicated Chrome profile with existing user data, verifies file hashes and bridge version, restarts dedicated Chrome only when required, and writes runtime readback. No Chrome download-path change, OAuth, new permissions, file move, NotebookLM generation, or normal-Chrome mutation."
 }
