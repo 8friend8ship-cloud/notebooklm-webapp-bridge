@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.52",
-  "description": "D56 diagnostic captures real visible Audio DOM evidence when artifact-card detection fails. No false PASS.",
+  "version": "0.2.53",
+  "description": "D57 aligns LOCAL_POWERSHELL claimed-without-start recovery to the 60-second central handoff rule.",
   "permissions": [
     "alarms",
     "identity",
