@@ -1,0 +1,57 @@
+name: fix-mirror-dedicated-port-0265-once
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-mirror-dedicated-port-0265-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch mirror onto dedicated runtime Port
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, subprocess
+          root=Path('notebooklm-webapp-bridge-source-v0.2.0/extension')
+          runner=root/'content/notebooklm-runner.js'
+          mirror=root/'artifact-drive-mirror.js'
+          manifest=root/'manifest.json'
+          r=runner.read_text(encoding='utf-8')
+          old='''  async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {\n    try {\n      return await chrome.runtime.sendMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE_V2",taskId:task.taskId,artifactType,startedAtEpochMs});\n    } catch (error) {\n      return {ok:false,error:String(error?.message || error)};\n    }\n  }\n'''
+          new='''  async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {\n    return await new Promise((resolve) => {\n      let settled=false;\n      let timer=null;\n      try {\n        const port=chrome.runtime.connect({name:"NLM_ARTIFACT_MIRROR_V3"});\n        const finish=(value)=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);try{port.disconnect();}catch{}resolve(value);};\n        timer=setTimeout(()=>finish({ok:false,error:"ARTIFACT_MIRROR_PORT_TIMEOUT"}),165000);\n        port.onMessage.addListener(msg=>finish(msg));\n        port.onDisconnect.addListener(()=>{if(!settled)finish({ok:false,error:chrome.runtime.lastError?.message||"ARTIFACT_MIRROR_PORT_DISCONNECTED"});});\n        port.postMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE_V3",taskId:task.taskId,artifactType,startedAtEpochMs});\n      } catch (error) {\n        if(timer)clearTimeout(timer);\n        resolve({ok:false,error:String(error?.message||error)});\n      }\n    });\n  }\n'''
+          if old not in r: raise SystemExit('mirrorNotebookArtifactToDrive block missing')
+          r=r.replace(old,new,1)
+          runner.write_text(r,encoding='utf-8')
+          a=mirror.read_text(encoding='utf-8')
+          port='''\nchrome.runtime.onConnect.addListener((port) => {\n  if (port?.name !== "NLM_ARTIFACT_MIRROR_V3") return;\n  let handled=false;\n  port.onMessage.addListener(async (message) => {\n    if (handled) return;\n    handled=true;\n    try {\n      if (message?.source !== NLM_ARTIFACT_SOURCE || message?.type !== "MIRROR_ARTIFACT_TO_DRIVE_V3") {\n        port.postMessage({ok:false,error:`ARTIFACT_MIRROR_PORT_BAD_MESSAGE type=${String(message?.type||"")} source=${String(message?.source||"")}`});\n        return;\n      }\n      const result=await nlmMirrorArtifact(message);\n      port.postMessage(result);\n    } catch (error) {\n      try { port.postMessage({ok:false,error:String(error?.message||error)}); } catch {}\n    }\n  });\n});\n'''
+          if 'NLM_ARTIFACT_MIRROR_V3' not in a:
+            a=a.rstrip()+port+'\n'
+          mirror.write_text(a,encoding='utf-8')
+          m=json.loads(manifest.read_text(encoding='utf-8'))
+          m['version']='0.2.65'
+          m['description']='D71 moves artifact mirror onto a dedicated runtime Port to isolate it from generic internal message routing.'
+          manifest.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          relp=Path('runtime/stable/release.json')
+          rel=json.loads(relp.read_text(encoding='utf-8'))
+          rel['version']='0.2.65'
+          rel['actionId']='APPLY_NOTEBOOKLM_0.2.65_D71_DEDICATED_MIRROR_PORT_20260827'
+          rel['releasedAt']='2026-08-27T16:58:00+09:00'
+          rel['description']='D71 isolates artifact mirror traffic on NLM_ARTIFACT_MIRROR_V3 runtime Port; existing artifact DONE still requires actual file mirror.'
+          rel['requiresUserApproval']=False
+          for entry in rel['files']:
+            p=root/entry['path']
+            if not p.exists(): raise SystemExit(f'missing release file {p}')
+            entry['gitBlobSha1']=subprocess.check_output(['git','hash-object',str(p)],text=True).strip()
+          relp.write_text(json.dumps(rel,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Commit patched runtime
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json runtime/stable/release.json
+          git commit -m 'Bridge 0.2.65 dedicated artifact mirror port' || exit 0
+          git push
