@@ -597,6 +597,16 @@
     return out;
   }
 
+  function openArtifactDownloadAction() {
+    const overlays = deepQueryAll("[role='menu'],[role='listbox'],.mat-mdc-menu-panel,.mat-menu-panel,.cdk-overlay-pane").filter(visible);
+    for (const overlay of overlays) {
+      const candidates = [...overlay.querySelectorAll("[role='menuitem'],button,[role='button'],a,div,span")].filter(visible);
+      const hit = candidates.find(el => /(^|\s)(download|다운로드)(\s|$)/.test(actionLabel(el)));
+      if (hit) return hit.closest?.("[role='menuitem'],button,[role='button'],a") || hit;
+    }
+    return null;
+  }
+
   async function requestNotebookArtifactDownload(readyNode) {
     const startedAtEpochMs = Date.now();
     const root = audioArtifactCardRoot(readyNode);
@@ -612,8 +622,8 @@
     if (!menu) return {requested:false, reason:"real audio card menu not found", startedAtEpochMs};
     try { menu.click(); } catch {}
     await sleep(700);
-    const download = await waitFor(() => findDeepControl(["다운로드","download"]), 8000, 250);
-    if (!download) return {requested:false, reason:"download action not found after real audio card menu", startedAtEpochMs};
+    const download = await waitFor(() => openArtifactDownloadAction(), 8000, 250);
+    if (!download) return {requested:false, reason:"download action not found inside final artifact card menu", startedAtEpochMs};
     try { download.click(); } catch {}
     await sleep(1200);
     return {requested:true, method:"MENU_DOWNLOAD", startedAtEpochMs, cardText:(root.innerText || root.textContent || "").trim().slice(0,500)};

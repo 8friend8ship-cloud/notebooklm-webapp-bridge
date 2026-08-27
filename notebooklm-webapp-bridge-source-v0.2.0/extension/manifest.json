@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.59",
-  "description": "D65 performs artifact mirror directly inside the service worker after NotebookLM result-card download, removing runtime message routing from content script.",
+  "version": "0.2.60",
+  "description": "D66 targets the final generated artifact card kebab menu, selects Download only inside the opened menu, and retains real-file mirror verification before completion.",
   "permissions": [
     "alarms",
     "identity",
