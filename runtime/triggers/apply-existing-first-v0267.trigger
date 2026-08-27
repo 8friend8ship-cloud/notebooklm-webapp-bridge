@@ -1,2 +1,0 @@
-triggered_at=2026-08-27T17:30:00+09:00
-policy=EXISTING_FIRST_TEST_V1
