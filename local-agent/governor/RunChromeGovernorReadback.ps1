@@ -60,8 +60,10 @@ if($InteriorAppsScriptSync){
       if(@($pulled).Count -lt 1){throw 'CLASP_PULL_EMPTY'}
       Compress-Archive -Path (Join-Path $Work '*') -DestinationPath $Backup -Force
       $src='https://raw.githubusercontent.com/8friend8ship-cloud/interior/'+$Branch+'/apps-script/InteriorMarketplaceRuntime_20260825.gs?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-      Invoke-WebRequest -UseBasicParsing -Uri $src -OutFile (Join-Path $Work 'InteriorMarketplaceRuntime_20260825.gs') -TimeoutSec 20
-      $code=Get-Content -LiteralPath (Join-Path $Work 'InteriorMarketplaceRuntime_20260825.gs') -Raw -Encoding UTF8
+      $target=Get-ChildItem -LiteralPath $Work -File|Where-Object{$_.BaseName -eq 'InteriorMarketplaceRuntime_20260825'}|Select-Object -First 1
+      if(-not $target){$target=Get-Item -LiteralPath (New-Item -ItemType File -Path (Join-Path $Work 'InteriorMarketplaceRuntime_20260825.gs') -Force)}
+      Invoke-WebRequest -UseBasicParsing -Uri $src -OutFile $target.FullName -TimeoutSec 20
+      $code=Get-Content -LiteralPath $target.FullName -Raw -Encoding UTF8
       if($code -notmatch 'INTERIOR_MARKETPLACE_RUNTIME_V2_20260827'){throw 'INTERIOR_RUNTIME_V2_MARKER_MISSING'}
       & npx --yes '@google/clasp@latest' push --force
       if($LASTEXITCODE -ne 0){throw 'CLASP_PUSH_FAILED'}
@@ -72,7 +74,7 @@ if($InteriorAppsScriptSync){
         $install=$LASTEXITCODE
         if($install -eq 0){& npx --yes '@google/clasp@latest' run inspectInteriorMarketplaceTriggers;$inspect2=$LASTEXITCODE}else{$inspect2=-1}
       }else{$install=-1;$inspect2=-1}
-      [ordered]@{ok=$true;action='INTERIOR_APPS_SCRIPT_SYNC';sourcePush=$true;scriptId=$ScriptId;runtimeMarker='INTERIOR_MARKETPLACE_RUNTIME_V2_20260827';backup=$Backup;inspectBeforeExit=$inspect1;installExit=$install;inspectAfterExit=$inspect2;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress
+      [ordered]@{ok=$true;action='INTERIOR_APPS_SCRIPT_SYNC';sourcePush=$true;scriptId=$ScriptId;runtimeMarker='INTERIOR_MARKETPLACE_RUNTIME_V2_20260827';backup=$Backup;targetFile=$target.Name;inspectBeforeExit=$inspect1;installExit=$install;inspectAfterExit=$inspect2;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress
       exit 0
     } finally { Pop-Location }
   } catch {
@@ -94,9 +96,9 @@ if($CaptureBridgeSmoke){
     $rel=[string]$CentralRelativePath
     $rel=$rel.Trim()
     $rel=$rel -replace '^[\\/]+',''
-    $prefix='00_중앙에이전트\';if($rel.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){$rel=$rel.Substring($prefix.Length)}
-    $rel=$rel.Replace('/','\')
-    if(-not $rel.StartsWith('CaptureBridge\',[StringComparison]::OrdinalIgnoreCase)){throw 'CAPTUREBRIDGE_PATH_NOT_ALLOWLISTED'}
+    $prefix='00_중앙에이전트\\';if($rel.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){$rel=$rel.Substring($prefix.Length)}
+    $rel=$rel.Replace('/','\\')
+    if(-not $rel.StartsWith('CaptureBridge\\',[StringComparison]::OrdinalIgnoreCase)){throw 'CAPTUREBRIDGE_PATH_NOT_ALLOWLISTED'}
     if($rel -match '(^|\\)\.\.(\\|$)' -or [IO.Path]::IsPathRooted($rel)){throw 'CAPTUREBRIDGE_PATH_INVALID'}
     $name=[string]$SmokeFile;if([string]::IsNullOrWhiteSpace($name)){throw 'SMOKE_FILE_REQUIRED'}
     if($name -ne [IO.Path]::GetFileName($name) -or $name -notmatch '^_SMOKE_CAPTUREBRIDGE_[A-Za-z0-9_.-]+\.txt$'){throw 'SMOKE_FILE_NOT_ALLOWLISTED'}
