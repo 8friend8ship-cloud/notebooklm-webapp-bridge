@@ -1,6 +1,7 @@
 param(
   [Parameter(Mandatory=$true)][string]$TaskId,
   [Parameter(Mandatory=$true)][string]$ArtifactType,
+  [string]$SourcePath = '',
   [int64]$StartedAtEpochMs = 0,
   [int]$TimeoutSeconds = 120
 )
@@ -71,33 +72,56 @@ function Get-NotebookLMDownloadDirectories {
 }
 
 $localCaptureDir = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX\NotebookLM'
-$sourceDirs = @(Get-NotebookLMDownloadDirectories)
-if ($sourceDirs.Count -eq 0) { throw 'NOTEBOOKLM_DOWNLOAD_SOURCE_DIRECTORIES_NOT_FOUND' }
-
 $exts = Get-ExpectedExtensions $ArtifactType
-$startedUtc = if ($StartedAtEpochMs -gt 0) { [DateTimeOffset]::FromUnixTimeMilliseconds($StartedAtEpochMs).UtcDateTime.AddSeconds(-5) } else { [DateTime]::UtcNow.AddSeconds(-15) }
-$deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(30,[Math]::Min(600,$TimeoutSeconds)))
 $found = $null
+$sourceMode = 'LEGACY_SCAN_FALLBACK'
+$sourceDirs = @()
 
-while ([DateTime]::UtcNow -lt $deadline) {
-  $candidates = @()
-  foreach ($dir in $sourceDirs) {
-    try {
-      $candidates += @(Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue |
-        Where-Object {
-          $_.LastWriteTimeUtc -ge $startedUtc -and
-          $exts -contains $_.Extension.ToLowerInvariant() -and
-          $_.Name -notlike '*.crdownload' -and
-          $_.Length -gt 0
-        })
-    } catch {}
+if ($SourcePath) {
+  if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
+    throw ("NOTEBOOKLM_EXACT_SOURCE_PATH_NOT_FOUND:{0}" -f $SourcePath)
   }
-  $found = $candidates | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-  if ($found) { break }
-  Start-Sleep -Seconds 2
-}
-if (-not $found) {
-  throw ("NOTEBOOKLM_ARTIFACT_DOWNLOAD_NOT_FOUND:{0}:searched={1}" -f $ArtifactType,($sourceDirs -join '|'))
+  $candidate = Get-Item -LiteralPath $SourcePath -ErrorAction Stop
+  $candidateExt = $candidate.Extension.ToLowerInvariant()
+  if ($candidate.Name -like '*.crdownload' -or $candidate.Name -like '*.tmp') {
+    throw ("NOTEBOOKLM_EXACT_SOURCE_INCOMPLETE:{0}" -f $candidate.FullName)
+  }
+  if ($exts -notcontains $candidateExt) {
+    throw ("NOTEBOOKLM_EXACT_SOURCE_EXTENSION_MISMATCH:{0}:expected={1}" -f $candidateExt,($exts -join ','))
+  }
+  if ($candidate.Length -le 0) {
+    throw ("NOTEBOOKLM_EXACT_SOURCE_ZERO_BYTES:{0}" -f $candidate.FullName)
+  }
+  $found = $candidate
+  $sourceMode = 'EXACT_SOURCE_PATH'
+} else {
+  $sourceDirs = @(Get-NotebookLMDownloadDirectories)
+  if ($sourceDirs.Count -eq 0) { throw 'NOTEBOOKLM_DOWNLOAD_SOURCE_DIRECTORIES_NOT_FOUND' }
+
+  $startedUtc = if ($StartedAtEpochMs -gt 0) { [DateTimeOffset]::FromUnixTimeMilliseconds($StartedAtEpochMs).UtcDateTime.AddSeconds(-5) } else { [DateTime]::UtcNow.AddSeconds(-15) }
+  $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(30,[Math]::Min(600,$TimeoutSeconds)))
+
+  while ([DateTime]::UtcNow -lt $deadline) {
+    $candidates = @()
+    foreach ($dir in $sourceDirs) {
+      try {
+        $candidates += @(Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue |
+          Where-Object {
+            $_.LastWriteTimeUtc -ge $startedUtc -and
+            $exts -contains $_.Extension.ToLowerInvariant() -and
+            $_.Name -notlike '*.crdownload' -and
+            $_.Name -notlike '*.tmp' -and
+            $_.Length -gt 0
+          })
+      } catch {}
+    }
+    $found = $candidates | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+    if ($found) { break }
+    Start-Sleep -Seconds 2
+  }
+  if (-not $found) {
+    throw ("NOTEBOOKLM_ARTIFACT_DOWNLOAD_NOT_FOUND:{0}:searched={1}" -f $ArtifactType,($sourceDirs -join '|'))
+  }
 }
 
 # Canonical visible local capture: all successful results converge here.
@@ -142,6 +166,7 @@ if ($copied.Length -le 0) { throw 'DRIVE_SYNC_COPY_ZERO_BYTES' }
   action = 'MIRROR_NOTEBOOKLM_ARTIFACT_TO_DRIVE_SYNC'
   taskId = $TaskId
   artifactType = $ArtifactType
+  sourceMode = $sourceMode
   searchedDirectories = $sourceDirs
   sourcePath = $found.FullName
   sourceName = $found.Name
