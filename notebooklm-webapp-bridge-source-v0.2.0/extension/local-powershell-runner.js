@@ -66,8 +66,8 @@ async function resumePendingHandoff(cfg,token,active){
     return {handled:true,state:String(started.state||"STARTED"),taskId:id};
   }catch(error){
     const age=Date.now()-Number(active.claimedAtMs||Date.now());
-    if(age<120000)return {handled:true,state:"WAIT_PENDING_HOST",taskId:id,error:String(error?.message||error)};
-    try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:`D30_CLAIM_HOST_HANDOFF_HOLD:${String(error?.message||error)}`,clearClaim:true,claimedAt:"",startedAt:""}});}catch{}
+    if(age<STALE_GRACE*1000)return {handled:true,state:"WAIT_PENDING_HOST",taskId:id,error:String(error?.message||error)};
+    try{await api(cfg.appsScriptUrl,{action:"updateTask",sessionToken:token,taskId:id,status:"HOLD_RECOVERY",patch:{error:`D58_CLAIM_HOST_HANDOFF_HOLD_60S:${String(error?.message||error)}`,clearClaim:true,claimedAt:"",startedAt:""}});}catch{}
     await setActive(null);
     return {handled:true,state:"HOLD_RECOVERY",taskId:id,error:String(error?.message||error)};
   }
