@@ -1,0 +1,21 @@
+name: patch-resume-cdp-once
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-resume-cdp-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch resume script
+        run: python tools/patch_resume_cdp_once.py
+      - name: Commit and push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1
+          git commit -m 'Add one-shot CDP download diagnostic to scheduled resume path' || exit 0
+          git push
