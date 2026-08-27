@@ -1,0 +1,113 @@
+name: Apply NotebookLM existing-first test policy v0.2.67
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-existing-first-tests-v0267.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch runner, manifest and stable release
+        shell: python
+        run: |
+          import json, os, subprocess
+          from pathlib import Path
+
+          root = Path('notebooklm-webapp-bridge-source-v0.2.0/extension')
+          runner = root / 'content/notebooklm-runner.js'
+          text = runner.read_text(encoding='utf-8')
+
+          marker = '  async function runTask(task) {\n'
+          if marker not in text:
+              raise SystemExit('runTask marker not found')
+
+          helper = r'''  function existingFirstTestSpec(taskType) {
+    const t = String(taskType || "").toUpperCase();
+    const specs = [
+      {types:["AUDIO","AUDIO_OVERVIEW","NOTEBOOKLM_AUDIO"], code:"AUDIO_OVERVIEW", matchWords:["AI 오디오 오버뷰","오디오 오버뷰","audio overview",".mp3",".wav",".m4a"]},
+      {types:["VIDEO","VIDEO_OVERVIEW","NOTEBOOKLM_VIDEO"], code:"VIDEO_OVERVIEW", matchWords:["동영상 개요","비디오 개요","video overview",".mp4",".webm"]},
+      {types:["REPORT","NOTEBOOKLM_REPORT","NOTEBOOKLM_REPORT_PDF"], code:"REPORT", matchWords:["보고서","report",".pdf",".docx"]},
+      {types:["SLIDES","SLIDE_DECK","NOTEBOOKLM_SLIDES"], code:"SLIDES", matchWords:["슬라이드 자료","슬라이드","slide deck","slides",".pptx",".pdf"]},
+      {types:["MIND_MAP","MINDMAP","NOTEBOOKLM_MIND_MAP"], code:"MIND_MAP", matchWords:["마인드맵","mind map"]},
+      {types:["FLASHCARDS","FLASHCARD","NOTEBOOKLM_FLASHCARDS"], code:"FLASHCARDS", matchWords:["플래시카드","flashcards","flash cards"]},
+      {types:["QUIZ","NOTEBOOKLM_QUIZ"], code:"QUIZ", matchWords:["퀴즈","quiz"]},
+      {types:["INFOGRAPHIC","NOTEBOOKLM_INFOGRAPHIC"], code:"INFOGRAPHIC", matchWords:["인포그래픽","infographic",".png",".jpg",".jpeg",".webp",".pdf"]},
+      {types:["DATA_TABLE","NOTEBOOKLM_DATA_TABLE","DATA_TABLE_EXISTING_DOWNLOAD","NOTEBOOKLM_DATA_TABLE_EXISTING_DOWNLOAD"], code:"DATA_TABLE", matchWords:["contentos-stage-table.xlsx","데이터 표","data table",".xlsx",".csv"]}
+    ];
+    return specs.find(x => x.types.includes(t)) || null;
+  }
+
+  function isExistingFirstTestTask(task) {
+    const text = norm([task?.taskId, task?.contentId, task?.title, task?.instruction].join(" "));
+    return /test|e2e|smoke|qa|테스트|검증|기존|existing|reuse/.test(text);
+  }
+
+  async function tryExistingFirstTestDownload(task, taskType) {
+    if (!isExistingFirstTestTask(task)) return null;
+    const spec = existingFirstTestSpec(taskType);
+    if (!spec) return null;
+    try {
+      const result = await runExistingStudioArtifactDownload(task, spec);
+      return {...result, reusePolicy:"EXISTING_FIRST_TEST_V1", generationSkipped:true};
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/_EXISTING_ARTIFACT_CARD_NOT_FOUND$/.test(message)) return null;
+      throw error;
+    }
+  }
+
+'''
+
+          if 'EXISTING_FIRST_TEST_V1' not in text:
+              text = text.replace(marker, helper + marker, 1)
+
+          needle = '    const normalizedTaskType = String(task.taskType || "CHAT").toUpperCase();\n'
+          insert = needle + '    const existingFirst = await tryExistingFirstTestDownload(task, normalizedTaskType);\n    if (existingFirst) return existingFirst;\n'
+          if 'const existingFirst = await tryExistingFirstTestDownload' not in text:
+              if needle not in text:
+                  raise SystemExit('normalizedTaskType marker not found')
+              text = text.replace(needle, insert, 1)
+          runner.write_text(text, encoding='utf-8')
+
+          manifest_path = root / 'manifest.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          manifest['version'] = '0.2.67'
+          manifest['description'] = 'D73 makes NotebookLM test/E2E tasks reuse existing Studio artifacts first and click Download; generation is fallback only when no matching prior card exists.'
+          manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          release_path = Path('runtime/stable/release.json')
+          release = json.loads(release_path.read_text(encoding='utf-8'))
+          release['version'] = '0.2.67'
+          release['actionId'] = 'APPLY_NOTEBOOKLM_0.2.67_D73_EXISTING_FIRST_TESTS_20260827'
+          release['releasedAt'] = '2026-08-27T17:25:00+09:00'
+          release['requiresUserApproval'] = False
+          release['description'] = 'D73: test/E2E/SMOKE/QA tasks first reuse an existing matching NotebookLM Studio artifact and click Download. Only when no prior matching card exists does the original generation path run.'
+          release['sourceCommit'] = os.environ.get('GITHUB_SHA','')
+
+          # Keep current stable file set; refresh hashes for every listed file that exists.
+          for item in release.get('files', []):
+              p = root / item['path']
+              if p.exists():
+                  item['gitBlobSha1'] = subprocess.check_output(['git','hash-object',str(p)], text=True).strip()
+          release_path.write_text(json.dumps(release, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+      - name: Verify patch
+        run: |
+          grep -q 'EXISTING_FIRST_TEST_V1' notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js
+          grep -q '0.2.67' notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
+          grep -q '0.2.67' runtime/stable/release.json
+
+      - name: Commit stable v0.2.67
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json runtime/stable/release.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat: reuse existing NotebookLM artifacts first in tests v0.2.67 [skip ci]'
+          git push
