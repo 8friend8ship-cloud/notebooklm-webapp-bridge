@@ -1,0 +1,57 @@
+name: add-studio-artifact-download-0262-once
+on:
+  push:
+    paths:
+      - '.github/workflows/add-studio-artifact-download-0262-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch generic Studio artifact download + real file gate
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, subprocess
+          root=Path('notebooklm-webapp-bridge-source-v0.2.0/extension')
+          runner=root/'content/notebooklm-runner.js'
+          manifest=root/'manifest.json'
+          r=runner.read_text(encoding='utf-8')
+          marker='''  async function runStudioArtifact(task, spec) {\n'''
+          helper='''  function studioArtifactCardRoot(words, readyText) {\n    const target = norm(readyText || "");\n    const nodes = deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);\n    const candidates = [];\n    for (const el of nodes) {\n      const text=(el.innerText || el.textContent || "").trim();\n      if (!text || text.length < 8 || text.length > 5000) continue;\n      const n=norm(text);\n      if (!words.some(w => n.includes(norm(w)))) continue;\n      if (target && !n.includes(target.slice(0,Math.min(80,target.length))) && !target.includes(n.slice(0,Math.min(80,n.length)))) continue;\n      const menu=artifactMenuButtonWithin(el);\n      if (!menu) continue;\n      candidates.push({el,len:text.length});\n    }\n    if (candidates.length) return candidates.sort((a,b)=>a.len-b.len)[0].el;\n    for (const el of nodes) {\n      const n=norm(el.innerText || el.textContent || "");\n      if (!words.some(w => n.includes(norm(w)))) continue;\n      if (artifactMenuButtonWithin(el)) return el;\n    }\n    return null;\n  }\n\n  async function requestStudioArtifactDownload(task, spec, readyText) {\n    const startedAtEpochMs=Date.now();\n    const root=studioArtifactCardRoot(spec.evidenceWords, readyText);\n    if (!root) return {ok:false,error:`${spec.code}_FINAL_CARD_NOT_FOUND`};\n    const menu=artifactMenuButtonWithin(root);\n    if (!menu) return {ok:false,error:`${spec.code}_FINAL_CARD_MENU_NOT_FOUND`};\n    try { menu.click(); } catch {}\n    await sleep(700);\n    const download=await waitFor(()=>openArtifactDownloadAction(),8000,250);\n    if (!download) return {ok:false,error:`${spec.code}_DOWNLOAD_ACTION_NOT_FOUND`};\n    try { download.click(); } catch {}\n    await sleep(1000);\n    const mirrored=await mirrorNotebookArtifactToDrive(task,spec.code,startedAtEpochMs);\n    if (!mirrored?.ok) return {ok:false,error:`${spec.code}_REAL_FILE_NOT_FOUND_OR_MIRROR_FAILED:${mirrored?.error||'unknown'}`,mirror:mirrored};\n    return {ok:true,method:`${spec.code}_FINAL_CARD_MENU_DOWNLOAD`,startedAtEpochMs,mirror:mirrored};\n  }\n\n'''
+          if marker not in r: raise SystemExit('runStudioArtifact marker not found')
+          r=r.replace(marker,helper+marker,1)
+          old='''    if (!ready) throw new Error(`${spec.code}_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND`);\n    return {resultText:ready,resultUrls:[location.href],captureMode:`${spec.code}_READY`,artifactType:spec.code,notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||spec.code,source:{...source,existingNotebookFallback:sourceFallback}};\n'''
+          new='''    if (!ready) throw new Error(`${spec.code}_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND`);\n    const actualArtifact = await requestStudioArtifactDownload(task, spec, ready);\n    if (!actualArtifact?.ok) throw new Error(actualArtifact?.error || `${spec.code}_ARTIFACT_DOWNLOAD_FAILED`);\n    return {resultText:ready,resultUrls:[location.href],captureMode:`${spec.code}_READY_AND_DOWNLOADED`,artifactType:spec.code,actualArtifact,notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||spec.code,source:{...source,existingNotebookFallback:sourceFallback}};\n'''
+          if old not in r: raise SystemExit('runStudioArtifact return block not found')
+          r=r.replace(old,new,1)
+          runner.write_text(r,encoding='utf-8')
+
+          m=json.loads(manifest.read_text(encoding='utf-8'))
+          m['version']='0.2.62'
+          m['description']='D68 adds type-specific Studio artifact download with a real Windows file and Drive mirror gate for infographic, slides, mind map, flashcards and quiz.'
+          manifest.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+
+          relp=Path('runtime/stable/release.json')
+          rel=json.loads(relp.read_text(encoding='utf-8'))
+          rel['version']='0.2.62'
+          rel['actionId']='APPLY_NOTEBOOKLM_0.2.62_D68_STUDIO_ARTIFACT_REAL_DOWNLOAD_20260827'
+          rel['releasedAt']='2026-08-27T16:20:00+09:00'
+          rel['description']='D68 requires actual downloaded file >0 and mirror success for infographic/slides/mind-map/flashcards/quiz Studio artifacts.'
+          rel['requiresUserApproval']=False
+          for entry in rel['files']:
+              p=root/entry['path']
+              if not p.exists(): raise SystemExit(f'missing release file {p}')
+              entry['gitBlobSha1']=subprocess.check_output(['git','hash-object',str(p)],text=True).strip()
+          relp.write_text(json.dumps(rel,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Commit patched runtime
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json runtime/stable/release.json
+          git commit -m 'Bridge 0.2.62 Studio artifact real download gate' || exit 0
+          git push
