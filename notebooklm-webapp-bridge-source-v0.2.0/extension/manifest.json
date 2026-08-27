@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.62",
-  "description": "D68 adds type-specific Studio artifact download with a real Windows file and Drive mirror gate for infographic, slides, mind map, flashcards and quiz.",
+  "version": "0.2.63",
+  "description": "D69 adds existing final-artifact card download routes so lightweight XLSX/PDF/PPTX files can validate real download and mirror without regenerating content.",
   "permissions": [
     "alarms",
     "identity",

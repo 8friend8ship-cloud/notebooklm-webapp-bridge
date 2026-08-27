@@ -934,6 +934,48 @@
     return {ok:true,method:`${spec.code}_FINAL_CARD_MENU_DOWNLOAD`,startedAtEpochMs,mirror:mirrored};
   }
 
+  function existingArtifactCard(matchWords) {
+    const nodes=deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);
+    const hits=[];
+    for (const el of nodes) {
+      const t=(el.innerText||el.textContent||"").trim();
+      if (!t || t.length>5000) continue;
+      const n=norm(t);
+      if (!matchWords.some(w=>n.includes(norm(w)))) continue;
+      if (/생성 중|generating|creating|만드는 중|준비 중|preparing/.test(n)) continue;
+      const menu=artifactMenuButtonWithin(el);
+      if (!menu) continue;
+      hits.push({el,t});
+    }
+    hits.sort((a,b)=>a.t.length-b.t.length);
+    return hits[0]?.el||null;
+  }
+
+  async function runExistingStudioArtifactDownload(task, spec) {
+    const studio=findDeepControl(["studio","스튜디오"]);
+    if (studio) { try { studio.click(); } catch {} await sleep(900); }
+    const root=await waitFor(()=>existingArtifactCard(spec.matchWords),30000,500);
+    if (!root) throw new Error(`${spec.code}_EXISTING_ARTIFACT_CARD_NOT_FOUND`);
+    const startedAtEpochMs=Date.now();
+    const menu=artifactMenuButtonWithin(root);
+    if (!menu) throw new Error(`${spec.code}_EXISTING_ARTIFACT_MENU_NOT_FOUND`);
+    try { menu.click(); } catch {}
+    await sleep(700);
+    const download=await waitFor(()=>openArtifactDownloadAction(),8000,250);
+    if (!download) throw new Error(`${spec.code}_EXISTING_DOWNLOAD_ACTION_NOT_FOUND`);
+    try { download.click(); } catch {}
+    await sleep(1200);
+    return {
+      resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),
+      resultUrls:[location.href],
+      captureMode:`${spec.code}_EXISTING_MENU_DOWNLOAD_REQUESTED`,
+      artifactType:spec.code,
+      artifactMirrorRequest:{artifactType:spec.code,startedAtEpochMs},
+      notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),
+      status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||`${spec.code}_EXISTING_DOWNLOAD`
+    };
+  }
+
   async function runStudioArtifact(task, spec) {
     const source = await addSource(task);
     const sourceFallback = !source.ok && Boolean(task.sourceText);
@@ -974,6 +1016,9 @@
 
     if (["REPORT","NOTEBOOKLM_REPORT","NOTEBOOKLM_REPORT_PDF"].includes(normalizedTaskType)) return runReport(task);
 
+    if (["DATA_TABLE_EXISTING_DOWNLOAD","NOTEBOOKLM_DATA_TABLE_EXISTING_DOWNLOAD"].includes(normalizedTaskType)) return runExistingStudioArtifactDownload(task,{code:"DATA_TABLE",matchWords:["contentos-stage-table.xlsx",".xlsx",".csv"]});
+    if (["REPORT_EXISTING_DOWNLOAD","NOTEBOOKLM_REPORT_EXISTING_DOWNLOAD"].includes(normalizedTaskType)) return runExistingStudioArtifactDownload(task,{code:"REPORT",matchWords:["보고서","report",".pdf",".docx"]});
+    if (["SLIDES_EXISTING_DOWNLOAD","NOTEBOOKLM_SLIDES_EXISTING_DOWNLOAD"].includes(normalizedTaskType)) return runExistingStudioArtifactDownload(task,{code:"SLIDES",matchWords:["슬라이드","slides",".pptx",".pdf"]});
     if (["DATA_TABLE","NOTEBOOKLM_DATA_TABLE"].includes(normalizedTaskType)) return runDataTable(task);
 
     if (["SLIDES","SLIDE_DECK","NOTEBOOKLM_SLIDES"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.SLIDES);
