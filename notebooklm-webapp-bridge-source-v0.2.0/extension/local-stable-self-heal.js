@@ -3,6 +3,7 @@ const HD_SELF_HEAL_HOST = "http://127.0.0.1:8765";
 const HD_SELF_HEAL_KEY = "homeDesignLocalStableSelfHealV3";
 const HD_SELF_HEAL_ALARM = "home-design-local-stable-self-heal";
 const HD_SELF_HEAL_PERIOD_MINUTES = 5;
+const HD_LOCAL_SAVE_SMOKE_KEY = "homeDesignNotebookLMLocalSaveSmokeV1";
 
 function hdSelfHealVersion() {
   try { return String(chrome.runtime.getManifest().version || "unknown"); }
@@ -59,6 +60,22 @@ function hdStableAgentTask(taskId) {
     })
   };
 }
+function hdVisibleLocalSaveSmokeTask(taskId) {
+  return {
+    taskId,
+    TASK_ID: taskId,
+    taskType: "LOCAL_POWERSHELL",
+    TASK_TYPE: "LOCAL_POWERSHELL",
+    timeoutSeconds: 60,
+    TIMEOUT_SECONDS: 60,
+    sourceText: JSON.stringify({
+      repo: "8friend8ship-cloud/notebooklm-webapp-bridge",
+      branch: "main",
+      script: "local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1",
+      args: { TaskId: "NLM_VISIBLE_LOCAL_SAVE_SMOKE_20260827_01", CreateLocalSaveSmoke: true }
+    })
+  };
+}
 async function hdWaitForResult(taskId, maxWaitMs = 45000) {
   const deadline = Date.now() + maxWaitMs;
   while (Date.now() < deadline) {
@@ -73,12 +90,12 @@ async function hdWaitForResult(taskId, maxWaitMs = 45000) {
   }
   throw new Error("HOST_RESULT_TIMEOUT");
 }
-async function hdRunStableKick(version, bucket, attempt) {
-  const taskId = hdSelfHealTaskId(version, bucket, attempt);
+async function hdRunTask(task) {
+  const taskId = task.taskId;
   const started = await hdFetchJson(`${HD_SELF_HEAL_HOST}/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source: HD_SELF_HEAL_SOURCE, task: hdStableAgentTask(taskId) })
+    body: JSON.stringify({ source: HD_SELF_HEAL_SOURCE, task })
   }, 10000);
   const final = await hdWaitForResult(taskId, 45000);
   const inner = final?.result || {};
@@ -86,12 +103,36 @@ async function hdRunStableKick(version, bucket, attempt) {
   if (!ok) throw new Error(inner?.stderr || inner?.error || `HOST_RESULT_${final?.state || "UNKNOWN"}`);
   return { taskId, started, final };
 }
+async function hdRunStableKick(version, bucket, attempt) {
+  return hdRunTask(hdStableAgentTask(hdSelfHealTaskId(version, bucket, attempt)));
+}
+async function hdEnsureVisibleLocalSaveSmoke(version) {
+  try {
+    const stored = await chrome.storage.local.get(HD_LOCAL_SAVE_SMOKE_KEY);
+    const state = stored[HD_LOCAL_SAVE_SMOKE_KEY] || {};
+    if (state.ok && state.version === version) return { ok: true, skipped: "already_verified", ...state };
+  } catch {}
+  const taskId = `NLM_VISIBLE_LOCAL_SAVE_SMOKE_DIRECT_${hdSafe(version)}_${Date.now()}`;
+  try {
+    const run = await hdRunTask(hdVisibleLocalSaveSmokeTask(taskId));
+    const inner = run.final?.result || {};
+    const resultText = String(inner.stdout || inner.resultText || "");
+    const next = { ok: true, version, taskId, resultText, at: new Date().toISOString() };
+    try { await chrome.storage.local.set({ [HD_LOCAL_SAVE_SMOKE_KEY]: next }); } catch {}
+    return next;
+  } catch (error) {
+    const next = { ok: false, version, taskId, error: String(error?.message || error), at: new Date().toISOString() };
+    try { await chrome.storage.local.set({ [HD_LOCAL_SAVE_SMOKE_KEY]: next }); } catch {}
+    return next;
+  }
+}
 async function hdKickStableAgent(reason = "worker-load") {
   const version = hdSelfHealVersion();
   const bucket = hdBucket();
   const state = await hdReadSelfHealState();
   if (Number(state.lastSuccessBucket) === bucket) {
-    return { ok: true, skipped: "already_succeeded_this_bucket", version, bucket };
+    const smoke = await hdEnsureVisibleLocalSaveSmoke(version);
+    return { ok: true, skipped: "already_succeeded_this_bucket", version, bucket, smoke };
   }
   let health;
   try {
@@ -107,6 +148,7 @@ async function hdKickStableAgent(reason = "worker-load") {
       attempt = 2;
       run = await hdRunStableKick(version, bucket, attempt);
     }
+    const smoke = await hdEnsureVisibleLocalSaveSmoke(version);
     await hdWriteSelfHealState({
       version,
       lastAttemptBucket: bucket,
@@ -117,10 +159,11 @@ async function hdKickStableAgent(reason = "worker-load") {
       attempt,
       hostVersion: health.version || "",
       hostState: run.final?.state || run.started?.state || "",
+      localSaveSmoke: smoke,
       firstError,
       lastError: ""
     });
-    return { ok: true, version, bucket, taskId: run.taskId, attempt, state: run.final?.state || "DONE" };
+    return { ok: true, version, bucket, taskId: run.taskId, attempt, state: run.final?.state || "DONE", smoke };
   } catch (error) {
     await hdWriteSelfHealState({
       version,
