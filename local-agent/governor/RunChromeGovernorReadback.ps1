@@ -1,4 +1,4 @@
-param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[switch]$VideoFailureDiagnostic,[switch]$FlowDirectRecoveryDiagnostic,[switch]$CaptureBridgeSmoke,[string]$CentralRelativePath='',[string]$SmokeFile='',[string]$ExpectedBridge='0.2.18')
+param([switch]$KickStableAgent,[switch]$StatusOnly,[switch]$RunGovernor,[switch]$ApplyStableBridge,[switch]$BridgeStatusOnly,[switch]$BridgeLocalEvidence,[switch]$VideoFailureDiagnostic,[switch]$FlowDirectRecoveryDiagnostic,[switch]$CaptureBridgeSmoke,[switch]$InteriorAppsScriptSync,[string]$CentralRelativePath='',[string]$SmokeFile='',[string]$ExpectedBridge='0.2.18')
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 
@@ -43,6 +43,43 @@ function RefreshV2 {try{$Raw='https://raw.githubusercontent.com/'+$Repo+'/main/l
 function StopStaleAgentProcesses([int]$MaxAgeSeconds=600){$Killed=@();$Now=Get-Date;try{foreach($P in @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue)){$Cmd=[string]$P.CommandLine;if(-not $Cmd){continue};if($Cmd -notmatch '(?i)HomeDesignLocalAgent(?:-1\\.1\\.\\d+-patched)?\\.ps1'){continue};$Created=$null;try{$Created=[datetime]$P.CreationDate}catch{};if(-not $Created){continue};$Age=[Math]::Floor(($Now-$Created).TotalSeconds);if($Age -le $MaxAgeSeconds){continue};try{& taskkill.exe /PID ([int]$P.ProcessId) /T /F 2>$null|Out-Null;$Killed+=[ordered]@{pid=[int]$P.ProcessId;ageSeconds=[int]$Age;commandLine=$Cmd}}catch{}}}catch{};return @($Killed)}
 function KickStableAgentRaw {$MetaUrl='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/stable/agent.json?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$Meta=((Invoke-WebRequest -UseBasicParsing -Uri $MetaUrl -TimeoutSec 10).Content|ConvertFrom-Json);if(-not $Meta.enabled){throw 'LOCAL_AGENT_STABLE_DISABLED'};$Target=[string]$Meta.version;$Expected=([string]$Meta.gitBlobSha1).ToLowerInvariant();$State=ReadJson (Join-Path $Root 'state.json');$Current=$(if($State){[string]$State.agentVersion}else{''});$LocalSha=$(if(Test-Path -LiteralPath $AgentFile){(GitBlobSha1 $AgentFile).ToLowerInvariant()}else{''});if($Current -ne $Target -or $LocalSha -ne $Expected){$Url='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/releases/'+$Target+'/HomeDesignLocalAgent.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$Tmp=$AgentFile+'.raw.download';Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Tmp -TimeoutSec 20;$Actual=(GitBlobSha1 $Tmp).ToLowerInvariant();if($Actual -ne $Expected){Remove-Item $Tmp -Force -ErrorAction SilentlyContinue;throw "AGENT_FILE_SHA_MISMATCH actual=$Actual expected=$Expected"};Move-Item -LiteralPath $Tmp -Destination $AgentFile -Force;$LocalSha=$Actual};$Killed=StopStaleAgentProcesses 600;if(@($Killed).Count -gt 0){Start-Sleep -Milliseconds 700};Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$AgentFile`"") -WindowStyle Hidden|Out-Null;return [ordered]@{ok=$true;action='KICK_STABLE_AGENT_RAW_BACKGROUND';currentAgent=$Current;targetAgent=$Target;expectedSha=$Expected;localSha=$LocalSha;staleAgentProcessesKilled=$Killed;at=(Get-Date).ToString('o')}}
 
+if($InteriorAppsScriptSync){
+  try{
+    $ScriptId='1nj9yVonD6rVBdpPMqI2Qzsi7LYGruZMi8XYt6_07xHMI9HH4NEMXHIZQ'
+    $Branch='feat/estimate-marketplace-personalization-20260825'
+    $Stamp=Get-Date -Format 'yyyyMMdd_HHmmss'
+    $Work=Join-Path $env:TEMP ('INTERIOR_APPS_SCRIPT_SYNC_'+$Stamp)
+    $Backup=Join-Path $env:USERPROFILE ('Downloads\\INTERIOR_APPS_SCRIPT_BACKUP_'+$Stamp+'.zip')
+    New-Item -ItemType Directory -Force -Path $Work|Out-Null
+    Set-Content -LiteralPath (Join-Path $Work '.clasp.json') -Value ('{"scriptId":"'+$ScriptId+'","rootDir":"."}') -Encoding UTF8
+    Push-Location $Work
+    try{
+      & npx --yes '@google/clasp@latest' pull
+      if($LASTEXITCODE -ne 0){throw 'CLASP_PULL_FAILED'}
+      $pulled=Get-ChildItem -LiteralPath $Work -File -Recurse|Where-Object{$_.Name -ne '.clasp.json'}
+      if(@($pulled).Count -lt 1){throw 'CLASP_PULL_EMPTY'}
+      Compress-Archive -Path (Join-Path $Work '*') -DestinationPath $Backup -Force
+      $src='https://raw.githubusercontent.com/8friend8ship-cloud/interior/'+$Branch+'/apps-script/InteriorMarketplaceRuntime_20260825.gs?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+      Invoke-WebRequest -UseBasicParsing -Uri $src -OutFile (Join-Path $Work 'InteriorMarketplaceRuntime_20260825.gs') -TimeoutSec 20
+      $code=Get-Content -LiteralPath (Join-Path $Work 'InteriorMarketplaceRuntime_20260825.gs') -Raw -Encoding UTF8
+      if($code -notmatch 'INTERIOR_MARKETPLACE_RUNTIME_V2_20260827'){throw 'INTERIOR_RUNTIME_V2_MARKER_MISSING'}
+      & npx --yes '@google/clasp@latest' push --force
+      if($LASTEXITCODE -ne 0){throw 'CLASP_PUSH_FAILED'}
+      & npx --yes '@google/clasp@latest' run inspectInteriorMarketplaceTriggers
+      $inspect1=$LASTEXITCODE
+      if($inspect1 -eq 0){
+        & npx --yes '@google/clasp@latest' run installInteriorMarketplaceTriggers
+        $install=$LASTEXITCODE
+        if($install -eq 0){& npx --yes '@google/clasp@latest' run inspectInteriorMarketplaceTriggers;$inspect2=$LASTEXITCODE}else{$inspect2=-1}
+      }else{$install=-1;$inspect2=-1}
+      [ordered]@{ok=$true;action='INTERIOR_APPS_SCRIPT_SYNC';sourcePush=$true;scriptId=$ScriptId;runtimeMarker='INTERIOR_MARKETPLACE_RUNTIME_V2_20260827';backup=$Backup;inspectBeforeExit=$inspect1;installExit=$install;inspectAfterExit=$inspect2;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress
+      exit 0
+    } finally { Pop-Location }
+  } catch {
+    [ordered]@{ok=$false;action='INTERIOR_APPS_SCRIPT_SYNC';error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    exit 2
+  }
+}
 if($FlowDirectRecoveryDiagnostic){
   $taskId='FLOW_SCRIPT_ID_DIRECT_RECOVERY_20260825_02';$hostResult=$null;$hostError=''
   try{$hostResult=Invoke-RestMethod -Uri ('http://127.0.0.1:8765/result?taskId='+[Uri]::EscapeDataString($taskId)) -Method Get -TimeoutSec 5}catch{$hostError=$_.Exception.Message}
