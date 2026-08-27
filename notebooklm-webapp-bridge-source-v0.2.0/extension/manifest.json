@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.63",
-  "description": "D69 adds existing final-artifact card download routes so lightweight XLSX/PDF/PPTX files can validate real download and mirror without regenerating content.",
+  "version": "0.2.64",
+  "description": "D70 requires inline local-file mirror success for existing Studio artifact downloads before DONE.",
   "permissions": [
     "alarms",
     "identity",

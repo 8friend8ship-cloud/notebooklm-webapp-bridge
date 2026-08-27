@@ -965,12 +965,16 @@
     if (!download) throw new Error(`${spec.code}_EXISTING_DOWNLOAD_ACTION_NOT_FOUND`);
     try { download.click(); } catch {}
     await sleep(1200);
+    const mirrored=await mirrorNotebookArtifactToDrive(task,spec.code,startedAtEpochMs);
+    if (!mirrored?.ok || !mirrored?.mirror?.ok) {
+      throw new Error(`${spec.code}_EXISTING_REAL_FILE_NOT_FOUND_OR_MIRROR_FAILED:${mirrored?.error||mirrored?.mirror?.error||mirrored?.raw?.stderr||"unknown"}`);
+    }
     return {
       resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),
       resultUrls:[location.href],
-      captureMode:`${spec.code}_EXISTING_MENU_DOWNLOAD_REQUESTED`,
+      captureMode:`${spec.code}_EXISTING_REAL_FILE_MIRRORED`,
       artifactType:spec.code,
-      artifactMirrorRequest:{artifactType:spec.code,startedAtEpochMs},
+      actualArtifact:{mirror:mirrored.mirror,localTaskId:mirrored.localTaskId},
       notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),
       status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||`${spec.code}_EXISTING_DOWNLOAD`
     };

@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.63_D69_EXISTING_ARTIFACT_DOWNLOAD_20260827",
-  "version": "0.2.63",
-  "releasedAt": "2026-08-27T16:36:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.64_D70_EXISTING_INLINE_MIRROR_GATE_20260827",
+  "version": "0.2.64",
+  "releasedAt": "2026-08-27T16:48:00+09:00",
   "requiresUserApproval": false,
-  "description": "D69 adds existing Studio final-file download paths, beginning with known XLSX data-table card, with actual Windows file and Drive mirror as completion gate.",
+  "description": "D70 makes existing Studio artifact download fail closed until actual Windows file capture and mirror readback succeed.",
   "sourceCommit": "083ce48c88cce0fcfa6349d06ca56100f4dd2cad",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
@@ -15,7 +15,7 @@
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "3d59be0399e15925c3ede92e56e966f5364b558d"
+      "gitBlobSha1": "e294c6755b060a5da00ba4ac4455f2c7fca91d6a"
     },
     {
       "path": "worker.js",
@@ -55,7 +55,7 @@
     },
     {
       "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "2f1ecc557b4c24d912c4b50c16195267bad520c3"
+      "gitBlobSha1": "06243737c681fcaed7637349e49385c3e3e17116"
     },
     {
       "path": "artifact-drive-mirror.js",
