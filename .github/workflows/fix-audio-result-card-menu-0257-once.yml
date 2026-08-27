@@ -1,0 +1,66 @@
+name: fix-audio-result-card-menu-0257-once
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-audio-result-card-menu-0257-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch actual audio result card detection and release 0.2.57
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, hashlib, subprocess, datetime
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          s=p.read_text(encoding='utf-8')
+          old='''  function audioOverviewReady() {\n    for (const el of deepQueryAll("audio")) {\n      try {\n        if (el.currentSrc || el.src || Number.isFinite(el.duration)) return el;\n      } catch {}\n    }\n    const c = audioOverviewContainer();\n    if (!c) return null;\n    const t = norm(c.innerText || c.textContent || "");\n    const labels = [...c.querySelectorAll("button,[role=button]")].filter(visible).map(b => norm([b.innerText,b.textContent,b.getAttribute("aria-label"),b.getAttribute("title")].join(" "))).join(" ");\n    if (/play|재생|download|다운로드|share|공유/.test(labels) && !/generating|생성 중|creating|만드는 중/.test(t)) return c;\n    return null;\n  }'''
+          new='''  function audioOverviewReady() {\n    // D63: only treat a real generated audio artifact as ready.\n    // The Studio catalog itself contains AI 오디오 오버뷰/share/menu text and must never count as an artifact.\n    for (const el of deepQueryAll("audio")) {\n      try {\n        if (el.currentSrc || el.src || (Number.isFinite(el.duration) && el.duration > 0)) return el;\n      } catch {}\n    }\n\n    const card = audioArtifactCardRoot(null);\n    if (card) {\n      const text = norm(card.innerText || card.textContent || "");\n      const controls = [...card.querySelectorAll("button,[role='button'],a")].filter(visible)\n        .map(el => actionLabel(el)).join(" ");\n      const hasPlayback = /play_arrow|(^|\\s)(play|재생)(\\s|$)|pause|일시정지/.test(controls + " " + text);\n      const hasDuration = /\\b\\d{1,2}:\\d{2}\\b/.test(text + " " + controls);\n      const catalogHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"]\n        .filter(w => text.includes(w)).length;\n      if ((hasPlayback || hasDuration) && catalogHits < 4 && !/generating|생성 중|creating|만드는 중/.test(text)) return card;\n    }\n    return null;\n  }'''
+          if old not in s:
+              raise SystemExit('target audioOverviewReady block not found')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+
+          manifest=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
+          m=json.loads(manifest.read_text(encoding='utf-8'))
+          m['version']='0.2.57'
+          manifest.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+
+          relp=Path('runtime/stable/release.json')
+          rel=json.loads(relp.read_text(encoding='utf-8'))
+          rel['version']='0.2.57'
+          rel['actionId']='APPLY_NOTEBOOKLM_0.2.57_D63_RESULT_CARD_MENU_DOWNLOAD_20260827'
+          rel['releasedAt']='2026-08-27T15:20:00+09:00'
+          rel['requiresUserApproval']=False
+          rel['description']='D63 identifies only real generated audio result cards (play/duration), then uses that card menu (more/⋮) and Download; Studio catalog is no longer a false ready signal.'
+          rel['sourceCommit']='PENDING_ACTION_COMMIT'
+          base=Path('notebooklm-webapp-bridge-source-v0.2.0/extension')
+          def blob_sha(path):
+              data=path.read_bytes(); hdr=f'blob {len(data)}\0'.encode(); return hashlib.sha1(hdr+data).hexdigest()
+          for f in rel['files']:
+              fp=base/f['path']
+              if not fp.exists(): raise SystemExit(f'missing release file {fp}')
+              f['gitBlobSha1']=blob_sha(fp)
+          relp.write_text(json.dumps(rel,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Commit patch
+        run: |
+          git config user.name "8friend8ship-cloud"
+          git config user.email "homedesigntaedi@gmail.com"
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json runtime/stable/release.json
+          git commit -m "Fix NotebookLM actual audio card menu download and release 0.2.57"
+          SHA=$(git rev-parse HEAD)
+          python - <<'PY'
+          from pathlib import Path
+          import json, subprocess
+          p=Path('runtime/stable/release.json'); r=json.loads(p.read_text())
+          r['sourceCommit']=subprocess.check_output(['git','rev-parse','HEAD']).decode().strip()
+          p.write_text(json.dumps(r,ensure_ascii=False,indent=2)+'\n')
+          PY
+          git add runtime/stable/release.json
+          git commit --amend --no-edit
+          git push origin HEAD:main
