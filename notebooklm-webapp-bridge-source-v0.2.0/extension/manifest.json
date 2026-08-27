@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.58",
-  "description": "D64 isolates NotebookLM artifact mirror messaging after result-card menu download and preserves Chrome default Downloads to visible local CaptureBridge routing.",
+  "version": "0.2.59",
+  "description": "D65 performs artifact mirror directly inside the service worker after NotebookLM result-card download, removing runtime message routing from content script.",
   "permissions": [
     "alarms",
     "identity",

@@ -197,6 +197,20 @@ async function runTask({ apiUrl, sessionToken, taskId, frontendOrigin }) {
     });
     if (!response?.ok) throw new Error(response?.error || "NotebookLM 실행에 실패했습니다.");
 
+    const mirrorReq = response?.result?.artifactMirrorRequest;
+    if (mirrorReq) {
+      const handler = globalThis.__NLM_MIRROR_ARTIFACT_TO_DRIVE__;
+      if (typeof handler !== "function") throw new Error("ARTIFACT_MIRROR_HANDLER_NOT_READY");
+      const mirror = await handler({
+        taskId,
+        artifactType: mirrorReq.artifactType || task.taskType || "OTHER",
+        startedAtEpochMs: Number(mirrorReq.startedAtEpochMs || Date.now())
+      });
+      if (!mirror?.ok || !mirror?.mirror?.ok) throw new Error(`AUDIO_DRIVE_MIRROR_FAILED: ${mirror?.error || mirror?.raw?.stderr || "unknown"}`);
+      response.result.actualArtifact = { ...(response.result.actualArtifact || {}), mirror: mirror.mirror, localTaskId: mirror.localTaskId };
+      delete response.result.artifactMirrorRequest;
+    }
+
     const completed = await apiPost(apiUrl, {
       action: "completeTask",
       sessionToken,

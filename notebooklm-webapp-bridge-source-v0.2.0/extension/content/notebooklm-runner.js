@@ -677,11 +677,8 @@
 
     const download = await requestNotebookArtifactDownload(ready);
     if (!download?.requested) throw new Error(`AUDIO_ARTIFACT_DOWNLOAD_NOT_TRIGGERED: ${download?.reason || "unknown"}`);
-    const mirror = await mirrorNotebookArtifactToDrive(task, "AUDIO_OVERVIEW", download.startedAtEpochMs);
-    if (!mirror?.ok || !mirror?.mirror?.ok) throw new Error(`AUDIO_DRIVE_MIRROR_FAILED: ${mirror?.error || mirror?.raw?.stderr || "unknown"}`);
-
     return {
-      resultText:"AUDIO_OVERVIEW_READY",
+      resultText:"AUDIO_OVERVIEW_DOWNLOAD_TRIGGERED",
       resultUrls:[location.href],
       captureMode:"AUDIO_PLAYER_READY",
       notebookUrl:location.href,
@@ -691,7 +688,8 @@
       taskId:task.taskId,
       contentId:task.contentId || "",
       taskType:task.taskType || "AUDIO_OVERVIEW",
-      actualArtifact:{download,mirror:mirror.mirror,localTaskId:mirror.localTaskId},
+      artifactMirrorRequest:{artifactType:"AUDIO_OVERVIEW",startedAtEpochMs:download.startedAtEpochMs},
+      actualArtifact:{download},
       source: {...source, existingNotebookFallback: sourceFallback}
     };
   }
