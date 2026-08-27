@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.65",
-  "description": "D71 simplifies NotebookLM artifact handling to UI download-click only. No download path override, file move, or Drive mirror gate in the click action.",
+  "version": "0.2.66",
+  "description": "D72 runs one safe one-shot smoke that only clicks an existing NotebookLM artifact Download action. It does not change download paths or mirror files.",
   "permissions": [
     "alarms",
     "identity",
