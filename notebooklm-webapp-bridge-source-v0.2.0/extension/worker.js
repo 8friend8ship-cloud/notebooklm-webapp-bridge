@@ -1,3 +1,4 @@
+import "./background.js";
 import "./artifact-drive-mirror.js";
 import "./local-stable-self-heal.js";
 import "./local-active-guard.js";

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.68",
-  "description": "D78 verifies that an existing NotebookLM Download click produced a real completed Chrome download with a nonzero file. It does not change the download path or move/mirror files.",
+  "version": "0.2.69",
+  "description": "D79 restores the main queue/background runtime import while retaining D78 real Chrome download evidence. Existing-artifact download succeeds only with a completed nonzero browser download; no path change or file move.",
   "permissions": [
     "alarms",
     "downloads",

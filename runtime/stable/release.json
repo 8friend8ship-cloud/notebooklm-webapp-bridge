@@ -3,23 +3,23 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.68_D78_REAL_DOWNLOAD_EVIDENCE_20260827",
-  "version": "0.2.68",
-  "releasedAt": "2026-08-27T19:50:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.69_D79_BACKGROUND_RUNTIME_RESTORE_20260827",
+  "version": "0.2.69",
+  "releasedAt": "2026-08-27T20:21:00+09:00",
   "requiresUserApproval": false,
-  "description": "D78 existing-artifact downloads are successful only when Chrome downloads API confirms state=complete, exists=true, and nonzero bytes. No download-path change, file move, Drive mirror, or new NotebookLM generation.",
-  "sourceCommit": "df3d99558ce7581c7f2bbe9d16eec7c6e991632c",
+  "description": "D79 restores background.js import in worker.js and retains D78 real-download verification. No Chrome download-path change, file move, Drive mirror, or NotebookLM generation.",
+  "sourceCommit": "71ec8e8f404234b9049cf62875fe39e58db4c5c2",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "65552de2a3f956435bd5a11b629a0ff1231d1d69"
+      "gitBlobSha1": "3c1d13033846cf3e6ce7deb426c8754594be53e5"
     },
     {
       "path": "worker.js",
-      "gitBlobSha1": "60ef8ec5e387c2a8fd4a504adcb4aeb9804c1d26"
+      "gitBlobSha1": "4c966a80d916f89bfdde4c1f510731436b09dece"
     },
     {
       "path": "download-click-smoke-worker.js",
