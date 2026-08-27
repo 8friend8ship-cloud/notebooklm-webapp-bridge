@@ -15,44 +15,50 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Load artifact mirror first and publish stable 0.2.50
+      - name: Target Material icon Audio cards and publish stable 0.2.51
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
-          import json
-          worker=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js')
-          worker.write_text('import "./artifact-drive-mirror.js";\nimport "./local-stable-self-heal.js";\nimport "./local-active-guard.js";\nimport "./local-powershell-runner.js";\nimport "./flow-script-id-direct-recovery.js";\nimport "./chat-active-guard.js";\n',encoding='utf-8')
+          import json,base64
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js')
+          s=p.read_text(encoding='utf-8')
+          start=s.index('  function artifactMenuButtonWithin(root) {')
+          end=s.index('  async function requestNotebookArtifactDownload', start)
+          payload='ICBmdW5jdGlvbiBhcnRpZmFjdE1lbnVCdXR0b25XaXRoaW4ocm9vdCkgewogICAgaWYgKCFyb290Py5xdWVyeVNlbGVjdG9yQWxsKSByZXR1cm4gbnVsbDsKICAgIGNvbnN0IGRpcmVjdCA9IFsuLi5yb290LnF1ZXJ5U2VsZWN0b3JBbGwoImJ1dHRvbixbcm9sZT0nYnV0dG9uJ10sYSIpXQogICAgICAuZmlsdGVyKHZpc2libGUpCiAgICAgIC5maW5kKGVsID0+IC9tb3JlX3ZlcnR8bW9yZV9ob3Jpenxtb3JlIG9wdGlvbnN8bW9yZSBhY3Rpb25zfOuNlOuztOq4sHzsmLXshZh866mU64m0Ly50ZXN0KGFjdGlvbkxhYmVsKGVsKSkpOwogICAgaWYgKGRpcmVjdCkgcmV0dXJuIGRpcmVjdDsKICAgIGZvciAoY29uc3QgaWNvbiBvZiBbLi4ucm9vdC5xdWVyeVNlbGVjdG9yQWxsKCIqIildLmZpbHRlcih2aXNpYmxlKSkgewogICAgICBjb25zdCB0ID0gbm9ybShbaWNvbi5pbm5lclRleHQsaWNvbi50ZXh0Q29udGVudCxpY29uLmdldEF0dHJpYnV0ZT8uKCJhcmlhLWxhYmVsIiksaWNvbi5nZXRBdHRyaWJ1dGU/LigidGl0bGUiKV0uam9pbigiICIpKTsKICAgICAgaWYgKCEvKF58XFxzKShtb3JlX3ZlcnR8bW9yZV9ob3JpeikoXFxzfCQpfOuNlOuztOq4sHzsmLXshZgvLnRlc3QodCkpIGNvbnRpbnVlOwogICAgICBjb25zdCBjbGlja2FibGUgPSBpY29uLmNsb3Nlc3Q/LigiYnV0dG9uLFtyb2xlPSdidXR0b24nXSxhIik7CiAgICAgIGlmIChjbGlja2FibGUgJiYgdmlzaWJsZShjbGlja2FibGUpKSByZXR1cm4gY2xpY2thYmxlOwogICAgfQogICAgcmV0dXJuIG51bGw7CiAgfQoKICBmdW5jdGlvbiBhdWRpb0FydGlmYWN0Q2FyZFJvb3QocmVhZHlOb2RlKSB7CiAgICBjb25zdCBjYW5kaWRhdGVzID0gW107CiAgICBjb25zdCBpY29uTm9kZXMgPSBkZWVwUXVlcnlBbGwoIioiKS5maWx0ZXIodmlzaWJsZSkuZmlsdGVyKGVsID0+IHsKICAgICAgY29uc3QgdCA9IG5vcm0oW2VsLmlubmVyVGV4dCxlbC50ZXh0Q29udGVudCxlbC5nZXRBdHRyaWJ1dGU/LigiYXJpYS1sYWJlbCIpLGVsLmdldEF0dHJpYnV0ZT8uKCJ0aXRsZSIpXS5qb2luKCIgIikpOwogICAgICByZXR1cm4gLyhefFxccykobW9yZV92ZXJ0fG1vcmVfaG9yaXopKFxcc3wkKXzrjZTrs7TquLB87Ji17IWYLy50ZXN0KHQpOwogICAgfSk7CgogICAgY29uc3QgbWVudUJ1dHRvbnMgPSBbXTsKICAgIGNvbnN0IHNlZW4gPSBuZXcgU2V0KCk7CiAgICBmb3IgKGNvbnN0IGljb24gb2YgaWNvbk5vZGVzKSB7CiAgICAgIGNvbnN0IGNsaWNrYWJsZSA9IGljb24uY2xvc2VzdD8uKCJidXR0b24sW3JvbGU9J2J1dHRvbiddLGEiKSB8fCBpY29uOwogICAgICBpZiAoIXNlZW4uaGFzKGNsaWNrYWJsZSkpIHsgc2Vlbi5hZGQoY2xpY2thYmxlKTsgbWVudUJ1dHRvbnMucHVzaChjbGlja2FibGUpOyB9CiAgICB9CiAgICBmb3IgKGNvbnN0IGVsIG9mIGRlZXBRdWVyeUFsbCgiYnV0dG9uLFtyb2xlPSdidXR0b24nXSxhIikuZmlsdGVyKHZpc2libGUpKSB7CiAgICAgIGlmICgvbW9yZV92ZXJ0fG1vcmVfaG9yaXp8bW9yZSBvcHRpb25zfG1vcmUgYWN0aW9uc3zrjZTrs7TquLB87Ji17IWYfOuplOuJtC8udGVzdChhY3Rpb25MYWJlbChlbCkpICYmICFzZWVuLmhhcyhlbCkpIHsKICAgICAgICBzZWVuLmFkZChlbCk7IG1lbnVCdXR0b25zLnB1c2goZWwpOwogICAgICB9CiAgICB9CgogICAgZm9yIChjb25zdCBtZW51IG9mIG1lbnVCdXR0b25zKSB7CiAgICAgIGxldCBjdXIgPSBtZW51LnBhcmVudEVsZW1lbnQ7CiAgICAgIGZvciAobGV0IGRlcHRoID0gMDsgZGVwdGggPCAxNCAmJiBjdXI7IGRlcHRoKyssIGN1ciA9IGN1ci5wYXJlbnRFbGVtZW50KSB7CiAgICAgICAgY29uc3QgcmF3ID0gKGN1ci5pbm5lclRleHQgfHwgY3VyLnRleHRDb250ZW50IHx8ICIiKS50cmltKCk7CiAgICAgICAgY29uc3QgdCA9IG5vcm0ocmF3KTsKICAgICAgICBpZiAocmF3Lmxlbmd0aCA8IDQgfHwgcmF3Lmxlbmd0aCA+IDQwMDApIGNvbnRpbnVlOwogICAgICAgIGNvbnN0IGRlc2NlbmRhbnRzID0gWy4uLmN1ci5xdWVyeVNlbGVjdG9yQWxsPy4oIioiKSB8fCBbXV0KICAgICAgICAgIC5maWx0ZXIodmlzaWJsZSkKICAgICAgICAgIC5tYXAoZWwgPT4gbm9ybShbZWwuaW5uZXJUZXh0LGVsLnRleHRDb250ZW50LGVsLmdldEF0dHJpYnV0ZT8uKCJhcmlhLWxhYmVsIiksZWwuZ2V0QXR0cmlidXRlPy4oInRpdGxlIildLmpvaW4oIiAiKSkpCiAgICAgICAgICAuam9pbigiICIpOwogICAgICAgIGNvbnN0IGhhc1BsYXkgPSAvcGxheV9hcnJvd3woXnxcXHMpKHBsYXl87J6s7IOdKShcXHN8JCl8cGF1c2V87J287Iuc7KCV7KeALy50ZXN0KGRlc2NlbmRhbnRzKTsKICAgICAgICBjb25zdCBkdXJhdGlvbiA9IC9cXGJcXGR7MSwyfTpcXGR7Mn1cXGIvLnRlc3QodCkgfHwgL1xcYlxcZHsxLDJ9OlxcZHsyfVxcYi8udGVzdChkZXNjZW5kYW50cyk7CiAgICAgICAgY29uc3Qgc291cmNlU2lnbmFsID0gL+yGjOyKpFxccypcXGQr6rCcfHNvdXJjZXM/XFxzKlxcZCt865SlIOuLpOydtOu4jHxkZWVwIGRpdmUvLnRlc3QodCk7CiAgICAgICAgY29uc3Qgc3R1ZGlvTWVudUhpdHMgPSBbImFpIOyYpOuUlOyYpCDsmKTrsoTrt7AiLCLsiqzrnbzsnbTrk5wg7J6Q66OMIiwi64+Z7JiB7IOBIOqwnOyalCIsIuuniOyduOuTnOuntSIsIuuztOqzoOyEnCIsIu2UjOuemOyLnOy5tOuTnCIsIu2AtOymiCIsIuyduO2PrOq3uOuemO2UvSIsIuuNsOydtO2EsCDtkZwiXQogICAgICAgICAgLmZpbHRlcih3ID0+IHQuaW5jbHVkZXModykpLmxlbmd0aDsKICAgICAgICBpZiAoKGhhc1BsYXkgfHwgZHVyYXRpb24pICYmIHN0dWRpb01lbnVIaXRzIDwgNSkgewogICAgICAgICAgY29uc3Qgc2NvcmUgPSAoaGFzUGxheSA/IDUgOiAwKSArIChkdXJhdGlvbiA/IDQgOiAwKSArIChzb3VyY2VTaWduYWwgPyAyIDogMCkgKyBNYXRoLm1heCgwLCAzIC0gZGVwdGgpOwogICAgICAgICAgY2FuZGlkYXRlcy5wdXNoKHtlbDpjdXIsIHNjb3JlLCBsZW46cmF3Lmxlbmd0aCwgZGVwdGh9KTsKICAgICAgICAgIGJyZWFrOwogICAgICAgIH0KICAgICAgfQogICAgfQoKICAgIGlmIChjYW5kaWRhdGVzLmxlbmd0aCkgcmV0dXJuIGNhbmRpZGF0ZXMuc29ydCgoYSxiKSA9PiBiLnNjb3JlIC0gYS5zY29yZSB8fCBhLmxlbiAtIGIubGVuIHx8IGEuZGVwdGggLSBiLmRlcHRoKVswXS5lbDsKCiAgICBmb3IgKGNvbnN0IG5vZGUgb2YgZGVlcFF1ZXJ5QWxsKCIqIikuZmlsdGVyKHZpc2libGUpKSB7CiAgICAgIGNvbnN0IHR4ID0gbm9ybShbbm9kZS5pbm5lclRleHQsbm9kZS50ZXh0Q29udGVudCxub2RlLmdldEF0dHJpYnV0ZT8uKCJhcmlhLWxhYmVsIiksbm9kZS5nZXRBdHRyaWJ1dGU/LigidGl0bGUiKV0uam9pbigiICIpKTsKICAgICAgaWYgKCEvcGxheV9hcnJvd3woXnxcXHMpKHBsYXl87J6s7IOdKShcXHN8JCl8cGF1c2V87J287Iuc7KCV7KeAfFxcYlxcZHsxLDJ9OlxcZHsyfVxcYi8udGVzdCh0eCkpIGNvbnRpbnVlOwogICAgICBsZXQgY3VyID0gbm9kZS5jbG9zZXN0Py4oImJ1dHRvbixbcm9sZT0nYnV0dG9uJ10sYSIpIHx8IG5vZGU7CiAgICAgIGZvciAobGV0IGRlcHRoID0gMDsgZGVwdGggPCAxMiAmJiBjdXI7IGRlcHRoKyssIGN1ciA9IGN1ci5wYXJlbnRFbGVtZW50KSB7CiAgICAgICAgaWYgKGFydGlmYWN0TWVudUJ1dHRvbldpdGhpbihjdXIpKSByZXR1cm4gY3VyOwogICAgICB9CiAgICB9CgogICAgbGV0IGN1ciA9IHJlYWR5Tm9kZSBpbnN0YW5jZW9mIEhUTUxFbGVtZW50ID8gcmVhZHlOb2RlIDogbnVsbDsKICAgIGZvciAobGV0IGRlcHRoID0gMDsgZGVwdGggPCAxMiAmJiBjdXI7IGRlcHRoKyssIGN1ciA9IGN1ci5wYXJlbnRFbGVtZW50KSB7CiAgICAgIGlmIChhcnRpZmFjdE1lbnVCdXR0b25XaXRoaW4oY3VyKSkgcmV0dXJuIGN1cjsKICAgIH0KICAgIHJldHVybiBudWxsOwogIH0KCg=='
+          new=base64.b64decode(payload).decode('utf-8')
+          s=s[:start]+new+s[end:]
+          p.write_text(s,encoding='utf-8')
           mpath=Path('notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json')
           m=json.loads(mpath.read_text(encoding='utf-8'))
-          m['version']='0.2.50'
-          m['description']='D53 loads artifact-drive-mirror before Local/background polling so MIRROR_ARTIFACT_TO_DRIVE handler is ready before any task can run. Worker reload also reconciles stale Local active state.'
+          m['version']='0.2.51'
+          m['description']='D55 resolves NotebookLM Audio artifact cards from Material icon descendants such as more_vert/play_arrow, then mirrors the real downloaded file to Drive.'
           mpath.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
-          git commit -m 'fix: initialize artifact mirror before background poll'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json
+          git commit -m 'fix: detect Material icon Audio artifact cards'
           git push
-          WORKER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/worker.js)
+          RUNNER_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/content/notebooklm-runner.js)
           MANIFEST_SHA=$(git hash-object notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json)
           SOURCE_COMMIT=$(git rev-parse HEAD)
-          python - "$WORKER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
+          python - "$RUNNER_SHA" "$MANIFEST_SHA" "$SOURCE_COMMIT" <<'PY'
           from pathlib import Path
           import json,sys
-          wsha,msha,commit=sys.argv[1:4]
+          rsha,msha,commit=sys.argv[1:4]
           p=Path('runtime/stable/release.json')
           d=json.loads(p.read_text(encoding='utf-8'))
-          d['actionId']='APPLY_NOTEBOOKLM_0.2.50_D53_MIRROR_IMPORT_ORDER_20260827'
-          d['version']='0.2.50'
-          d['releasedAt']='2026-08-27T01:00:00+09:00'
-          d['description']='D53 initializes artifact mirror before Local/background poll and lets worker reload reconcile stale Local active state.'
+          d['actionId']='APPLY_NOTEBOOKLM_0.2.51_D55_MATERIAL_AUDIO_CARD_20260827'
+          d['version']='0.2.51'
+          d['releasedAt']='2026-08-27T11:05:00+09:00'
+          d['description']='D55 resolves real Audio cards from Material icon descendants and retains actual-file Drive mirror.'
           d['sourceCommit']=commit
           for f in d['files']:
               if f['path']=='manifest.json': f['gitBlobSha1']=msha
-              if f['path']=='worker.js': f['gitBlobSha1']=wsha
+              if f['path']=='content/notebooklm-runner.js': f['gitBlobSha1']=rsha
           p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
           git add runtime/stable/release.json
-          git commit -m 'chore: promote NotebookLM bridge stable 0.2.50'
+          git commit -m 'chore: promote NotebookLM bridge stable 0.2.51'
           git push
