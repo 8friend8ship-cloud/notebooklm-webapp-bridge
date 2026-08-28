@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Repo = '8friend8ship-cloud/notebooklm-webapp-bridge'
 $ManagerExpected = '76a9718b30d1432829ea7c0f2e6af95ea6942ab8'
-$FlowHelperExpected = '0941c69d525d37de3bf98796f0a77a73b0a49a1e'
+$FlowHelperExpected = 'd3d9cd856889c7b890302e2d9e57a3d5929c09c0'
 $InstallRoot = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent\capture'
 $Manager = Join-Path $InstallRoot 'ManageChromeExtensionArtifacts.ps1'
 $Wrapper = Join-Path $InstallRoot 'Reconcile-AllManagedChromeArtifacts.ps1'
@@ -141,7 +141,6 @@ foreach ($service in $Services) {
   $smoke += [ordered]@{service=$service;ok=$true;drivePath=[string]$first.drivePath;bytes=[int64]$first.bytes;sha256=[string]$first.sha256}
 }
 
-# Smoke one future/unregistered adapter key to prove that new managed extensions do not require a manager-code edit.
 $futureService = 'FutureManagedExtension'
 $futureSrc = Join-Path $smokeRoot 'future-managed-smoke.txt'
 Set-Content -LiteralPath $futureSrc -Value ('MANAGED_CHROME_CAPTURE_SMOKE ' + $futureService + ' ' + (Get-Date).ToString('o')) -Encoding UTF8
