@@ -43,6 +43,7 @@ jobs:
             'apps-script/CentralAiPlatformTrendGovernor.gs',
             'apps-script/CentralChatWorkFactory.gs',
             'apps-script/CentralDailyWorkflowGovernor.gs',
+            'apps-script/CentralDailyWorkflowGovernorV2.gs',
             'apps-script/CentralDataManagementHub.gs',
             'apps-script/CentralIntegratedTriggerV2.gs',
             'apps-script/CentralNotebookRuntimeHub.gs'
@@ -103,6 +104,17 @@ jobs:
             if(-not $text.Contains($needle)){ throw "APPROVAL_READBACK_CONTRACT_MISSING:$needle" }
           }
 
+      - name: API-free-first promotion contract
+        shell: pwsh
+        run: |
+          $v2 = Get-Content 'apps-script/CentralDailyWorkflowGovernorV2.gs' -Raw
+          $integrated = Get-Content 'apps-script/CentralIntegratedTriggerV2.gs' -Raw
+          foreach($needle in @('API_QA_DISABLED_POLICY','PASS_APPROVED_FOR_PROMOTION_API_FREE','CENTRAL_API_FREE_BASELINE_PASS','PASS_API_FREE_BASELINE')){
+            if(-not $v2.Contains($needle)){ throw "API_FREE_PROMOTION_CONTRACT_MISSING:$needle" }
+          }
+          if(-not $integrated.Contains('runCentralDailyQaAssetGovernorV2')){ throw 'INTEGRATED_GOVERNOR_NOT_ROUTED_TO_V2' }
+          if($v2.Contains('OPENAI_API_KEY') -or $v2.Contains('GEMINI_API_KEY')){ throw 'V2_MUST_NOT_REQUIRE_OR_EMBED_AI_KEYS' }
+
       - name: Guarded bound sync contract
         shell: pwsh
         run: |
@@ -136,6 +148,7 @@ jobs:
             'apps-script/CentralAiPlatformTrendGovernor.gs',
             'apps-script/CentralChatWorkFactory.gs',
             'apps-script/CentralDailyWorkflowGovernor.gs',
+            'apps-script/CentralDailyWorkflowGovernorV2.gs',
             'apps-script/CentralDataManagementHub.gs',
             'apps-script/CentralIntegratedTriggerV2.gs',
             'apps-script/CentralNotebookRuntimeHub.gs',
