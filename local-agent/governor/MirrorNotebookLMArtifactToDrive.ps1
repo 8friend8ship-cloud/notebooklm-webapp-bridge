@@ -25,20 +25,23 @@ function Get-ExpectedExtensions([string]$type) {
 
 function Find-GoogleDriveMyDrive {
   $candidates = New-Object System.Collections.Generic.List[string]
+  $koMyDrive = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
   foreach ($d in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
     if (-not $d.Root) { continue }
     $candidates.Add((Join-Path $d.Root 'My Drive'))
-    $candidates.Add((Join-Path $d.Root '내 드라이브'))
+    $candidates.Add((Join-Path $d.Root $koMyDrive))
   }
   if ($env:USERPROFILE) {
     $candidates.Add((Join-Path $env:USERPROFILE 'My Drive'))
     $candidates.Add((Join-Path $env:USERPROFILE 'Google Drive\My Drive'))
-    $candidates.Add((Join-Path $env:USERPROFILE 'Google Drive\내 드라이브'))
+    $candidates.Add((Join-Path (Join-Path $env:USERPROFILE 'Google Drive') $koMyDrive))
   }
-  foreach ($p in ($candidates | Select-Object -Unique)) {
-    if (Test-Path -LiteralPath $p) { return (Resolve-Path -LiteralPath $p).Path }
+  foreach ($p in @($candidates | Select-Object -Unique)) {
+    try {
+      if ($p -and (Test-Path -LiteralPath $p)) { return (Resolve-Path -LiteralPath $p).Path }
+    } catch {}
   }
-  throw 'GOOGLE_DRIVE_MY_DRIVE_NOT_FOUND'
+  throw ('GOOGLE_DRIVE_MY_DRIVE_NOT_FOUND:candidates=' + (($candidates | Select-Object -Unique) -join '|'))
 }
 
 function Get-NotebookLMDownloadDirectories {
