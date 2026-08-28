@@ -6,6 +6,7 @@ const mirrorJs = fs.readFileSync('notebooklm-webapp-bridge-source-v0.2.0/extensi
 const backgroundJs = fs.readFileSync('notebooklm-webapp-bridge-source-v0.2.0/extension/background.js', 'utf8');
 const mirrorPs = fs.readFileSync('local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1', 'utf8');
 const watcherPs = fs.readFileSync('local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1', 'utf8');
+const agent29Ps = fs.readFileSync('local-agent/releases/1.1.29/HomeDesignLocalAgent.ps1', 'utf8');
 
 test('Chrome mirror resolves a completed download and forwards exact SourcePath', () => {
   assert.match(mirrorJs, /chrome\.downloads\.search/);
@@ -40,4 +41,15 @@ test('Existing verified download synthesizes exact SourcePath mirror request', (
   assert.match(backgroundJs, /verifiedDownload\?\.filename/);
   assert.match(backgroundJs, /sourcePath:\s*verifiedDownload\.filename/);
   assert.match(backgroundJs, /sourcePath:\s*String\(mirrorReq\.sourcePath/);
+});
+
+test('Local Agent 1.1.29 restores Host before applying stable Bridge and records failures', () => {
+  assert.match(agent29Ps, /\$AgentVersion='1\.1\.29'/);
+  assert.match(agent29Ps, /function EnsureHost124/);
+  assert.match(agent29Ps, /RefreshVerified \$HostUrl \$HostFile \$HostExpected/);
+  assert.match(agent29Ps, /StartHost124/);
+  assert.match(agent29Ps, /EnsureAutoResume.*EnsureHost124.*GetRelease/s);
+  assert.match(agent29Ps, /PersistState \$failure/);
+  assert.match(agent29Ps, /WriteCentral 'AGENT_1\.1\.29_RECOVERY\.json'/);
+  assert.doesNotMatch(agent29Ps, /EXISTING_HOST_NOT_HEALTHY/);
 });
