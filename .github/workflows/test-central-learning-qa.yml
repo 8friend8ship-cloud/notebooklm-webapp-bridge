@@ -1,0 +1,43 @@
+name: test-central-learning-qa
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps-script/CentralLearningQaAutomation.gs'
+      - 'apps-script/CentralResultAudit.gs'
+      - '.github/workflows/test-central-learning-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Central learning QA contract tests
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const q=fs.readFileSync('apps-script/CentralLearningQaAutomation.gs','utf8');
+          const a=fs.readFileSync('apps-script/CentralResultAudit.gs','utf8');
+          function ok(v,m){if(!v) throw new Error(m); console.log('PASS',m)}
+          ok(/function\s+installCentralLearningQaTriggersV1/.test(q),'trigger installer exists');
+          ok(/everyMinutes\(5\)/.test(q),'5-minute incremental trigger');
+          ok(/function\s+runCentralDriveLearningQaCycleV1/.test(q),'Drive QA cycle exists');
+          ok(/function\s+inferExpectedOutputContractV1/.test(q),'output inference exists');
+          ok(q.indexOf('IMAGE_ASSET_T1')>=0 && q.indexOf('IMAGE_ASSET_T1')<q.indexOf('FLOW_RESULT_GENERIC_V1'),'image type precedes generic Flow fallback');
+          ok(/\.\(png\|jpe\?g\|webp\|gif\)/.test(q) || /png\|jpe\?g\|webp\|gif/.test(q),'image extension classification exists');
+          ok(/mp4\|mov\|webm\|mkv/.test(q),'video extension classification exists');
+          ok(/CENTRAL_GEMINI_QA_DAILY_CAP/.test(q) && /CENTRAL_OPENAI_QA_DAILY_CAP/.test(q),'provider daily caps exist');
+          ok(/CAP_ZERO_OR_UNSET/.test(q),'zero/unset cap blocks API');
+          ok(!/setProperty\([^\n]*CENTRAL_(GEMINI|OPENAI)_QA_DAILY_CAP/.test(q),'code never creates/raises API budget');
+          ok(/BROWSER_OR_FREE_ONLY/.test(q),'Gemini subscription/free-first default');
+          ok(/CENTRAL_AGENT_OR_API_GATED/.test(q),'OpenAI central-agent/API-gated default');
+          ok(/centralAuditResultV1\(/.test(q) && /function\s+centralAuditResultV1/.test(a),'existing central audit integration');
+          ok(/35_INTERNAL_SEED_REGISTRY/.test(a) && /77_TEMPLATE_EVOLUTION_FACTORY/.test(a),'Seed/template learning writeback exists');
+          ok(/testCentralLearningQaFunctionsV1/.test(q),'runtime fixture test exists');
+          console.log('CENTRAL_LEARNING_QA_STATIC_REGRESSION_PASS');
+          NODE
