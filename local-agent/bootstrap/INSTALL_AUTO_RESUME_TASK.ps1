@@ -57,10 +57,8 @@ $xml|Set-Content -LiteralPath $tmp -Encoding Unicode
 if($LASTEXITCODE -ne 0){throw "schtasks create failed: $LASTEXITCODE"}
 Remove-Item $tmp -Force -ErrorAction SilentlyContinue
 
-# D99: install an independent per-user logon fallback at bootstrap time too.
-# Agent 1.1.30 also repairs this key, but the installer must not depend on the Agent
-# having already run successfully. This breaks the Scheduled-Task-only bootstrap
-# dependency without adding a new OAuth, service, admin privilege, or browser profile.
+# Install an independent per-user logon fallback too. This does not add an OAuth,
+# service, admin privilege, or browser profile.
 $runKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $runName='HomeDesignAutomationAutoResume'
 $runCommand='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"'
