@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.40",
-  "releasedAt": "2026-08-28T18:47:00+09:00",
-  "gitBlobSha1": "d491891efdf7039209e7334fa10dcd4123272a59",
+  "version": "1.1.41",
+  "releasedAt": "2026-08-28T18:53:00+09:00",
+  "gitBlobSha1": "b24b470dfc439a09446164091d392f886cb8f71e",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Runtime-safe bridge automation repair for old 180s bootstrap installations. The agent itself stays short: hash-patches local AgentBootstrap.ps1 to configurable 900s cycle support, hash-fetches the NotebookLM exact-target x2 regression wrapper, dispatches it hidden in the background exactly once with a no-blind-retry marker, writes a central Drive dispatch receipt, and exits before the legacy parent timeout. Subsequent cycles only read the result/marker; they never duplicate the probe. Exact-target regression requires the known notebook URL, CDP target verification, input sentinel fill/readback/restore x2, and normal Chrome preservation. No Generate/credits/OAuth/scope/settings/public/destructive action."
+  "notes": "Repairs the confirmed CLAIMED-but-never-STARTED gate. Host1.2.7 did not allow RunChromeGovernorReadbackV2 or the exact-target/QA scripts. Agent1.1.41 is short enough for legacy bootstrap: installs hash-pinned Host1.2.8 with only the approved V2/exact-target/central-QA/Gemini-Web/credit-readback scripts added to the notebook bridge allowlist, verifies host health+asyncJobs, patches Bootstrap to 900s configurable cycles, dispatches NotebookLM exact-target x2 regression once in background, writes Drive receipt and exits. No Generate/credits/new OAuth/scope/settings/project/public/destructive action."
 }
