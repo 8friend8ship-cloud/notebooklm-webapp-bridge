@@ -1,0 +1,17 @@
+name: Test Apps Script Queue Integrity
+on:
+  push:
+    paths:
+      - 'notebooklm-webapp-bridge-source-v0.2.0/apps-script/Code.gs'
+      - 'tests/apps-script-queue-integrity.test.mjs'
+      - '.github/workflows/test-apps-script-queue-integrity.yml'
+  workflow_dispatch:
+jobs:
+  static-queue-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node tests/apps-script-queue-integrity.test.mjs
