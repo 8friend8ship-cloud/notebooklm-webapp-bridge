@@ -20,6 +20,13 @@ function TaskInfo([string]$Name){
   [ordered]@{name=$Name;exists=($LASTEXITCODE -eq 0);text=(($raw|Out-String).Trim())}
 }
 function WriteState($obj){$obj|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $State -Encoding UTF8}
+function Test-NightWindow([string]$StartText,[string]$EndText){
+  $now=Get-Date
+  $start=[datetime]::Today.Add([TimeSpan]::Parse($StartText))
+  $end=[datetime]::Today.Add([TimeSpan]::Parse($EndText))
+  if($end -gt $start){return ($now -ge $start -and $now -lt $end)}
+  return ($now -ge $start -or $now -lt $end)
+}
 
 if($StatusOnly){
   $out=[ordered]@{ok=$true;action='POWER_CONTINUITY_STATUS';watchdog=(TaskInfo $TaskWatch);night=(TaskInfo $TaskNight);state=$null;at=(Get-Date).ToString('o')}
@@ -77,7 +84,7 @@ $watchCmd='powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Wi
 & schtasks.exe /Create /F /SC ONLOGON /TN $TaskWatch /TR $watchCmd | Out-Null
 if($LASTEXITCODE -ne 0){throw ('WATCHDOG_TASK_CREATE_FAILED:'+ $LASTEXITCODE)}
 
-# Daily 02:00 display-off. Keyboard/mouse immediately wakes the display because Windows itself is not sleeping.
+# Daily display-off at NightStart. Keyboard/mouse immediately wakes the display because Windows itself is not sleeping.
 $nightCmd='powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "'+$Night+'"'
 & schtasks.exe /Create /F /SC DAILY /ST $NightStart /TN $TaskNight /TR $nightCmd /IT | Out-Null
 if($LASTEXITCODE -ne 0){
@@ -89,11 +96,21 @@ if($LASTEXITCODE -ne 0){
 # Start watchdog now without waiting for next logon.
 & schtasks.exe /Run /TN $TaskWatch | Out-Null
 Start-Sleep -Milliseconds 800
+
+# If installation happens after NightStart but before NightEnd, run display-off once now instead of waiting until tomorrow.
+$currentWindowTriggered=$false
+if(Test-NightWindow $NightStart $NightEnd){
+  & schtasks.exe /Run /TN $TaskNight | Out-Null
+  if($LASTEXITCODE -eq 0){$currentWindowTriggered=$true}
+  Start-Sleep -Milliseconds 400
+}
+
 $watch=TaskInfo $TaskWatch;$nightInfo=TaskInfo $TaskNight
 $stateObj=[ordered]@{
   ok=$true;mode='AC_SYSTEM_AWAKE_DISPLAY_MAY_OFF';batteryPolicy='NO_OVERRIDE';nightStart=$NightStart;nightEnd=$NightEnd;
-  keyboardMouseWake='DISPLAY_WAKE_NATIVE_WINDOWS_NO_SYSTEM_SLEEP';watchdog=$watch;night=$nightInfo;
-  note='NightEnd is policy metadata; no forced screen-on at 05:00 to avoid waking the user. The display wakes immediately on normal keyboard/mouse activity.';
+  keyboardMouseWake='DISPLAY_WAKE_NATIVE_WINDOWS_NO_SYSTEM_SLEEP';currentNightWindow=(Test-NightWindow $NightStart $NightEnd);currentWindowDisplayOffTriggered=$currentWindowTriggered;
+  watchdog=$watch;night=$nightInfo;
+  note='NightEnd is policy metadata; no forced screen-on at 05:00 to avoid waking the user. The display wakes immediately on normal keyboard/mouse activity. Installing during the night window triggers one immediate display-off run.';
   installedAt=(Get-Date).ToString('o')
 }
 WriteState $stateObj
