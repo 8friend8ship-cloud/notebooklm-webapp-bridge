@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const mirrorJs = fs.readFileSync('notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js', 'utf8');
+const backgroundJs = fs.readFileSync('notebooklm-webapp-bridge-source-v0.2.0/extension/background.js', 'utf8');
 const mirrorPs = fs.readFileSync('local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1', 'utf8');
 const watcherPs = fs.readFileSync('local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1', 'utf8');
 
@@ -32,4 +33,10 @@ test('FileSystemWatcher route is fallback-only and waits synchronously for a sta
   assert.match(watcherPs, /Copy-Item/);
   assert.doesNotMatch(watcherPs, /Register-ObjectEvent/);
   assert.doesNotMatch(watcherPs, /Move-Item/);
+});
+
+test('Existing verified download synthesizes exact SourcePath mirror request', () => {
+  assert.match(backgroundJs, /actualArtifact\?\.downloadEvidence\?\.download/);
+  assert.match(backgroundJs, /sourcePath:\s*verifiedDownload\.filename/);
+  assert.match(backgroundJs, /sourcePath:\s*String\(mirrorReq\.sourcePath/);
 });
