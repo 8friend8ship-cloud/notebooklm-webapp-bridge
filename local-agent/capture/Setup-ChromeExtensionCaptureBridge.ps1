@@ -2,9 +2,12 @@ param(
   [switch]$SmokeOnly,
   [switch]$FlowBridgeConnectSmoke,
   [switch]$FlowExtensionInspect,
+  [switch]$FlowExactWorkspaceProbe,
   [switch]$NotebookLMTabPrecheck,
   [string]$FlowSmokeTaskId = '',
   [int]$FlowDebugPort = 9224,
+  [int]$FlowExactTimeoutSeconds = 45,
+  [string]$FlowExactTargetUrl = 'https://labs.google/fx/tools/flow',
   [int]$NotebookLMDebugPort = 9223,
   [string]$ManagerRef = 'main',
   [string]$LocalInboxRoot = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX',
@@ -16,6 +19,7 @@ $ProgressPreference = 'SilentlyContinue'
 $Repo = '8friend8ship-cloud/notebooklm-webapp-bridge'
 $ManagerExpected = '76a9718b30d1432829ea7c0f2e6af95ea6942ab8'
 $FlowHelperExpected = 'd3d9cd856889c7b890302e2d9e57a3d5929c09c0'
+$FlowAutopilotV2Expected = '4072cbf9d1c3c6c05f62f8416481afdd8f24162e'
 $InstallRoot = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent\capture'
 $Manager = Join-Path $InstallRoot 'ManageChromeExtensionArtifacts.ps1'
 $Wrapper = Join-Path $InstallRoot 'Reconcile-AllManagedChromeArtifacts.ps1'
@@ -43,8 +47,6 @@ function Find-FlowExtensionLocal {
   return ''
 }
 
-# Read-only PRE_CHECK: verify the dedicated Chrome exposes both the central control page
-# and a real NotebookLM notebook page before any new download E2E is allowed.
 if($NotebookLMTabPrecheck){
   $result=[ordered]@{ok=$false;action='NOTEBOOKLM_DEDICATED_CHROME_TAB_PRECHECK';cdpReady=$false;debugPort=$NotebookLMDebugPort;controlCenterPresent=$false;notebookTabPresent=$false;notebookResultPagePresent=$false;controlCenterTabs=@();notebookTabs=@();allPages=@();normalChromeMutated=$false;downloadClicked=$false;readOnly=$true;error='';at=(Get-Date).ToString('o')}
   try{
@@ -69,8 +71,6 @@ if($NotebookLMTabPrecheck){
   if($result.ok){exit 0}else{exit 2}
 }
 
-# Read the actual local Flow extension implementation before designing the connection probe.
-# This is read-only and does not start Chrome or spend credits.
 if($FlowExtensionInspect){
   $ext=Find-FlowExtensionLocal;if(-not $ext){throw 'FLOW_EXTENSION_PATH_NOT_FOUND'}
   $manifestPath=Join-Path $ext 'manifest.json';$manifestRaw=Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8;$manifest=$manifestRaw|ConvertFrom-Json
@@ -85,9 +85,46 @@ if($FlowExtensionInspect){
   exit 0
 }
 
-# Central-agent direct Flow bridge control reuses this already Host-allowlisted setup script.
-# The helper may report a failed deep gate with exit 2. The allowlisted wrapper still exits 0 in probe mode
-# so the central queue preserves the helper's structured JSON and we can resume from the exact failed gate.
+# Visible Flow workspace verification. Reuses this already Host-allowlisted wrapper,
+# but validates the real content-script+popup architecture through exact page DOM input readback.
+# It opens/restarts only the dedicated HomeDesign Chrome profile; normal Chrome is protected by the exact launcher.
+if($FlowExactWorkspaceProbe){
+  New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
+  $v2=Join-Path $InstallRoot 'ManagedExtensionAutopilotV2.ps1'
+  $tmpV2=$v2+'.download'
+  $v2Raw='https://raw.githubusercontent.com/'+$Repo+'/refs/heads/main/local-agent/governor/ManagedExtensionAutopilotV2.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  Invoke-WebRequest -UseBasicParsing -Uri $v2Raw -OutFile $tmpV2 -TimeoutSec 20
+  $v2Actual=(GitBlobSha1 $tmpV2).ToLowerInvariant()
+  if($v2Actual -ne $FlowAutopilotV2Expected){
+    Remove-Item -LiteralPath $tmpV2 -Force -ErrorAction SilentlyContinue
+    throw ('FLOW_AUTOPILOT_V2_SHA_MISMATCH:actual={0}:expected={1}' -f $v2Actual,$FlowAutopilotV2Expected)
+  }
+  Move-Item -LiteralPath $tmpV2 -Destination $v2 -Force
+  $probeArgs=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$v2,'-Mode','ProbeExact','-Service','FLOW','-TargetUrl',$FlowExactTargetUrl,'-ExpectedUrlPattern','labs\.google/.*/flow|labs\.google/fx/tools/flow','-ExpectedExtensionId','lgedgmpcikglaajhfclcihicgafimlna','-RemoteDebuggingPort',[string]$FlowDebugPort,'-TimeoutSeconds',[string]$FlowExactTimeoutSeconds,'-RestartDedicatedChrome','-ProbeInput')
+  $oldEap=$ErrorActionPreference;$ErrorActionPreference='Continue'
+  try{$probeOut=& powershell.exe @probeArgs 2>&1;$probeRc=$LASTEXITCODE}finally{$ErrorActionPreference=$oldEap}
+  $probeText=($probeOut|Out-String).Trim();$probe=$null
+  try{$probe=(($probeText -split "`r?`n")[-1]|ConvertFrom-Json)}catch{}
+  [ordered]@{
+    ok=[bool]($probeRc -eq 0 -and $probe -and $probe.ok)
+    action='FLOW_VISIBLE_EXACT_WORKSPACE_PROBE_WRAPPER'
+    helperExit=$probeRc
+    helperSha=$v2Actual
+    targetUrl=$FlowExactTargetUrl
+    debugPort=$FlowDebugPort
+    inputProbe=$true
+    generateClicked=$false
+    creditSpend=$false
+    oauthChanged=$false
+    chromeSettingsChanged=$false
+    result=$probe
+    raw=$probeText
+    at=(Get-Date).ToString('o')
+  }|ConvertTo-Json -Depth 70 -Compress
+  # Preserve structured evidence in queue even when a deep gate fails; helperExit/result carry truth.
+  exit 0
+}
+
 if ($FlowBridgeConnectSmoke) {
   New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
   $helper = Join-Path $InstallRoot 'RunFlowBridgeConnectSmoke.ps1'
