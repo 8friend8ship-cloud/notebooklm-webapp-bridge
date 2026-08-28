@@ -1,0 +1,25 @@
+param()
+$ErrorActionPreference='Continue';$ProgressPreference='SilentlyContinue'
+$Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7';$Root=Join-Path $Base 'LocalAgent';New-Item -ItemType Directory -Force -Path $Root|Out-Null
+$Repo='8friend8ship-cloud/notebooklm-webapp-bridge';$Sync=Join-Path $Root 'Sync-NotebookLMQueueIntegrityAppsScriptV2-1.1.45.ps1';$Marker=Join-Path $Root 'queue-integrity-sync-v2-1.1.45-dispatch.json';$State=Join-Path $Root 'state.json'
+$SyncUrl='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/governor/Sync-NotebookLMQueueIntegrityAppsScriptV2.ps1';$SyncSha='9a06c6ef475a6427a04258c1ff84ebdc2ce498a3'
+function GitBlob([string]$p){$b=[IO.File]::ReadAllBytes($p);$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
+function Fetch([string]$u,[string]$d,[string]$sha){$t=$d+'.download';Invoke-WebRequest -UseBasicParsing -Uri ($u+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -OutFile $t -TimeoutSec 20;$a=(GitBlob $t).ToLowerInvariant();if($a -ne $sha){Remove-Item $t -Force -ErrorAction SilentlyContinue;throw ('SHA_MISMATCH:'+ $a+':'+$sha)};Move-Item $t $d -Force;return $a}
+function Central{$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){if(!$d.Root){continue};foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ('내 드라이브\'+$n)),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path $c -PathType Container){return $c}}};return ''}
+function SaveJson([string]$p,$o){$par=Split-Path -Parent $p;if($par){New-Item -ItemType Directory -Force -Path $par|Out-Null};$o|ConvertTo-Json -Depth 50|Set-Content -LiteralPath $p -Encoding UTF8}
+$c=Central;$resultPath=$(if($c){Join-Path $c 'Runtime_Readback\AppsScript_QueueIntegrity\NOTEBOOKLM_QUEUE_INTEGRITY_SYNC.json'}else{''});$existing=$null;$dispatch='';$pid=$null;$err='';$syncSha=''
+try{$syncSha=Fetch $SyncUrl $Sync $SyncSha}catch{$err='FETCH:'+($_.Exception.Message);$dispatch='FETCH_FAILED'}
+if(!$dispatch){
+ if($resultPath -and (Test-Path $resultPath)){try{$existing=Get-Content $resultPath -Raw -Encoding UTF8|ConvertFrom-Json}catch{};if($existing -and $existing.ok -and [string]$existing.status -eq 'PUSH_PULL_READBACK_PASS' -and [string]$existing.version -eq '0.2.10-queue-lock'){$dispatch='LIVE_QUEUE_LOCK_PASS'}elseif($existing -and -not $existing.ok){$dispatch='PREVIOUS_FAILURE_PRESENT_CHANGED_TO_V2'}else{$dispatch='EXISTING_RESULT_UNKNOWN'}}
+ if($dispatch -eq 'PREVIOUS_FAILURE_PRESENT_CHANGED_TO_V2' -or -not $dispatch){
+   if(Test-Path $Marker){$m=$null;try{$m=Get-Content $Marker -Raw -Encoding UTF8|ConvertFrom-Json}catch{};$alive=$false;if($m -and $m.pid){try{$alive=[bool](Get-Process -Id ([int]$m.pid) -ErrorAction SilentlyContinue)}catch{}};$dispatch=if($alive){'SYNC_V2_ALREADY_RUNNING'}else{'SYNC_V2_MARKER_NO_RESULT_HOLD'}}
+   if(-not(Test-Path $Marker)){try{$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$true;$psi.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Sync+'"';$p=[Diagnostics.Process]::Start($psi);$pid=[int]$p.Id;SaveJson $Marker ([ordered]@{version='1.1.45';pid=$pid;syncSha=$SyncSha;startedAt=(Get-Date).ToString('o');expectedResult=$resultPath;retryPolicy='NO_BLIND_RETRY';newProjectCreated=$false;oauthChanged=$false;scopeChanged=$false});$dispatch='SYNC_V2_DISPATCHED_BACKGROUND'}catch{$err='DISPATCH:'+($_.Exception.Message);$dispatch='SYNC_V2_DISPATCH_FAILED'}}
+ }
+}
+$ok=[bool]($syncSha -eq $SyncSha -and $dispatch -in @('SYNC_V2_DISPATCHED_BACKGROUND','SYNC_V2_ALREADY_RUNNING','LIVE_QUEUE_LOCK_PASS'))
+$status=if($dispatch -eq 'LIVE_QUEUE_LOCK_PASS'){'SELF_HEAL_PASS'}elseif($ok){'QUEUE_LOCK_SYNC_V2_PENDING'}else{'QUEUE_LOCK_SYNC_V2_HOLD'}
+$receipt=[ordered]@{ok=$ok;action='AGENT_1.1.45_QUEUE_INTEGRITY_SYNC_V2_DISPATCH';agentVersion='1.1.45';syncSha=$syncSha;dispatchState=$dispatch;pid=$pid;resultPath=$resultPath;existingResult=$existing;newProjectCreated=$false;oauthChanged=$false;scopeChanged=$false;generateClicked=$false;creditSpend=$false;normalChromeRestarted=$false;retryPolicy='NO_BLIND_RETRY';error=$err;at=(Get-Date).ToString('o')}
+if($c){SaveJson (Join-Path $c 'Runtime_Readback\AGENT_1.1.45_QUEUE_INTEGRITY_SYNC_V2_DISPATCH.json') $receipt}
+try{$s=$null;if(Test-Path $State){$s=Get-Content $State -Raw -Encoding UTF8|ConvertFrom-Json};if(!$s){$s=[pscustomobject]@{}};$s|Add-Member agentVersion '1.1.45' -Force;$s|Add-Member agentMode 'QUEUE_INTEGRITY_SYNC_V2_1.1.45' -Force;$s|Add-Member ok $ok -Force;$s|Add-Member status $status -Force;$s|Add-Member updatedAt ((Get-Date).ToString('o')) -Force;SaveJson $State $s}catch{}
+$receipt|ConvertTo-Json -Depth 50 -Compress
+if($ok){exit 0}else{exit 2}
