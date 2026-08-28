@@ -12,6 +12,8 @@ const agent30Ps = fs.readFileSync(agent30Path, 'utf8');
 const host125Path = 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1';
 const agent31Path = 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1';
 const agent31Ps = fs.readFileSync(agent31Path, 'utf8');
+const agent32Path = 'local-agent/releases/1.1.32/HomeDesignLocalAgent.ps1';
+const agent32Ps = fs.readFileSync(agent32Path, 'utf8');
 const host126Path = 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1';
 const stableAgent = JSON.parse(fs.readFileSync('local-agent/stable/agent.json', 'utf8'));
 const stableBridge = JSON.parse(fs.readFileSync('runtime/stable/release.json', 'utf8'));
@@ -77,12 +79,29 @@ test('Local Agent 1.1.31 targets Host 1.2.6 managed CaptureBridge allowlist', ()
   assert.match(host126Ps, /local-agent\/capture\/Setup-ChromeExtensionCaptureBridge\.ps1/);
 });
 
+test('Local Agent 1.1.32 adds only a guarded dedicated control-center wake over Host 1.2.6 lineage', () => {
+  assert.match(agent32Ps, /1\.1\.32/);
+  assert.match(agent32Ps, /1\.2\.6/);
+  assert.match(agent32Ps, /AGENT_1\.1\.32_CONTROL_CENTER_WAKE\.attempted/);
+  assert.match(agent32Ps, /normalChromeUntouched=\$true/);
+  assert.match(agent32Ps, /newOAuth=\$false/);
+  assert.match(agent32Ps, /newScope=\$false/);
+  assert.doesNotMatch(agent32Ps, /Stop-Process.+chrome/i);
+  assert.doesNotMatch(agent32Ps, /taskkill.+chrome/i);
+});
+
 test('Stable Agent manifest points to its exact release blob and pinned Host blob', () => {
-  assert.ok(['1.1.30', '1.1.31'].includes(stableAgent.version), `unexpected stable agent ${stableAgent.version}`);
+  assert.ok(['1.1.30', '1.1.31', '1.1.32'].includes(stableAgent.version), `unexpected stable agent ${stableAgent.version}`);
   const stableAgentPath = `local-agent/releases/${stableAgent.version}/HomeDesignLocalAgent.ps1`;
   assert.equal(stableAgent.gitBlobSha1.toLowerCase(), repositoryBlobSha1(stableAgentPath));
   const stableAgentPs = fs.readFileSync(stableAgentPath, 'utf8');
-  if (stableAgent.version === '1.1.31') {
+  if (stableAgent.version === '1.1.32') {
+    assert.equal(repositoryBlobSha1(host126Path), '5d17bb233706897cd1706930cea9af3796f29488');
+    assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.6\/HomeDesignLocalCommandHost\.ps1/);
+    assert.match(stableAgentPs, /5d17bb233706897cd1706930cea9af3796f29488/);
+    assert.match(stableAgentPs, /AGENT_1\.1\.32_CONTROL_CENTER_WAKE\.attempted/);
+    assert.match(stableAgentPs, /normalChromeUntouched=\$true/);
+  } else if (stableAgent.version === '1.1.31') {
     assert.equal(repositoryBlobSha1(host126Path), '5d17bb233706897cd1706930cea9af3796f29488');
     assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.6\/HomeDesignLocalCommandHost\.ps1/);
     assert.match(stableAgentPs, /5d17bb233706897cd1706930cea9af3796f29488/);
