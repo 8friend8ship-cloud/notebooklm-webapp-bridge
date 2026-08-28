@@ -30,7 +30,7 @@ if($hostRecoveryIndex -lt 0 -or $autoResumeIndex -lt 0 -or $hostRecoveryIndex -g
 if([string]$stable.version -ne '1.1.30'){throw "BAD_STABLE_VERSION:$($stable.version)"}
 $agentSha=(& git hash-object -- $agentPath).Trim()
 if($LASTEXITCODE -ne 0){throw 'AGENT_HASH_FAILED'}
-if($agentSha -ne [string]$stable.gitBlobSha1){throw "AGENT_STABLE_SHA_MISMATCH:$agentSha:$($stable.gitBlobSha1)"}
+if($agentSha -ne [string]$stable.gitBlobSha1){throw ("AGENT_STABLE_SHA_MISMATCH:{0}:{1}" -f $agentSha,[string]$stable.gitBlobSha1)}
 $hostSha=(& git hash-object -- $hostPath).Trim()
 if($LASTEXITCODE -ne 0){throw 'HOST_HASH_FAILED'}
 if($hostSha -ne 'e6a79fbb113a79e19650b2864072f6abde5bcffb'){throw "HOST125_SHA_MISMATCH:$hostSha"}
