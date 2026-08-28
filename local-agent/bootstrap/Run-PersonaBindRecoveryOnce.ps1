@@ -5,9 +5,11 @@ $ProgressPreference='SilentlyContinue'
 $ExpectedAgent='1.1.46'
 $ExpectedAgentBlob='b72e57af70f77578fddb3de49f6581a37e2de792'
 $ExpectedV2Blob='a4b7967da7bc26f3cb49c88d3b3cb122ddf86c7c'
+$ExpectedPowerBlob='3edde1fe1276052a084380a84fe27a2b2574e9ef'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $V2=Join-Path $Root 'RunChromeGovernorReadbackV2.ps1'
+$PowerHelper=Join-Path $Root 'Setup-PowerContinuity.ps1'
 $LocalReceipt=Join-Path $Root 'PERSONA_BIND_DEVICE_RECOVERY_ONCE.json'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
@@ -24,6 +26,17 @@ function GitBlobSha1([string]$Path){
 function GitHubContent([string]$Path){
   $headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}
   return Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers $headers -Method Get -TimeoutSec 20
+}
+function FetchPinned([string]$Path,[string]$Destination,[string]$ExpectedBlob){
+  $resp=GitHubContent $Path
+  $tmp=$Destination+'.recovery.download'
+  [IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$resp.content -replace '\s','')))
+  $sha=(GitBlobSha1 $tmp).ToLowerInvariant()
+  if($sha -ne $ExpectedBlob.ToLowerInvariant()){
+    Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+    throw ('PINNED_BLOB_MISMATCH:'+ $Path + ':' + $sha)
+  }
+  Move-Item -LiteralPath $tmp -Destination $Destination -Force
 }
 function WriteReceipt($obj){
   $json=$obj|ConvertTo-Json -Depth 30
@@ -51,6 +64,10 @@ $receipt=[ordered]@{
   expectedAgent=$ExpectedAgent
   expectedAgentBlob=$ExpectedAgentBlob
   expectedV2Blob=$ExpectedV2Blob
+  expectedPowerBlob=$ExpectedPowerBlob
+  nightStart='02:00'
+  nightEnd='05:00'
+  powerContinuity=$null
   newProjectCreated=$false
   oauthChanged=$false
   scopeChanged=$false
@@ -70,12 +87,7 @@ try{
   if(([string]$metaJson.gitBlobSha1).ToLowerInvariant() -ne $ExpectedAgentBlob){throw 'STABLE_AGENT_BLOB_CHANGED'}
 
   $receipt.stage='FETCH_V2_API_HELPER'
-  $v2Resp=GitHubContent 'local-agent/governor/RunChromeGovernorReadbackV2.ps1'
-  $tmp=$V2+'.recovery.download'
-  [IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$v2Resp.content -replace '\s','')))
-  $v2Sha=(GitBlobSha1 $tmp).ToLowerInvariant()
-  if($v2Sha -ne $ExpectedV2Blob){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw ('V2_BLOB_MISMATCH:'+ $v2Sha)}
-  Move-Item -LiteralPath $tmp -Destination $V2 -Force
+  FetchPinned 'local-agent/governor/RunChromeGovernorReadbackV2.ps1' $V2 $ExpectedV2Blob
 
   $receipt.stage='KICK_EXACT_STABLE_AGENT'
   $old=$ErrorActionPreference;$ErrorActionPreference='Continue'
@@ -90,7 +102,23 @@ try{
   }
   if(-not $parsed -or -not [bool]$parsed.ok){throw 'KICK_NO_PASS_JSON'}
   if([string]$parsed.targetAgent -and [string]$parsed.targetAgent -ne $ExpectedAgent){throw ('KICK_TARGET_MISMATCH:'+[string]$parsed.targetAgent)}
-  $receipt.stage='AGENT_KICK_PASS_PERSONA_RECEIPT_EXPECTED'
+
+  $receipt.stage='INSTALL_POWER_CONTINUITY_0200_0500'
+  FetchPinned 'local-agent/capture/Setup-PowerContinuity.ps1' $PowerHelper $ExpectedPowerBlob
+  $old=$ErrorActionPreference;$ErrorActionPreference='Continue'
+  try{$powerOut=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $PowerHelper -Install -NightStart '02:00' -NightEnd '05:00' 2>&1|Out-String;$powerRc=$LASTEXITCODE}
+  finally{$ErrorActionPreference=$old}
+  if($powerRc -ne 0){throw ('POWER_CONTINUITY_EXIT_'+$powerRc+':'+$powerOut.Trim())}
+  $powerParsed=$null
+  foreach($line in @($powerOut -split "`r?`n")){
+    if(-not $line -or -not $line.Trim()){continue}
+    try{$candidate=$line.Trim()|ConvertFrom-Json;if($candidate -and $null -ne $candidate.ok){$powerParsed=$candidate}}catch{}
+  }
+  if(-not $powerParsed -or -not [bool]$powerParsed.ok){throw ('POWER_CONTINUITY_NO_PASS_JSON:'+ $powerOut.Trim())}
+  if([string]$powerParsed.nightStart -ne '02:00' -or [string]$powerParsed.nightEnd -ne '05:00'){throw 'POWER_CONTINUITY_WINDOW_MISMATCH'}
+  $receipt.powerContinuity=$powerParsed
+
+  $receipt.stage='AGENT_KICK_AND_POWER_CONTINUITY_PASS'
   $receipt.ok=$true
   $receipt.completedAt=(Get-Date).ToString('o')
   WriteReceipt $receipt
