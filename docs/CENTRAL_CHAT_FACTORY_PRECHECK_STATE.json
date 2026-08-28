@@ -1,0 +1,43 @@
+{
+  "schema": "CENTRAL_CHAT_FACTORY_PRECHECK_STATE_V1",
+  "captured_at": "2026-08-28T13:32:00+09:00",
+  "task_id": "LOCAL_CENTRAL_CHAT_FACTORY_SYNC_20260828_1332_01",
+  "central_task_id": "TASK_20260828_CENTRAL_CHAT_FACTORY_RUNTIME_001",
+  "local_queue_status": "HOLD_RECOVERY",
+  "central_status": "HOLD_PRECHECK_D82_DEVICE_READBACK",
+  "reason": "Latest physical device readback is stale and reports SELF_HEAL_FAILED; D82 policy blocks duplicate local PowerShell/clasp work before a fresh device readback.",
+  "latest_physical_readback": {
+    "file": "Runtime_Readback/VIDEO_LOCAL_RUNTIME_READBACK.json",
+    "modified_kst": "2026-08-27T18:57:56+09:00",
+    "status": "SELF_HEAL_FAILED",
+    "agent_version": "1.1.21",
+    "host_version": "1.2.3",
+    "host_healthy": true,
+    "bridge_version": "0.2.66"
+  },
+  "do_not_repeat": [
+    "Chrome UI bound Script-ID discovery",
+    "CDP bound Script-ID discovery without new evidence",
+    "duplicate manual CMD/PowerShell/clasp reruns while device state is stale"
+  ],
+  "next_safe_runtime_route": [
+    "fresh device readback",
+    "ensure no other local task is CLAIMED or STARTED",
+    "release the existing row-285 task instead of creating a duplicate",
+    "RunCentralChatFactorySyncAfterD82Gate.ps1",
+    "verify unique clasp project title and existing deployment id",
+    "sync CentralChatWorkFactory.gs only",
+    "pull/hash readback",
+    "install trigger and run same fixture twice",
+    "verify central 34/07/59/35/77/80/83 readback"
+  ],
+  "approval_policy": "Existing clasp auth/project/deployment only. Stop for new login/OAuth/scope, ambiguity, deployment mismatch, paid API, public deployment, destructive changes.",
+  "github": {
+    "pr": 11,
+    "head": "913e9a8556ad5cff25b3598e2217e4eef32a3e63",
+    "mergeable": true,
+    "mergeable_state": "unstable",
+    "status_reason": "Vercel deployment rate limited; no GitHub Actions run exists for helper commit"
+  },
+  "verified": false
+}
