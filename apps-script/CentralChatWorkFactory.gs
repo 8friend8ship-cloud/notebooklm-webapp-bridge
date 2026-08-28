@@ -1,4 +1,4 @@
-const CCWF_VERSION = 'CENTRAL_CHAT_WORK_FACTORY_V1_1_20260828';
+const CCWF_VERSION = 'CENTRAL_CHAT_WORK_FACTORY_V1_2_20260828';
 const CCWF_MASTER_ID = '1C_CznU1Uo7dk-gKay3-oH8wFxutsGMlz27RSrbdVQwI';
 
 /**
@@ -124,26 +124,28 @@ function ccwfClassifyCommand_(cmd) {
   const evidence = String(cmd.EVIDENCE || '');
   const next = String(cmd.NEXT_ACTION || '').toUpperCase();
   const work = String(cmd.WORK_REQUIRED || '').trim().toUpperCase();
+  const active = /QUEUED|READY|PENDING|REGISTERED|STAGED|REQUIRED|ACTIVE|RUNNING|IMPLEMENTING|IN_PROGRESS|INSTALL_PENDING|SYNC_PENDING|RUNTIME_PENDING|E2E_PENDING|DEPLOYMENT_PENDING|REVIEW_REQUIRED/.test(status);
 
   // Safety gates win over learning or execution classification.
   if (ccwfNeedsHumanApproval_(cmd) || /USER_|HUMAN_|APPROVAL_REQUIRED|2FA|OAUTH|SECRET|PAYMENT|BILLING|PUBLIC_PUBLISH/.test(status + '|' + blocker + '|' + next)) {
     return 'HUMAN_GATE';
   }
 
-  // Explicit no-work rows are history only. Never resurrect them into 07.
-  if (/^(NO|FALSE|NONE|N\/A|NOT_REQUIRED)$/.test(work)) return 'IGNORE';
+  // Failures are reusable evidence even when no new code/work is required.
+  if (/FAILED|FAIL_|BLOCKED|DIAGNOSTIC_HOLD|ROOT_CAUSE/.test(status) && (blocker || evidence || next)) return 'LEARN_FAILURE';
 
-  // Active/pending states are the only states that may create execution work.
-  if (/QUEUED|READY|PENDING|REGISTERED|STAGED|REQUIRED|ACTIVE|RUNNING|IMPLEMENTING|IN_PROGRESS|INSTALL_PENDING|SYNC_PENDING|RUNTIME_PENDING|E2E_PENDING|DEPLOYMENT_PENDING|REVIEW_REQUIRED/.test(status)) {
-    return 'EXECUTE';
-  }
+  // A real terminal success becomes a reusable Seed/template lesson. A row
+  // that still says PENDING/ACTIVE is not promoted as success yet.
+  if (!active && /COMPLETE|VERIFIED|PASS|SUCCESS|RESOLVED/.test(status) && evidence) return 'LEARN_SUCCESS';
 
-  if (/FAILED|FAIL_|DIAGNOSTIC_HOLD|ROOT_CAUSE/.test(status) && (blocker || evidence || next)) return 'LEARN_FAILURE';
-  if (/COMPLETE|VERIFIED|PASS|SUCCESS|RESOLVED/.test(status) && evidence) return 'LEARN_SUCCESS';
+  // Explicit no-work/policy-only rows stay history and are never resurrected.
+  if (/^(NO|FALSE|NONE|N\/A|NOT_REQUIRED|ALL_TASKS)$/.test(work)) return 'IGNORE';
+  if (/CANONICAL_LOCKED|POLICY_LOCKED|GUARDRAIL_STORED/.test(status)) return 'IGNORE';
 
-  // Stored/canonical/closed historical rows must remain history even if their
-  // task is absent from 07. Default is IGNORE, never EXECUTE.
-  if (/COMPLETE|VERIFIED|CANCELLED|CLOSED|STORED|CANONICAL|SUPERSEDED|HOLD_RECOVERY/.test(status)) return 'IGNORE';
+  // Only explicit active/pending states may create execution work.
+  if (active) return 'EXECUTE';
+
+  // Default is IGNORE, never EXECUTE.
   return 'IGNORE';
 }
 
