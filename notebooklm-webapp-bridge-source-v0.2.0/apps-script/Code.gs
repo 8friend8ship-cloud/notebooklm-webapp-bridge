@@ -1,4 +1,4 @@
-const VERSION = "0.2.9-compat";
+const VERSION = "0.2.10-queue-lock";
 const DEFAULT_SHEET = "NotebookLM_Task_Queue";
 const HEADERS = [
   "TASK_ID","CONTENT_ID","TASK_DATE","TASK_TYPE","TITLE","SOURCE_TEXT","INSTRUCTION","LANGUAGE",
@@ -6,6 +6,7 @@ const HEADERS = [
   "CLAIMED_AT","STARTED_AT","COMPLETED_AT","RESULT_TYPE","RESULT_URL","RESULT_FILE_ID","RESULT_TEXT",
   "ERROR_MESSAGE","CALLBACK_URL","CALLBACK_TOKEN","CREATED_AT","UPDATED_AT"
 ];
+const QUEUE_LOCK_TIMEOUT_MS = 30000;
 
 function doGet(e){
   return json_({ok:true,method:"GET",template:true,legacyCompatible:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});
@@ -80,9 +81,25 @@ function rows_(){
   return values.map((row,index)=>({rowNumber:index+2,data:Object.fromEntries(headers.map((h,i)=>[h,row[i]]))}));
 }
 function findTask_(taskId){ const found=rows_().find(item=>String(item.data.TASK_ID)===String(taskId)); if(!found) throw new Error("TASK_ID를 찾지 못했습니다: "+taskId); return found; }
-function setTask_(rowNumber,patch){
-  const sh=sheet_(); const map=Object.fromEntries(HEADERS.map((h,i)=>[h,i+1])); patch.UPDATED_AT=new Date();
-  Object.keys(patch).forEach(key=>{if(map[key]) sh.getRange(rowNumber,map[key]).setValue(patch[key]);});
+function withQueueLock_(fn){
+  const lock=LockService.getScriptLock();
+  if(!lock.tryLock(QUEUE_LOCK_TIMEOUT_MS)) throw new Error("TASK_QUEUE_LOCK_TIMEOUT");
+  try{return fn();}finally{lock.releaseLock();}
+}
+function assertTaskRow_(sh,rowNumber,taskId){
+  const actual=String(sh.getRange(rowNumber,1).getValue()||"");
+  if(actual!==String(taskId)) throw new Error(`TASK_ROW_ID_MISMATCH expected=${taskId} actual=${actual||"EMPTY"} row=${rowNumber}`);
+}
+function setTask_(rowNumber,patch,expectedTaskId){
+  const sh=sheet_();
+  if(expectedTaskId) assertTaskRow_(sh,rowNumber,expectedTaskId);
+  const map=Object.fromEntries(HEADERS.map((h,i)=>[h,i+1])); patch.UPDATED_AT=new Date();
+  const current=sh.getRange(rowNumber,1,1,HEADERS.length).getValues()[0];
+  const next=current.slice();
+  Object.keys(patch).forEach(key=>{if(map[key]) next[map[key]-1]=patch[key];});
+  if(expectedTaskId&&String(next[0])!==String(expectedTaskId)) throw new Error("TASK_ROW_ID_MUTATION_BLOCKED");
+  sh.getRange(rowNumber,1,1,HEADERS.length).setValues([next]);
+  if(expectedTaskId) assertTaskRow_(sh,rowNumber,expectedTaskId);
 }
 function isoOrEmpty_(value){return value instanceof Date?value.toISOString():String(value||"");}
 function taskDto_(data){ return {
@@ -103,30 +120,44 @@ function listTasks_(session,body){
   return {ok:true,tasks,user:session.email,includeClaimed:allowed.indexOf("CLAIMED")>=0};
 }
 function claimTask_(session,body){
-  const item=findTask_(body.taskId); const status=String(item.data.STATUS||"READY");
-  if(["READY","RETRY","ERROR"].indexOf(status)<0) throw new Error("현재 실행할 수 없는 상태입니다: "+status);
-  if(body.chromeProfileEmail&&String(body.chromeProfileEmail).toLowerCase()!==String(session.email).toLowerCase()) throw new Error("프런트앱 Google 계정과 Chrome Google 계정이 다릅니다.");
-  const claimedAt=new Date();
-  setTask_(item.rowNumber,{STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:"",ERROR_MESSAGE:""});
-  return {ok:true,task:taskDto_({...item.data,STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:""})};
+  return withQueueLock_(()=>{
+    const item=findTask_(body.taskId); const status=String(item.data.STATUS||"READY");
+    if(["READY","RETRY","ERROR"].indexOf(status)<0) throw new Error("현재 실행할 수 없는 상태입니다: "+status);
+    if(body.chromeProfileEmail&&String(body.chromeProfileEmail).toLowerCase()!==String(session.email).toLowerCase()) throw new Error("프런트앱 Google 계정과 Chrome Google 계정이 다릅니다.");
+    const claimedAt=new Date();
+    setTask_(item.rowNumber,{STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:"",ERROR_MESSAGE:""},body.taskId);
+    return {ok:true,task:taskDto_({...item.data,STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:""})};
+  });
 }
 function updateTask_(session,body){
-  const item=findTask_(body.taskId); if(item.data.OWNER_EMAIL&&String(item.data.OWNER_EMAIL)!==session.email) throw new Error("다른 사용자가 수령한 작업입니다.");
-  const patch=body.patch||{}; const status=String(body.status||item.data.STATUS); const write={STATUS:status,ERROR_MESSAGE:String(patch.error||"")};
-  if(status==="RETRY"||patch.clearClaim===true||patch.claimedAt===""){write.CLAIMED_AT="";write.STARTED_AT="";}
-  else if(!item.data.STARTED_AT){write.STARTED_AT=new Date();}
-  setTask_(item.rowNumber,write);
-  return {ok:true,taskId:body.taskId,status};
+  return withQueueLock_(()=>{
+    const item=findTask_(body.taskId); if(item.data.OWNER_EMAIL&&String(item.data.OWNER_EMAIL)!==session.email) throw new Error("다른 사용자가 수령한 작업입니다.");
+    const patch=body.patch||{}; const status=String(body.status||item.data.STATUS); const write={STATUS:status,ERROR_MESSAGE:String(patch.error||"")};
+    if(status==="RETRY"||patch.clearClaim===true||patch.claimedAt===""){write.CLAIMED_AT="";write.STARTED_AT="";}
+    else if(!item.data.STARTED_AT){write.STARTED_AT=new Date();}
+    setTask_(item.rowNumber,write,body.taskId);
+    return {ok:true,taskId:body.taskId,status};
+  });
 }
 function completeTask_(session,body){
-  const item=findTask_(body.taskId); const result=body.result||{}; const folder=resolveFolder_(item.data.DRIVE_FOLDER_ID);
-  const manifest={taskId:body.taskId,contentId:item.data.CONTENT_ID,taskType:item.data.TASK_TYPE,completedAt:new Date().toISOString(),result};
-  const file=folder.createFile(`notebooklm_${body.taskId}_result.json`,JSON.stringify(manifest,null,2),MimeType.PLAIN_TEXT);
-  let textFile=null; if(result.resultText){ textFile=folder.createFile(`notebooklm_${body.taskId}_result.txt`,String(result.resultText),MimeType.PLAIN_TEXT); }
-  const resultUrl=(result.resultUrls&&result.resultUrls[0])||result.notebookUrl||file.getUrl();
-  setTask_(item.rowNumber,{STATUS:"DONE",COMPLETED_AT:new Date(),RESULT_TYPE:String(item.data.TASK_TYPE||"RESULT"),RESULT_URL:resultUrl,RESULT_FILE_ID:(textFile||file).getId(),RESULT_TEXT:String(result.resultText||"").slice(0,45000),ERROR_MESSAGE:""});
-  notifyWriter_(item.data,{status:"DONE",resultUrl,resultFileId:(textFile||file).getId()});
-  return {ok:true,result:{resultUrl,driveUrl:(textFile||file).getUrl(),resultFileId:(textFile||file).getId()}};
+  let notifyData=null,notifyResult=null;
+  const out=withQueueLock_(()=>{
+    const item=findTask_(body.taskId);
+    if(item.data.OWNER_EMAIL&&String(item.data.OWNER_EMAIL)!==session.email) throw new Error("다른 사용자가 수령한 작업입니다.");
+    if(String(item.data.STATUS)==="DONE"){
+      return {ok:true,idempotent:true,result:{resultUrl:String(item.data.RESULT_URL||""),driveUrl:String(item.data.RESULT_URL||""),resultFileId:String(item.data.RESULT_FILE_ID||"")}};
+    }
+    const result=body.result||{}; const folder=resolveFolder_(item.data.DRIVE_FOLDER_ID);
+    const manifest={taskId:body.taskId,contentId:item.data.CONTENT_ID,taskType:item.data.TASK_TYPE,completedAt:new Date().toISOString(),result};
+    const file=folder.createFile(`notebooklm_${body.taskId}_result.json`,JSON.stringify(manifest,null,2),MimeType.PLAIN_TEXT);
+    let textFile=null; if(result.resultText){ textFile=folder.createFile(`notebooklm_${body.taskId}_result.txt`,String(result.resultText),MimeType.PLAIN_TEXT); }
+    const resultUrl=(result.resultUrls&&result.resultUrls[0])||result.notebookUrl||file.getUrl();
+    setTask_(item.rowNumber,{STATUS:"DONE",COMPLETED_AT:new Date(),RESULT_TYPE:String(item.data.TASK_TYPE||"RESULT"),RESULT_URL:resultUrl,RESULT_FILE_ID:(textFile||file).getId(),RESULT_TEXT:String(result.resultText||"").slice(0,45000),ERROR_MESSAGE:""},body.taskId);
+    notifyData=item.data; notifyResult={status:"DONE",resultUrl,resultFileId:(textFile||file).getId()};
+    return {ok:true,result:{resultUrl,driveUrl:(textFile||file).getUrl(),resultFileId:(textFile||file).getId()}};
+  });
+  if(notifyData&&notifyResult) notifyWriter_(notifyData,notifyResult);
+  return out;
 }
 function resolveFolder_(folderId){
   if(folderId) try{return DriveApp.getFolderById(String(folderId));}catch(_e){}
@@ -138,9 +169,16 @@ function enqueueFromWriter_(body){
   return appendTask_(body.task||{},String(body.ownerEmail||""));
 }
 function appendTask_(task,ownerEmail){
-  const now=new Date(); const taskId=String(task.taskId||`NLM_${Utilities.formatDate(now,"Asia/Seoul","yyyyMMdd_HHmmss")}_${Utilities.getUuid().slice(0,6)}`);
-  const row={TASK_ID:taskId,CONTENT_ID:task.contentId||"",TASK_DATE:task.taskDate||Utilities.formatDate(now,"Asia/Seoul","yyyy-MM-dd"),TASK_TYPE:task.taskType||"CHAT",TITLE:task.title||"",SOURCE_TEXT:task.sourceText||"",INSTRUCTION:task.instruction||"",LANGUAGE:task.language||"ko-KR",NOTEBOOK_URL:task.notebookUrl||"https://notebooklm.google.com/",DRIVE_FOLDER_ID:task.driveFolderId||"",AUTO_SUBMIT:task.autoSubmit===false?"FALSE":"TRUE",TIMEOUT_SECONDS:task.timeoutSeconds||180,STATUS:"READY",OWNER_EMAIL:ownerEmail||"",CALLBACK_URL:task.callbackUrl||"",CALLBACK_TOKEN:task.callbackToken||"",CREATED_AT:now,UPDATED_AT:now};
-  sheet_().appendRow(HEADERS.map(h=>row[h]||"")); return {ok:true,taskId,status:"READY"};
+  return withQueueLock_(()=>{
+    const now=new Date(); const taskId=String(task.taskId||`NLM_${Utilities.formatDate(now,"Asia/Seoul","yyyyMMdd_HHmmss")}_${Utilities.getUuid().slice(0,6)}`);
+    const duplicate=rows_().find(item=>String(item.data.TASK_ID)===taskId);
+    if(duplicate) return {ok:true,taskId,status:String(duplicate.data.STATUS||"READY"),idempotent:true,rowNumber:duplicate.rowNumber};
+    const row={TASK_ID:taskId,CONTENT_ID:task.contentId||"",TASK_DATE:task.taskDate||Utilities.formatDate(now,"Asia/Seoul","yyyy-MM-dd"),TASK_TYPE:task.taskType||"CHAT",TITLE:task.title||"",SOURCE_TEXT:task.sourceText||"",INSTRUCTION:task.instruction||"",LANGUAGE:task.language||"ko-KR",NOTEBOOK_URL:task.notebookUrl||"https://notebooklm.google.com/",DRIVE_FOLDER_ID:task.driveFolderId||"",AUTO_SUBMIT:task.autoSubmit===false?"FALSE":"TRUE",TIMEOUT_SECONDS:task.timeoutSeconds||180,STATUS:"READY",OWNER_EMAIL:ownerEmail||"",CALLBACK_URL:task.callbackUrl||"",CALLBACK_TOKEN:task.callbackToken||"",CREATED_AT:now,UPDATED_AT:now};
+    const sh=sheet_(); const rowNumber=sh.getLastRow()+1;
+    sh.getRange(rowNumber,1,1,HEADERS.length).setValues([HEADERS.map(h=>row[h]||"")]);
+    assertTaskRow_(sh,rowNumber,taskId);
+    return {ok:true,taskId,status:"READY",rowNumber};
+  });
 }
 function notifyWriter_(data,result){
   if(!data.CALLBACK_URL) return; try{UrlFetchApp.fetch(String(data.CALLBACK_URL),{method:"post",contentType:"application/json",payload:JSON.stringify({taskId:data.TASK_ID,contentId:data.CONTENT_ID,callbackToken:data.CALLBACK_TOKEN,...result}),muteHttpExceptions:true});}catch(_e){}
