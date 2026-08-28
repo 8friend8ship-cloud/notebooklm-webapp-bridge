@@ -19,7 +19,7 @@ $ProgressPreference = 'SilentlyContinue'
 $Repo = '8friend8ship-cloud/notebooklm-webapp-bridge'
 $ManagerExpected = '76a9718b30d1432829ea7c0f2e6af95ea6942ab8'
 $FlowHelperExpected = 'd3d9cd856889c7b890302e2d9e57a3d5929c09c0'
-$FlowAutopilotV2Expected = '4072cbf9d1c3c6c05f62f8416481afdd8f24162e'
+$FlowAutopilotV2Expected = '02a8d4b57c90d96e5bde6521b2e2f939decd60e7'
 $InstallRoot = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent\capture'
 $Manager = Join-Path $InstallRoot 'ManageChromeExtensionArtifacts.ps1'
 $Wrapper = Join-Path $InstallRoot 'Reconcile-AllManagedChromeArtifacts.ps1'
@@ -85,9 +85,6 @@ if($FlowExtensionInspect){
   exit 0
 }
 
-# Visible Flow workspace verification. Reuses this already Host-allowlisted wrapper,
-# but validates the real content-script+popup architecture through exact page DOM input readback.
-# It opens/restarts only the dedicated HomeDesign Chrome profile; normal Chrome is protected by the exact launcher.
 if($FlowExactWorkspaceProbe){
   New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
   $v2=Join-Path $InstallRoot 'ManagedExtensionAutopilotV2.ps1'
@@ -121,7 +118,6 @@ if($FlowExactWorkspaceProbe){
     raw=$probeText
     at=(Get-Date).ToString('o')
   }|ConvertTo-Json -Depth 70 -Compress
-  # Preserve structured evidence in queue even when a deep gate fails; helperExit/result carry truth.
   exit 0
 }
 
