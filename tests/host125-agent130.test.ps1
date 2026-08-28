@@ -14,11 +14,11 @@ foreach($path in @($agentPath,$hostPath)){
 }
 
 $agent=Get-Content -LiteralPath $agentPath -Raw -Encoding UTF8
-$host=Get-Content -LiteralPath $hostPath -Raw -Encoding UTF8
+$hostCode=Get-Content -LiteralPath $hostPath -Raw -Encoding UTF8
 $stable=Get-Content -LiteralPath $stablePath -Raw -Encoding UTF8|ConvertFrom-Json
 
 foreach($needle in @('MirrorNotebookLMArtifactToDrive.ps1','WatchNotebookLMDownloadsToCaptureBridge.ps1','1.2.5')){
-  if(-not $host.Contains($needle)){throw "HOST125_MISSING:$needle"}
+  if(-not $hostCode.Contains($needle)){throw "HOST125_MISSING:$needle"}
 }
 foreach($needle in @("`$AgentVersion='1.1.30'","`$HostVersion='1.2.5'",'EnsureHost125','AGENT_1.1.30_HOST125_FIRST_AUTORESUME','HOST125_FIRST_AUTORESUME_1.1.30')){
   if(-not $agent.Contains($needle)){throw "AGENT130_MISSING:$needle"}
