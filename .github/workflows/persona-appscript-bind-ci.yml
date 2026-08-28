@@ -31,14 +31,17 @@ jobs:
         run: |
           $p='local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV1.ps1'
           $t=Get-Content $p -Raw
-          $required=@(
-            "ExpectedDeploymentId='AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo'",
-            "SourceCommit='0ad86472116e73728d99c0c49d940e0a884d4739'",
-            "ExpectedSourceBlob='948c056e6d175b5b709b53955abdd3b83869b9c3'",
-            'TARGET_BY_DEPLOYMENT','PERSONA_ORCH_FACTORY_ADAPTER_V1','READBACK_X1','READBACK_X2','Restore $target.dir',
-            'newProjectCreated=$false','oauthChanged=$false','newDeployment=$false','newTrigger=$false','paidGeminiApiCalled=$false'
+          $assignmentPatterns=@(
+            "ExpectedDeploymentId\s*=\s*'AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo'",
+            "SourceCommit\s*=\s*'0ad86472116e73728d99c0c49d940e0a884d4739'",
+            "ExpectedSourceBlob\s*=\s*'948c056e6d175b5b709b53955abdd3b83869b9c3'"
           )
-          foreach($n in $required){if(-not $t.Contains($n)){throw "MISSING_CONTRACT:$n"}}
+          foreach($pattern in $assignmentPatterns){if($t -notmatch $pattern){throw "MISSING_ASSIGNMENT:$pattern"}}
+          $requiredText=@(
+            'TARGET_BY_DEPLOYMENT','PERSONA_ORCH_FACTORY_ADAPTER_V1','READBACK_X1','READBACK_X2','Restore-Snapshot',
+            'newProjectCreated = $false','oauthChanged = $false','scopeChanged = $false','newDeployment = $false','newTrigger = $false','paidGeminiApiCalled = $false'
+          )
+          foreach($n in $requiredText){if(-not $t.Contains($n)){throw "MISSING_CONTRACT:$n"}}
           $forbidden=@('clasp login','create-script','create-deployment','ScriptApp.newTrigger')
           foreach($n in $forbidden){if($t -match [regex]::Escape($n)){throw "FORBIDDEN_OPERATION:$n"}}
           Write-Host 'Persona binder safety/x2 contract PASS'
