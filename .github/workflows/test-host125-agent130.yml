@@ -8,8 +8,9 @@ on:
     paths:
       - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+      - 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
       - 'local-agent/stable/agent.json'
-      - 'local-agent/stable/host.json'
       - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
       - 'tests/host125-agent130.test.ps1'
       - '.github/workflows/test-host125-agent130.yml'
@@ -17,8 +18,9 @@ on:
     paths:
       - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+      - 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
       - 'local-agent/stable/agent.json'
-      - 'local-agent/stable/host.json'
       - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
       - 'tests/host125-agent130.test.ps1'
       - '.github/workflows/test-host125-agent130.yml'
@@ -32,7 +34,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Host125 Agent130 regression
+      - name: Recovery lineage regression
         shell: pwsh
         run: ./tests/host125-agent130.test.ps1
       - name: Existing NotebookLM handoff regression
