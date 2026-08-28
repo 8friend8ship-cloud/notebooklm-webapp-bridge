@@ -1,0 +1,42 @@
+name: test-managed-extension-factory
+on:
+  push:
+    branches: ['feat/auto-extension-factory-20260828']
+    paths:
+      - 'local-agent/governor/NewOrReuseManagedExtension.ps1'
+      - 'config/managed-extension-factory-policy-v1.json'
+      - '.github/workflows/test-managed-extension-factory.yml'
+  pull_request:
+    paths:
+      - 'local-agent/governor/NewOrReuseManagedExtension.ps1'
+      - 'config/managed-extension-factory-policy-v1.json'
+      - '.github/workflows/test-managed-extension-factory.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell and policy
+        shell: pwsh
+        run: |
+          $f='local-agent/governor/NewOrReuseManagedExtension.ps1'
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+          if($errors.Count){$errors|%{Write-Error $_.Message};throw 'POWERSHELL_PARSE_FAIL'}
+          $p=Get-Content 'config/managed-extension-factory-policy-v1.json' -Raw|ConvertFrom-Json
+          if(-not $p.enabled -or -not $p.autoCreate.enabled -or -not $p.autoRegister.enabled){throw 'FACTORY_POLICY_DISABLED'}
+          if(-not $p.autoCreate.broadAllUrlsForbidden){throw 'BROAD_HOST_GUARD_MISSING'}
+      - name: Create sample no-publish bridge
+        shell: pwsh
+        run: |
+          $out=& powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'local-agent/governor/NewOrReuseManagedExtension.ps1' -Mode CreateOrReuse -Service 'TEST_SERVICE' -HostPatterns 'https://example.com/*' -Capability 'PAGE_PROBE'
+          $j=$out|ConvertFrom-Json
+          if(-not $j.ok -or $j.decision -ne 'CREATED'){throw 'FACTORY_CREATE_FAIL'}
+          $m=Get-Content $j.manifest -Raw|ConvertFrom-Json
+          if($m.manifest_version -ne 3){throw 'MV3_FAIL'}
+          if(@($m.host_permissions) -contains '<all_urls>'){throw 'BROAD_HOST_FORBIDDEN'}
+          $c=Get-Content (Join-Path $j.sourcePath 'content.js') -Raw
+          if(-not $c.Contains('PUBLIC_OR_HIGH_IMPACT_ACTION_BLOCKED')){throw 'FAIL_CLOSED_GUARD_MISSING'}
