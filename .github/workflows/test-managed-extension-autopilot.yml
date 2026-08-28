@@ -1,0 +1,58 @@
+name: test-managed-extension-autopilot
+
+on:
+  push:
+    branches:
+      - 'feat/managed-extension-autopilot-20260828'
+    paths:
+      - 'local-agent/governor/ManagedExtensionAutopilot.ps1'
+      - 'config/managed-extension-autopilot-v1.json'
+      - 'extensions/central-platform-publisher-bridge/**'
+      - '.github/workflows/test-managed-extension-autopilot.yml'
+  pull_request:
+    paths:
+      - 'local-agent/governor/ManagedExtensionAutopilot.ps1'
+      - 'config/managed-extension-autopilot-v1.json'
+      - 'extensions/central-platform-publisher-bridge/**'
+      - '.github/workflows/test-managed-extension-autopilot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-regression:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell parse
+        shell: pwsh
+        run: |
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'local-agent/governor/ManagedExtensionAutopilot.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'POWERSHELL_PARSE_FAIL'}
+      - name: Registry contract
+        shell: pwsh
+        run: |
+          $r=Get-Content 'config/managed-extension-autopilot-v1.json' -Raw|ConvertFrom-Json
+          if($r.schema -ne 'MANAGED_EXTENSION_AUTOPILOT_REGISTRY_V1'){throw 'SCHEMA_FAIL'}
+          foreach($n in @('noManualZipExtract','noManualLoadUnpackedForManagedDedicatedChrome','noDuplicateInstall','noNormalChromeRestart','preserveLastGood','publicPublishFailClosed')){if(-not $r.principles.$n){throw "POLICY_MISSING:$n"}}
+          foreach($p in @('BLOGGER','YOUTUBE','INSTAGRAM','TIKTOK','NAVER_BLOG','NAVER_CAFE','NAVER_CLIP','PINTEREST')){if(-not (($r.extensions|Where-Object name -eq 'Central Platform Publisher Bridge').platforms -contains $p)){throw "PLATFORM_MISSING:$p"}}
+      - name: Manifest and JavaScript syntax
+        shell: pwsh
+        run: |
+          $m=Get-Content 'extensions/central-platform-publisher-bridge/manifest.json' -Raw|ConvertFrom-Json
+          if($m.manifest_version -ne 3){throw 'MV3_REQUIRED'}
+          foreach($f in @('background.js','content.js')){node --check (Join-Path 'extensions/central-platform-publisher-bridge' $f);if($LASTEXITCODE){throw "JS_PARSE_FAIL:$f"}}
+      - name: Publish fail-closed guard
+        shell: pwsh
+        run: |
+          $bg=Get-Content 'extensions/central-platform-publisher-bridge/background.js' -Raw
+          $cs=Get-Content 'extensions/central-platform-publisher-bridge/content.js' -Raw
+          foreach($needle in @('PUBLIC_PUBLISH_FAIL_CLOSED','USER_GATE_REQUIRED')){if(-not (($bg+$cs).Contains($needle))){throw "PUBLISH_GUARD_MISSING:$needle"}}
+          if($cs -match '\.click\s*\('){throw 'UNAPPROVED_CLICK_AUTOMATION_FORBIDDEN'}
+      - name: Secret guard
+        shell: pwsh
+        run: |
+          $bad=Select-String -Path 'local-agent/governor/ManagedExtensionAutopilot.ps1','config/managed-extension-autopilot-v1.json','extensions/central-platform-publisher-bridge/*' -Pattern 'sk-proj-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|ghp_[A-Za-z0-9]{20,}' -AllMatches
+          if($bad){throw 'SECRET_LIKE_LITERAL_FOUND'}
