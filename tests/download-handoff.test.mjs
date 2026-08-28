@@ -82,13 +82,15 @@ test('Stable Agent manifest points to its exact release blob and pinned Host blo
   const stableAgentPath = `local-agent/releases/${stableAgent.version}/HomeDesignLocalAgent.ps1`;
   assert.equal(stableAgent.gitBlobSha1.toLowerCase(), repositoryBlobSha1(stableAgentPath));
   const stableAgentPs = fs.readFileSync(stableAgentPath, 'utf8');
-  const hostExpected = stableAgentPs.match(/\$HostExpected='([0-9a-f]{40})'/i)?.[1];
-  assert.ok(hostExpected, 'Agent must pin HostExpected');
-  const expectedHostPath = stableAgent.version === '1.1.31' ? host126Path : host125Path;
-  assert.equal(hostExpected.toLowerCase(), repositoryBlobSha1(expectedHostPath));
   if (stableAgent.version === '1.1.31') {
+    assert.equal(repositoryBlobSha1(host126Path), '5d17bb233706897cd1706930cea9af3796f29488');
     assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.6\/HomeDesignLocalCommandHost\.ps1/);
+    assert.match(stableAgentPs, /5d17bb233706897cd1706930cea9af3796f29488/);
+    assert.match(stableAgentPs, /"\$HostExpected='e6a79fbb113a79e19650b2864072f6abde5bcffb'"="\$HostExpected='5d17bb233706897cd1706930cea9af3796f29488'"/);
   } else {
+    const hostExpected = stableAgentPs.match(/\$HostExpected='([0-9a-f]{40})'/i)?.[1];
+    assert.ok(hostExpected, 'Agent 1.1.30 must pin HostExpected');
+    assert.equal(hostExpected.toLowerCase(), repositoryBlobSha1(host125Path));
     assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.5\/HomeDesignLocalCommandHost\.ps1/);
   }
 });
