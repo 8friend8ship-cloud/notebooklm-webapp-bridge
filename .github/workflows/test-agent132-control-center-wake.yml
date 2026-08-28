@@ -1,0 +1,47 @@
+name: test-agent132-control-center-wake
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'local-agent/releases/1.1.32/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - '.github/workflows/test-agent132-control-center-wake.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-regression:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell syntax
+        shell: pwsh
+        run: |
+          $f='local-agent/releases/1.1.32/HomeDesignLocalAgent.ps1'
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$tokens, [ref]$errors)
+          if($errors.Count -gt 0){$errors|ForEach-Object{Write-Error $_.Message};throw 'POWERSHELL_SYNTAX_FAIL'}
+      - name: One-shot dedicated Chrome contract
+        shell: pwsh
+        run: |
+          $t=Get-Content 'local-agent/releases/1.1.32/HomeDesignLocalAgent.ps1' -Raw
+          foreach($needle in @('AGENT_1.1.32_CONTROL_CENTER_WAKE.attempted','DedicatedProcs','--user-data-dir=$UserData','--load-extension=$ExtensionRoot','normalChromeUntouched=$true','newOAuth=$false','newScope=$false','publicPublish=$false','destructive=$false')){
+            if(-not $t.Contains($needle)){throw "MISSING_WAKE_GUARD:$needle"}
+          }
+          if($t -match 'Stop-Process.+chrome' -or $t -match 'taskkill.+chrome'){throw 'CHROME_KILL_FORBIDDEN_IN_WAKE_LAYER'}
+      - name: Stable lineage contract
+        shell: pwsh
+        run: |
+          $t=Get-Content 'local-agent/releases/1.1.32/HomeDesignLocalAgent.ps1' -Raw
+          foreach($needle in @("$AgentVersion='1.1.32'","$HostVersion='1.2.6'",'AGENT_1.1.32_RECOVERY.json','HOST126_FIRST_AUTORESUME_1.1.32')){
+            if(-not $t.Contains($needle)){throw "MISSING_STABLE_LINEAGE:$needle"}
+          }
+          if($t.Contains('AGENT_1.1.30_RECOVERY.json"="AGENT_1.1.31_RECOVERY.json')){throw 'STALE_131_PATCH_TARGET'}
+      - name: Secret-like literal guard
+        shell: pwsh
+        run: |
+          $bad=Select-String -Path 'local-agent/releases/1.1.32/HomeDesignLocalAgent.ps1' -Pattern 'sk-proj-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|ghp_[A-Za-z0-9]{20,}' -AllMatches
+          if($bad){throw 'SECRET_LIKE_LITERAL_FOUND'}
