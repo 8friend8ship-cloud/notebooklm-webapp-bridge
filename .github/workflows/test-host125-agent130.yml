@@ -1,0 +1,35 @@
+name: test-host125-agent130
+
+on:
+  push:
+    branches:
+      - 'fix/notebooklm-host125-agent130-20260828'
+    paths:
+      - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
+      - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - 'tests/host125-agent130.test.ps1'
+      - '.github/workflows/test-host125-agent130.yml'
+  pull_request:
+    paths:
+      - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
+      - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - 'tests/host125-agent130.test.ps1'
+      - '.github/workflows/test-host125-agent130.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host125 Agent130 regression
+        shell: pwsh
+        run: ./tests/host125-agent130.test.ps1
+      - name: Existing NotebookLM handoff regression
+        shell: pwsh
+        run: npm test
