@@ -5,7 +5,7 @@ $ProgressPreference='SilentlyContinue'
 $ExpectedAgent='1.1.46'
 $ExpectedAgentBlob='b72e57af70f77578fddb3de49f6581a37e2de792'
 $ExpectedV2Blob='a4b7967da7bc26f3cb49c88d3b3cb122ddf86c7c'
-$ExpectedPowerBlob='d1d80a0362a170f1c017c3e63a7d3c6d6b32a576'
+$ExpectedPowerBlob='b98ed149d91cdec4ff75ccf4b03aa7b9e09f241f'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $V2=Join-Path $Root 'RunChromeGovernorReadbackV2.ps1'
@@ -104,7 +104,7 @@ try{
   if(-not $parsed -or -not [bool]$parsed.ok){throw 'KICK_NO_PASS_JSON'}
   if([string]$parsed.targetAgent -and [string]$parsed.targetAgent -ne $ExpectedAgent){throw ('KICK_TARGET_MISMATCH:'+[string]$parsed.targetAgent)}
 
-  $receipt.stage='INSTALL_POWER_CONTINUITY_0200_0500_IDLE30'
+  $receipt.stage='INSTALL_POWER_CONTINUITY_0200_0500_IDLE30_KEYBOARD_GUARD'
   FetchPinned 'local-agent/capture/Setup-PowerContinuity.ps1' $PowerHelper $ExpectedPowerBlob
   $old=$ErrorActionPreference;$ErrorActionPreference='Continue'
   try{$powerOut=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $PowerHelper -Install -NightStart '02:00' -NightEnd '05:00' -IdleDisplayMinutes 30 2>&1|Out-String;$powerRc=$LASTEXITCODE}
@@ -119,6 +119,8 @@ try{
   if([string]$powerParsed.nightStart -ne '02:00' -or [string]$powerParsed.nightEnd -ne '05:00'){throw 'POWER_CONTINUITY_WINDOW_MISMATCH'}
   if([int]$powerParsed.idleDisplayMinutes -ne 30){throw 'POWER_CONTINUITY_IDLE_MISMATCH'}
   if([string]$powerParsed.acAutomaticSleep -ne 'DISABLED'){throw 'POWER_CONTINUITY_AC_SLEEP_MISMATCH'}
+  if([string]$powerParsed.acUsbSelectiveSuspend -ne 'DISABLED'){throw 'POWER_CONTINUITY_USB_SUSPEND_MISMATCH'}
+  if([string]$powerParsed.keyboardFreezeGuard -ne 'NO_AC_SLEEP_RESUME_PLUS_USB_SELECTIVE_SUSPEND_DISABLED'){throw 'POWER_CONTINUITY_KEYBOARD_GUARD_MISMATCH'}
   $receipt.powerContinuity=$powerParsed
 
   $receipt.stage='AGENT_KICK_AND_POWER_CONTINUITY_PASS'
