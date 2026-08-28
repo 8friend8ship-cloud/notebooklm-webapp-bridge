@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.28",
-  "releasedAt": "2026-08-28T08:12:00+09:00",
-  "gitBlobSha1": "60b072c8bb5fa1d268684c74108aedaeae37545a",
+  "version": "1.1.29",
+  "releasedAt": "2026-08-28T12:05:00+09:00",
+  "gitBlobSha1": "6f0c15153ba07d7ab5a74e656c361c975c8263e2",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "No-reapproval dual-persistence recovery. Preserves the healthy async Host and persistent ChromeUserData, refreshes the existing AutoResume/Watchdog scripts, verifies or repairs the existing HomeDesignAutomation-AutoResume scheduled task, and also ensures an HKCU logon fallback points to the same watchdog when Task Scheduler is missing or unavailable. Then applies the current stable Bridge dynamically and writes runtime readback. No new CMD, OAuth reset, download-path change, file move, NotebookLM generation, normal-Chrome mutation, or repeated same-condition approval request."
+  "notes": "Host-first no-reapproval self-heal. If the local async Host is missing, stale, or not Host 1.2.5, refresh the SHA-verified Host 1.2.5 wrapper, restart only HomeDesignLocalCommandHost, and require /health ok+asyncJobs before running the existing Agent 1.1.28 AutoResume/Bridge recovery. Host 1.2.5 adds the exact NotebookLM artifact mirror and watcher scripts to the existing notebooklm-webapp-bridge main allowlist. Preserves persistent ChromeUserData and normal Chrome; no new CMD, OAuth, clasp, download-path change, file move, NotebookLM generation, or repeated approval request."
 }
