@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.38",
-  "releasedAt": "2026-08-28T17:55:00+09:00",
-  "gitBlobSha1": "67aeac9fb3f147875c600baeaf9ef8d847f6f3f7",
+  "version": "1.1.39",
+  "releasedAt": "2026-08-28T18:36:00+09:00",
+  "gitBlobSha1": "9d5eb0c7ad6f44756fd254d6cdd21dbb0f7df930",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Changed-route central learning QA completion package. Preserves verified Agent1.1.36 recovery lineage, runs hash-pinned read-only Flow approved-account/credit inspection, then hash-pinned existing-project-only Apps Script QA sync with Drive backup, static guards, fixture test, one 5-minute incremental Drive QA trigger install, and one runtime cycle when clasp execution is available. Gemini/OpenAI separate API calls remain cap=0/unset blocked by default and use subscription/UI queues first; no API budget/key/OAuth/scope/project is created or raised. No Flow Generate/credit spend/public/destructive action. Receipt: Runtime_Readback/AGENT_1.1.38_FLOW_CREDIT_AND_CENTRAL_LEARNING_QA.json."
+  "notes": "Fixes managed Chrome automation false-positive behavior where LaunchDedicated opened chrome://extensions/ instead of the exact service workspace. Preserves Agent1.1.38 work, then runs hash-pinned NotebookLM exact-target x2 regression through dedicated Chrome/CDP: exact notebook URL, expected target verification, open-shadow input discovery, sentinel fill/readback/restore, normal Chrome untouched. Page-open/load-extension alone cannot PASS. No Generate, credits, new OAuth/scope/settings/project/public/destructive action. Receipts: Runtime_Readback/AGENT_1.1.39_EXACT_TARGET_CHROME_AUTOMATION.json and Runtime_Readback/Chrome_Exact_Target/NOTEBOOKLM_EXACT_TARGET_X2_REGRESSION.json."
 }
