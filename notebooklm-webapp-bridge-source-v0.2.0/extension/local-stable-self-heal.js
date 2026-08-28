@@ -1,6 +1,6 @@
 const HD_SELF_HEAL_SOURCE = "notebooklm-webapp-bridge";
 const HD_SELF_HEAL_HOST = "http://127.0.0.1:8765";
-const HD_SELF_HEAL_KEY = "homeDesignLocalStableSelfHealV3";
+const HD_SELF_HEAL_KEY = "homeDesignLocalStableSelfHealV4";
 const HD_SELF_HEAL_ALARM = "home-design-local-stable-self-heal";
 const HD_SELF_HEAL_PERIOD_MINUTES = 5;
 const HD_LOCAL_SAVE_SMOKE_KEY = "homeDesignNotebookLMLocalSaveSmokeV1";
@@ -12,7 +12,7 @@ function hdSelfHealVersion() {
 function hdBucket() { return Math.floor(Date.now() / (HD_SELF_HEAL_PERIOD_MINUTES * 60 * 1000)); }
 function hdSafe(v) { return String(v || "").replace(/[^A-Za-z0-9_.-]/g, "_").replace(/\./g, "_"); }
 function hdSelfHealTaskId(version, bucket, attempt = 1) {
-  return `LOCAL_STABLE_SELF_HEAL_${hdSafe(version)}_${bucket}_A${attempt}`;
+  return `LOCAL_STABLE_API_SELF_HEAL_${hdSafe(version)}_${bucket}_A${attempt}`;
 }
 async function hdFetchJson(url, options = {}, timeoutMs = 8000) {
   const controller = new AbortController();
@@ -39,9 +39,7 @@ async function hdWriteSelfHealState(patch) {
 async function hdEnsureSelfHealAlarm() {
   try {
     const existing = await chrome.alarms.get(HD_SELF_HEAL_ALARM);
-    if (!existing) {
-      await chrome.alarms.create(HD_SELF_HEAL_ALARM, { delayInMinutes: 0.15, periodInMinutes: HD_SELF_HEAL_PERIOD_MINUTES });
-    }
+    if (!existing) await chrome.alarms.create(HD_SELF_HEAL_ALARM, { delayInMinutes: 0.15, periodInMinutes: HD_SELF_HEAL_PERIOD_MINUTES });
   } catch {}
 }
 function hdStableAgentTask(taskId) {
@@ -50,13 +48,13 @@ function hdStableAgentTask(taskId) {
     TASK_ID: taskId,
     taskType: "LOCAL_POWERSHELL",
     TASK_TYPE: "LOCAL_POWERSHELL",
-    timeoutSeconds: 180,
-    TIMEOUT_SECONDS: 180,
+    timeoutSeconds: 90,
+    TIMEOUT_SECONDS: 90,
     sourceText: JSON.stringify({
       repo: "8friend8ship-cloud/notebooklm-webapp-bridge",
       branch: "main",
-      script: "local-agent/governor/RunChromeGovernorReadback.ps1",
-      args: { KickStableAgent: true }
+      script: "local-agent/governor/Run-ExactTargetNotebookLMRegression.ps1",
+      args: { RepairStableAgentApi: true }
     })
   };
 }
@@ -161,7 +159,8 @@ async function hdKickStableAgent(reason = "worker-load") {
       hostState: run.final?.state || run.started?.state || "",
       localSaveSmoke: smoke,
       firstError,
-      lastError: ""
+      lastError: "",
+      stableSource: "GITHUB_CONTENTS_API_VIA_ALLOWLISTED_REPAIR"
     });
     return { ok: true, version, bucket, taskId: run.taskId, attempt, state: run.final?.state || "DONE", smoke };
   } catch (error) {
@@ -171,7 +170,8 @@ async function hdKickStableAgent(reason = "worker-load") {
       lastKickAt: new Date().toISOString(),
       reason,
       hostVersion: health?.version || "",
-      lastError: String(error?.message || error)
+      lastError: String(error?.message || error),
+      stableSource: "GITHUB_CONTENTS_API_VIA_ALLOWLISTED_REPAIR"
     });
     return { ok: false, version, bucket, error: String(error?.message || error) };
   }
