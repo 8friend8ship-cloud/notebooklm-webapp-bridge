@@ -1,4 +1,4 @@
-const CDMH_VERSION = 'CENTRAL_DATA_MANAGEMENT_HUB_V1_20260828';
+const CDMH_VERSION = 'CENTRAL_DATA_MANAGEMENT_HUB_V1_1_20260828';
 const CDMH_MASTER_ID = '1C_CznU1Uo7dk-gKay3-oH8wFxutsGMlz27RSrbdVQwI';
 const CDMH_HUB_ID = '1aBvDTPAFOjOI_CufzQsOJUFkU6bOhy6gBRy54VS1o-s';
 const CDMH_HUB_URL = 'https://docs.google.com/spreadsheets/d/1aBvDTPAFOjOI_CufzQsOJUFkU6bOhy6gBRy54VS1o-s/edit';
@@ -178,29 +178,23 @@ function runConditionalDataGapAuditV1_(runId, gates) {
   } catch(e) { return {status:'DUAL_QA_ERROR',error:String(e)}; }
 }
 
+/**
+ * Approval inbox is an evidence/readback surface, not a reason to expand OAuth scope.
+ * Gmail is intentionally NOT called from this bound-runtime file. Gmail/connector scans
+ * may update 08_APPROVAL_INBOX through an already-approved external route. The DataHub
+ * only consumes that evidence and preserves the user's no-new-OAuth/no-repeat-approval gate.
+ */
 function runCentralApprovalInboxScanV1() {
-  const inbox = [];
-  const rules = [
-    {id:'APP_PINTEREST_API_REVIEW',q:'newer_than:180d from:pinterest.com (subject:API OR subject:요청 OR subject:review)',workflow:'PINTEREST_API',cls:'EXTERNAL_REVIEW_PENDING'},
-    {id:'APP_GOOGLE_OAUTH',q:'newer_than:180d from:googledevelopers-noreply@google.com subject:OAuth',workflow:'GOOGLE_OAUTH',cls:'USER_APPROVAL_REQUIRED'},
-    {id:'APP_GEMINI_BILLING',q:'newer_than:180d (from:googleaistudio-noreply@google.com OR from:CloudPlatform-noreply@google.com) (subject:billing OR subject:결제)',workflow:'GEMINI_API_BILLING',cls:'USER_APPROVAL_REQUIRED'},
-    {id:'APP_GITHUB_FAILURE',q:'newer_than:30d from:notifications@github.com subject:(failed OR failure)',workflow:'GITHUB_CI',cls:'AUTO_DIAGNOSE_ONLY'}
-  ];
-  let gmailError='';
-  try {
-    rules.forEach(function(rule){
-      GmailApp.search(rule.q,0,10).forEach(function(t){
-        const m=t.getMessages().slice(-1)[0];
-        inbox.push([rule.id+'_'+t.getId(), 'GMAIL', m.getDate(), m.getSubject(), rule.workflow,
-          rule.cls==='EXTERNAL_REVIEW_PENDING'?'UNDER_REVIEW':(rule.cls==='USER_APPROVAL_REQUIRED'?'ACTION_REVIEW':'EVIDENCE_ONLY'),
-          rule.cls==='AUTO_DIAGNOSE_ONLY'?'Y_READ_DIAGNOSE_ONLY':'N', rule.cls, rule.cls==='USER_APPROVAL_REQUIRED'?'Y':'N', '', 'gmail:'+m.getId(),
-          rule.cls==='AUTO_DIAGNOSE_ONLY'?'ROOT_CAUSE_MIN_FIX_RETEST':'WAIT_OR_REQUEST_USER_ONLY_IF_ACTION_NEEDED', new Date(), 'No credentials/secrets stored']);
-      });
-    });
-  } catch(e) { gmailError=String(e); }
-  if (!inbox.length) inbox.push(['APPROVAL_SCAN_STATE','GMAIL',new Date(),gmailError?'GMAIL_SCOPE_OR_AUTH_REQUIRED':'NO_MATCHES','CENTRAL_APPROVAL_SCAN',gmailError?'USER_APPROVAL_REQUIRED':'CLEAR','N',gmailError?'USER_APPROVAL_REQUIRED':'NONE',gmailError?'Y':'N','','',gmailError?'Authorize Gmail scope only if current approval cannot be reused':'Continue',new Date(),gmailError]);
-  writeHubTable_('08_APPROVAL_INBOX', inbox);
-  return {status:gmailError?'GMAIL_SCOPE_OR_AUTH_PENDING':'PASS_APPROVAL_SCAN', rows:inbox.length, userApprovalCount:inbox.filter(function(r){return r[8]==='Y';}).length, error:gmailError};
+  const inbox = sheetObjects_(CDMH_HUB_ID,'08_APPROVAL_INBOX');
+  const actionable = inbox.filter(function(r){ return String(r.USER_ACTION_REQUIRED||'').toUpperCase() === 'Y'; });
+  return {
+    status: inbox.length ? 'PASS_EXISTING_APPROVAL_INBOX_READBACK' : 'PASS_NO_APPROVAL_EVIDENCE',
+    rows: inbox.length,
+    userApprovalCount: actionable.length,
+    source: 'EXISTING_DRIVE_EVIDENCE_ONLY',
+    scopeExpansion: false,
+    error: ''
+  };
 }
 
 function writeHubTable_(sheetName, rows) {
