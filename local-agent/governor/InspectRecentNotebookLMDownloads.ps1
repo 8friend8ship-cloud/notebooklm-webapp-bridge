@@ -1,5 +1,6 @@
 param([int]$Hours=48,[int]$MaxItems=80)
 $ErrorActionPreference='Stop'
+$scriptVersion='D106_CONFIGURED_PATHS_V2'
 $cut=(Get-Date).AddHours(-1*[Math]::Max(1,[Math]::Min(168,$Hours)))
 $limit=[Math]::Max(1,[Math]::Min(300,$MaxItems))
 $exts=@('.mp3','.m4a','.wav','.ogg','.aac','.flac','.mp4','.webm','.mov','.pdf','.pptx','.xlsx','.csv','.png','.jpg','.jpeg','.webp','.docx','.txt','.json','.zip')
@@ -74,6 +75,7 @@ $items=@($items|Sort-Object {[DateTime]$_.lastWrite} -Descending|Group-Object fu
 [ordered]@{
   ok=$true
   action='INSPECT_RECENT_NOTEBOOKLM_DOWNLOADS_CONFIGURED_PATHS'
+  scriptVersion=$scriptVersion
   hours=$Hours
   cut=$cut.ToString('o')
   chromeUserData=$chromeUserData
