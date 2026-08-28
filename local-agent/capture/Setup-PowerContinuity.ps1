@@ -2,7 +2,8 @@ param(
   [switch]$Install,
   [switch]$StatusOnly,
   [string]$NightStart='02:00',
-  [string]$NightEnd='05:00'
+  [string]$NightEnd='05:00',
+  [int]$IdleDisplayMinutes=30
 )
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
@@ -35,6 +36,7 @@ if($StatusOnly){
 }
 
 if(-not $Install){throw 'INSTALL_OR_STATUS_REQUIRED'}
+if($IdleDisplayMinutes -lt 1 -or $IdleDisplayMinutes -gt 1440){throw 'IDLE_DISPLAY_MINUTES_OUT_OF_RANGE'}
 
 $watchdogBody=@'
 $ErrorActionPreference='SilentlyContinue'
@@ -79,6 +81,18 @@ $SC_MONITORPOWER=0xF170
 '@
 Set-Content -LiteralPath $Night -Value $nightBody -Encoding UTF8
 
+# Native Windows idle rule: after N minutes without keyboard/mouse use, turn only the display off.
+# Display timeout applies on AC and battery. Automatic system sleep/hibernate is disabled only on AC
+# so automation keeps running while plugged in; the existing battery sleep policy remains untouched.
+& powercfg.exe /change monitor-timeout-ac $IdleDisplayMinutes | Out-Null
+if($LASTEXITCODE -ne 0){throw ('DISPLAY_TIMEOUT_AC_FAILED:'+ $LASTEXITCODE)}
+& powercfg.exe /change monitor-timeout-dc $IdleDisplayMinutes | Out-Null
+if($LASTEXITCODE -ne 0){throw ('DISPLAY_TIMEOUT_DC_FAILED:'+ $LASTEXITCODE)}
+& powercfg.exe /change standby-timeout-ac 0 | Out-Null
+if($LASTEXITCODE -ne 0){throw ('STANDBY_TIMEOUT_AC_FAILED:'+ $LASTEXITCODE)}
+& powercfg.exe /change hibernate-timeout-ac 0 | Out-Null
+if($LASTEXITCODE -ne 0){throw ('HIBERNATE_TIMEOUT_AC_FAILED:'+ $LASTEXITCODE)}
+
 # Current-user logon watchdog. It is intentionally AC-safe: battery mode releases the sleep block.
 $watchCmd='powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "'+$Watchdog+'"'
 & schtasks.exe /Create /F /SC ONLOGON /TN $TaskWatch /TR $watchCmd | Out-Null
@@ -105,12 +119,15 @@ if(Test-NightWindow $NightStart $NightEnd){
   Start-Sleep -Milliseconds 400
 }
 
+$displayReadback=((& powercfg.exe /query SCHEME_CURRENT SUB_VIDEO VIDEOIDLE 2>&1)|Out-String).Trim()
+$sleepReadback=((& powercfg.exe /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 2>&1)|Out-String).Trim()
 $watch=TaskInfo $TaskWatch;$nightInfo=TaskInfo $TaskNight
 $stateObj=[ordered]@{
-  ok=$true;mode='AC_SYSTEM_AWAKE_DISPLAY_MAY_OFF';batteryPolicy='NO_OVERRIDE';nightStart=$NightStart;nightEnd=$NightEnd;
+  ok=$true;mode='AC_SYSTEM_AWAKE_DISPLAY_MAY_OFF';batteryPolicy='DISPLAY_30_MIN_SLEEP_POLICY_NO_OVERRIDE';nightStart=$NightStart;nightEnd=$NightEnd;
+  idleDisplayMinutes=$IdleDisplayMinutes;idleDisplayApplies='AC_AND_BATTERY';acAutomaticSleep='DISABLED';acAutomaticHibernate='DISABLED';
   keyboardMouseWake='DISPLAY_WAKE_NATIVE_WINDOWS_NO_SYSTEM_SLEEP';currentNightWindow=(Test-NightWindow $NightStart $NightEnd);currentWindowDisplayOffTriggered=$currentWindowTriggered;
-  watchdog=$watch;night=$nightInfo;
-  note='NightEnd is policy metadata; no forced screen-on at 05:00 to avoid waking the user. The display wakes immediately on normal keyboard/mouse activity. Installing during the night window triggers one immediate display-off run.';
+  powercfgDisplayReadback=$displayReadback;powercfgSleepReadback=$sleepReadback;watchdog=$watch;night=$nightInfo;
+  note='After the configured idle period Windows turns only the display off. While on AC, automatic sleep and hibernate are disabled so NotebookLM/download/Drive/triggers keep running. Battery system-sleep policy is not overridden. NightStart still forces a display-off run; NightEnd does not force the screen on. Normal keyboard/mouse activity wakes the display.';
   installedAt=(Get-Date).ToString('o')
 }
 WriteState $stateObj
