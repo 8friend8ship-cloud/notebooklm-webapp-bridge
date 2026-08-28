@@ -8,7 +8,8 @@ param(
   [int]$HostPort=8765,
   [switch]$WriteCentralReadback,
   [switch]$CreateLocalSaveSmoke,
-  [switch]$SetupCaptureBridgeAutoSync
+  [switch]$SetupCaptureBridgeAutoSync,
+  [switch]$KickAgent1141HostRepair
 )
 
 $ErrorActionPreference='Continue'
@@ -19,6 +20,46 @@ $ResultRoot=Join-Path $Root 'CommandResults'
 $TaskRoot=Join-Path $ResultRoot $TaskId
 $StatusPath=Join-Path $TaskRoot 'status.json'
 $ResultPath=Join-Path $TaskRoot 'result.json'
+
+function GitBlobSha1([string]$Path){$b=[IO.File]::ReadAllBytes($Path);$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
+function Find-CentralRoot {
+  $target=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+  foreach($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
+    $r=[string]$drive.Root;if(-not $r){continue}
+    foreach($candidate in @((Join-Path $r $target),(Join-Path $r ('My Drive\'+$target)),(Join-Path $r ('내 드라이브\'+$target)),(Join-Path $r ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $candidate){return $candidate}}
+  }
+  return ''
+}
+
+if($KickAgent1141HostRepair){
+  try{
+    New-Item -ItemType Directory -Force -Path $Root|Out-Null
+    $agent=Join-Path $Root 'HomeDesignLocalAgent-1.1.41-direct.ps1'
+    $helper=Join-Path $Root 'Kick-Agent1141-AfterHostTask.ps1'
+    $url='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases/1.1.41/HomeDesignLocalAgent.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $agent -TimeoutSec 20
+    $expected='b24b470dfc439a09446164091d392f886cb8f71e';$actual=(GitBlobSha1 $agent).ToLowerInvariant()
+    if($actual -ne $expected){Remove-Item $agent -Force -ErrorAction SilentlyContinue;throw ('AGENT1141_SHA_MISMATCH actual='+$actual+' expected='+$expected)}
+    $helperCode=@'
+param([string]$AgentPath,[string]$ReceiptPath)
+$ErrorActionPreference='Continue'
+Start-Sleep -Seconds 4
+$started=(Get-Date).ToString('o')
+$p=$null;$err=''
+try{$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$true;$psi.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$AgentPath+'"';$p=[Diagnostics.Process]::Start($psi)}catch{$err=$_.Exception.Message}
+try{if($ReceiptPath){$o=[ordered]@{ok=[bool]$p;action='AGENT1141_DELAYED_HANDOFF';pid=$(if($p){[int]$p.Id}else{$null});agentPath=$AgentPath;startedAt=$started;error=$err;at=(Get-Date).ToString('o')};$o|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ReceiptPath -Encoding UTF8}}catch{}
+'@
+    Set-Content -LiteralPath $helper -Value $helperCode -Encoding UTF8
+    $central=Find-CentralRoot;$receipt=$(if($central){Join-Path $central 'Runtime_Readback\AGENT_1.1.41_DELAYED_HANDOFF.json'}else{''})
+    if($central){New-Item -ItemType Directory -Force -Path (Split-Path -Parent $receipt)|Out-Null}
+    $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$true;$psi.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$helper+'" -AgentPath "'+$agent+'" -ReceiptPath "'+$receipt+'"';$p=[Diagnostics.Process]::Start($psi)
+    [ordered]@{ok=$true;action='AGENT1141_HOST128_DELAYED_HANDOFF_DISPATCHED';taskId=$TaskId;agentSha=$actual;handoffPid=[int]$p.Id;delaySeconds=4;expectedAgent='1.1.41';expectedHost='1.2.8';normalChromeRestarted=$false;generateClicked=$false;creditSpend=$false;oauthChanged=$false;scopeChanged=$false;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress
+    exit 0
+  }catch{
+    [ordered]@{ok=$false;action='AGENT1141_HOST128_DELAYED_HANDOFF_DISPATCHED';taskId=$TaskId;error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
+    exit 2
+  }
+}
 
 if($SetupCaptureBridgeAutoSync){
   try{
@@ -57,14 +98,6 @@ if($CreateLocalSaveSmoke){
 function Read-Json([string]$Path){
   if(-not(Test-Path -LiteralPath $Path)){return $null}
   try{return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{return $null}
-}
-function Find-CentralRoot {
-  $target=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
-  foreach($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
-    $r=[string]$drive.Root;if(-not $r){continue}
-    foreach($candidate in @((Join-Path $r $target),(Join-Path $r ('My Drive\'+$target)),(Join-Path $r ('내 드라이브\'+$target)),(Join-Path $r ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $candidate){return $candidate}}
-  }
-  return ''
 }
 function Get-WorkBudgetSeconds([string]$Kind,[int]$MediaSeconds){
   $m=[Math]::Max(0,$MediaSeconds)
