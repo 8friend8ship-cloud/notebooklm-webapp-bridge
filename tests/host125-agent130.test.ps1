@@ -4,13 +4,14 @@ $agent30Path=Join-Path $root 'local-agent/releases/1.1.30/HomeDesignLocalAgent.p
 $host125Path=Join-Path $root 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
 $agent31Path=Join-Path $root 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
 $agent32Path=Join-Path $root 'local-agent/releases/1.1.32/HomeDesignLocalAgent.ps1'
+$agent33Path=Join-Path $root 'local-agent/releases/1.1.33/HomeDesignLocalAgent.ps1'
 $host126Path=Join-Path $root 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
 $stablePath=Join-Path $root 'local-agent/stable/agent.json'
 
-foreach($path in @($agent30Path,$host125Path,$agent31Path,$agent32Path,$host126Path,$stablePath)){
+foreach($path in @($agent30Path,$host125Path,$agent31Path,$agent32Path,$agent33Path,$host126Path,$stablePath)){
   if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "MISSING:$path"}
 }
-foreach($path in @($agent30Path,$host125Path,$agent31Path,$agent32Path,$host126Path)){
+foreach($path in @($agent30Path,$host125Path,$agent31Path,$agent32Path,$agent33Path,$host126Path)){
   $tokens=$null;$errors=$null
   [void][System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
   if($errors.Count -gt 0){throw ("PARSE_FAIL:{0}:{1}" -f $path,($errors.Message -join '|'))}
@@ -20,6 +21,7 @@ $agent30=Get-Content -LiteralPath $agent30Path -Raw -Encoding UTF8
 $host125=Get-Content -LiteralPath $host125Path -Raw -Encoding UTF8
 $agent31=Get-Content -LiteralPath $agent31Path -Raw -Encoding UTF8
 $agent32=Get-Content -LiteralPath $agent32Path -Raw -Encoding UTF8
+$agent33=Get-Content -LiteralPath $agent33Path -Raw -Encoding UTF8
 $host126=Get-Content -LiteralPath $host126Path -Raw -Encoding UTF8
 $stable=Get-Content -LiteralPath $stablePath -Raw -Encoding UTF8|ConvertFrom-Json
 
@@ -49,13 +51,21 @@ $host126Sha=(& git hash-object -- $host126Path).Trim()
 if($LASTEXITCODE -ne 0){throw 'HOST126_HASH_FAILED'}
 if($host126Sha -ne '5d17bb233706897cd1706930cea9af3796f29488'){throw "HOST126_SHA_MISMATCH:$host126Sha"}
 
-# Current stable Agent 1.1.32 must preserve Host 1.2.6 and add only a version-keyed dedicated control-center wake.
+# Agent 1.1.32 preserves Host 1.2.6 and has the first version-keyed dedicated control-center wake attempt.
 foreach($needle in @('1.1.32','1.2.6','5d17bb233706897cd1706930cea9af3796f29488','AGENT_1.1.32_CONTROL_CENTER_WAKE.attempted','normalChromeUntouched=$true','newOAuth=$false','newScope=$false')){
   if(-not $agent32.Contains($needle)){throw "AGENT132_MISSING:$needle"}
 }
 if($agent32 -match 'Stop-Process.+chrome' -or $agent32 -match 'taskkill.+chrome'){throw 'AGENT132_CHROME_KILL_FORBIDDEN'}
-if([string]$stable.version -ne '1.1.32'){throw "BAD_STABLE_VERSION:$($stable.version)"}
-$agent32Sha=(& git hash-object -- $agent32Path).Trim()
-if($LASTEXITCODE -ne 0){throw 'AGENT132_HASH_FAILED'}
-if($agent32Sha -ne [string]$stable.gitBlobSha1){throw ("AGENT_STABLE_SHA_MISMATCH:{0}:{1}" -f $agent32Sha,[string]$stable.gitBlobSha1)}
-Write-Host 'HOST125_AGENT130_HISTORY_AGENT131_HOST126_AND_AGENT132_STABLE_PASS'
+
+# Agent 1.1.33 is a changed-condition diagnostic. It must detect 1.1.32 local evidence before deciding whether to wake once.
+foreach($needle in @('1.1.33','1.2.6','5d17bb233706897cd1706930cea9af3796f29488','AGENT_1.1.32_CONTROL_CENTER_WAKE.attempted','prior132MarkerPresent','prior132LocalEvidencePresent','PRIOR_1.1.32_WAKE_MARKER_PRESENT_NO_REPEAT','AGENT_1.1.33_EXTENSION_WAKE_DIAGNOSTIC.attempted','AGENT_1.1.33_EXTENSION_WAKE_DIAGNOSTIC.json','normalChromeUntouched=$true','tokenContentsRead=$false','newOAuth=$false','newScope=$false')){
+  if(-not $agent33.Contains($needle)){throw "AGENT133_MISSING:$needle"}
+}
+if($agent33 -match 'Stop-Process.+chrome' -or $agent33 -match 'taskkill.+chrome'){throw 'AGENT133_CHROME_KILL_FORBIDDEN'}
+
+if(@('1.1.32','1.1.33') -notcontains [string]$stable.version){throw "BAD_STABLE_VERSION:$($stable.version)"}
+$stableAgentPath=$(if([string]$stable.version -eq '1.1.33'){$agent33Path}else{$agent32Path})
+$stableSha=(& git hash-object -- $stableAgentPath).Trim()
+if($LASTEXITCODE -ne 0){throw 'STABLE_AGENT_HASH_FAILED'}
+if($stableSha -ne [string]$stable.gitBlobSha1){throw ("AGENT_STABLE_SHA_MISMATCH:{0}:{1}" -f $stableSha,[string]$stable.gitBlobSha1)}
+Write-Host ('HOST125_AGENT130_HISTORY_AGENT131_HOST126_AGENT132_AND_AGENT133_CANDIDATE_PASS stable='+[string]$stable.version)
