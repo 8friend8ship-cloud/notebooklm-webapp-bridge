@@ -10,6 +10,7 @@ on:
       - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
       - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
       - 'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1'
+      - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
       - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/stable/agent.json'
@@ -23,6 +24,7 @@ on:
       - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
       - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
       - 'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1'
+      - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
       - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/stable/agent.json'
@@ -59,6 +61,7 @@ jobs:
           $files = @(
             'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1',
             'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1',
+            'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1',
             'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
           )
@@ -74,6 +77,21 @@ jobs:
             }
           }
           if ($failed) { exit 1 }
+
+      - name: AutoResume dual-persistence contract
+        shell: pwsh
+        run: |
+          $text = Get-Content -LiteralPath 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1' -Raw
+          foreach ($required in @(
+            "HomeDesignAutomation-AutoResume",
+            "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            "HomeDesignAutomationAutoResume",
+            "HomeDesignLocalWatchdog.ps1",
+            "HKCU_RUN_FALLBACK_VERIFY_FAILED"
+          )) {
+            if ($text -notmatch [regex]::Escape($required)) { throw "AUTORESUME_CONTRACT_MISSING:$required" }
+          }
+          Write-Host 'AUTORESUME_DUAL_PERSISTENCE_CONTRACT_PASS'
 
   windows-smoke:
     runs-on: windows-latest
