@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.45",
-  "releasedAt": "2026-08-28T20:31:00+09:00",
-  "gitBlobSha1": "6773033cb0505347ae47906de62daca5f1b73b42",
+  "version": "1.1.46",
+  "releasedAt": "2026-08-28T22:27:46+09:00",
+  "gitBlobSha1": "b72e57af70f77578fddb3de49f6581a37e2de792",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Queue integrity recovery V2. Agent1.1.45 dispatches Sync-NotebookLMQueueIntegrityAppsScriptV2 SHA 9a06c6ef475a6427a04258c1ff84ebdc2ce498a3. V2 removes invalid clasp-list project discovery, scans only existing local .clasp.json bindings, and always writes a structured success/failure receipt with exact stage/error. It still backs up before push and never creates a new Apps Script project or changes OAuth/scope. Browser/Generate/credit actions remain blocked until live PUSH_PULL_READBACK_PASS for Code.gs 0.2.10-queue-lock."
+  "notes": "Preserves Agent 1.1.45 Queue Integrity V2 and adds Persona Apps Script binding governor. Persona governor is pinned to blob 186e987af8cb61e7a11242a6a2c69251ec0e1c73 and canonical Persona source commit 0ad86472116e73728d99c0c49d940e0a884d4739. It scans only existing local .clasp.json bindings, targets WEBAPP_TEMPLATE_05 by existing deployment AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo, backs up before push, injects Persona maintenance into the existing processTaskQueue wake, performs pull readback X2, preserves the deployment, and rolls back on post-push failure. No new Apps Script project, OAuth/scope, deployment, trigger, paid Gemini API, browser Generate, or credit action is created."
 }
