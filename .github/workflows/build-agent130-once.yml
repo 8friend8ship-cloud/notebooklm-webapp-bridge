@@ -1,0 +1,114 @@
+name: build-agent130-once
+
+on:
+  push:
+    branches:
+      - 'fix/notebooklm-host125-agent130-20260828'
+    paths:
+      - '.github/workflows/build-agent130-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build Agent 1.1.30 from current 1.1.29
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, subprocess
+
+          src = Path('local-agent/releases/1.1.29/HomeDesignLocalAgent.ps1')
+          dst = Path('local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1')
+          s = src.read_text(encoding='utf-8')
+
+          replacements = [
+              ("$AgentVersion='1.1.29'", "$AgentVersion='1.1.30'"),
+              ("$HostVersion='1.2.4'", "$HostVersion='1.2.5'"),
+              ("AGENT_1.1.29_RECOVERY.json", "AGENT_1.1.30_RECOVERY.json"),
+              ("local-agent/releases/1.2.4/HomeDesignLocalCommandHost.ps1", "local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1"),
+              ("$HostExpected='01cee0022b14748f638ee245d8632c1ff3ecde6e'", "$HostExpected='e6a79fbb113a79e19650b2864072f6abde5bcffb'"),
+              ("function StartHost124", "function StartHost125"),
+              ("HOST_1.2.4_START_FAILED", "HOST_1.2.5_START_FAILED"),
+              ("function EnsureHost124", "function EnsureHost125"),
+              ("$after=StartHost124", "$after=StartHost125"),
+              ("HOST_SELF_HEAL_PLUS_AUTORESUME_1.1.29", "HOST125_FIRST_AUTORESUME_1.1.30"),
+              ("AGENT_1.1.29_HOST_SELF_HEAL_PLUS_AUTORESUME", "AGENT_1.1.30_HOST125_FIRST_AUTORESUME"),
+              ("WriteCentral 'AGENT_1.1.29_RECOVERY.json'", "WriteCentral 'AGENT_1.1.30_RECOVERY.json'"),
+          ]
+          for old, new in replacements:
+              if old not in s:
+                  raise SystemExit(f'AGENT130_ANCHOR_MISSING:{old}')
+              s = s.replace(old, new)
+
+          old_flow = "try{$result.hostBefore=HostHealth;$result.autoResume=EnsureAutoResume;if(-not [bool]$result.autoResume.ok){throw 'AUTO_RESUME_PERSISTENCE_NOT_HEALTHY'};$result.hostRecovery=EnsureHost124;if(-not [bool]$result.hostRecovery.ok){throw 'HOST_SELF_HEAL_FAILED'};"
+          new_flow = "try{$result.hostBefore=HostHealth;$result.hostRecovery=EnsureHost125;if(-not [bool]$result.hostRecovery.ok){throw 'HOST_SELF_HEAL_FAILED'};$result.autoResume=EnsureAutoResume;if(-not [bool]$result.autoResume.ok){throw 'AUTO_RESUME_PERSISTENCE_NOT_HEALTHY'};"
+          if old_flow not in s:
+              raise SystemExit('AGENT130_FLOW_ANCHOR_MISSING')
+          s = s.replace(old_flow, new_flow, 1)
+
+          dst.parent.mkdir(parents=True, exist_ok=True)
+          dst.write_text(s, encoding='utf-8')
+
+          # Static order and safety checks before staging stable metadata.
+          assert "$HostVersion='1.2.5'" in s
+          assert 'MirrorNotebookLMArtifactToDrive.ps1' not in s  # capability belongs in Host allowlist, not Agent body
+          assert s.index('$result.hostRecovery=EnsureHost125') < s.index('$result.autoResume=EnsureAutoResume')
+          assert 'HOST_1.2.4_START_FAILED' not in s
+          assert 'EnsureHost124' not in s
+          assert 'AGENT_1.1.29_RECOVERY.json' not in s
+
+          stable_path = Path('local-agent/stable/agent.json')
+          stable = json.loads(stable_path.read_text(encoding='utf-8'))
+          blob = subprocess.check_output(['git','hash-object',str(dst)], text=True).strip()
+          stable.update({
+              'version':'1.1.30',
+              'releasedAt':'2026-08-28T12:10:00+09:00',
+              'gitBlobSha1':blob,
+              'file':'HomeDesignLocalAgent.ps1',
+              'pollSeconds':300,
+              'notes':'Host 1.2.5 first, then AutoResume/Watchdog and current stable Bridge. Repairs or restarts only HomeDesignLocalCommandHost when Host 1.2.5 health/asyncJobs is missing, then verifies AutoResume dual persistence and applies the current stable Bridge dynamically. Host 1.2.5 adds exact NotebookLM artifact mirror and watcher scripts to the existing main allowlist. Preserves persistent ChromeUserData and normal Chrome. No new CMD, OAuth, clasp, download-path change, file move, NotebookLM generation, or repeated approval request.'
+          })
+          stable_path.write_text(json.dumps(stable, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+
+      - name: Validate Agent 1.1.30 and Host 1.2.5
+        shell: pwsh
+        run: |
+          $targets=@(
+            'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
+          )
+          foreach($file in $targets){
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+            if($errors.Count -gt 0){throw "POWERSHELL_PARSE_ERROR:$file $($errors.Message -join '|')"}
+          }
+          $agent=Get-Content 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          $host=Get-Content 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1' -Raw -Encoding UTF8
+          if(-not $host.Contains('MirrorNotebookLMArtifactToDrive.ps1')){throw 'HOST125_MIRROR_NOT_ALLOWLISTED'}
+          if(-not $host.Contains('WatchNotebookLMDownloadsToCaptureBridge.ps1')){throw 'HOST125_WATCHER_NOT_ALLOWLISTED'}
+          if($agent.IndexOf('$result.hostRecovery=EnsureHost125') -ge $agent.IndexOf('$result.autoResume=EnsureAutoResume')){throw 'AGENT130_NOT_HOST_FIRST'}
+          $stable=Get-Content 'local-agent/stable/agent.json' -Raw -Encoding UTF8|ConvertFrom-Json
+          $sha=(& git hash-object -- 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1').Trim()
+          if($stable.version -ne '1.1.30' -or $stable.gitBlobSha1 -ne $sha){throw 'AGENT130_STABLE_SHA_MISMATCH'}
+          Write-Host 'AGENT130_HOST125_STATIC_PASS'
+
+      - name: Existing download handoff regression
+        shell: pwsh
+        run: npm test
+
+      - name: Commit generated recovery and remove one-shot workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/build-agent130-once.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Add Agent 1.1.30 Host 1.2.5 first recovery'
+          git push
