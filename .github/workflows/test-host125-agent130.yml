@@ -13,6 +13,7 @@ on:
       - 'local-agent/stable/agent.json'
       - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
       - 'tests/host125-agent130.test.ps1'
+      - 'tests/download-handoff.test.mjs'
       - '.github/workflows/test-host125-agent130.yml'
   pull_request:
     paths:
@@ -23,6 +24,7 @@ on:
       - 'local-agent/stable/agent.json'
       - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
       - 'tests/host125-agent130.test.ps1'
+      - 'tests/download-handoff.test.mjs'
       - '.github/workflows/test-host125-agent130.yml'
   workflow_dispatch:
 
