@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.71",
-  "description": "D92 exact-download handoff: verified Chrome download filenames flow into the local PowerShell mirror as exact SourcePath. Legacy scan remains fallback-only; FileSystemWatcher fallback copies stable completed files without moving originals.",
+  "version": "0.2.72",
+  "description": "Async host-handoff lease recovery: unstarted LOCAL_POWERSHELL_ASYNC claims expire after a short handoff window and initial Host start failures release the claim immediately. D92 exact-download handoff remains unchanged.",
   "permissions": [
     "alarms",
     "downloads",
