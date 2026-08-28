@@ -9,6 +9,7 @@ on:
       - 'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1'
       - 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+      - 'tests/capturebridge-all-managed.test.mjs'
       - '.github/workflows/test-managed-capturebridge.yml'
   pull_request:
     paths:
@@ -16,6 +17,7 @@ on:
       - 'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1'
       - 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+      - 'tests/capturebridge-all-managed.test.mjs'
       - '.github/workflows/test-managed-capturebridge.yml'
   workflow_dispatch:
 
@@ -49,7 +51,14 @@ jobs:
 
           $managerText = Get-Content -LiteralPath 'local-agent/capture/ManageChromeExtensionArtifacts.ps1' -Raw
           foreach ($required in @(
-            "ValidateSet('NotebookLM','Flow','AIStudio','GoogleAI')",
+            "ValidatePattern('^[A-Za-z0-9_.-]{1,64}$')",
+            "'NotebookLM'",
+            "'Flow'",
+            "'AIStudio'",
+            "'GoogleAI'",
+            "'FrontQA'",
+            "'SketchUp'",
+            'knownProfile = $false',
             'EXPLICIT_SOURCE_PATH_OR_EXPLICIT_SERVICE_INBOX_ONLY',
             'genericDownloadsScan = $false',
             'Copy-Item',
@@ -64,9 +73,11 @@ jobs:
           $setupText = Get-Content -LiteralPath 'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1' -Raw
           foreach ($required in @(
             'HomeDesign-CaptureBridge-ManagedChrome-Reconcile',
-            "@('NotebookLM','Flow','AIStudio','GoogleAI')",
+            "@('NotebookLM','Flow','AIStudio','GoogleAI','FrontQA','SketchUp')",
+            'FutureManagedExtension',
+            'dynamicInboxDiscovery = $true',
             'genericDownloadsSync = $false',
-            '1b03384cbf7cb4608cd57e015208671f89744fa7'
+            '76a9718b30d1432829ea7c0f2e6af95ea6942ab8'
           )) {
             if ($setupText -notmatch [regex]::Escape($required)) { throw "CAPTURE_SETUP_CONTRACT_MISSING:$required" }
           }
@@ -85,6 +96,9 @@ jobs:
             if ($agentText -notmatch [regex]::Escape($required)) { throw "AGENT131_CONTRACT_MISSING:$required" }
           }
           Write-Host 'MANAGED_CAPTUREBRIDGE_STATIC_CONTRACT_PASS'
+
+      - name: Node contract tests
+        run: node --test tests/capturebridge-all-managed.test.mjs
 
   windows-smoke:
     runs-on: windows-latest
@@ -124,7 +138,10 @@ jobs:
             @{service='NotebookLM';name='note.txt';bytes=[Text.Encoding]::UTF8.GetBytes('notebooklm')},
             @{service='Flow';name='flow.png';bytes=[Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZK1sAAAAASUVORK5CYII=')},
             @{service='AIStudio';name='studio.json';bytes=[Text.Encoding]::UTF8.GetBytes('{"ok":true}')},
-            @{service='GoogleAI';name='google.txt';bytes=[Text.Encoding]::UTF8.GetBytes('google-ai')}
+            @{service='GoogleAI';name='google.txt';bytes=[Text.Encoding]::UTF8.GetBytes('google-ai')},
+            @{service='FrontQA';name='frontqa.txt';bytes=[Text.Encoding]::UTF8.GetBytes('front-qa')},
+            @{service='SketchUp';name='model.skp';bytes=[Text.Encoding]::UTF8.GetBytes('sketchup-model')},
+            @{service='FutureManagedExtension';name='future.txt';bytes=[Text.Encoding]::UTF8.GetBytes('future-managed')}
           )
           foreach ($f in $fixtures) {
             $src = Join-Path $sources $f.name
@@ -171,7 +188,7 @@ jobs:
           $exe = Join-Path $sources 'bad.exe'
           [IO.File]::WriteAllBytes($exe,[byte[]](1..8))
           Assert-Rejected 'AIStudio' $exe 'CI_EXE'
-          Write-Host 'MANAGED_CHROME_CAPTURE_SMOKE_PASS services=4 negative=3'
+          Write-Host 'MANAGED_CHROME_CAPTURE_SMOKE_PASS services=7 negative=3'
 
       - name: Managed setup smoke with Windows PowerShell 5.1
         shell: powershell
@@ -180,8 +197,10 @@ jobs:
           $local = Join-Path $env:RUNNER_TEMP 'setup-capture\INBOX'
           New-Item -ItemType Directory -Force -Path $central,$local | Out-Null
           $setup = (Resolve-Path './local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1').Path
+          $managerRef = if ($env:GITHUB_HEAD_REF) { $env:GITHUB_HEAD_REF } else { 'main' }
           $raw = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $setup `
             -SmokeOnly `
+            -ManagerRef $managerRef `
             -LocalInboxRoot $local `
             -CentralRootOverride $central
           if ($LASTEXITCODE -ne 0) { throw "SETUP_EXEC_FAILED:$LASTEXITCODE" }
@@ -190,9 +209,10 @@ jobs:
           if ([bool]$result.scheduled) { throw 'SMOKE_ONLY_CREATED_SCHEDULE' }
           if ([bool]$result.genericDownloadsSync) { throw 'SETUP_GENERIC_DOWNLOADS_SYNC_TRUE' }
           if (-not [bool]$result.copyOnly) { throw 'SETUP_COPY_ONLY_FALSE' }
-          if (@($result.smoke).Count -ne 4) { throw "SETUP_SMOKE_SERVICE_COUNT:$(@($result.smoke).Count)" }
+          if (-not [bool]$result.dynamicInboxDiscovery) { throw 'DYNAMIC_INBOX_DISCOVERY_FALSE' }
+          if (@($result.smoke).Count -ne 7) { throw "SETUP_SMOKE_SERVICE_COUNT:$(@($result.smoke).Count)" }
           foreach ($item in @($result.smoke)) {
             if (-not [bool]$item.ok) { throw "SETUP_SMOKE_NOT_OK:$($item.service)" }
             if (-not (Test-Path -LiteralPath ([string]$item.drivePath) -PathType Leaf)) { throw "SETUP_SMOKE_MISSING:$($item.service)" }
           }
-          Write-Host 'MANAGED_CAPTUREBRIDGE_SETUP_SMOKE_PASS services=4'
+          Write-Host 'MANAGED_CAPTUREBRIDGE_SETUP_SMOKE_PASS services=7'
