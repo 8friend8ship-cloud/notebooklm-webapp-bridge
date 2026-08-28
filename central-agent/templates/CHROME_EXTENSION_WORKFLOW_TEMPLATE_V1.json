@@ -1,0 +1,65 @@
+{
+  "templateId": "CHROME_EXTENSION_WORKFLOW_TEMPLATE_V1",
+  "version": "1.0.0",
+  "purpose": "Canonical cross-check workflow for every managed Chrome extension task",
+  "precheck": [
+    "read central instructions/history/library/work-order/error-learning/LAST_GOOD",
+    "identify extension id/service/profile/canonical source/current version",
+    "verify existing approvals and do not re-request CMD/PowerShell/OAuth/clasp without new evidence",
+    "verify dedicated-vs-normal Chrome boundary and site/CDP permissions",
+    "verify traffic lock, cost/public/destructive/security gates"
+  ],
+  "runtimeFlow": [
+    "inventory_and_manifest_integrity",
+    "source_contract_check",
+    "browser_tab_or_service_surface_precheck",
+    "same_fixture_runtime_action",
+    "download_or_result_complete_event",
+    "exact_source_path_nonzero",
+    "service_capturebridge_copy_only",
+    "drive_cloud_readback_fileid_size_mime_parent",
+    "asset_auto_classification",
+    "queens_raw_registration",
+    "analysis_and_seed_candidate",
+    "x2_or_required_QA_before_seed_active",
+    "template_candidate_then_front_or_platform_router",
+    "history_error_learning_resume_writeback"
+  ],
+  "downloadClassification": {
+    "audio": [".mp3", ".m4a", ".wav", ".ogg", ".aac", ".flac"],
+    "video": [".mp4", ".webm", ".mov"],
+    "image": [".png", ".jpg", ".jpeg", ".webp"],
+    "document": [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".txt"],
+    "data": [".xlsx", ".xls", ".csv", ".json"],
+    "other": ["*"]
+  },
+  "storageContract": {
+    "localInbox": "C:/HomeDesignAutomationV7/CaptureBridge/INBOX/<ServiceKey>",
+    "centralInbox": "00_중앙에이전트/CaptureBridge/INBOX/<ServiceKey>",
+    "copyOnly": true,
+    "genericDownloadsSync": false,
+    "dedupe": "service+filename+size+sha256 when available",
+    "requiredEvidence": ["sourcePath", "bytes", "sha256_if_available", "driveFileId", "drivePath", "mimeType", "timestamp", "taskId"]
+  },
+  "errorPolicy": {
+    "blindRetry": false,
+    "sameFailureWithoutChangedEvidence": "HOLD_DIAGNOSTIC",
+    "minimumFixOnly": true,
+    "preserveFailureEvidence": true,
+    "requiredFields": ["FAILED_STAGE", "EXPECTED", "ACTUAL", "ROOT_CAUSE", "WRONG_ASSUMPTION", "FAILED_APPROACH", "MINIMUM_FIX", "SAME_FIXTURE_RETEST", "DO_NOT_REPEAT", "RESUME_POINT"]
+  },
+  "approvalPolicy": {
+    "autoReuse": ["existing CMD/PowerShell", "existing OAuth/clasp", "existing site/CDP permission", "existing Local Agent/Host/Bridge/Queue/ScheduledTask"],
+    "userGate": ["new login/2FA", "new OAuth scope", "secret/API key entry", "new paid cost", "public publish", "payment", "destructive delete/overwrite", "new browser security permission"]
+  },
+  "cadence": {
+    "captureReconcile": "5m where installed",
+    "chromeHealth": "15m target",
+    "assetIngest": "30m target",
+    "seedPromotion": "1h target",
+    "templatePromotion": "2h target",
+    "fullAudit": "06:00,14:00,22:00 KST target",
+    "centralFallbackWatch": "1h active"
+  },
+  "completionGate": "actual runtime + result/download + exact path + nonzero bytes + Drive cloud object + required QA/readback + history/lesson writeback"
+}
