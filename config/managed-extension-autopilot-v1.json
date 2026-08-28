@@ -1,6 +1,9 @@
 {
-  "schema": "MANAGED_EXTENSION_AUTOPILOT_REGISTRY_V1",
-  "updatedAt": "2026-08-28T17:45:00+09:00",
+  "schema": "MANAGED_EXTENSION_AUTOPILOT_REGISTRY_V2",
+  "updatedAt": "2026-08-28T18:42:00+09:00",
+  "canonicalRunner": "local-agent/governor/ManagedExtensionAutopilotV2.ps1",
+  "legacyStageRunner": "local-agent/governor/ManagedExtensionAutopilot.ps1",
+  "exactTargetRunner": "local-agent/governor/ManagedExtensionExactTargetLauncher.ps1",
   "principles": {
     "historyFirst": true,
     "noManualZipExtract": true,
@@ -9,11 +12,18 @@
     "noNormalChromeRestart": true,
     "preserveLastGood": true,
     "publicPublishFailClosed": true,
+    "pageOpenIsNotConnected": true,
+    "loadExtensionArgIsNotConnected": true,
+    "exactTargetBeforeAction": true,
+    "inputReadbackBeforeAction": true,
     "userFinalGate": "CHATGPT_COMPUTER_USE_SITE_PERMISSION_REVIEW_ONLY"
   },
   "sitePermissionTargets": [
     "https://notebooklm.google.com",
+    "https://notebook.google.com",
     "https://flow.google",
+    "https://labs.google",
+    "https://aistudio.google.com",
     "https://www.blogger.com",
     "https://studio.youtube.com",
     "https://www.instagram.com",
@@ -29,22 +39,29 @@
       "extensionId": "llgjlejpknemhdmckoaifgjnjikceamp",
       "installMode": "LOCAL_AGENT_STABLE_EXISTING",
       "service": "NOTEBOOKLM",
+      "targetUrl": "https://notebook.google.com/",
+      "targetUrlPattern": "notebook(lm)?\\.google\\.com",
+      "executionMode": "LaunchExact+ProbeExact",
       "approval": "EXISTING_APPROVAL_REUSE",
-      "status": "MANAGED_EXISTING"
+      "status": "EXACT_TARGET_V2_RUNTIME_RETEST"
     },
     {
       "name": "Google AI Local Bridge - Flow",
       "extensionId": "lgedgmpcikglaajhfclcihicgafimlna",
       "installMode": "DRIVE_SOURCE_EXISTING",
       "service": "FLOW",
+      "targetUrl": "https://labs.google/fx/tools/flow",
+      "targetUrlPattern": "labs\\.google/.*/flow|labs\\.google/fx/tools/flow",
+      "executionMode": "LaunchExact+ProbeExact",
       "approval": "EXISTING_APPROVAL_REUSE+CREDIT_GATE",
-      "status": "MANAGED_EXISTING"
+      "status": "EXACT_TARGET_V2_NO_CREDIT_RETEST"
     },
     {
       "name": "Central Tab → Drive + Sheets Bridge",
       "extensionId": "READBACK_REQUIRED",
       "installMode": "LOCAL_EXISTING_SOURCE_BIND_REQUIRED",
       "service": "CENTRAL_CAPTURE",
+      "executionMode": "ProbeExact",
       "approval": "EXISTING_APPROVAL_REUSE",
       "status": "RUNTIME_SOURCE_BIND_PENDING"
     },
@@ -53,6 +70,7 @@
       "extensionId": "dpdklanogbhgimagkhlanambmojliieh",
       "installMode": "DRIVE_SOURCE_EXISTING",
       "service": "FRONT_QA",
+      "executionMode": "LaunchExact+ProbeExact",
       "approval": "AUTO_SAFE",
       "status": "MANAGED_EXISTING"
     },
@@ -63,6 +81,7 @@
       "service": "PLATFORM_PUBLISH_QA",
       "sourceUrl": "https://codeload.github.com/8friend8ship-cloud/notebooklm-webapp-bridge/zip/refs/heads/main",
       "manifestSubPath": "notebooklm-webapp-bridge-main/extensions/central-platform-publisher-bridge",
+      "executionMode": "ProbeExact;PUBLIC_PUBLISH_USER_GATE",
       "approval": "AUTO_DRAFT_QA; PUBLIC_PUBLISH_USER_GATE",
       "status": "SOURCE_READY_RUNTIME_STAGE_PENDING",
       "platforms": ["BLOGGER","YOUTUBE","INSTAGRAM","TIKTOK","NAVER_BLOG","NAVER_CAFE","NAVER_CLIP","PINTEREST"]
@@ -72,8 +91,11 @@
       "extensionId": "okppbdphadmdfbfpllpjjnmmemokbccp",
       "installMode": "OBSERVE_EXISTING",
       "service": "AI_STUDIO",
+      "targetUrl": "https://aistudio.google.com/",
+      "targetUrlPattern": "aistudio\\.google\\.com",
+      "executionMode": "LaunchExact+ProbeExact",
       "approval": "EXISTING_APPROVAL_REUSE",
-      "status": "MANAGED_EXISTING"
+      "status": "EXACT_TARGET_V2_RUNTIME_RETEST"
     },
     {
       "name": "SketchUp Plan Template Bridge",
@@ -85,7 +107,21 @@
     }
   ],
   "successTemplate": {
-    "required": ["SOURCE_HASH_PASS","MANIFEST_V3_PASS","REQUIRED_FILES_PASS","DEDICATED_CHROME_LOAD_PASS","EXTENSION_ID_READBACK_PASS","SITE_PERMISSION_READBACK_PASS","SAME_FIXTURE_X2_PASS","DRIVE_WRITEBACK_PASS","LAST_GOOD_RECORDED"],
+    "required": [
+      "SOURCE_HASH_PASS",
+      "MANIFEST_V3_PASS",
+      "REQUIRED_FILES_PASS",
+      "DEDICATED_CHROME_LOAD_PASS",
+      "EXACT_TARGET_CONTEXT_OPENED",
+      "EXACT_TARGET_CONTEXT_VERIFIED",
+      "ARCHITECTURE_CLASSIFIED",
+      "INPUT_CONTROL_FOUND_WHEN_REQUIRED",
+      "INPUT_FILL_READBACK_RESTORE_PASS_WHEN_REQUIRED",
+      "NORMAL_CHROME_UNTOUCHED",
+      "SAME_FIXTURE_X2_PASS",
+      "DRIVE_WRITEBACK_PASS",
+      "LAST_GOOD_RECORDED"
+    ],
     "failure": ["STAGE","SIGNATURE","ROOT_CAUSE","MINIMUM_FIX","RETEST","ROLLBACK_POINTER","NEXT_RESUME_POINT"]
   }
 }
