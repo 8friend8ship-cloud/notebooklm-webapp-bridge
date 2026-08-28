@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.42",
-  "releasedAt": "2026-08-28T19:06:00+09:00",
-  "gitBlobSha1": "5cf81f66bdbee7bf394fb200aa98e4f862755907",
+  "version": "1.1.43",
+  "releasedAt": "2026-08-28T19:24:00+09:00",
+  "gitBlobSha1": "e18ee86dafdb31cd13d8cc5950fe93e07a0c8f21",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Fixes the Host1.2.8 patch-generator anchor defect that could produce scripts=scripts=@(...) and abort before host replacement. Agent1.1.42 installs hash-pinned Host1.2.9 SHA 2b58e72d35fb8b8e56b179fc89dbc7ba7ac3a577, verifies localhost health version 1.2.9 with asyncJobs=true, then dispatches the existing NotebookLM exact-target x2 regression exactly once. No Generate/credits/OAuth/scope/settings/public/destructive action."
+  "notes": "Replaces the invalid V1 exact-target probe before runtime. Agent1.1.43 installs fixed Host1.2.9 SHA 2b58e72d35fb8b8e56b179fc89dbc7ba7ac3a577, patches AgentBootstrap to 900s SHA 93bbbcfbb1e3afc718c6c39d009036dc1c964b78, and dispatches only Run-ExactTargetNotebookLMRegressionV2 SHA 1b7f543850c42b6d4f36641c73b5c9021ccd3384. V2 requires exact notebook-id target, actual NotebookLM content-script isolated-world marker __NLM_WEBAPP_BRIDGE_LOADED__, input sentinel fill/readback/restore, and normal Chrome preservation x2. No Generate/credits/OAuth/scope/settings/public/destructive action."
 }
