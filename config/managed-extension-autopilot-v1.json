@@ -1,0 +1,91 @@
+{
+  "schema": "MANAGED_EXTENSION_AUTOPILOT_REGISTRY_V1",
+  "updatedAt": "2026-08-28T17:45:00+09:00",
+  "principles": {
+    "historyFirst": true,
+    "noManualZipExtract": true,
+    "noManualLoadUnpackedForManagedDedicatedChrome": true,
+    "noDuplicateInstall": true,
+    "noNormalChromeRestart": true,
+    "preserveLastGood": true,
+    "publicPublishFailClosed": true,
+    "userFinalGate": "CHATGPT_COMPUTER_USE_SITE_PERMISSION_REVIEW_ONLY"
+  },
+  "sitePermissionTargets": [
+    "https://notebooklm.google.com",
+    "https://flow.google",
+    "https://www.blogger.com",
+    "https://studio.youtube.com",
+    "https://www.instagram.com",
+    "https://www.tiktok.com",
+    "https://blog.naver.com",
+    "https://cafe.naver.com",
+    "https://clip.naver.com",
+    "https://www.pinterest.com"
+  ],
+  "extensions": [
+    {
+      "name": "NotebookLM WebApp Bridge CANONICAL",
+      "extensionId": "llgjlejpknemhdmckoaifgjnjikceamp",
+      "installMode": "LOCAL_AGENT_STABLE_EXISTING",
+      "service": "NOTEBOOKLM",
+      "approval": "EXISTING_APPROVAL_REUSE",
+      "status": "MANAGED_EXISTING"
+    },
+    {
+      "name": "Google AI Local Bridge - Flow",
+      "extensionId": "lgedgmpcikglaajhfclcihicgafimlna",
+      "installMode": "DRIVE_SOURCE_EXISTING",
+      "service": "FLOW",
+      "approval": "EXISTING_APPROVAL_REUSE+CREDIT_GATE",
+      "status": "MANAGED_EXISTING"
+    },
+    {
+      "name": "Central Tab → Drive + Sheets Bridge",
+      "extensionId": "READBACK_REQUIRED",
+      "installMode": "LOCAL_EXISTING_SOURCE_BIND_REQUIRED",
+      "service": "CENTRAL_CAPTURE",
+      "approval": "EXISTING_APPROVAL_REUSE",
+      "status": "RUNTIME_SOURCE_BIND_PENDING"
+    },
+    {
+      "name": "Front App Test Bridge",
+      "extensionId": "dpdklanogbhgimagkhlanambmojliieh",
+      "installMode": "DRIVE_SOURCE_EXISTING",
+      "service": "FRONT_QA",
+      "approval": "AUTO_SAFE",
+      "status": "MANAGED_EXISTING"
+    },
+    {
+      "name": "Central Platform Publisher Bridge",
+      "extensionId": "READBACK_AFTER_FIRST_LOAD",
+      "installMode": "AUTO_GITHUB_ZIP",
+      "service": "PLATFORM_PUBLISH_QA",
+      "sourceUrl": "https://codeload.github.com/8friend8ship-cloud/notebooklm-webapp-bridge/zip/refs/heads/main",
+      "manifestSubPath": "notebooklm-webapp-bridge-main/extensions/central-platform-publisher-bridge",
+      "approval": "AUTO_DRAFT_QA; PUBLIC_PUBLISH_USER_GATE",
+      "status": "SOURCE_READY_RUNTIME_STAGE_PENDING",
+      "platforms": ["BLOGGER","YOUTUBE","INSTAGRAM","TIKTOK","NAVER_BLOG","NAVER_CAFE","NAVER_CLIP","PINTEREST"]
+    },
+    {
+      "name": "AI Studio Bridge",
+      "extensionId": "okppbdphadmdfbfpllpjjnmmemokbccp",
+      "installMode": "OBSERVE_EXISTING",
+      "service": "AI_STUDIO",
+      "approval": "EXISTING_APPROVAL_REUSE",
+      "status": "MANAGED_EXISTING"
+    },
+    {
+      "name": "SketchUp Plan Template Bridge",
+      "extensionId": "hegckbbodcngelkcilioacdjhlpmhaen",
+      "installMode": "OBSERVE_EXISTING",
+      "service": "SKETCHUP",
+      "approval": "LOCAL_FILE_SECURITY_ONLY",
+      "status": "MANAGED_EXISTING"
+    }
+  ],
+  "successTemplate": {
+    "required": ["SOURCE_HASH_PASS","MANIFEST_V3_PASS","REQUIRED_FILES_PASS","DEDICATED_CHROME_LOAD_PASS","EXTENSION_ID_READBACK_PASS","SITE_PERMISSION_READBACK_PASS","SAME_FIXTURE_X2_PASS","DRIVE_WRITEBACK_PASS","LAST_GOOD_RECORDED"],
+    "failure": ["STAGE","SIGNATURE","ROOT_CAUSE","MINIMUM_FIX","RETEST","ROLLBACK_POINTER","NEXT_RESUME_POINT"]
+  }
+}
