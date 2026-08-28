@@ -5,7 +5,7 @@ $ProgressPreference='SilentlyContinue'
 $ExpectedAgent='1.1.46'
 $ExpectedAgentBlob='b72e57af70f77578fddb3de49f6581a37e2de792'
 $ExpectedV2Blob='a4b7967da7bc26f3cb49c88d3b3cb122ddf86c7c'
-$ExpectedPowerBlob='3edde1fe1276052a084380a84fe27a2b2574e9ef'
+$ExpectedPowerBlob='d1d80a0362a170f1c017c3e63a7d3c6d6b32a576'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $V2=Join-Path $Root 'RunChromeGovernorReadbackV2.ps1'
@@ -67,6 +67,7 @@ $receipt=[ordered]@{
   expectedPowerBlob=$ExpectedPowerBlob
   nightStart='02:00'
   nightEnd='05:00'
+  idleDisplayMinutes=30
   powerContinuity=$null
   newProjectCreated=$false
   oauthChanged=$false
@@ -103,10 +104,10 @@ try{
   if(-not $parsed -or -not [bool]$parsed.ok){throw 'KICK_NO_PASS_JSON'}
   if([string]$parsed.targetAgent -and [string]$parsed.targetAgent -ne $ExpectedAgent){throw ('KICK_TARGET_MISMATCH:'+[string]$parsed.targetAgent)}
 
-  $receipt.stage='INSTALL_POWER_CONTINUITY_0200_0500'
+  $receipt.stage='INSTALL_POWER_CONTINUITY_0200_0500_IDLE30'
   FetchPinned 'local-agent/capture/Setup-PowerContinuity.ps1' $PowerHelper $ExpectedPowerBlob
   $old=$ErrorActionPreference;$ErrorActionPreference='Continue'
-  try{$powerOut=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $PowerHelper -Install -NightStart '02:00' -NightEnd '05:00' 2>&1|Out-String;$powerRc=$LASTEXITCODE}
+  try{$powerOut=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $PowerHelper -Install -NightStart '02:00' -NightEnd '05:00' -IdleDisplayMinutes 30 2>&1|Out-String;$powerRc=$LASTEXITCODE}
   finally{$ErrorActionPreference=$old}
   if($powerRc -ne 0){throw ('POWER_CONTINUITY_EXIT_'+$powerRc+':'+$powerOut.Trim())}
   $powerParsed=$null
@@ -116,6 +117,8 @@ try{
   }
   if(-not $powerParsed -or -not [bool]$powerParsed.ok){throw ('POWER_CONTINUITY_NO_PASS_JSON:'+ $powerOut.Trim())}
   if([string]$powerParsed.nightStart -ne '02:00' -or [string]$powerParsed.nightEnd -ne '05:00'){throw 'POWER_CONTINUITY_WINDOW_MISMATCH'}
+  if([int]$powerParsed.idleDisplayMinutes -ne 30){throw 'POWER_CONTINUITY_IDLE_MISMATCH'}
+  if([string]$powerParsed.acAutomaticSleep -ne 'DISABLED'){throw 'POWER_CONTINUITY_AC_SLEEP_MISMATCH'}
   $receipt.powerContinuity=$powerParsed
 
   $receipt.stage='AGENT_KICK_AND_POWER_CONTINUITY_PASS'
