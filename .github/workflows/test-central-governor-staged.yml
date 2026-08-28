@@ -94,6 +94,15 @@ jobs:
             throw 'CLASSIFICATION_ORDER_UNSAFE'
           }
 
+      - name: DataHub approval evidence must not expand Gmail scope
+        shell: pwsh
+        run: |
+          $text = Get-Content 'apps-script/CentralDataManagementHub.gs' -Raw
+          if ($text.Contains('GmailApp')) { throw 'IMPLICIT_GMAIL_SCOPE_EXPANSION_FORBIDDEN' }
+          foreach($needle in @('PASS_EXISTING_APPROVAL_INBOX_READBACK','EXISTING_DRIVE_EVIDENCE_ONLY','scopeExpansion: false')){
+            if(-not $text.Contains($needle)){ throw "APPROVAL_READBACK_CONTRACT_MISSING:$needle" }
+          }
+
       - name: Guarded bound sync contract
         shell: pwsh
         run: |
