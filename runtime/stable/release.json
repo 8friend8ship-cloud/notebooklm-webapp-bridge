@@ -3,19 +3,19 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.70_D82_AUDIO_EXISTING_REAL_DOWNLOAD_20260827",
-  "version": "0.2.70",
-  "releasedAt": "2026-08-27T21:12:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.71_D92_EXACT_SOURCEPATH_MIRROR_20260828",
+  "version": "0.2.71",
+  "releasedAt": "2026-08-28T11:49:58+09:00",
   "requiresUserApproval": false,
-  "description": "D82 adds AUDIO_EXISTING_DOWNLOAD: reuse existing audio only, never generate, and complete only after Chrome downloads reports a complete existing nonzero file. No download-path change, file move, OAuth change, normal-Chrome mutation, or new NotebookLM artifact.",
-  "sourceCommit": "c2ba22b9f8fda941652abe90c053b5a3756e249f",
+  "description": "D92 promotes the verified exact-download handoff. Chrome-completed nonzero downloads feed their absolute filename as SourcePath into the local PowerShell mirror; D82 existing-audio downloads now synthesize the mirror request automatically. Legacy timestamp scan and FileSystemWatcher remain fallback-only, originals are copied not moved, and no OAuth/download-path/normal-Chrome change is introduced.",
+  "sourceCommit": "7c381c929b779d93a9eab10bab6d67c414da0849",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "f03db683fa0576f5ff83ca404eb5578a59203012"
+      "gitBlobSha1": "46e6a77867f5f6e9f04edce254531d5c85ac90ad"
     },
     {
       "path": "worker.js",
@@ -43,7 +43,7 @@
     },
     {
       "path": "background.js",
-      "gitBlobSha1": "c3ed4826e97b1ba22aa6925ca55b51070d06ff31"
+      "gitBlobSha1": "2daab3e001c6e3b1a02421b9eef6dca3854eba69"
     },
     {
       "path": "local-powershell-runner.js",
@@ -67,7 +67,7 @@
     },
     {
       "path": "artifact-drive-mirror.js",
-      "gitBlobSha1": "547bb944a730b5c8ffb2823a5079813cc6c13a22"
+      "gitBlobSha1": "cb96b863ab7a49acca38edbd3a6bd9e9af6d4476"
     }
   ]
 }
