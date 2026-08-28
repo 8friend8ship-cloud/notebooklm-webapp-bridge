@@ -16,7 +16,7 @@ function GitBlobSha1([string]$Path) {
   $sha = [Security.Cryptography.SHA1]::Create(); try { return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() }
 }
 function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
-function StopStaleAgentProcesses([int]$MaxAgeSeconds=600){
+function StopStaleAgentProcesses([int]$MaxAgeSeconds=1800){
   $killed=@();$now=Get-Date
   try{
     foreach($p in @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue)){
@@ -30,7 +30,7 @@ function StopStaleAgentProcesses([int]$MaxAgeSeconds=600){
   }catch{}
   return @($killed)
 }
-function RunAgentBounded([string]$Path,[int]$TimeoutSeconds=180){
+function RunAgentBounded([string]$Path,[int]$TimeoutSeconds=900){
   $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true
   $psi.Arguments="-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$Path`""
   $proc=[Diagnostics.Process]::Start($psi)
@@ -48,10 +48,12 @@ if (-not $mutex.WaitOne(0,$false)) { exit 0 }
 try {
   do {
     $pollSeconds = 300
+    $maxCycleSeconds = 900
     try {
       $nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString()
       $meta = Invoke-RestMethod -Uri (Bust $AgentMetaUrl $nonce) -Method Get -TimeoutSec 30
       if ($meta.pollSeconds) { $pollSeconds = [Math]::Max(60,[int]$meta.pollSeconds) }
+      if ($meta.maxCycleSeconds) { $maxCycleSeconds = [Math]::Max(180,[Math]::Min(1800,[int]$meta.maxCycleSeconds)) }
 
       if ($meta.enabled) {
         $expected=([string]$meta.gitBlobSha1).ToLowerInvariant()
@@ -67,9 +69,9 @@ try {
           BLog "Agent updated to $($meta.version) sha=$expected."
         }
 
-        [void](StopStaleAgentProcesses 600)
-        $rc=RunAgentBounded $AgentFile 180
-        if($rc -ne 0){BLog "Agent cycle exit=$rc."}
+        [void](StopStaleAgentProcesses ([Math]::Max(1800,$maxCycleSeconds+300)))
+        $rc=RunAgentBounded $AgentFile $maxCycleSeconds
+        if($rc -ne 0){BLog "Agent cycle exit=$rc maxCycleSeconds=$maxCycleSeconds."}
       } else { BLog 'Agent stable channel is disabled.' }
     } catch { BLog ("Bootstrap cycle error: " + $_.Exception.Message) }
 
