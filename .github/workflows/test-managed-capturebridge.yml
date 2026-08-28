@@ -118,6 +118,7 @@ jobs:
           $local = Join-Path $env:RUNNER_TEMP 'capture\INBOX'
           $sources = Join-Path $env:RUNNER_TEMP 'managed-sources'
           New-Item -ItemType Directory -Force -Path $central,$local,$sources | Out-Null
+          $manager = (Resolve-Path './local-agent/capture/ManageChromeExtensionArtifacts.ps1').Path
 
           $fixtures = @(
             @{service='NotebookLM';name='note.txt';bytes=[Text.Encoding]::UTF8.GetBytes('notebooklm')},
@@ -128,7 +129,7 @@ jobs:
           foreach ($f in $fixtures) {
             $src = Join-Path $sources $f.name
             [IO.File]::WriteAllBytes($src,[byte[]]$f.bytes)
-            $raw = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 `
+            $raw = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $manager `
               -ServiceKey $f.service `
               -SourcePath $src `
               -TaskId ('CI_' + $f.service) `
@@ -147,20 +148,29 @@ jobs:
             if ($sourceHash -ne [string]$item.sha256) { throw "HASH_MISMATCH:$($f.service)" }
           }
 
+          function Assert-Rejected([string]$service,[string]$src,[string]$task) {
+            $stdout = Join-Path $env:RUNNER_TEMP ($task + '.out.txt')
+            $stderr = Join-Path $env:RUNNER_TEMP ($task + '.err.txt')
+            $args = @(
+              '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$manager,
+              '-ServiceKey',$service,'-SourcePath',$src,'-TaskId',$task,
+              '-LocalInboxRoot',$local,'-CentralRootOverride',$central
+            )
+            $p = Start-Process powershell.exe -ArgumentList $args -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+            if ($p.ExitCode -eq 0) { throw "NEGATIVE_GATE_ACCEPTED:$task" }
+          }
+
           $partial = Join-Path $sources 'bad.mp4.crdownload'
           [IO.File]::WriteAllBytes($partial,[byte[]](1..8))
-          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 -ServiceKey Flow -SourcePath $partial -TaskId CI_BAD -LocalInboxRoot $local -CentralRootOverride $central *> $null
-          if ($LASTEXITCODE -eq 0) { throw 'CRDOWNLOAD_NOT_REJECTED' }
+          Assert-Rejected 'Flow' $partial 'CI_BAD'
 
           $zero = Join-Path $sources 'zero.txt'
           [IO.File]::WriteAllBytes($zero,[byte[]]@())
-          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 -ServiceKey NotebookLM -SourcePath $zero -TaskId CI_ZERO -LocalInboxRoot $local -CentralRootOverride $central *> $null
-          if ($LASTEXITCODE -eq 0) { throw 'ZERO_BYTE_NOT_REJECTED' }
+          Assert-Rejected 'NotebookLM' $zero 'CI_ZERO'
 
           $exe = Join-Path $sources 'bad.exe'
           [IO.File]::WriteAllBytes($exe,[byte[]](1..8))
-          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 -ServiceKey AIStudio -SourcePath $exe -TaskId CI_EXE -LocalInboxRoot $local -CentralRootOverride $central *> $null
-          if ($LASTEXITCODE -eq 0) { throw 'UNSUPPORTED_EXTENSION_NOT_REJECTED' }
+          Assert-Rejected 'AIStudio' $exe 'CI_EXE'
           Write-Host 'MANAGED_CHROME_CAPTURE_SMOKE_PASS services=4 negative=3'
 
       - name: Managed setup smoke with Windows PowerShell 5.1
@@ -169,7 +179,8 @@ jobs:
           $central = Join-Path $env:RUNNER_TEMP 'setup-drive\00-central-agent'
           $local = Join-Path $env:RUNNER_TEMP 'setup-capture\INBOX'
           New-Item -ItemType Directory -Force -Path $central,$local | Out-Null
-          $raw = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1 `
+          $setup = (Resolve-Path './local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1').Path
+          $raw = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $setup `
             -SmokeOnly `
             -LocalInboxRoot $local `
             -CentralRootOverride $central
