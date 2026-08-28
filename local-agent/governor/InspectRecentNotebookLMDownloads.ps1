@@ -1,6 +1,6 @@
 param([int]$Hours=48,[int]$MaxItems=80)
 $ErrorActionPreference='Stop'
-$scriptVersion='D106_CONFIGURED_PATHS_V2'
+$scriptVersion='D108_CONFIGURED_PATHS_PS51'
 $cut=(Get-Date).AddHours(-1*[Math]::Max(1,[Math]::Min(168,$Hours)))
 $limit=[Math]::Max(1,[Math]::Min(300,$MaxItems))
 $exts=@('.mp3','.m4a','.wav','.ogg','.aac','.flac','.mp4','.webm','.mov','.pdf','.pptx','.xlsx','.csv','.png','.jpg','.jpeg','.webp','.docx','.txt','.json','.zip')
@@ -50,7 +50,7 @@ foreach($pref in $preferenceFiles){
 
 $items=@()
 $checked=@()
-foreach($candidate in @($candidates)){
+foreach($candidate in $candidates){
   $exists=Test-Path -LiteralPath $candidate.path -PathType Container
   $checked+= [ordered]@{path=$candidate.path;source=$candidate.source;profile=$candidate.profile;exists=[bool]$exists}
   if(-not $exists){continue}
