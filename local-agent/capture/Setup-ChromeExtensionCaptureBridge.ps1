@@ -1,6 +1,7 @@
 param(
   [switch]$SmokeOnly,
   [switch]$FlowBridgeConnectSmoke,
+  [switch]$FlowExtensionInspect,
   [string]$FlowSmokeTaskId = '',
   [int]$FlowDebugPort = 9224,
   [string]$ManagerRef = 'main',
@@ -27,6 +28,33 @@ function GitBlobSha1([string]$Path) {
   [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
   $sha = [Security.Cryptography.SHA1]::Create()
   try { return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() }
+}
+function Sha256([string]$Path){$h=[Security.Cryptography.SHA256]::Create();try{$fs=[IO.File]::OpenRead($Path);try{return (($h.ComputeHash($fs)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$fs.Dispose()}}finally{$h.Dispose()}}
+function Find-FlowExtensionLocal {
+  $base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
+  foreach($p in @(
+    (Join-Path $env:USERPROFILE 'Downloads\flow-agent-bridge-v0.1.0\flow-agent-bridge-v0.1.0'),
+    (Join-Path $env:USERPROFILE 'Downloads\flow-agent-bridge-v0.1.0'),
+    (Join-Path $base 'Extension\Flow-Agent-Bridge'),
+    (Join-Path $base 'Extension\Google-AI-Local-Bridge-Flow')
+  )){if(Test-Path -LiteralPath (Join-Path $p 'manifest.json') -PathType Leaf){return $p}}
+  return ''
+}
+
+# Read the actual local Flow extension implementation before designing the connection probe.
+# This is read-only and does not start Chrome or spend credits.
+if($FlowExtensionInspect){
+  $ext=Find-FlowExtensionLocal;if(-not $ext){throw 'FLOW_EXTENSION_PATH_NOT_FOUND'}
+  $manifestPath=Join-Path $ext 'manifest.json';$manifestRaw=Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8;$manifest=$manifestRaw|ConvertFrom-Json
+  $files=@('manifest.json','content.js','popup.html','popup.js')
+  $inventory=@()
+  foreach($name in $files){$p=Join-Path $ext $name;if(Test-Path -LiteralPath $p -PathType Leaf){$raw=Get-Content -LiteralPath $p -Raw -Encoding UTF8;$inventory += [ordered]@{name=$name;path=$p;bytes=[int64](Get-Item -LiteralPath $p).Length;sha256=(Sha256 $p);text=$(if($raw.Length -le 20000){$raw}else{$raw.Substring(0,20000)})}}}
+  $extraScripts=@()
+  $popup=Join-Path $ext 'popup.html'
+  if(Test-Path -LiteralPath $popup -PathType Leaf){$html=Get-Content -LiteralPath $popup -Raw -Encoding UTF8;foreach($m in [regex]::Matches($html,'<script[^>]+src=["'']([^"'']+)["'']',[Text.RegularExpressions.RegexOptions]::IgnoreCase)){ $name=[string]$m.Groups[1].Value;if($name -and $name -notmatch '^(https?:|//)'){$p=Join-Path $ext $name;if(Test-Path -LiteralPath $p -PathType Leaf -and -not($files -contains $name)){$raw=Get-Content -LiteralPath $p -Raw -Encoding UTF8;$extraScripts += [ordered]@{name=$name;path=$p;bytes=[int64](Get-Item -LiteralPath $p).Length;sha256=(Sha256 $p);text=$(if($raw.Length -le 20000){$raw}else{$raw.Substring(0,20000)})}}}}
+  }
+  [ordered]@{ok=$true;action='FLOW_EXTENSION_SOURCE_INSPECT';extensionPath=$ext;name=[string]$manifest.name;version=[string]$manifest.version;manifestVersion=[int]$manifest.manifest_version;background=$manifest.background;contentScripts=$manifest.content_scripts;actionConfig=$manifest.action;permissions=$manifest.permissions;hostPermissions=$manifest.host_permissions;files=$inventory;extraScripts=$extraScripts;readOnly=$true;chromeStarted=$false;creditSpend=$false;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 40 -Compress
+  exit 0
 }
 
 # Central-agent direct Flow bridge control reuses this already Host-allowlisted setup script.
