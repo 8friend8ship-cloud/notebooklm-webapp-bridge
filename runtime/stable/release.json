@@ -3,71 +3,29 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.71_D92_EXACT_SOURCEPATH_MIRROR_20260828",
-  "version": "0.2.71",
-  "releasedAt": "2026-08-28T11:49:58+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.72_ASYNC_HANDOFF_LEASE_20260828",
+  "version": "0.2.72",
+  "releasedAt": "2026-08-28T20:45:00+09:00",
   "requiresUserApproval": false,
-  "description": "D92 promotes the verified exact-download handoff. Chrome-completed nonzero downloads feed their absolute filename as SourcePath into the local PowerShell mirror; D82 existing-audio downloads now synthesize the mirror request automatically. Legacy timestamp scan and FileSystemWatcher remain fallback-only, originals are copied not moved, and no OAuth/download-path/normal-Chrome change is introduced.",
-  "sourceCommit": "7c381c929b779d93a9eab10bab6d67c414da0849",
+  "description": "Fixes LOCAL_POWERSHELL_ASYNC claim-only stalls. Unstarted claims use a 45-second host-handoff lease instead of full task timeout plus grace; initial Host /run failures release the claim immediately and clear local active state. Existing D92 exact-download handoff remains unchanged. No new permission, OAuth, download-path, normal-Chrome, Generate, or credit behavior.",
+  "sourceCommit": "2cf25ba7bef4dd626494c6ee32c5c5830e1c05c4",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
   "files": [
-    {
-      "path": "manifest.json",
-      "gitBlobSha1": "46e6a77867f5f6e9f04edce254531d5c85ac90ad"
-    },
-    {
-      "path": "worker.js",
-      "gitBlobSha1": "4c966a80d916f89bfdde4c1f510731436b09dece"
-    },
-    {
-      "path": "download-click-smoke-worker.js",
-      "gitBlobSha1": "e90cd0ed0bc98e73b139547e66834ed525be4d27"
-    },
-    {
-      "path": "content/download-click-smoke.js",
-      "gitBlobSha1": "526509e795923fc0fe330b519802bfc407409420"
-    },
-    {
-      "path": "chat-active-guard.js",
-      "gitBlobSha1": "ab5a8b94de52580721bbd93302f9de0120cf218b"
-    },
-    {
-      "path": "local-stable-self-heal.js",
-      "gitBlobSha1": "7fbc23c25883d38aaefcf1aec5743d9b2c2c4432"
-    },
-    {
-      "path": "local-active-guard.js",
-      "gitBlobSha1": "7ed811834a5997873d75d322d93186b71d52e7ee"
-    },
-    {
-      "path": "background.js",
-      "gitBlobSha1": "2daab3e001c6e3b1a02421b9eef6dca3854eba69"
-    },
-    {
-      "path": "local-powershell-runner.js",
-      "gitBlobSha1": "2ddb682d596024f840e7066d795426d4887e720a"
-    },
-    {
-      "path": "flow-script-id-direct-recovery.js",
-      "gitBlobSha1": "8e65789b03ccff5e2aefd78f8048f001e8929ef3"
-    },
-    {
-      "path": "front-main.js",
-      "gitBlobSha1": "a246bcfe6a199ae7d171d1cf21b19a20d39db42f"
-    },
-    {
-      "path": "front-extension.js",
-      "gitBlobSha1": "01590edbfd9eb9d1f0b1271ea7755a49a4a81871"
-    },
-    {
-      "path": "content/notebooklm-runner.js",
-      "gitBlobSha1": "98bd13179b56ab231579d5818372fe8203a55d1f"
-    },
-    {
-      "path": "artifact-drive-mirror.js",
-      "gitBlobSha1": "cb96b863ab7a49acca38edbd3a6bd9e9af6d4476"
-    }
+    {"path":"manifest.json","gitBlobSha1":"5e46ec8d9b52abc1aa3e16c82cfd523b228bb88f"},
+    {"path":"worker.js","gitBlobSha1":"4c966a80d916f89bfdde4c1f510731436b09dece"},
+    {"path":"download-click-smoke-worker.js","gitBlobSha1":"e90cd0ed0bc98e73b139547e66834ed525be4d27"},
+    {"path":"content/download-click-smoke.js","gitBlobSha1":"526509e795923fc0fe330b519802bfc407409420"},
+    {"path":"chat-active-guard.js","gitBlobSha1":"ab5a8b94de52580721bbd93302f9de0120cf218b"},
+    {"path":"local-stable-self-heal.js","gitBlobSha1":"7fbc23c25883d38aaefcf1aec5743d9b2c2c4432"},
+    {"path":"local-active-guard.js","gitBlobSha1":"7ed811834a5997873d75d322d93186b71d52e7ee"},
+    {"path":"background.js","gitBlobSha1":"2daab3e001c6e3b1a02421b9eef6dca3854eba69"},
+    {"path":"local-powershell-runner.js","gitBlobSha1":"5629bf5f7da52dd41aabe15d4b2f54af5db7caa4"},
+    {"path":"flow-script-id-direct-recovery.js","gitBlobSha1":"8e65789b03ccff5e2aefd78f8048f001e8929ef3"},
+    {"path":"front-main.js","gitBlobSha1":"a246bcfe6a199ae7d171d1cf21b19a20d39db42f"},
+    {"path":"front-extension.js","gitBlobSha1":"01590edbfd9eb9d1f0b1271ea7755a49a4a81871"},
+    {"path":"content/notebooklm-runner.js","gitBlobSha1":"98bd13179b56ab231579d5818372fe8203a55d1f"},
+    {"path":"artifact-drive-mirror.js","gitBlobSha1":"cb96b863ab7a49acca38edbd3a6bd9e9af6d4476"}
   ]
 }
