@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.41",
-  "releasedAt": "2026-08-28T18:53:00+09:00",
-  "gitBlobSha1": "b24b470dfc439a09446164091d392f886cb8f71e",
+  "version": "1.1.42",
+  "releasedAt": "2026-08-28T19:06:00+09:00",
+  "gitBlobSha1": "5cf81f66bdbee7bf394fb200aa98e4f862755907",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Repairs the confirmed CLAIMED-but-never-STARTED gate. Host1.2.7 did not allow RunChromeGovernorReadbackV2 or the exact-target/QA scripts. Agent1.1.41 is short enough for legacy bootstrap: installs hash-pinned Host1.2.8 with only the approved V2/exact-target/central-QA/Gemini-Web/credit-readback scripts added to the notebook bridge allowlist, verifies host health+asyncJobs, patches Bootstrap to 900s configurable cycles, dispatches NotebookLM exact-target x2 regression once in background, writes Drive receipt and exits. No Generate/credits/new OAuth/scope/settings/project/public/destructive action."
+  "notes": "Fixes the Host1.2.8 patch-generator anchor defect that could produce scripts=scripts=@(...) and abort before host replacement. Agent1.1.42 installs hash-pinned Host1.2.9 SHA 2b58e72d35fb8b8e56b179fc89dbc7ba7ac3a577, verifies localhost health version 1.2.9 with asyncJobs=true, then dispatches the existing NotebookLM exact-target x2 regression exactly once. No Generate/credits/OAuth/scope/settings/public/destructive action."
 }
