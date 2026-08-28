@@ -1,0 +1,42 @@
+name: Local Agent 1.1.46 CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/releases/1.1.46/HomeDesignLocalAgent.ps1'
+      - '.github/workflows/local-agent-1-1-46-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/releases/1.1.46/HomeDesignLocalAgent.ps1'
+
+jobs:
+  validate-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell syntax
+        shell: powershell
+        run: |
+          $p='local-agent/releases/1.1.46/HomeDesignLocalAgent.ps1'
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p), [ref]$tokens, [ref]$errors)
+          if($errors.Count){
+            foreach($e in $errors){Write-Host ("line={0} col={1} id={2} message={3}" -f $e.Extent.StartLineNumber,$e.Extent.StartColumnNumber,$e.ErrorId,$e.Message)}
+            exit 1
+          }
+      - name: Preserve 1.1.45 and add Persona only
+        shell: powershell
+        run: |
+          $t=Get-Content 'local-agent/releases/1.1.46/HomeDesignLocalAgent.ps1' -Raw
+          $required=@(
+            "AgentVersion = '1.1.46'",
+            "QueueSha = '9a06c6ef475a6427a04258c1ff84ebdc2ce498a3'",
+            "PersonaSha = '186e987af8cb61e7a11242a6a2c69251ec0e1c73'",
+            "PersonaSourceCommit = '0ad86472116e73728d99c0c49d940e0a884d4739'",
+            'LIVE_QUEUE_LOCK_PASS','PERSONA_BIND_DISPATCHED_BACKGROUND','LIVE_PERSONA_BIND_X2_PASS','NO_BLIND_RETRY',
+            'newProjectCreated = $false','oauthChanged = $false','scopeChanged = $false','newDeployment = $false','newTrigger = $false','paidGeminiApiCalled = $false'
+          )
+          foreach($n in $required){if(-not $t.Contains($n)){throw "MISSING_CONTRACT:$n"}}
+          $forbidden=@('clasp login','create-script','create-deployment','ScriptApp.newTrigger')
+          foreach($n in $forbidden){if($t -match [regex]::Escape($n)){throw "FORBIDDEN_DIRECT_OPERATION:$n"}}
+          Write-Host 'Local Agent 1.1.46 preservation/persona contract PASS'
