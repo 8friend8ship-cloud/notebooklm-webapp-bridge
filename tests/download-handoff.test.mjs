@@ -37,6 +37,7 @@ test('FileSystemWatcher route is fallback-only and waits synchronously for a sta
 
 test('Existing verified download synthesizes exact SourcePath mirror request', () => {
   assert.match(backgroundJs, /actualArtifact\?\.downloadEvidence\?\.download/);
+  assert.match(backgroundJs, /verifiedDownload\?\.filename/);
   assert.match(backgroundJs, /sourcePath:\s*verifiedDownload\.filename/);
   assert.match(backgroundJs, /sourcePath:\s*String\(mirrorReq\.sourcePath/);
 });
