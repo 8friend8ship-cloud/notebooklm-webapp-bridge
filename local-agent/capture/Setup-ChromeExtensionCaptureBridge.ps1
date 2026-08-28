@@ -1,5 +1,8 @@
 param(
   [switch]$SmokeOnly,
+  [switch]$FlowBridgeConnectSmoke,
+  [string]$FlowSmokeTaskId = '',
+  [int]$FlowDebugPort = 9224,
   [string]$ManagerRef = 'main',
   [string]$LocalInboxRoot = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX',
   [string]$CentralRootOverride = ''
@@ -9,6 +12,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Repo = '8friend8ship-cloud/notebooklm-webapp-bridge'
 $ManagerExpected = '76a9718b30d1432829ea7c0f2e6af95ea6942ab8'
+$FlowHelperExpected = '167df66dfe9cbc55335eed8bb891402caa42c9ad'
 $InstallRoot = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent\capture'
 $Manager = Join-Path $InstallRoot 'ManageChromeExtensionArtifacts.ps1'
 $Wrapper = Join-Path $InstallRoot 'Reconcile-AllManagedChromeArtifacts.ps1'
@@ -23,6 +27,30 @@ function GitBlobSha1([string]$Path) {
   [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
   $sha = [Security.Cryptography.SHA1]::Create()
   try { return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() }
+}
+
+# Central-agent direct Flow bridge control reuses this already Host-allowlisted setup script.
+# It downloads an integrity-pinned helper, runs only dedicated ChromeForTesting, never clicks Generate,
+# writes result+ACK to central Drive, restores the NotebookLM dedicated Chrome, and exits with helper status.
+if ($FlowBridgeConnectSmoke) {
+  New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
+  $helper = Join-Path $InstallRoot 'RunFlowBridgeConnectSmoke.ps1'
+  $tmpHelper = $helper + '.download'
+  $helperRaw = 'https://raw.githubusercontent.com/' + $Repo + '/refs/heads/main/local-agent/governor/RunFlowBridgeConnectSmoke.ps1?hdcb=' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  Invoke-WebRequest -UseBasicParsing -Uri $helperRaw -OutFile $tmpHelper -TimeoutSec 20
+  $helperActual = (GitBlobSha1 $tmpHelper).ToLowerInvariant()
+  if ($helperActual -ne $FlowHelperExpected) {
+    Remove-Item -LiteralPath $tmpHelper -Force -ErrorAction SilentlyContinue
+    throw ('FLOW_HELPER_SHA_MISMATCH:actual={0}:expected={1}' -f $helperActual,$FlowHelperExpected)
+  }
+  Move-Item -LiteralPath $tmpHelper -Destination $helper -Force
+  $helperArgs = @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$helper,'-DebugPort',[string]$FlowDebugPort)
+  if ($FlowSmokeTaskId) { $helperArgs += @('-TaskId',$FlowSmokeTaskId) }
+  if ($CentralRootOverride) { $helperArgs += @('-CentralRootOverride',$CentralRootOverride) }
+  $helperOut = & powershell.exe @helperArgs 2>&1
+  $helperRc = $LASTEXITCODE
+  $helperOut | ForEach-Object { Write-Output $_ }
+  exit $helperRc
 }
 
 function Find-CentralRoot {
