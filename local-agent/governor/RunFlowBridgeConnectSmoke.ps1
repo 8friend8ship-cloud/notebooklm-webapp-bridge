@@ -28,6 +28,7 @@ function Find-CentralRoot {
 function Find-CftChrome {return Get-ChildItem -LiteralPath $CftRoot -Recurse -Filter chrome.exe -File -ErrorAction SilentlyContinue|Sort-Object FullName -Descending|Select-Object -First 1}
 function Dedicated-Procs {try{return @(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -and ([string]$_.CommandLine).Contains($UserData)})}catch{return @()}}
 function Normal-Procs {try{return @(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue|Where-Object{-not $_.CommandLine -or -not ([string]$_.CommandLine).Contains($UserData)})}catch{return @()}}
+function Normal-BrowserRoots {return @(Normal-Procs|Where-Object{-not $_.CommandLine -or ([string]$_.CommandLine) -notmatch '(?i)(^|\s)--type='})}
 function Stop-Dedicated {$k=@();foreach($p in @(Dedicated-Procs)){try{& taskkill.exe /PID ([int]$p.ProcessId) /T /F 2>$null|Out-Null;$k += [int]$p.ProcessId}catch{}};Start-Sleep -Seconds 2;return @($k)}
 function Find-FlowExtension {
   $candidates=@(
@@ -61,6 +62,7 @@ $manifest=Get-Content -LiteralPath (Join-Path $flowExtension 'manifest.json') -R
 $chrome=Find-CftChrome
 if(-not $chrome){throw 'CFT_CHROME_EXE_NOT_FOUND'}
 $normalBefore=@(Normal-Procs|ForEach-Object{[int]$_.ProcessId})
+$normalRootBefore=@(Normal-BrowserRoots|ForEach-Object{[int]$_.ProcessId})
 $dedicatedStopped=@(Stop-Dedicated)
 $args=@("--user-data-dir=$UserData",'--profile-directory=Default','--new-window','--no-first-run','--no-default-browser-check','--disable-session-crashed-bubble','--disable-download-notification',("--load-extension=$flowExtension"),("--remote-debugging-port=$DebugPort"),'--remote-debugging-address=127.0.0.1',$FlowUrl)
 Start-Process -FilePath $chrome.FullName -ArgumentList $args -WorkingDirectory $chrome.Directory.FullName|Out-Null
@@ -84,8 +86,12 @@ $dedicatedCmd=@(Dedicated-Procs|ForEach-Object{[string]$_.CommandLine})
 $loadArgPresent=(@($dedicatedCmd|Where-Object{$_ -and $_.Contains('--load-extension=') -and $_.Contains($flowExtension)}).Count -gt 0)
 $restored=Restore-Notebook
 $normalAfter=@(Normal-Procs|ForEach-Object{[int]$_.ProcessId})
+$normalRootAfter=@(Normal-BrowserRoots|ForEach-Object{[int]$_.ProcessId})
 $missingNormal=@($normalBefore|Where-Object{$normalAfter -notcontains $_})
-$ok=($version -and $version.webSocketDebuggerUrl -and $flowPages.Count -gt 0 -and $loadArgPresent -and $loginPages.Count -eq 0 -and $restored -and $missingNormal.Count -eq 0)
+$missingRoot=@($normalRootBefore|Where-Object{$normalRootAfter -notcontains $_})
+$childChurn=@($missingNormal|Where-Object{$missingRoot -notcontains $_})
+$normalChromeUntouched=($missingRoot.Count -eq 0)
+$ok=($version -and $version.webSocketDebuggerUrl -and $flowPages.Count -gt 0 -and $loadArgPresent -and $loginPages.Count -eq 0 -and $restored -and $normalChromeUntouched)
 
 $readbackDir=Join-Path (Join-Path $central 'Runtime_Readback') 'Flow_Bridge_Direct'
 $resultPath=Join-Path $readbackDir ($task+'_result.json')
@@ -97,7 +103,8 @@ $result=[ordered]@{
   flowPageFound=($flowPages.Count -gt 0);flowPages=@($flowPages|ForEach-Object{[ordered]@{title=$_.title;url=$_.url}});
   loginRequired=($loginPages.Count -gt 0);loadExtensionArgPresent=[bool]$loadArgPresent;extensionTargets=$extensionTargets;extensionTargetCount=$extensionTargets.Count;
   dedicatedStopped=$dedicatedStopped;notebookDedicatedRestored=[bool]$restored;
-  normalChromeBeforeCount=$normalBefore.Count;normalChromeAfterCount=$normalAfter.Count;normalChromeMissingPids=$missingNormal;normalChromeUntouched=($missingNormal.Count -eq 0);
+  normalChromeBeforeCount=$normalBefore.Count;normalChromeAfterCount=$normalAfter.Count;normalChromeMissingPids=$missingNormal;
+  normalChromeRootBeforeCount=$normalRootBefore.Count;normalChromeRootAfterCount=$normalRootAfter.Count;normalChromeMissingRootPids=$missingRoot;normalChromeChildChurnPids=$childChurn;normalChromeUntouched=[bool]$normalChromeUntouched;
   generateClicked=$false;creditSpend=$false;oauthChanged=$false;chromeSettingsChanged=$false;at=(Get-Date).ToString('o')
 }
 Write-JsonAtomic $resultPath $result
