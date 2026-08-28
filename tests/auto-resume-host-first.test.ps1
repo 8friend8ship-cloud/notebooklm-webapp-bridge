@@ -19,9 +19,9 @@ foreach($path in $parseTargets){
 
 $hostWrapper=Get-Content -LiteralPath $hostWrapperPath -Raw -Encoding UTF8
 foreach($needle in @(
-  "`$NewVersion=\"`$HostVersion='1.2.5'\"",
   'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1',
   'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1',
+  'HOST_VERSION_PATCH_TARGET_MISSING',
   'HOST_NOTEBOOK_ALLOWLIST_PATCH_TARGET_MISSING',
   'HOST_TIMEOUT_STREAM_PATCH_TARGET_MISSING'
 )){
