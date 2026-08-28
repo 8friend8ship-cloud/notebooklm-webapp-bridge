@@ -1,0 +1,194 @@
+name: test-central-governor-staged
+
+on:
+  push:
+    branches:
+      - 'feat/central-daily-qa-asset-governor-20260828'
+    paths:
+      - 'apps-script/**'
+      - 'config/central-chrome-extension-manager-v1.json'
+      - 'tests/central-governor-policy.test.js'
+      - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - 'local-agent/governor/CentralNotebookRuntimeHub.ps1'
+      - 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1'
+      - 'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+      - 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
+      - 'docs/CENTRAL_*'
+      - 'docs/D82_*'
+      - 'docs/RUNTIME_BLOCKER_INDEX_20260828.md'
+      - '.github/workflows/test-central-governor-staged.yml'
+  pull_request:
+    paths:
+      - 'apps-script/**'
+      - 'config/central-chrome-extension-manager-v1.json'
+      - 'tests/central-governor-policy.test.js'
+      - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - 'local-agent/governor/CentralNotebookRuntimeHub.ps1'
+      - 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1'
+      - 'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+      - 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
+      - 'docs/CENTRAL_*'
+      - 'docs/D82_*'
+      - 'docs/RUNTIME_BLOCKER_INDEX_20260828.md'
+      - '.github/workflows/test-central-governor-staged.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-regression:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apps Script JavaScript syntax
+        shell: pwsh
+        run: |
+          $files = @(
+            'apps-script/CentralAiPlatformTrendGovernor.gs',
+            'apps-script/CentralChatWorkFactory.gs',
+            'apps-script/CentralDailyWorkflowGovernor.gs',
+            'apps-script/CentralDailyWorkflowGovernorV2.gs',
+            'apps-script/CentralDataManagementHub.gs',
+            'apps-script/CentralIntegratedTriggerV2.gs',
+            'apps-script/CentralNotebookRuntimeHub.gs',
+            'apps-script/CentralChromeExtensionAutomationManager.gs'
+          )
+          foreach ($f in $files) {
+            if (-not (Test-Path $f)) { throw "MISSING:$f" }
+            $tmp = Join-Path $env:RUNNER_TEMP ((Split-Path $f -Leaf) + '.js')
+            Copy-Item $f $tmp -Force
+            node --check $tmp
+            if ($LASTEXITCODE -ne 0) { throw "JS_SYNTAX_FAIL:$f" }
+          }
+
+      - name: PowerShell syntax
+        shell: pwsh
+        run: |
+          $files = @(
+            'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1',
+            'local-agent/governor/CentralNotebookRuntimeHub.ps1',
+            'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1',
+            'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1',
+            'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
+          )
+          foreach ($f in $files) {
+            if (-not (Test-Path $f)) { throw "MISSING:$f" }
+            $tokens=$null; $errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              throw "POWERSHELL_SYNTAX_FAIL:$f"
+            }
+          }
+
+      - name: Central Chat Factory classification guard
+        shell: pwsh
+        run: |
+          $text = Get-Content 'apps-script/CentralChatWorkFactory.gs' -Raw
+          $required = @(
+            "return 'HUMAN_GATE'",
+            "return 'LEARN_FAILURE'",
+            "return 'LEARN_SUCCESS'",
+            "if (active) return 'EXECUTE'",
+            "return 'IGNORE'"
+          )
+          foreach($r in $required){ if(-not $text.Contains($r)){ throw "MISSING_CLASSIFICATION_GUARD:$r" } }
+          $idxFail=$text.IndexOf("return 'LEARN_FAILURE'")
+          $idxSuccess=$text.IndexOf("return 'LEARN_SUCCESS'")
+          $idxExecute=$text.IndexOf("if (active) return 'EXECUTE'")
+          $idxDefault=$text.LastIndexOf("return 'IGNORE'")
+          if(-not ($idxFail -lt $idxSuccess -and $idxSuccess -lt $idxExecute -and $idxExecute -lt $idxDefault)) {
+            throw 'CLASSIFICATION_ORDER_UNSAFE'
+          }
+
+      - name: DataHub approval evidence must not expand Gmail scope
+        shell: pwsh
+        run: |
+          $text = Get-Content 'apps-script/CentralDataManagementHub.gs' -Raw
+          if ($text.Contains('GmailApp')) { throw 'IMPLICIT_GMAIL_SCOPE_EXPANSION_FORBIDDEN' }
+          foreach($needle in @('PASS_EXISTING_APPROVAL_INBOX_READBACK','EXISTING_DRIVE_EVIDENCE_ONLY','scopeExpansion: false')){
+            if(-not $text.Contains($needle)){ throw "APPROVAL_READBACK_CONTRACT_MISSING:$needle" }
+          }
+
+      - name: API-free-first promotion contract
+        shell: pwsh
+        run: |
+          $v2 = Get-Content 'apps-script/CentralDailyWorkflowGovernorV2.gs' -Raw
+          $integrated = Get-Content 'apps-script/CentralIntegratedTriggerV2.gs' -Raw
+          foreach($needle in @('API_QA_DISABLED_POLICY','PASS_APPROVED_FOR_PROMOTION_API_FREE','CENTRAL_API_FREE_BASELINE_PASS','PASS_API_FREE_BASELINE')){
+            if(-not $v2.Contains($needle)){ throw "API_FREE_PROMOTION_CONTRACT_MISSING:$needle" }
+          }
+          if(-not $integrated.Contains('runCentralDailyQaAssetGovernorV2')){ throw 'INTEGRATED_GOVERNOR_NOT_ROUTED_TO_V2' }
+          if($v2.Contains('OPENAI_API_KEY') -or $v2.Contains('GEMINI_API_KEY')){ throw 'V2_MUST_NOT_REQUIRE_OR_EMBED_AI_KEYS' }
+
+      - name: API-free promotion behavior regression
+        shell: pwsh
+        run: node tests/central-governor-policy.test.js
+
+      - name: Chrome extension manager contract
+        shell: pwsh
+        run: |
+          $policy = Get-Content 'config/central-chrome-extension-manager-v1.json' -Raw | ConvertFrom-Json
+          if($policy.schema -ne 'CENTRAL_CHROME_EXTENSION_MANAGER_V1'){ throw 'CCEM_SCHEMA_MISMATCH' }
+          if(-not $policy.principles.historyFirst){ throw 'CCEM_HISTORY_FIRST_REQUIRED' }
+          if(-not $policy.principles.noDuplicateExtensionInstall){ throw 'CCEM_DUPLICATE_GUARD_REQUIRED' }
+          if(-not $policy.principles.noNormalChromeRestart){ throw 'CCEM_NORMAL_CHROME_PROTECTION_REQUIRED' }
+          foreach($boundary in @('NEW_OAUTH','NEW_SCOPE','NEW_SECRET','NEW_PAID_API_OR_CREDIT','PUBLIC_PUBLISH','DESTRUCTIVE_CHANGE','PAYMENT_OR_CONTRACT')){
+            if($policy.approvalBoundaries -notcontains $boundary){ throw "CCEM_APPROVAL_BOUNDARY_MISSING:$boundary" }
+          }
+          $app = Get-Content 'apps-script/CentralChromeExtensionAutomationManager.gs' -Raw
+          foreach($needle in @('installCentralChromeExtensionAutomationTriggersV1','runCentralChromeExtensionHealthCycleV1','runCentralAssetIngestCycleV1','dispatchChromeWorkflowTaskV1','analyzeNewAssetV1','runCentralSeedPromotionCycleV1','runCentralTemplatePromotionCycleV1','registerPlatformResultUrlV1','runCentralChromeDataOrchestraAuditV1')){
+            if(-not $app.Contains($needle)){ throw "CCEM_APP_CONTRACT_MISSING:$needle" }
+          }
+          $ps = Get-Content 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1' -Raw
+          foreach($needle in @("[ValidateSet('Inventory','Stage','Rollback','LaunchDedicated')]",'Expand-Archive','manifest.json','--load-extension','noNormalChromeRestart','preserveLastGood')){
+            if(-not $ps.Contains($needle)){ throw "CCEM_PS_CONTRACT_MISSING:$needle" }
+          }
+
+      - name: Guarded bound sync contract
+        shell: pwsh
+        run: |
+          $gate = Get-Content 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1' -Raw
+          $sync = Get-Content 'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1' -Raw
+          foreach($needle in @('D82','state.json','/health','STOP_NO_BLIND_RETRY')){
+            if(-not $gate.Contains($needle)){ throw "D82_GATE_CONTRACT_MISSING:$needle" }
+          }
+          foreach($needle in @('WEBAPP_TEMPLATE_03','ExpectedDeploymentId','clasp','pull','hash')){
+            if(-not $sync.ToLowerInvariant().Contains($needle.ToLowerInvariant())){ throw "SYNC_CONTRACT_MISSING:$needle" }
+          }
+
+      - name: Completion and approval policy contract
+        shell: pwsh
+        run: |
+          $docs = @(
+            'docs/CENTRAL_DAILY_QA_ASSET_GOVERNOR.md',
+            'docs/CENTRAL_CHAT_FACTORY_RUNTIME_GATE_20260828.md',
+            'docs/D82_CHAT_FACTORY_AUTOMATION_LINK_20260828.md',
+            'docs/RUNTIME_BLOCKER_INDEX_20260828.md'
+          )
+          $joined = ($docs | ForEach-Object { Get-Content $_ -Raw }) -join "`n"
+          foreach($needle in @('same-fixture','runtime','readback','No new Apps Script project','do not create duplicate','Merge remains prohibited until runtime x2')){
+            if(-not $joined.ToLowerInvariant().Contains($needle.ToLowerInvariant())){ throw "POLICY_CONTRACT_MISSING:$needle" }
+          }
+
+      - name: Secret-like literal guard
+        shell: pwsh
+        run: |
+          $targets = @(
+            'apps-script/CentralAiPlatformTrendGovernor.gs',
+            'apps-script/CentralChatWorkFactory.gs',
+            'apps-script/CentralDailyWorkflowGovernor.gs',
+            'apps-script/CentralDailyWorkflowGovernorV2.gs',
+            'apps-script/CentralDataManagementHub.gs',
+            'apps-script/CentralIntegratedTriggerV2.gs',
+            'apps-script/CentralNotebookRuntimeHub.gs',
+            'apps-script/CentralChromeExtensionAutomationManager.gs',
+            'local-agent/governor/CentralNotebookRuntimeHub.ps1',
+            'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1',
+            'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1',
+            'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
+          )
+          $bad = Select-String -Path $targets -Pattern 'sk-proj-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|ghp_[A-Za-z0-9]{20,}' -AllMatches
+          if($bad){ $bad | ForEach-Object { Write-Error $_.Line }; throw 'SECRET_LIKE_LITERAL_FOUND' }
