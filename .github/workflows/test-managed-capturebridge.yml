@@ -1,0 +1,187 @@
+name: test-managed-capturebridge
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'local-agent/capture/ManageChromeExtensionArtifacts.ps1'
+      - 'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1'
+      - 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+      - '.github/workflows/test-managed-capturebridge.yml'
+  pull_request:
+    paths:
+      - 'local-agent/capture/ManageChromeExtensionArtifacts.ps1'
+      - 'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1'
+      - 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+      - '.github/workflows/test-managed-capturebridge.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PowerShell syntax and contracts
+        shell: pwsh
+        run: |
+          $files = @(
+            'local-agent/capture/ManageChromeExtensionArtifacts.ps1',
+            'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1',
+            'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Host $_.Message }
+              throw "POWERSHELL_PARSE_FAILED:$file"
+            }
+          }
+
+          $managerText = Get-Content -LiteralPath 'local-agent/capture/ManageChromeExtensionArtifacts.ps1' -Raw
+          foreach ($required in @(
+            "ValidateSet('NotebookLM','Flow','AIStudio','GoogleAI')",
+            'EXPLICIT_SOURCE_PATH_OR_EXPLICIT_SERVICE_INBOX_ONLY',
+            'genericDownloadsScan = $false',
+            'Copy-Item',
+            'originalPreserved',
+            'ARTIFACT_ZERO_BYTES',
+            'ARTIFACT_EXTENSION_NOT_ALLOWED'
+          )) {
+            if ($managerText -notmatch [regex]::Escape($required)) { throw "CAPTURE_MANAGER_CONTRACT_MISSING:$required" }
+          }
+          if ($managerText -match 'Get-ChildItem[^\r\n]+Downloads') { throw 'GENERIC_DOWNLOADS_SCAN_FORBIDDEN' }
+
+          $setupText = Get-Content -LiteralPath 'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1' -Raw
+          foreach ($required in @(
+            'HomeDesign-CaptureBridge-ManagedChrome-Reconcile',
+            "@('NotebookLM','Flow','AIStudio','GoogleAI')",
+            'genericDownloadsSync = $false',
+            '1b03384cbf7cb4608cd57e015208671f89744fa7'
+          )) {
+            if ($setupText -notmatch [regex]::Escape($required)) { throw "CAPTURE_SETUP_CONTRACT_MISSING:$required" }
+          }
+
+          $hostText = Get-Content -LiteralPath 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1' -Raw
+          foreach ($required in @(
+            '1.2.6',
+            'local-agent/capture/ManageChromeExtensionArtifacts.ps1',
+            'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1'
+          )) {
+            if ($hostText -notmatch [regex]::Escape($required)) { throw "HOST126_CONTRACT_MISSING:$required" }
+          }
+
+          $agentText = Get-Content -LiteralPath 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1' -Raw
+          foreach ($required in @('1.1.31','1.2.6','5d17bb233706897cd1706930cea9af3796f29488')) {
+            if ($agentText -notmatch [regex]::Escape($required)) { throw "AGENT131_CONTRACT_MISSING:$required" }
+          }
+          Write-Host 'MANAGED_CAPTUREBRIDGE_STATIC_CONTRACT_PASS'
+
+  windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Windows PowerShell 5.1 parser
+        shell: powershell
+        run: |
+          $files = @(
+            'local-agent/capture/ManageChromeExtensionArtifacts.ps1',
+            'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1',
+            'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Host $_.Message }
+              throw "WINDOWS_PS51_PARSE_FAILED:$file"
+            }
+          }
+          Write-Host 'WINDOWS_PS51_PARSE_PASS'
+
+      - name: Managed artifacts exact-path smoke and negative gates
+        shell: powershell
+        run: |
+          $central = Join-Path $env:RUNNER_TEMP 'drive\00-central-agent'
+          $local = Join-Path $env:RUNNER_TEMP 'capture\INBOX'
+          $sources = Join-Path $env:RUNNER_TEMP 'managed-sources'
+          New-Item -ItemType Directory -Force -Path $central,$local,$sources | Out-Null
+
+          $fixtures = @(
+            @{service='NotebookLM';name='note.txt';bytes=[Text.Encoding]::UTF8.GetBytes('notebooklm')},
+            @{service='Flow';name='flow.png';bytes=[Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZK1sAAAAASUVORK5CYII=')},
+            @{service='AIStudio';name='studio.json';bytes=[Text.Encoding]::UTF8.GetBytes('{"ok":true}')},
+            @{service='GoogleAI';name='google.txt';bytes=[Text.Encoding]::UTF8.GetBytes('google-ai')}
+          )
+          foreach ($f in $fixtures) {
+            $src = Join-Path $sources $f.name
+            [IO.File]::WriteAllBytes($src,[byte[]]$f.bytes)
+            $raw = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 `
+              -ServiceKey $f.service `
+              -SourcePath $src `
+              -TaskId ('CI_' + $f.service) `
+              -LocalInboxRoot $local `
+              -CentralRootOverride $central
+            if ($LASTEXITCODE -ne 0) { throw "MANAGED_EXEC_FAILED:$($f.service)" }
+            $result = ($raw | Select-Object -Last 1) | ConvertFrom-Json
+            if (-not $result.ok) { throw "MANAGED_RESULT_NOT_OK:$($f.service)" }
+            if ([bool]$result.genericDownloadsScan) { throw "GENERIC_DOWNLOADS_SCAN_TRUE:$($f.service)" }
+            if (-not [bool]$result.copyOnly) { throw "COPY_ONLY_FALSE:$($f.service)" }
+            if ([int]$result.processedCount -ne 1) { throw "BAD_PROCESSED_COUNT:$($f.service)" }
+            $item = @($result.results)[0]
+            if (-not [bool]$item.originalPreserved) { throw "SOURCE_NOT_PRESERVED:$($f.service)" }
+            if (-not (Test-Path -LiteralPath ([string]$item.drivePath) -PathType Leaf)) { throw "DRIVE_RESULT_MISSING:$($f.service)" }
+            $sourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $src).Hash.ToLowerInvariant()
+            if ($sourceHash -ne [string]$item.sha256) { throw "HASH_MISMATCH:$($f.service)" }
+          }
+
+          $partial = Join-Path $sources 'bad.mp4.crdownload'
+          [IO.File]::WriteAllBytes($partial,[byte[]](1..8))
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 -ServiceKey Flow -SourcePath $partial -TaskId CI_BAD -LocalInboxRoot $local -CentralRootOverride $central *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'CRDOWNLOAD_NOT_REJECTED' }
+
+          $zero = Join-Path $sources 'zero.txt'
+          [IO.File]::WriteAllBytes($zero,[byte[]]@())
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 -ServiceKey NotebookLM -SourcePath $zero -TaskId CI_ZERO -LocalInboxRoot $local -CentralRootOverride $central *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'ZERO_BYTE_NOT_REJECTED' }
+
+          $exe = Join-Path $sources 'bad.exe'
+          [IO.File]::WriteAllBytes($exe,[byte[]](1..8))
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 -ServiceKey AIStudio -SourcePath $exe -TaskId CI_EXE -LocalInboxRoot $local -CentralRootOverride $central *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'UNSUPPORTED_EXTENSION_NOT_REJECTED' }
+          Write-Host 'MANAGED_CHROME_CAPTURE_SMOKE_PASS services=4 negative=3'
+
+      - name: Managed setup smoke with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $central = Join-Path $env:RUNNER_TEMP 'setup-drive\00-central-agent'
+          $local = Join-Path $env:RUNNER_TEMP 'setup-capture\INBOX'
+          New-Item -ItemType Directory -Force -Path $central,$local | Out-Null
+          $raw = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1 `
+            -SmokeOnly `
+            -LocalInboxRoot $local `
+            -CentralRootOverride $central
+          if ($LASTEXITCODE -ne 0) { throw "SETUP_EXEC_FAILED:$LASTEXITCODE" }
+          $result = ($raw | Select-Object -Last 1) | ConvertFrom-Json
+          if (-not $result.ok) { throw 'SETUP_RESULT_NOT_OK' }
+          if ([bool]$result.scheduled) { throw 'SMOKE_ONLY_CREATED_SCHEDULE' }
+          if ([bool]$result.genericDownloadsSync) { throw 'SETUP_GENERIC_DOWNLOADS_SYNC_TRUE' }
+          if (-not [bool]$result.copyOnly) { throw 'SETUP_COPY_ONLY_FALSE' }
+          if (@($result.smoke).Count -ne 4) { throw "SETUP_SMOKE_SERVICE_COUNT:$(@($result.smoke).Count)" }
+          foreach ($item in @($result.smoke)) {
+            if (-not [bool]$item.ok) { throw "SETUP_SMOKE_NOT_OK:$($item.service)" }
+            if (-not (Test-Path -LiteralPath ([string]$item.drivePath) -PathType Leaf)) { throw "SETUP_SMOKE_MISSING:$($item.service)" }
+          }
+          Write-Host 'MANAGED_CAPTUREBRIDGE_SETUP_SMOKE_PASS services=4'
