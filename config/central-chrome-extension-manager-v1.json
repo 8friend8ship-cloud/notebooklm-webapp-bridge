@@ -1,0 +1,127 @@
+{
+  "schema": "CENTRAL_CHROME_EXTENSION_MANAGER_V1",
+  "updatedAt": "2026-08-28T14:30:00+09:00",
+  "managerSpreadsheetId": "147pycCA4XT2u4TxFYZOaR9na0RtpplbNmRJmmN2o-3w",
+  "masterRegistryId": "1C_CznU1Uo7dk-gKay3-oH8wFxutsGMlz27RSrbdVQwI",
+  "dataManagementHubId": "1aBvDTPAFOjOI_CufzQsOJUFkU6bOhy6gBRy54VS1o-s",
+  "principles": {
+    "historyFirst": true,
+    "workflowMapFirst": true,
+    "reuseExistingApproval": true,
+    "noBlindRetry": true,
+    "noDuplicateExtensionInstall": true,
+    "noNormalChromeRestart": true,
+    "noCredentialCapture": true,
+    "driveResultReadbackRequired": true,
+    "seedCandidateBeforePromotion": true,
+    "templatePromotionRequiresX2": true,
+    "platformUrlMustBeReal": true,
+    "runtimeEvidenceWinsOverCodeState": true
+  },
+  "approvalBoundaries": [
+    "NEW_OAUTH",
+    "NEW_SCOPE",
+    "NEW_SECRET",
+    "NEW_PAID_API_OR_CREDIT",
+    "PUBLIC_PUBLISH",
+    "DESTRUCTIVE_CHANGE",
+    "PAYMENT_OR_CONTRACT"
+  ],
+  "traffic": {
+    "globalChromeMaxConcurrent": 1,
+    "startAckTimeoutSeconds": 60,
+    "driveWriteMinGapSeconds": 5,
+    "notebookLmStudioMinGapSeconds": 30,
+    "flowGenerationMinGapSeconds": 120,
+    "priorityOrder": ["P0", "P1", "P2", "P3"],
+    "sameServicePolicy": "SERIALIZE",
+    "differentServicePolicy": "PARALLEL_ONLY_WHEN_NO_SHARED_RESOURCE",
+    "longMediaPolicy": "RELEASE_UI_SLOT_AFTER_GENERATION_START_AND_WATCH_IN_BACKGROUND"
+  },
+  "schedules": [
+    {"id":"TRG_CHROME_HEALTH_15M","handler":"runCentralChromeExtensionHealthCycleV1","cadence":"EVERY_15_MIN"},
+    {"id":"TRG_ASSET_SCAN_30M","handler":"runCentralAssetIngestCycleV1","cadence":"EVERY_30_MIN"},
+    {"id":"TRG_SEED_PROMOTION_HOURLY","handler":"runCentralSeedPromotionCycleV1","cadence":"HOURLY"},
+    {"id":"TRG_TEMPLATE_2H","handler":"runCentralTemplatePromotionCycleV1","cadence":"EVERY_2_HOURS"},
+    {"id":"TRG_FULL_AUDIT_06_14_22","handler":"runCentralChromeDataOrchestraAuditV1","cadence":"DAILY_AT_06_14_22_KST"}
+  ],
+  "extensions": [
+    {
+      "extensionId": "llgjlejpknemhdmckoaifgjnjikceamp",
+      "name": "NotebookLM WebApp Bridge CANONICAL",
+      "service": "NOTEBOOKLM",
+      "canonicalSource": "8friend8ship-cloud/notebooklm-webapp-bridge",
+      "profile": "HomeDesign dedicated CFT",
+      "trafficLock": "NOTEBOOKLM_STUDIO",
+      "approval": "EXISTING_APPROVAL_REUSE",
+      "resultRoute": "CaptureBridge/INBOX/NotebookLM",
+      "runtimeTruthSource": "01_MASTER_REGISTRY:24_CHROME_BRIDGE_REGISTRY+88_CHROME_EXTENSION_CONTROL_CHECKLIST"
+    },
+    {
+      "extensionId": "lgedgmpcikglaajhfclcihicgafimlna",
+      "name": "Google AI Local Bridge - Flow",
+      "service": "FLOW",
+      "canonicalSource": "DRIVE_SOURCE:flow-agent-bridge-v0.1.0",
+      "profile": "actual installed profile",
+      "trafficLock": "FLOW_GENERATION",
+      "approval": "EXISTING_APPROVAL_REUSE+CREDIT_GATE",
+      "resultRoute": "Drive video/image asset route",
+      "runtimeTruthSource": "01_MASTER_REGISTRY:24+88"
+    },
+    {
+      "extensionId": "dpdklanogbhgimagkhlanambmojliieh",
+      "name": "Front App Test Bridge",
+      "service": "FRONT_QA",
+      "trafficLock": "CHROME_GLOBAL",
+      "approval": "AUTO_SAFE"
+    },
+    {
+      "extensionId": "kieodjjlhpefnakodgllmpckepjaggbd",
+      "name": "Google AI Local Bridge v1",
+      "service": "GOOGLE_AI_LOCAL",
+      "trafficLock": "CHROME_GLOBAL",
+      "approval": "EXISTING_APPROVAL_REUSE"
+    },
+    {
+      "extensionId": "okppbdphadmdfbfpllpjjnmmemokbccp",
+      "name": "AI Studio Bridge",
+      "service": "AI_STUDIO",
+      "trafficLock": "CHROME_GLOBAL",
+      "approval": "EXISTING_APPROVAL_REUSE"
+    },
+    {
+      "extensionId": "hegckbbodcngelkcilioacdjhlpmhaen",
+      "name": "SketchUp Plan Template Bridge",
+      "service": "SKETCHUP",
+      "trafficLock": "CHROME_GLOBAL",
+      "approval": "LOCAL_FILE_SECURITY_ONLY"
+    }
+  ],
+  "assetAnalysis": {
+    "VIDEO": ["VISUAL", "AUDIO", "VOICE", "MOTION", "LANGUAGE", "PERSONA", "ASSET", "SCRIPT", "HOOK", "CAMERA", "CAPTION", "STYLE", "QUALITY", "RIGHTS", "FRONT_FIT"],
+    "AUDIO": ["VOICE", "LANGUAGE", "ROLE", "TIMING", "EMOTION", "PERSONA_FIT", "RIGHTS"],
+    "IMAGE": ["OBJECT", "STYLE", "COMPOSITION", "PERSONA", "SPACE_MATERIAL", "RIGHTS", "FRONT_FIT"],
+    "TEXT": ["TOPIC", "FACT", "STRUCTURE", "STYLE", "KEYWORDS", "APP_FIT", "TEMPLATE_PATTERN", "SOURCE_TRACEABILITY"]
+  },
+  "learningLoop": {
+    "queensRegistry": "37_QUEENS_RESEARCH_RESULTS",
+    "seedRegistry": "35_INTERNAL_SEED_REGISTRY",
+    "templateLibrary": "70_MULTIMODAL_TEMPLATE_LIBRARY",
+    "templateEvolution": "77_TEMPLATE_EVOLUTION_FACTORY",
+    "precheckMap": "83_TASK_PRECHECK_ASSET_MAP",
+    "runtimeQa": "80_DATA_RUNTIME_QA_LOG",
+    "audit": "84_OPENAI_CENTRAL_AUDIT",
+    "failureLog": "63_EVOLUTION_CHANGELOG"
+  },
+  "completionGate": [
+    "MAP_CHECK_DONE",
+    "CASE_LOOKUP_DONE",
+    "WORKFLOW_RUN_PASS",
+    "RESULT_READBACK_PASS",
+    "SAME_FIXTURE_RETEST_PASS",
+    "REGRESSION_CHECK_PASS",
+    "DRIVE_EVIDENCE_PASS_IF_APPLICABLE",
+    "LESSON_CHECKED",
+    "WRITEBACK_DONE"
+  ]
+}
