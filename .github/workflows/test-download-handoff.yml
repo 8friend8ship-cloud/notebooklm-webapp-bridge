@@ -83,11 +83,11 @@ jobs:
         run: |
           $text = Get-Content -LiteralPath 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1' -Raw
           foreach ($required in @(
-            "HomeDesignAutomation-AutoResume",
-            "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-            "HomeDesignAutomationAutoResume",
-            "HomeDesignLocalWatchdog.ps1",
-            "HKCU_RUN_FALLBACK_VERIFY_FAILED"
+            'HomeDesignAutomation-AutoResume',
+            'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run',
+            'HomeDesignAutomationAutoResume',
+            'HomeDesignLocalWatchdog.ps1',
+            'HKCU_RUN_FALLBACK_VERIFY_FAILED'
           )) {
             if ($text -notmatch [regex]::Escape($required)) { throw "AUTORESUME_CONTRACT_MISSING:$required" }
           }
