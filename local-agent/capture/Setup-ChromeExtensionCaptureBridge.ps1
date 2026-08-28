@@ -2,8 +2,10 @@ param(
   [switch]$SmokeOnly,
   [switch]$FlowBridgeConnectSmoke,
   [switch]$FlowExtensionInspect,
+  [switch]$NotebookLMTabPrecheck,
   [string]$FlowSmokeTaskId = '',
   [int]$FlowDebugPort = 9224,
+  [int]$NotebookLMDebugPort = 9223,
   [string]$ManagerRef = 'main',
   [string]$LocalInboxRoot = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX',
   [string]$CentralRootOverride = ''
@@ -39,6 +41,32 @@ function Find-FlowExtensionLocal {
     (Join-Path $base 'Extension\Google-AI-Local-Bridge-Flow')
   )){if(Test-Path -LiteralPath (Join-Path $p 'manifest.json') -PathType Leaf){return $p}}
   return ''
+}
+
+# Read-only PRE_CHECK: verify the dedicated Chrome exposes both the central control page
+# and a real NotebookLM notebook page before any new download E2E is allowed.
+if($NotebookLMTabPrecheck){
+  $result=[ordered]@{ok=$false;action='NOTEBOOKLM_DEDICATED_CHROME_TAB_PRECHECK';cdpReady=$false;debugPort=$NotebookLMDebugPort;controlCenterPresent=$false;notebookTabPresent=$false;notebookResultPagePresent=$false;controlCenterTabs=@();notebookTabs=@();allPages=@();normalChromeMutated=$false;downloadClicked=$false;readOnly=$true;error='';at=(Get-Date).ToString('o')}
+  try{
+    $version=Invoke-RestMethod -Uri ("http://127.0.0.1:$NotebookLMDebugPort/json/version") -TimeoutSec 3
+    $result.cdpReady=[bool]$version.webSocketDebuggerUrl
+    if(-not $result.cdpReady){throw 'DEDICATED_CHROME_CDP_NOT_READY'}
+    $targets=@(Invoke-RestMethod -Uri ("http://127.0.0.1:$NotebookLMDebugPort/json/list") -TimeoutSec 4)
+    $pages=@($targets|Where-Object{$_.type -eq 'page'}|ForEach-Object{[ordered]@{title=[string]$_.title;url=[string]$_.url;id=[string]$_.id}})
+    $control=@($pages|Where-Object{$_.url -like 'https://notebooklm-webapp-bridge.vercel.app/*'})
+    $notebook=@($pages|Where-Object{$_.url -match '^https://(notebook|notebooklm)\.google\.com/'})
+    $result.allPages=$pages
+    $result.controlCenterTabs=$control
+    $result.notebookTabs=$notebook
+    $result.controlCenterPresent=(@($control).Count -gt 0)
+    $result.notebookTabPresent=(@($notebook).Count -gt 0)
+    $result.notebookResultPagePresent=(@($notebook|Where-Object{$_.url -match '/notebook/'}).Count -gt 0)
+    $result.ok=[bool]($result.controlCenterPresent -and $result.notebookResultPagePresent)
+    if(-not $result.ok){$result.error='PRECHECK_REQUIRES_CONTROL_CENTER_AND_NOTEBOOK_RESULT_PAGE'}
+  }catch{$result.error=$_.Exception.Message}
+  $result.completedAt=(Get-Date).ToString('o')
+  $result|ConvertTo-Json -Depth 20 -Compress
+  if($result.ok){exit 0}else{exit 2}
 }
 
 # Read the actual local Flow extension implementation before designing the connection probe.
