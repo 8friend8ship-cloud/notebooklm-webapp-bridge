@@ -1,5 +1,19 @@
 const CDWG_V2_VERSION = 'CENTRAL_DAILY_WORKFLOW_GOVERNOR_V2_API_FREE_FIRST_20260828';
 
+function decideCentralPromotionV2_(baselineStatus, dualQaStatus) {
+  const baselinePass = String(baselineStatus || '') === 'PASS';
+  const dualPass = String(dualQaStatus || '') === 'PASS_BOTH_MODELS';
+  const apiOffByPolicy = String(dualQaStatus || '') === 'API_QA_DISABLED_POLICY';
+  const approved = baselinePass && (dualPass || apiOffByPolicy);
+  return {
+    approved: approved,
+    approvalMode: approved ? (dualPass ? 'DUAL_QA' : 'API_FREE_BASELINE') : 'NONE',
+    finalStatus: approved
+      ? (dualPass ? 'PASS_APPROVED_FOR_PROMOTION_DUAL_QA' : 'PASS_APPROVED_FOR_PROMOTION_API_FREE')
+      : (baselinePass ? String(dualQaStatus || 'QA_STATUS_MISSING') : 'NEEDS_FIX_BASELINE')
+  };
+}
+
 /**
  * Canonical daily QA runner for the staged governor.
  * Stored-data deterministic QA is authoritative. External OpenAI/Gemini QA is
@@ -28,31 +42,24 @@ function runCentralDailyQaAssetGovernorV2() {
     baseline: baseline
   });
 
-  const baselinePass = baseline.status === 'PASS';
-  const dualPass = dualQa.status === 'PASS_BOTH_MODELS';
-  const apiOffByPolicy = dualQa.status === 'API_QA_DISABLED_POLICY';
-  const approved = baselinePass && (dualPass || apiOffByPolicy);
-  const finalStatus = approved
-    ? (dualPass ? 'PASS_APPROVED_FOR_PROMOTION_DUAL_QA' : 'PASS_APPROVED_FOR_PROMOTION_API_FREE')
-    : (baselinePass ? dualQa.status : 'NEEDS_FIX_BASELINE');
-
-  appendFactoryAbLog_(runId, snapshot, baseline, dualQa, finalStatus);
+  const decision = decideCentralPromotionV2_(baseline.status, dualQa.status);
+  appendFactoryAbLog_(runId, snapshot, baseline, dualQa, decision.finalStatus);
 
   let promotion = {status: 'NOT_PROMOTED'};
-  if (approved) {
+  if (decision.approved) {
     promotion = promoteApprovedQaResultToSeedAssetV2({
       runId: runId,
       snapshot: snapshot,
       baseline: baseline,
       dualQa: dualQa,
-      approvalMode: dualPass ? 'DUAL_QA' : 'API_FREE_BASELINE'
+      approvalMode: decision.approvalMode
     });
   }
 
   const catalog = exportFrontStaticCatalogSnapshotV1();
-  const details = {snapshot: snapshot, baseline: baseline, dualQa: dualQa, promotion: promotion, catalog: catalog, version: CDWG_V2_VERSION};
-  finalizeDailyRun_(runId, started, finalStatus, details, approved ? '' : 'PROMOTION_GATE_NOT_PASSED');
-  return {runId: runId, status: finalStatus, baseline: baseline, dualQa: dualQa, promotion: promotion, catalog: catalog, version: CDWG_V2_VERSION};
+  const details = {snapshot: snapshot, baseline: baseline, dualQa: dualQa, decision: decision, promotion: promotion, catalog: catalog, version: CDWG_V2_VERSION};
+  finalizeDailyRun_(runId, started, decision.finalStatus, details, decision.approved ? '' : 'PROMOTION_GATE_NOT_PASSED');
+  return {runId: runId, status: decision.finalStatus, baseline: baseline, dualQa: dualQa, decision: decision, promotion: promotion, catalog: catalog, version: CDWG_V2_VERSION};
 }
 
 function promoteApprovedQaResultToSeedAssetV2(ctx) {
