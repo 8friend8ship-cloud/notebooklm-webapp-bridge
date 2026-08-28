@@ -1,7 +1,9 @@
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('NotebookLM','Flow','AIStudio','GoogleAI')][string]$ServiceKey,
+  [Parameter(Mandatory=$true)][ValidatePattern('^[A-Za-z0-9_.-]{1,64}$')][string]$ServiceKey,
   [string]$SourcePath = '',
   [string]$TaskId = '',
+  [string]$ExtensionId = '',
+  [string]$OriginUrl = '',
   [switch]$ReconcileOnly,
   [string]$LocalInboxRoot = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX',
   [string]$CentralRootOverride = ''
@@ -10,34 +12,70 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
+$commonExtensions = @(
+  '.mp3','.wav','.m4a','.ogg','.aac','.flac',
+  '.mp4','.webm','.mov','.mkv',
+  '.pdf','.pptx','.xlsx','.csv','.docx','.txt','.md','.json','.html',
+  '.png','.jpg','.jpeg','.webp','.gif','.svg',
+  '.zip',
+  '.skp','.skb','.dae','.dwg','.dxf','.obj','.fbx','.stl','.3ds','.ifc'
+)
+
 function Get-ServiceConfig([string]$Key) {
   switch ($Key) {
     'NotebookLM' {
       return [ordered]@{
         folder = 'NotebookLM'
+        knownProfile = $true
         extensions = @('.mp3','.wav','.m4a','.ogg','.mp4','.webm','.mov','.pdf','.pptx','.xlsx','.csv','.png','.jpg','.jpeg','.webp','.docx','.txt','.json')
       }
     }
     'Flow' {
       return [ordered]@{
         folder = 'Flow'
+        knownProfile = $true
         extensions = @('.mp4','.webm','.mov','.png','.jpg','.jpeg','.webp')
       }
     }
     'AIStudio' {
       return [ordered]@{
         folder = 'AIStudio'
+        knownProfile = $true
         extensions = @('.json','.txt','.md','.csv','.pdf','.png','.jpg','.jpeg','.webp','.mp3','.wav','.m4a','.mp4','.webm','.mov')
       }
     }
     'GoogleAI' {
       return [ordered]@{
         folder = 'GoogleAI'
+        knownProfile = $true
         extensions = @('.json','.txt','.md','.csv','.pdf','.png','.jpg','.jpeg','.webp','.mp3','.wav','.m4a','.mp4','.webm','.mov')
       }
     }
+    'FrontQA' {
+      return [ordered]@{
+        folder = 'FrontQA'
+        knownProfile = $true
+        extensions = @('.json','.txt','.md','.csv','.pdf','.png','.jpg','.jpeg','.webp','.html')
+      }
+    }
+    'SketchUp' {
+      return [ordered]@{
+        folder = 'SketchUp'
+        knownProfile = $true
+        extensions = @('.skp','.skb','.dae','.dwg','.dxf','.obj','.fbx','.stl','.3ds','.ifc','.zip','.csv','.xlsx','.pdf','.png','.jpg','.jpeg','.webp','.json','.txt')
+      }
+    }
+    default {
+      # Future managed extensions are accepted only through an explicit SourcePath
+      # or their own explicit per-service inbox. Generic Downloads are never scanned.
+      $safeFolder = ($Key -replace '[^A-Za-z0-9_.-]','_')
+      return [ordered]@{
+        folder = $safeFolder
+        knownProfile = $false
+        extensions = @($commonExtensions)
+      }
+    }
   }
-  throw ('UNSUPPORTED_SERVICE_KEY:{0}' -f $Key)
 }
 
 function Find-CentralRoot {
@@ -127,6 +165,9 @@ function Copy-ToCaptureAndDrive([System.IO.FileInfo]$Source,[string]$Mode) {
 
   $meta = [ordered]@{
     serviceKey = $ServiceKey
+    knownProfile = [bool]$config.knownProfile
+    extensionId = $ExtensionId
+    originUrl = $OriginUrl
     taskId = $TaskId
     mode = $Mode
     sourcePath = $Source.FullName
@@ -160,6 +201,8 @@ $health = [ordered]@{
   ok = $true
   action = 'MANAGED_CHROME_EXTENSION_CAPTUREBRIDGE'
   serviceKey = $ServiceKey
+  knownProfile = [bool]$config.knownProfile
+  extensionId = $ExtensionId
   taskId = $TaskId
   localInbox = $localServiceDir
   driveInbox = $driveServiceDir
@@ -170,6 +213,6 @@ $health = [ordered]@{
   results = @($results)
   at = (Get-Date).ToString('o')
 }
-$healthPath = Join-Path $healthDir (('CAPTUREBRIDGE_{0}_HEALTH.json' -f $ServiceKey.ToUpperInvariant()))
+$healthPath = Join-Path $healthDir (('CAPTUREBRIDGE_{0}_HEALTH.json' -f (($ServiceKey -replace '[^A-Za-z0-9_.-]','_').ToUpperInvariant())))
 $health | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $healthPath -Encoding UTF8
 $health | ConvertTo-Json -Depth 12 -Compress

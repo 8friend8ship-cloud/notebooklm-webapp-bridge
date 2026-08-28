@@ -1,5 +1,6 @@
 param(
   [switch]$SmokeOnly,
+  [string]$ManagerRef = 'main',
   [string]$LocalInboxRoot = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX',
   [string]$CentralRootOverride = ''
 )
@@ -7,12 +8,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Repo = '8friend8ship-cloud/notebooklm-webapp-bridge'
-$ManagerExpected = '1b03384cbf7cb4608cd57e015208671f89744fa7'
+$ManagerExpected = '76a9718b30d1432829ea7c0f2e6af95ea6942ab8'
 $InstallRoot = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent\capture'
 $Manager = Join-Path $InstallRoot 'ManageChromeExtensionArtifacts.ps1'
 $Wrapper = Join-Path $InstallRoot 'Reconcile-AllManagedChromeArtifacts.ps1'
 $TaskName = 'HomeDesign-CaptureBridge-ManagedChrome-Reconcile'
-$Services = @('NotebookLM','Flow','AIStudio','GoogleAI')
+$Services = @('NotebookLM','Flow','AIStudio','GoogleAI','FrontQA','SketchUp')
 
 function GitBlobSha1([string]$Path) {
   $bytes = [IO.File]::ReadAllBytes($Path)
@@ -53,7 +54,7 @@ foreach ($service in $Services) {
   New-Item -ItemType Directory -Force -Path (Join-Path (Join-Path $CentralRoot 'CaptureBridge\INBOX') $service) | Out-Null
 }
 
-$raw = 'https://raw.githubusercontent.com/' + $Repo + '/main/local-agent/capture/ManageChromeExtensionArtifacts.ps1?hdcb=' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$raw = 'https://raw.githubusercontent.com/' + $Repo + '/refs/heads/' + $ManagerRef + '/local-agent/capture/ManageChromeExtensionArtifacts.ps1?hdcb=' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $tmp = $Manager + '.download'
 Invoke-WebRequest -UseBasicParsing -Uri $raw -OutFile $tmp -TimeoutSec 20
 $actual = (GitBlobSha1 $tmp).ToLowerInvariant()
@@ -69,7 +70,9 @@ $wrapperBody = @"
 `$ErrorActionPreference='Continue'
 `$Manager='$escapedManager'
 `$LocalInboxRoot='$escapedLocal'
-`$services=@('NotebookLM','Flow','AIStudio','GoogleAI')
+`$known=@('NotebookLM','Flow','AIStudio','GoogleAI','FrontQA','SketchUp')
+`$discovered=@(Get-ChildItem -LiteralPath `$LocalInboxRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object { `$_.Name })
+`$services=@(`$known + `$discovered | Where-Object { `$_ -match '^[A-Za-z0-9_.-]{1,64}$' } | Sort-Object -Unique)
 foreach(`$service in `$services){
   try { & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `$Manager -ServiceKey `$service -ReconcileOnly -LocalInboxRoot `$LocalInboxRoot | Out-Null } catch {}
 }
@@ -110,17 +113,35 @@ foreach ($service in $Services) {
   $smoke += [ordered]@{service=$service;ok=$true;drivePath=[string]$first.drivePath;bytes=[int64]$first.bytes;sha256=[string]$first.sha256}
 }
 
+# Smoke one future/unregistered adapter key to prove that new managed extensions do not require a manager-code edit.
+$futureService = 'FutureManagedExtension'
+$futureSrc = Join-Path $smokeRoot 'future-managed-smoke.txt'
+Set-Content -LiteralPath $futureSrc -Value ('MANAGED_CHROME_CAPTURE_SMOKE ' + $futureService + ' ' + (Get-Date).ToString('o')) -Encoding UTF8
+$futureArgs = @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$Manager,'-ServiceKey',$futureService,'-SourcePath',$futureSrc,'-TaskId','SETUP_SMOKE_FUTURE_MANAGED','-LocalInboxRoot',$LocalInboxRoot)
+if ($CentralRootOverride) { $futureArgs += @('-CentralRootOverride',$CentralRoot) }
+$futureRaw = & powershell.exe @futureArgs
+if ($LASTEXITCODE -ne 0) { throw 'CAPTURE_SMOKE_FAILED:FUTURE_MANAGED' }
+$futureParsed = ($futureRaw | Select-Object -Last 1) | ConvertFrom-Json
+if (-not [bool]$futureParsed.ok -or [int]$futureParsed.processedCount -lt 1 -or [bool]$futureParsed.knownProfile -or [bool]$futureParsed.genericDownloadsScan) {
+  throw 'CAPTURE_SMOKE_CONTRACT_FAILED:FUTURE_MANAGED'
+}
+$futureFirst = @($futureParsed.results)[0]
+$smoke += [ordered]@{service=$futureService;ok=$true;drivePath=[string]$futureFirst.drivePath;bytes=[int64]$futureFirst.bytes;sha256=[string]$futureFirst.sha256;knownProfile=$false}
+
 $result = [ordered]@{
   ok = $true
   action = 'SETUP_MANAGED_CHROME_CAPTUREBRIDGE'
   services = $Services
+  futureManagedAdapter = $futureService
   manager = $Manager
+  managerRef = $ManagerRef
   managerSha = $actual
   localInboxRoot = $LocalInboxRoot
   centralRoot = $CentralRoot
   scheduledTask = $TaskName
   scheduled = $scheduled
   smokeOnly = [bool]$SmokeOnly
+  dynamicInboxDiscovery = $true
   genericDownloadsSync = $false
   copyOnly = $true
   smoke = $smoke
