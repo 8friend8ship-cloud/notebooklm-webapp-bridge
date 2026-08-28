@@ -24,18 +24,49 @@ function Get-ExpectedExtensions([string]$type) {
 }
 
 function Find-GoogleDriveMyDrive {
-  $candidates = New-Object System.Collections.Generic.List[string]
   $koMyDrive = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
+  $centralName = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+
+  # Prefer the already-proven central root when the local runner exposes it.
+  if ($env:HDCENTRAL) {
+    try {
+      if (Test-Path -LiteralPath $env:HDCENTRAL) {
+        $central = (Resolve-Path -LiteralPath $env:HDCENTRAL).Path
+        $parent = Split-Path -Parent $central
+        if ($parent -and (Test-Path -LiteralPath $parent)) { return $parent }
+      }
+    } catch {}
+  }
+
+  $candidates = New-Object System.Collections.Generic.List[string]
   foreach ($d in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
     if (-not $d.Root) { continue }
+
+    # Strongest probe: locate the known central folder and derive My Drive as its parent.
+    foreach ($centralCandidate in @(
+      (Join-Path $d.Root $centralName),
+      (Join-Path (Join-Path $d.Root 'My Drive') $centralName),
+      (Join-Path (Join-Path $d.Root $koMyDrive) $centralName)
+    )) {
+      try {
+        if (Test-Path -LiteralPath $centralCandidate) {
+          $resolvedCentral = (Resolve-Path -LiteralPath $centralCandidate).Path
+          $parent = Split-Path -Parent $resolvedCentral
+          if ($parent -and (Test-Path -LiteralPath $parent)) { return $parent }
+        }
+      } catch {}
+    }
+
     $candidates.Add((Join-Path $d.Root 'My Drive'))
     $candidates.Add((Join-Path $d.Root $koMyDrive))
   }
+
   if ($env:USERPROFILE) {
     $candidates.Add((Join-Path $env:USERPROFILE 'My Drive'))
     $candidates.Add((Join-Path $env:USERPROFILE 'Google Drive\My Drive'))
     $candidates.Add((Join-Path (Join-Path $env:USERPROFILE 'Google Drive') $koMyDrive))
   }
+
   foreach ($p in @($candidates | Select-Object -Unique)) {
     try {
       if ($p -and (Test-Path -LiteralPath $p)) { return (Resolve-Path -LiteralPath $p).Path }
@@ -54,7 +85,6 @@ function Get-NotebookLMDownloadDirectories {
     $dirs.Add((Join-Path $env:USERPROFILE 'Downloads'))
   }
 
-  # Dedicated Chrome profile: use the browser's real download.default_directory when configured.
   $pref = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\ChromeUserData\Default\Preferences'
   if (Test-Path -LiteralPath $pref) {
     try {
@@ -64,7 +94,6 @@ function Get-NotebookLMDownloadDirectories {
     } catch {}
   }
 
-  # Legacy CaptureBridge locations are read-only compatibility inputs. New captures are always copied to canonical.
   $docs = [Environment]::GetFolderPath('MyDocuments')
   if ($docs) {
     $dirs.Add((Join-Path $docs '_365-3.30\CaptureBridge\INBOX\NotebookLM'))
@@ -127,7 +156,6 @@ if ($SourcePath) {
   }
 }
 
-# Canonical visible local capture: all successful results converge here.
 New-Item -ItemType Directory -Path $localCaptureDir -Force | Out-Null
 $localSafeTask = ($TaskId -replace '[^A-Za-z0-9_.-]','_')
 $localCaptureName = "${localSafeTask}__$($found.Name)"
