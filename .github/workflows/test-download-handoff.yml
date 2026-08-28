@@ -10,13 +10,9 @@ on:
       - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
       - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
       - 'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1'
-      - 'local-agent/capture/ManageChromeExtensionArtifacts.ps1'
-      - 'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1'
       - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
       - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
-      - 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
-      - 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/stable/agent.json'
       - 'local-agent/stable/host.json'
       - 'runtime/stable/release.json'
@@ -28,13 +24,9 @@ on:
       - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
       - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
       - 'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1'
-      - 'local-agent/capture/ManageChromeExtensionArtifacts.ps1'
-      - 'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1'
       - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
       - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
-      - 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
-      - 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/stable/agent.json'
       - 'local-agent/stable/host.json'
       - 'runtime/stable/release.json'
@@ -69,13 +61,9 @@ jobs:
           $files = @(
             'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1',
             'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1',
-            'local-agent/capture/ManageChromeExtensionArtifacts.ps1',
-            'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1',
             'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1',
             'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1',
-            'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1',
-            'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1',
-            'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+            'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
           )
           $failed = $false
           foreach ($file in $files) {
@@ -89,42 +77,6 @@ jobs:
             }
           }
           if ($failed) { exit 1 }
-
-      - name: Managed CaptureBridge contracts
-        shell: pwsh
-        run: |
-          $manager = Get-Content -LiteralPath 'local-agent/capture/ManageChromeExtensionArtifacts.ps1' -Raw
-          foreach ($required in @(
-            "ValidateSet('NotebookLM','Flow','AIStudio','GoogleAI')",
-            'EXPLICIT_SOURCE_PATH_OR_EXPLICIT_SERVICE_INBOX_ONLY',
-            'genericDownloadsScan = $false',
-            'Copy-Item',
-            'originalPreserved'
-          )) {
-            if ($manager -notmatch [regex]::Escape($required)) { throw "CAPTURE_MANAGER_CONTRACT_MISSING:$required" }
-          }
-          if ($manager -match 'Get-ChildItem[^\r\n]+Downloads') { throw 'GENERIC_DOWNLOADS_SCAN_FORBIDDEN' }
-
-          $setup = Get-Content -LiteralPath 'local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1' -Raw
-          foreach ($required in @(
-            'HomeDesign-CaptureBridge-ManagedChrome-Reconcile',
-            "@('NotebookLM','Flow','AIStudio','GoogleAI')",
-            'genericDownloadsSync = $false',
-            'd118872f0558776abf098c0c51ed192fdcb6a78b'
-          )) {
-            if ($setup -notmatch [regex]::Escape($required)) { throw "CAPTURE_SETUP_CONTRACT_MISSING:$required" }
-          }
-
-          $host = Get-Content -LiteralPath 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1' -Raw
-          foreach ($required in @('1.2.6','local-agent/capture/ManageChromeExtensionArtifacts.ps1','local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1')) {
-            if ($host -notmatch [regex]::Escape($required)) { throw "HOST126_CONTRACT_MISSING:$required" }
-          }
-
-          $agent = Get-Content -LiteralPath 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1' -Raw
-          foreach ($required in @('1.1.31','1.2.6','5d17bb233706897cd1706930cea9af3796f29488')) {
-            if ($agent -notmatch [regex]::Escape($required)) { throw "AGENT131_CONTRACT_MISSING:$required" }
-          }
-          Write-Host 'MANAGED_CAPTUREBRIDGE_STATIC_CONTRACT_PASS'
 
       - name: AutoResume dual-persistence contract
         shell: pwsh
@@ -171,80 +123,6 @@ jobs:
           if ([int64]$result.sourceBytes -ne [int64]$result.localCaptureBytes) { throw 'LOCAL_CAPTURE_SIZE_MISMATCH' }
           if ([int64]$result.sourceBytes -ne [int64]$result.destinationBytes) { throw 'DRIVE_COPY_SIZE_MISMATCH' }
           Write-Host "EXACT_PATH_SMOKE_PASS sourceMode=$($result.sourceMode) bytes=$($result.sourceBytes)"
-
-      - name: Managed Chrome extension artifacts smoke
-        shell: pwsh
-        run: |
-          $central = Join-Path $env:RUNNER_TEMP 'drive\00_중앙에이전트'
-          $local = Join-Path $env:RUNNER_TEMP 'capture\INBOX'
-          $sources = Join-Path $env:RUNNER_TEMP 'managed-sources'
-          New-Item -ItemType Directory -Force -Path $central,$local,$sources | Out-Null
-
-          $fixtures = @(
-            @{service='NotebookLM';name='note.txt';bytes=[Text.Encoding]::UTF8.GetBytes('notebooklm')},
-            @{service='Flow';name='flow.png';bytes=[Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZK1sAAAAASUVORK5CYII=')},
-            @{service='AIStudio';name='studio.json';bytes=[Text.Encoding]::UTF8.GetBytes('{"ok":true}')},
-            @{service='GoogleAI';name='google.txt';bytes=[Text.Encoding]::UTF8.GetBytes('google-ai')}
-          )
-          foreach ($f in $fixtures) {
-            $src = Join-Path $sources $f.name
-            [IO.File]::WriteAllBytes($src,[byte[]]$f.bytes)
-            $raw = & ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 `
-              -ServiceKey $f.service `
-              -SourcePath $src `
-              -TaskId ('CI_' + $f.service) `
-              -LocalInboxRoot $local `
-              -CentralRootOverride $central
-            $result = ($raw | Select-Object -Last 1) | ConvertFrom-Json
-            if (-not $result.ok) { throw "MANAGED_RESULT_NOT_OK:$($f.service)" }
-            if ([bool]$result.genericDownloadsScan) { throw "GENERIC_DOWNLOADS_SCAN_TRUE:$($f.service)" }
-            if (-not [bool]$result.copyOnly) { throw "COPY_ONLY_FALSE:$($f.service)" }
-            if ([int]$result.processedCount -ne 1) { throw "BAD_PROCESSED_COUNT:$($f.service)" }
-            $item = @($result.results)[0]
-            if (-not [bool]$item.originalPreserved) { throw "SOURCE_NOT_PRESERVED:$($f.service)" }
-            if (-not (Test-Path -LiteralPath $item.drivePath -PathType Leaf)) { throw "DRIVE_RESULT_MISSING:$($f.service)" }
-            if ((Get-FileHash -Algorithm SHA256 -LiteralPath $src).Hash.ToLowerInvariant() -ne [string]$item.sha256) { throw "HASH_MISMATCH:$($f.service)" }
-          }
-
-          $partial = Join-Path $sources 'bad.mp4.crdownload'
-          [IO.File]::WriteAllBytes($partial,[byte[]](1..8))
-          $failed = $false
-          try { & ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 -ServiceKey Flow -SourcePath $partial -TaskId CI_BAD -LocalInboxRoot $local -CentralRootOverride $central | Out-Null } catch { $failed = $true }
-          if (-not $failed) { throw 'CRDOWNLOAD_NOT_REJECTED' }
-
-          $zero = Join-Path $sources 'zero.txt'
-          [IO.File]::WriteAllBytes($zero,[byte[]]@())
-          $failed = $false
-          try { & ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 -ServiceKey NotebookLM -SourcePath $zero -TaskId CI_ZERO -LocalInboxRoot $local -CentralRootOverride $central | Out-Null } catch { $failed = $true }
-          if (-not $failed) { throw 'ZERO_BYTE_NOT_REJECTED' }
-
-          $exe = Join-Path $sources 'bad.exe'
-          [IO.File]::WriteAllBytes($exe,[byte[]](1..8))
-          $failed = $false
-          try { & ./local-agent/capture/ManageChromeExtensionArtifacts.ps1 -ServiceKey AIStudio -SourcePath $exe -TaskId CI_EXE -LocalInboxRoot $local -CentralRootOverride $central | Out-Null } catch { $failed = $true }
-          if (-not $failed) { throw 'UNSUPPORTED_EXTENSION_NOT_REJECTED' }
-          Write-Host 'MANAGED_CHROME_CAPTURE_SMOKE_PASS services=4 negative=3'
-
-      - name: Managed CaptureBridge setup smoke
-        shell: pwsh
-        run: |
-          $central = Join-Path $env:RUNNER_TEMP 'setup-drive\00_중앙에이전트'
-          $local = Join-Path $env:RUNNER_TEMP 'setup-capture\INBOX'
-          New-Item -ItemType Directory -Force -Path $central,$local | Out-Null
-          $raw = & ./local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1 `
-            -SmokeOnly `
-            -LocalInboxRoot $local `
-            -CentralRootOverride $central
-          $result = ($raw | Select-Object -Last 1) | ConvertFrom-Json
-          if (-not $result.ok) { throw 'SETUP_RESULT_NOT_OK' }
-          if ([bool]$result.scheduled) { throw 'SMOKE_ONLY_CREATED_SCHEDULE' }
-          if ([bool]$result.genericDownloadsSync) { throw 'SETUP_GENERIC_DOWNLOADS_SYNC_TRUE' }
-          if (-not [bool]$result.copyOnly) { throw 'SETUP_COPY_ONLY_FALSE' }
-          if (@($result.smoke).Count -ne 4) { throw "SETUP_SMOKE_SERVICE_COUNT:$(@($result.smoke).Count)" }
-          foreach ($item in @($result.smoke)) {
-            if (-not [bool]$item.ok -or -not (Test-Path -LiteralPath ([string]$item.drivePath) -PathType Leaf)) { throw "SETUP_SMOKE_MISSING:$($item.service)" }
-          }
-          Write-Host 'MANAGED_CAPTUREBRIDGE_SETUP_SMOKE_PASS services=4'
 
       - name: FileSystemWatcher fallback smoke
         shell: pwsh
