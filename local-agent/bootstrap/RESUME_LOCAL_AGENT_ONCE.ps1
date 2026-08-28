@@ -97,10 +97,11 @@ if(-not(Test-Path -LiteralPath $verifyMarker)){
   Set-Content -LiteralPath $verifyMarker -Value $attempt.completedAt -Encoding ASCII
   try{
     $centralName=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+    $myDriveKo=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
     foreach($drv in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
       $rr=[string]$drv.Root
       if(-not $rr){continue}
-      foreach($cand in @((Join-Path $rr $centralName),(Join-Path $rr ('My Drive\'+$centralName)),(Join-Path $rr ('내 드라이브\'+$centralName)),(Join-Path $rr ('Google Drive\'+$centralName)))){
+      foreach($cand in @((Join-Path $rr $centralName),(Join-Path $rr ($myDriveKo+'\'+$centralName)),(Join-Path $rr ('My Drive\'+$centralName)),(Join-Path $rr ('Google Drive\'+$centralName)))){
         if(Test-Path -LiteralPath $cand){
           $dest=Join-Path $cand 'Runtime_Readback'
           New-Item -ItemType Directory -Force -Path $dest|Out-Null
