@@ -1,0 +1,59 @@
+name: Local Agent Bootstrap UTF8 Safety CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
+      - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
+      - 'local-agent/bootstrap/HomeDesignAutoResume.ps1'
+      - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - '.github/workflows/local-agent-bootstrap-utf8-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-powershell51:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Windows PowerShell 5.1 syntax
+        shell: powershell
+        run: |
+          $files=@(
+            'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1',
+            'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1',
+            'local-agent/bootstrap/HomeDesignAutoResume.ps1',
+            'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+          )
+          foreach($f in $files){
+            $tokens=$null; $errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+            if($errors.Count -gt 0){
+              $errors | ForEach-Object { Write-Error ("${f}: "+$_.Message) }
+              throw "WINDOWS_POWERSHELL51_SYNTAX_FAIL:$f"
+            }
+          }
+      - name: ASCII safe bootstrap source
+        shell: powershell
+        run: |
+          $files=@(
+            'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1',
+            'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1',
+            'local-agent/bootstrap/HomeDesignAutoResume.ps1',
+            'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+          )
+          foreach($f in $files){
+            $text=[IO.File]::ReadAllText((Resolve-Path $f),[Text.Encoding]::UTF8)
+            if($text -match '[^\x00-\x7F]'){ throw "NON_ASCII_BOOTSTRAP_SOURCE:$f" }
+          }
+      - name: Recovery safety contract
+        shell: powershell
+        run: |
+          $resume=Get-Content 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' -Raw
+          foreach($needle in @('No reinstall / no new OAuth / no Apps Script redeploy / normal Chrome untouched.','gitBlobSha1','HomeDesignLocalAgent.ps1','-Loop')){
+            if(-not $resume.Contains($needle)){ throw "MISSING_RESUME_GUARD:$needle" }
+          }
+          if($resume -match 'clasp\s+create' -or $resume -match 'clasp\s+login' -or $resume -match 'ScriptApp\.newTrigger'){ throw 'FORBIDDEN_RECOVERY_ACTION' }
