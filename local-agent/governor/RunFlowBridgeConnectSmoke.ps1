@@ -12,9 +12,10 @@ $CftRoot=Join-Path $Base 'ChromeForTesting'
 $NotebookExtension=Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
 $NotebookFront='https://notebooklm-webapp-bridge.vercel.app/'
 $FlowUrl='https://labs.google/fx/tools/flow'
+$ExpectedFlowExtensionId='lgedgmpcikglaajhfclcihicgafimlna'
 
 function Safe-TaskId([string]$Value){if([string]::IsNullOrWhiteSpace($Value)){return ('FLOW_BRIDGE_CONNECT_'+(Get-Date -Format 'yyyyMMdd_HHmmss'))};if($Value -notmatch '^[A-Za-z0-9_.-]{1,180}$'){throw 'UNSAFE_TASK_ID'};return $Value}
-function Write-JsonAtomic([string]$Path,$Object){$parent=Split-Path -Parent $Path;if(-not(Test-Path -LiteralPath $parent)){New-Item -ItemType Directory -Force -Path $parent|Out-Null};$tmp=$Path+'.tmp';$Object|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $tmp -Encoding UTF8;Move-Item -LiteralPath $tmp -Destination $Path -Force}
+function Write-JsonAtomic([string]$Path,$Object){$parent=Split-Path -Parent $Path;if(-not(Test-Path -LiteralPath $parent)){New-Item -ItemType Directory -Force -Path $parent|Out-Null};$tmp=$Path+'.tmp';$Object|ConvertTo-Json -Depth 40|Set-Content -LiteralPath $tmp -Encoding UTF8;Move-Item -LiteralPath $tmp -Destination $Path -Force}
 function Find-CentralRoot {
   if($CentralRootOverride -and (Test-Path -LiteralPath $CentralRootOverride -PathType Container)){return $CentralRootOverride}
   $target=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
@@ -52,6 +53,23 @@ function Restore-Notebook {
     return (@(Dedicated-Procs).Count -gt 0)
   }catch{return $false}
 }
+function Invoke-DeepProbe([string]$BrowserWs,[string]$PageWs,[string]$Sentinel){
+  $node=Get-Command node.exe -ErrorAction SilentlyContinue;if(-not $node){$node=Get-Command node -ErrorAction SilentlyContinue};if(-not $node){return [ordered]@{ok=$false;stage='NODE_NOT_FOUND'}}
+  $js=Join-Path $env:TEMP ('flow-bridge-deep-probe-'+[guid]::NewGuid().ToString('N')+'.js')
+  $code=@'
+const browserWs=process.argv[2], pageWs=process.argv[3], sentinel=process.argv[4], expectedId=process.argv[5];
+function connect(url){return new Promise((resolve,reject)=>{const ws=new WebSocket(url);let seq=0;const pending=new Map();ws.onopen=()=>resolve({ws,send:(method,params={})=>new Promise((res,rej)=>{const id=++seq;pending.set(id,{res,rej});ws.send(JSON.stringify({id,method,params}));})});ws.onerror=reject;ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return};if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.rej(new Error(JSON.stringify(m.error))):p.res(m.result);}};});}
+const b=await connect(browserWs);const all=await b.send('Target.getTargets');
+const ext=(all.targetInfos||[]).filter(t=>(t.url||'').startsWith('chrome-extension://'));
+const expected=ext.filter(t=>(t.url||'').startsWith('chrome-extension://'+expectedId+'/'));
+const p=await connect(pageWs);const sentinelLit=JSON.stringify(sentinel);
+const expr=`(()=>{const roots=[document],q=[document],seen=new Set(q);while(q.length){const r=q.shift();let a=[];try{a=[...r.querySelectorAll('*')]}catch{};for(const e of a){if(e.shadowRoot&&!seen.has(e.shadowRoot)){seen.add(e.shadowRoot);roots.push(e.shadowRoot);q.push(e.shadowRoot)}}}const vis=e=>{if(!e)return false;const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&Number(s.opacity)!==0&&r.width>18&&r.height>18&&r.bottom>=0&&r.right>=0};const desc=e=>[e.getAttribute?.('aria-label'),e.getAttribute?.('placeholder'),e.getAttribute?.('data-placeholder'),e.getAttribute?.('title'),e.getAttribute?.('name'),e.id,e.textContent,e.value].filter(Boolean).join(' ').replace(/\\s+/g,' ').trim();let inputs=[];for(const r of roots){try{inputs.push(...r.querySelectorAll('textarea,input[type=text],input:not([type]),[contenteditable=true],[role=textbox]'))}catch{}}let best=null,score=-9999;for(const e of [...new Set(inputs)]){if(!vis(e)||e.disabled||e.readOnly)continue;const d=desc(e).toLowerCase();let s=0;for(const w of ['prompt','describe','description','imagine','scene','video','image','create','make','what do you want','type your','enter your','프롬프트','설명','장면','영상','이미지','만들','생성','입력'])if(d.includes(w))s+=12;for(const w of ['search','find','검색','댓글','comment','title','제목','name','이름'])if(d.includes(w))s-=20;if(e.tagName==='TEXTAREA')s+=12;if(e.isContentEditable)s+=7;if(e.getAttribute?.('role')==='textbox')s+=4;const z=e.getBoundingClientRect();s+=Math.min(12,Math.round(z.width*z.height/30000));if(z.top>innerHeight*.35)s+=3;if(s>score){score=s;best=e}}let fill={attempted:false,verified:false,cleared:false};if(best&&score>=5){fill.attempted=true;const old=('value'in best)?best.value:best.textContent;const v=${sentinelLit};best.focus();if('value'in best){const proto=best.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;const set=Object.getOwnPropertyDescriptor(proto,'value')?.set;if(set)set.call(best,v);else best.value=v}else best.textContent=v;try{best.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:v}))}catch{best.dispatchEvent(new Event('input',{bubbles:true}))}best.dispatchEvent(new Event('change',{bubbles:true}));fill.verified=(('value'in best)?best.value:best.textContent)===v;if('value'in best){const proto=best.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;const set=Object.getOwnPropertyDescriptor(proto,'value')?.set;if(set)set.call(best,old);else best.value=old}else best.textContent=old;try{best.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'deleteContentBackward',data:null}))}catch{best.dispatchEvent(new Event('input',{bubbles:true}))}best.dispatchEvent(new Event('change',{bubbles:true}));fill.cleared=(('value'in best)?best.value:best.textContent)===old}let buttons=[];for(const r of roots){try{buttons.push(...r.querySelectorAll('button,[role=button],a'))}catch{}}const routeHints=[...new Set(buttons)].filter(vis).map(e=>({text:desc(e).slice(0,180),href:e.href||''})).filter(x=>/project|create|new|generate|flow|프로젝트|만들|생성/i.test(x.text+' '+x.href)).slice(0,20);return {url:location.href,title:document.title,readyState:document.readyState,shadowRootCount:roots.length-1,inputCandidateCount:inputs.length,promptInputFound:!!(best&&score>=5),promptInputScore:score,promptInputTag:best?.tagName||'',promptInputDesc:best?desc(best).slice(0,240):'',inputFillAttempted:fill.attempted,inputFillVerified:fill.verified,inputCleared:fill.cleared,routeHints,bodyTextLength:(document.body?.innerText||'').length}})()`;
+const r=await p.send('Runtime.evaluate',{expression:expr,returnByValue:true,awaitPromise:true,userGesture:true});
+console.log(JSON.stringify({ok:true,targets:{extensionTargets:ext,expectedExtensionTargets:expected,extensionTargetCount:ext.length,expectedExtensionTargetCount:expected.length,expectedServiceWorkerCount:expected.filter(t=>t.type==='service_worker').length},page:r.result?.value||null}));
+'@
+  Set-Content -LiteralPath $js -Value $code -Encoding UTF8
+  try{$out=& $node.Source $js $BrowserWs $PageWs $Sentinel $ExpectedFlowExtensionId 2>&1|Out-String;$trim=$out.Trim();if(-not $trim){return [ordered]@{ok=$false;stage='EMPTY_DEEP_PROBE'}};return ($trim.Split("`n")|Select-Object -Last 1|ConvertFrom-Json)}catch{return [ordered]@{ok=$false;stage='DEEP_PROBE_ERROR';error=$_.Exception.Message}}finally{Remove-Item -LiteralPath $js -Force -ErrorAction SilentlyContinue}
+}
 
 $task=Safe-TaskId $TaskId
 $central=Find-CentralRoot
@@ -59,6 +77,9 @@ if(-not $central){throw 'CENTRAL_DRIVE_ROOT_NOT_FOUND'}
 $flowExtension=Find-FlowExtension
 if(-not $flowExtension){throw 'FLOW_EXTENSION_PATH_NOT_FOUND'}
 $manifest=Get-Content -LiteralPath (Join-Path $flowExtension 'manifest.json') -Raw -Encoding UTF8|ConvertFrom-Json
+$manifestBackground='';try{$manifestBackground=[string]$manifest.background.service_worker}catch{}
+$manifestContentScripts=@();try{$manifestContentScripts=@($manifest.content_scripts|ForEach-Object{[ordered]@{matches=@($_.matches);js=@($_.js);runAt=[string]$_.run_at}})}catch{}
+$manifestActionPopup='';try{$manifestActionPopup=[string]$manifest.action.default_popup}catch{}
 $chrome=Find-CftChrome
 if(-not $chrome){throw 'CFT_CHROME_EXE_NOT_FOUND'}
 $normalBefore=@(Normal-Procs|ForEach-Object{[int]$_.ProcessId})
@@ -69,47 +90,42 @@ Start-Process -FilePath $chrome.FullName -ArgumentList $args -WorkingDirectory $
 
 $version=$null;$targets=@();$deadline=(Get-Date).AddSeconds(30)
 do{
-  try{
-    $version=Invoke-RestMethod -Uri ("http://127.0.0.1:$DebugPort/json/version") -TimeoutSec 2
-    if($version.webSocketDebuggerUrl){
-      $targets=@(Invoke-RestMethod -Uri ("http://127.0.0.1:$DebugPort/json/list") -TimeoutSec 2)
-      if(@($targets|Where-Object{$_.type -eq 'page' -and $_.url -and ([string]$_.url).Contains('/fx/tools/flow')}).Count -gt 0){break}
-    }
-  }catch{}
+  try{$version=Invoke-RestMethod -Uri ("http://127.0.0.1:$DebugPort/json/version") -TimeoutSec 2;if($version.webSocketDebuggerUrl){$targets=@(Invoke-RestMethod -Uri ("http://127.0.0.1:$DebugPort/json/list") -TimeoutSec 2);if(@($targets|Where-Object{$_.type -eq 'page' -and $_.url -and ([string]$_.url).Contains('/fx/tools/flow')}).Count -gt 0){break}}}catch{}
   Start-Sleep -Milliseconds 500
 }while((Get-Date)-lt $deadline)
 
 $flowPages=@($targets|Where-Object{$_.type -eq 'page' -and $_.url -and ([string]$_.url).Contains('/fx/tools/flow')})
+$flowPage=$flowPages|Select-Object -First 1
 $loginPages=@($targets|Where-Object{$_.type -eq 'page' -and $_.url -and ([string]$_.url).Contains('accounts.google.com')})
-$extensionTargets=@($targets|Where-Object{$_.url -and ([string]$_.url).StartsWith('chrome-extension://')}|ForEach-Object{[ordered]@{type=$_.type;title=$_.title;url=$_.url}})
 $dedicatedCmd=@(Dedicated-Procs|ForEach-Object{[string]$_.CommandLine})
 $loadArgPresent=(@($dedicatedCmd|Where-Object{$_ -and $_.Contains('--load-extension=') -and $_.Contains($flowExtension)}).Count -gt 0)
+$sentinel='CENTRAL_AGENT_FLOW_INPUT_PROBE_'+(Get-Date -Format 'HHmmss')
+$deep=$null
+if($version -and $version.webSocketDebuggerUrl -and $flowPage -and $flowPage.webSocketDebuggerUrl){$deep=Invoke-DeepProbe -BrowserWs ([string]$version.webSocketDebuggerUrl) -PageWs ([string]$flowPage.webSocketDebuggerUrl) -Sentinel $sentinel}else{$deep=[ordered]@{ok=$false;stage='NO_CDP_PAGE_FOR_DEEP_PROBE'}}
 $restored=Restore-Notebook
 $normalAfter=@(Normal-Procs|ForEach-Object{[int]$_.ProcessId})
 $normalRootAfter=@(Normal-BrowserRoots|ForEach-Object{[int]$_.ProcessId})
 $missingNormal=@($normalBefore|Where-Object{$normalAfter -notcontains $_})
 $missingRoot=@($normalRootBefore|Where-Object{$normalRootAfter -notcontains $_})
-$childChurn=@($missingNormal|Where-Object{$missingRoot -notcontains $_})
 $normalChromeUntouched=($missingRoot.Count -eq 0)
-$ok=($version -and $version.webSocketDebuggerUrl -and $flowPages.Count -gt 0 -and $loadArgPresent -and $loginPages.Count -eq 0 -and $restored -and $normalChromeUntouched)
+$serviceWorkerActive=($deep -and $deep.ok -and [int]$deep.targets.expectedServiceWorkerCount -gt 0)
+$inputVerified=($deep -and $deep.ok -and [bool]$deep.page.promptInputFound -and [bool]$deep.page.inputFillVerified -and [bool]$deep.page.inputCleared)
+$ok=($version -and $version.webSocketDebuggerUrl -and $flowPages.Count -gt 0 -and $loadArgPresent -and $loginPages.Count -eq 0 -and $serviceWorkerActive -and $inputVerified -and $restored -and $normalChromeUntouched)
 
 $readbackDir=Join-Path (Join-Path $central 'Runtime_Readback') 'Flow_Bridge_Direct'
 $resultPath=Join-Path $readbackDir ($task+'_result.json')
 $ackPath=Join-Path $readbackDir ($task+'_ACK.json')
 $result=[ordered]@{
-  ok=[bool]$ok;action='FLOW_BRIDGE_DIRECT_CONNECT_SMOKE';taskId=$task;centralRoot=$central;flowUrl=$FlowUrl;
-  extensionPath=$flowExtension;extensionName=[string]$manifest.name;extensionVersion=[string]$manifest.version;
-  cftChrome=$chrome.FullName;debugPort=$DebugPort;cdpReady=[bool]($version -and $version.webSocketDebuggerUrl);
-  flowPageFound=($flowPages.Count -gt 0);flowPages=@($flowPages|ForEach-Object{[ordered]@{title=$_.title;url=$_.url}});
-  loginRequired=($loginPages.Count -gt 0);loadExtensionArgPresent=[bool]$loadArgPresent;extensionTargets=$extensionTargets;extensionTargetCount=$extensionTargets.Count;
-  dedicatedStopped=$dedicatedStopped;notebookDedicatedRestored=[bool]$restored;
-  normalChromeBeforeCount=$normalBefore.Count;normalChromeAfterCount=$normalAfter.Count;normalChromeMissingPids=$missingNormal;
-  normalChromeRootBeforeCount=$normalRootBefore.Count;normalChromeRootAfterCount=$normalRootAfter.Count;normalChromeMissingRootPids=$missingRoot;normalChromeChildChurnPids=$childChurn;normalChromeUntouched=[bool]$normalChromeUntouched;
-  generateClicked=$false;creditSpend=$false;oauthChanged=$false;chromeSettingsChanged=$false;at=(Get-Date).ToString('o')
+  ok=[bool]$ok;action='FLOW_BRIDGE_DEEP_CONNECT_PROBE';taskId=$task;centralRoot=$central;flowUrl=$FlowUrl;
+  extensionPath=$flowExtension;expectedExtensionId=$ExpectedFlowExtensionId;extensionName=[string]$manifest.name;extensionVersion=[string]$manifest.version;manifestVersion=[int]$manifest.manifest_version;manifestBackgroundServiceWorker=$manifestBackground;manifestContentScripts=$manifestContentScripts;manifestActionPopup=$manifestActionPopup;
+  cftChrome=$chrome.FullName;debugPort=$DebugPort;cdpReady=[bool]($version -and $version.webSocketDebuggerUrl);flowPageFound=($flowPages.Count -gt 0);flowPages=@($flowPages|ForEach-Object{[ordered]@{title=$_.title;url=$_.url;type=$_.type}});loginRequired=($loginPages.Count -gt 0);loadExtensionArgPresent=[bool]$loadArgPresent;
+  deepProbe=$deep;serviceWorkerActive=[bool]$serviceWorkerActive;promptInputVerified=[bool]$inputVerified;
+  dedicatedStopped=$dedicatedStopped;notebookDedicatedRestored=[bool]$restored;normalChromeBeforeCount=$normalBefore.Count;normalChromeAfterCount=$normalAfter.Count;normalChromeMissingRootPids=$missingRoot;normalChromeUntouched=[bool]$normalChromeUntouched;
+  generateClicked=$false;creditSpend=$false;oauthChanged=$false;chromeSettingsChanged=$false;verificationContract='PAGE+EXTENSION_SERVICE_WORKER+PROMPT_INPUT_FILL_READBACK_CLEAR+DRIVE_ACK';at=(Get-Date).ToString('o')
 }
 Write-JsonAtomic $resultPath $result
-$ack=[ordered]@{ack=[bool]$ok;taskId=$task;action='FLOW_BRIDGE_DIRECT_CONNECT_SMOKE';resultPath=$resultPath;generateClicked=$false;creditSpend=$false;at=(Get-Date).ToString('o')}
+$ack=[ordered]@{ack=[bool]$ok;taskId=$task;action='FLOW_BRIDGE_DEEP_CONNECT_PROBE';resultPath=$resultPath;serviceWorkerActive=[bool]$serviceWorkerActive;promptInputVerified=[bool]$inputVerified;generateClicked=$false;creditSpend=$false;at=(Get-Date).ToString('o')}
 Write-JsonAtomic $ackPath $ack
 $result['resultPath']=$resultPath;$result['ackPath']=$ackPath;$result['ack']=[bool]$ok
-$result|ConvertTo-Json -Depth 30 -Compress
+$result|ConvertTo-Json -Depth 40 -Compress
 if($ok){exit 0}else{exit 2}
