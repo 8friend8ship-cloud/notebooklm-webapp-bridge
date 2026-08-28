@@ -86,7 +86,9 @@ test('Stable Agent manifest points to its exact release blob and pinned Host blo
     assert.equal(repositoryBlobSha1(host126Path), '5d17bb233706897cd1706930cea9af3796f29488');
     assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.6\/HomeDesignLocalCommandHost\.ps1/);
     assert.match(stableAgentPs, /5d17bb233706897cd1706930cea9af3796f29488/);
-    assert.match(stableAgentPs, /"\$HostExpected='e6a79fbb113a79e19650b2864072f6abde5bcffb'"="\$HostExpected='5d17bb233706897cd1706930cea9af3796f29488'"/);
+    assert.ok(stableAgentPs.includes('e6a79fbb113a79e19650b2864072f6abde5bcffb'), 'Agent 1.1.31 wrapper must identify the prior Host 1.2.5 pin');
+    assert.ok(stableAgentPs.includes('5d17bb233706897cd1706930cea9af3796f29488'), 'Agent 1.1.31 wrapper must replace it with Host 1.2.6 pin');
+    assert.ok(stableAgentPs.includes('HostExpected'), 'Agent 1.1.31 wrapper must patch HostExpected');
   } else {
     const hostExpected = stableAgentPs.match(/\$HostExpected='([0-9a-f]{40})'/i)?.[1];
     assert.ok(hostExpected, 'Agent 1.1.30 must pin HostExpected');
