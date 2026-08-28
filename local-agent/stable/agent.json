@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.44",
-  "releasedAt": "2026-08-28T19:48:00+09:00",
-  "gitBlobSha1": "cc4fb89e29ad85e0efe6b31e6fd76801ac79d8e3",
+  "version": "1.1.45",
+  "releasedAt": "2026-08-28T20:31:00+09:00",
+  "gitBlobSha1": "6773033cb0505347ae47906de62daca5f1b73b42",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Queue integrity recovery has priority before more browser tests. Agent1.1.44 is short enough for legacy bootstrap and dispatches existing-project-only clasp sync SHA e6f1557089e1cc0258bdda777cd8d63b793b4432 exactly once in background. The sync backs up the matched existing NotebookLM Apps Script project, pushes Code.gs 0.2.10-queue-lock SHA e7c22534048062eca913e2d1b5d8b3c6e7ac8b28, then pull-readback verifies LockService + TASK_ID row guards. No new Apps Script project, OAuth/scope, Generate, credit spend, normal Chrome restart, public or destructive action. Failed receipt is held with no blind retry."
+  "notes": "Queue integrity recovery V2. Agent1.1.45 dispatches Sync-NotebookLMQueueIntegrityAppsScriptV2 SHA 9a06c6ef475a6427a04258c1ff84ebdc2ce498a3. V2 removes invalid clasp-list project discovery, scans only existing local .clasp.json bindings, and always writes a structured success/failure receipt with exact stage/error. It still backs up before push and never creates a new Apps Script project or changes OAuth/scope. Browser/Generate/credit actions remain blocked until live PUSH_PULL_READBACK_PASS for Code.gs 0.2.10-queue-lock."
 }
