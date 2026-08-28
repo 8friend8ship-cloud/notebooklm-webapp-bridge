@@ -10,8 +10,10 @@ on:
       - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
       - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
       - 'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1'
-      - 'local-agent/releases/1.1.29/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/stable/agent.json'
+      - 'local-agent/stable/host.json'
       - 'runtime/stable/release.json'
       - 'tests/download-handoff.test.mjs'
       - '.github/workflows/test-download-handoff.yml'
@@ -21,8 +23,10 @@ on:
       - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
       - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
       - 'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1'
-      - 'local-agent/releases/1.1.29/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/stable/agent.json'
+      - 'local-agent/stable/host.json'
       - 'runtime/stable/release.json'
       - 'tests/download-handoff.test.mjs'
       - '.github/workflows/test-download-handoff.yml'
@@ -55,7 +59,8 @@ jobs:
           $files = @(
             'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1',
             'local-agent/governor/WatchNotebookLMDownloadsToCaptureBridge.ps1',
-            'local-agent/releases/1.1.29/HomeDesignLocalAgent.ps1'
+            'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
           )
           $failed = $false
           foreach ($file in $files) {
