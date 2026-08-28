@@ -54,20 +54,6 @@ jobs:
               t += test_block
           tests.write_text(t, encoding='utf-8')
 
-          workflow = Path('.github/workflows/test-download-handoff.yml')
-          w = workflow.read_text(encoding='utf-8')
-          path_line = "      - 'notebooklm-webapp-bridge-source-v0.2.0/extension/background.js'\n"
-          artifact_line = "      - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'\n"
-          if w.count(path_line) < 2:
-              w = w.replace(artifact_line, path_line + artifact_line)
-          syntax_line = '        run: node --check notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js\n'
-          syntax_new = '''        run: |\n          node --check notebooklm-webapp-bridge-source-v0.2.0/extension/background.js\n          node --check notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js\n'''
-          if syntax_line in w:
-              w = w.replace(syntax_line, syntax_new, 1)
-          elif 'node --check notebooklm-webapp-bridge-source-v0.2.0/extension/background.js' not in w:
-              raise SystemExit('WORKFLOW_SYNTAX_ANCHOR_MISSING')
-          workflow.write_text(w, encoding='utf-8')
-
       - name: Validate patch before commit
         run: |
           node --check notebooklm-webapp-bridge-source-v0.2.0/extension/background.js
@@ -78,7 +64,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add notebooklm-webapp-bridge-source-v0.2.0/extension/background.js tests/download-handoff.test.mjs .github/workflows/test-download-handoff.yml
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/background.js tests/download-handoff.test.mjs
           git diff --cached --quiet && exit 0
           git commit -m 'Fix D82 verified download mirror handoff'
           git push
