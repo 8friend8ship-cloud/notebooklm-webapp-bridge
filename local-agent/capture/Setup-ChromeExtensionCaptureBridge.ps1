@@ -1,0 +1,128 @@
+param(
+  [switch]$SmokeOnly,
+  [string]$LocalInboxRoot = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX',
+  [string]$CentralRootOverride = ''
+)
+
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$Repo = '8friend8ship-cloud/notebooklm-webapp-bridge'
+$ManagerExpected = 'd118872f0558776abf098c0c51ed192fdcb6a78b'
+$InstallRoot = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent\capture'
+$Manager = Join-Path $InstallRoot 'ManageChromeExtensionArtifacts.ps1'
+$Wrapper = Join-Path $InstallRoot 'Reconcile-AllManagedChromeArtifacts.ps1'
+$TaskName = 'HomeDesign-CaptureBridge-ManagedChrome-Reconcile'
+$Services = @('NotebookLM','Flow','AIStudio','GoogleAI')
+
+function GitBlobSha1([string]$Path) {
+  $bytes = [IO.File]::ReadAllBytes($Path)
+  $header = [Text.Encoding]::ASCII.GetBytes(('blob ' + $bytes.Length + [char]0))
+  $all = New-Object byte[] ($header.Length + $bytes.Length)
+  [Buffer]::BlockCopy($header,0,$all,0,$header.Length)
+  [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
+  $sha = [Security.Cryptography.SHA1]::Create()
+  try { return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() }
+}
+
+function Find-CentralRoot {
+  if ($CentralRootOverride) {
+    if (Test-Path -LiteralPath $CentralRootOverride -PathType Container) { return (Resolve-Path -LiteralPath $CentralRootOverride).Path }
+    throw ('CENTRAL_ROOT_OVERRIDE_NOT_FOUND:{0}' -f $CentralRootOverride)
+  }
+  $target = '00_중앙에이전트'
+  foreach ($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
+    $root = [string]$drive.Root
+    if (-not $root) { continue }
+    foreach ($candidate in @(
+      (Join-Path $root $target),
+      (Join-Path $root ('My Drive\' + $target)),
+      (Join-Path $root ('내 드라이브\' + $target)),
+      (Join-Path $root ('Google Drive\' + $target))
+    )) {
+      if (Test-Path -LiteralPath $candidate -PathType Container) { return $candidate }
+    }
+  }
+  throw 'CENTRAL_DRIVE_ROOT_NOT_FOUND'
+}
+
+New-Item -ItemType Directory -Force -Path $InstallRoot,$LocalInboxRoot | Out-Null
+$CentralRoot = Find-CentralRoot
+foreach ($service in $Services) {
+  New-Item -ItemType Directory -Force -Path (Join-Path $LocalInboxRoot $service) | Out-Null
+  New-Item -ItemType Directory -Force -Path (Join-Path (Join-Path $CentralRoot 'CaptureBridge\INBOX') $service) | Out-Null
+}
+
+$raw = 'https://raw.githubusercontent.com/' + $Repo + '/main/local-agent/capture/ManageChromeExtensionArtifacts.ps1?hdcb=' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$tmp = $Manager + '.download'
+Invoke-WebRequest -UseBasicParsing -Uri $raw -OutFile $tmp -TimeoutSec 20
+$actual = (GitBlobSha1 $tmp).ToLowerInvariant()
+if ($actual -ne $ManagerExpected) {
+  Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+  throw ('CAPTURE_MANAGER_SHA_MISMATCH:actual={0}:expected={1}' -f $actual,$ManagerExpected)
+}
+Move-Item -LiteralPath $tmp -Destination $Manager -Force
+
+$escapedManager = $Manager.Replace("'","''")
+$escapedLocal = $LocalInboxRoot.Replace("'","''")
+$wrapperBody = @"
+`$ErrorActionPreference='Continue'
+`$Manager='$escapedManager'
+`$LocalInboxRoot='$escapedLocal'
+`$services=@('NotebookLM','Flow','AIStudio','GoogleAI')
+foreach(`$service in `$services){
+  try { & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `$Manager -ServiceKey `$service -ReconcileOnly -LocalInboxRoot `$LocalInboxRoot | Out-Null } catch {}
+}
+"@
+Set-Content -LiteralPath $Wrapper -Value $wrapperBody -Encoding UTF8
+
+$scheduled = $false
+if (-not $SmokeOnly) {
+  $tr = 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $Wrapper + '"'
+  & schtasks.exe /Create /F /SC MINUTE /MO 5 /TN $TaskName /TR $tr | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw ('CAPTURE_SCHEDULED_TASK_CREATE_FAILED:{0}' -f $LASTEXITCODE) }
+  $scheduled = $true
+}
+
+$smokeRoot = Join-Path ([IO.Path]::GetTempPath()) ('CaptureBridgeManagedChromeSmoke_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
+New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
+$smoke = @()
+foreach ($service in $Services) {
+  if ($service -eq 'Flow') {
+    $src = Join-Path $smokeRoot 'flow-smoke.png'
+    [IO.File]::WriteAllBytes($src,[Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZK1sAAAAASUVORK5CYII='))
+  } else {
+    $src = Join-Path $smokeRoot (($service.ToLowerInvariant()) + '-smoke.txt')
+    Set-Content -LiteralPath $src -Value ('MANAGED_CHROME_CAPTURE_SMOKE ' + $service + ' ' + (Get-Date).ToString('o')) -Encoding UTF8
+  }
+  $args = @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$Manager,'-ServiceKey',$service,'-SourcePath',$src,'-TaskId',('SETUP_SMOKE_' + $service),'-LocalInboxRoot',$LocalInboxRoot)
+  if ($CentralRootOverride) { $args += @('-CentralRootOverride',$CentralRoot) }
+  $rawResult = & powershell.exe @args
+  if ($LASTEXITCODE -ne 0) { throw ('CAPTURE_SMOKE_FAILED:{0}' -f $service) }
+  $parsed = ($rawResult | Select-Object -Last 1) | ConvertFrom-Json
+  if (-not [bool]$parsed.ok -or [int]$parsed.processedCount -lt 1 -or [bool]$parsed.genericDownloadsScan) {
+    throw ('CAPTURE_SMOKE_CONTRACT_FAILED:{0}' -f $service)
+  }
+  $first = @($parsed.results)[0]
+  if (-not [bool]$first.originalPreserved -or -not (Test-Path -LiteralPath ([string]$first.drivePath) -PathType Leaf)) {
+    throw ('CAPTURE_SMOKE_COPY_VERIFY_FAILED:{0}' -f $service)
+  }
+  $smoke += [ordered]@{service=$service;ok=$true;drivePath=[string]$first.drivePath;bytes=[int64]$first.bytes;sha256=[string]$first.sha256}
+}
+
+$result = [ordered]@{
+  ok = $true
+  action = 'SETUP_MANAGED_CHROME_CAPTUREBRIDGE'
+  services = $Services
+  manager = $Manager
+  managerSha = $actual
+  localInboxRoot = $LocalInboxRoot
+  centralRoot = $CentralRoot
+  scheduledTask = $TaskName
+  scheduled = $scheduled
+  smokeOnly = [bool]$SmokeOnly
+  genericDownloadsSync = $false
+  copyOnly = $true
+  smoke = $smoke
+  at = (Get-Date).ToString('o')
+}
+$result | ConvertTo-Json -Depth 10 -Compress
