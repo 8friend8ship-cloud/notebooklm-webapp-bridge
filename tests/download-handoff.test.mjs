@@ -16,7 +16,10 @@ const agent32Path = 'local-agent/releases/1.1.32/HomeDesignLocalAgent.ps1';
 const agent32Ps = fs.readFileSync(agent32Path, 'utf8');
 const agent33Path = 'local-agent/releases/1.1.33/HomeDesignLocalAgent.ps1';
 const agent33Ps = fs.readFileSync(agent33Path, 'utf8');
+const agent34Path = 'local-agent/releases/1.1.34/HomeDesignLocalAgent.ps1';
+const agent34Ps = fs.readFileSync(agent34Path, 'utf8');
 const host126Path = 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1';
+const host127Path = 'local-agent/releases/1.2.7/HomeDesignLocalCommandHost.ps1';
 const stableAgent = JSON.parse(fs.readFileSync('local-agent/stable/agent.json', 'utf8'));
 const stableBridge = JSON.parse(fs.readFileSync('runtime/stable/release.json', 'utf8'));
 
@@ -109,12 +112,32 @@ test('Local Agent 1.1.33 diagnoses prior 1.1.32 wake before performing any chang
   assert.doesNotMatch(agent33Ps, /taskkill.+chrome/i);
 });
 
+test('Local Agent 1.1.34 pins Host 1.2.7 with exact ContentOS repair allowlist', () => {
+  assert.match(agent34Ps, /1\.1\.34/);
+  assert.match(agent34Ps, /1\.2\.7/);
+  assert.match(agent34Ps, /ac4aae953fae2219d393de2307ef655b0988c9f4/);
+  assert.match(agent34Ps, /CONTENTOS_REPAIR_ALLOWLIST_READY/);
+  assert.match(agent34Ps, /tools\/Repair-ContentOS-DriveCacheAppsScript\.ps1/);
+  assert.match(agent34Ps, /newOAuth=\$false/);
+  assert.match(agent34Ps, /newScope=\$false/);
+  const host127Ps = fs.readFileSync(host127Path, 'utf8');
+  assert.equal(repositoryBlobSha1(host127Path), 'ac4aae953fae2219d393de2307ef655b0988c9f4');
+  assert.match(host127Ps, /tools\/Switch-ContentOS-VercelGit\.ps1/);
+  assert.match(host127Ps, /tools\/Repair-ContentOS-DriveCacheAppsScript\.ps1/);
+  assert.doesNotMatch(host127Ps, /contents-os-git[^\n]+scripts=@\([^\)]*\*/);
+});
+
 test('Stable Agent manifest points to its exact release blob and pinned Host blob', () => {
-  assert.ok(['1.1.30', '1.1.31', '1.1.32', '1.1.33'].includes(stableAgent.version), `unexpected stable agent ${stableAgent.version}`);
+  assert.ok(['1.1.30', '1.1.31', '1.1.32', '1.1.33', '1.1.34'].includes(stableAgent.version), `unexpected stable agent ${stableAgent.version}`);
   const stableAgentPath = `local-agent/releases/${stableAgent.version}/HomeDesignLocalAgent.ps1`;
   assert.equal(stableAgent.gitBlobSha1.toLowerCase(), repositoryBlobSha1(stableAgentPath));
   const stableAgentPs = fs.readFileSync(stableAgentPath, 'utf8');
-  if (stableAgent.version === '1.1.33') {
+  if (stableAgent.version === '1.1.34') {
+    assert.equal(repositoryBlobSha1(host127Path), 'ac4aae953fae2219d393de2307ef655b0988c9f4');
+    assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.7\/HomeDesignLocalCommandHost\.ps1/);
+    assert.match(stableAgentPs, /ac4aae953fae2219d393de2307ef655b0988c9f4/);
+    assert.match(stableAgentPs, /CONTENTOS_REPAIR_ALLOWLIST_READY/);
+  } else if (stableAgent.version === '1.1.33') {
     assert.equal(repositoryBlobSha1(host126Path), '5d17bb233706897cd1706930cea9af3796f29488');
     assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.6\/HomeDesignLocalCommandHost\.ps1/);
     assert.match(stableAgentPs, /5d17bb233706897cd1706930cea9af3796f29488/);
