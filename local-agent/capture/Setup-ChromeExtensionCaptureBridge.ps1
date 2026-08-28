@@ -30,8 +30,8 @@ function GitBlobSha1([string]$Path) {
 }
 
 # Central-agent direct Flow bridge control reuses this already Host-allowlisted setup script.
-# It downloads an integrity-pinned helper, runs only dedicated ChromeForTesting, never clicks Generate,
-# writes result+ACK to central Drive, restores the NotebookLM dedicated Chrome, and exits with helper status.
+# The helper may report a failed deep gate with exit 2. The allowlisted wrapper still exits 0 in probe mode
+# so the central queue preserves the helper's structured JSON and we can resume from the exact failed gate.
 if ($FlowBridgeConnectSmoke) {
   New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
   $helper = Join-Path $InstallRoot 'RunFlowBridgeConnectSmoke.ps1'
@@ -47,10 +47,21 @@ if ($FlowBridgeConnectSmoke) {
   $helperArgs = @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$helper,'-DebugPort',[string]$FlowDebugPort)
   if ($FlowSmokeTaskId) { $helperArgs += @('-TaskId',$FlowSmokeTaskId) }
   if ($CentralRootOverride) { $helperArgs += @('-CentralRootOverride',$CentralRootOverride) }
-  $helperOut = & powershell.exe @helperArgs 2>&1
-  $helperRc = $LASTEXITCODE
-  $helperOut | ForEach-Object { Write-Output $_ }
-  exit $helperRc
+  $oldEap=$ErrorActionPreference;$ErrorActionPreference='Continue'
+  try { $helperOut = & powershell.exe @helperArgs 2>&1; $helperRc = $LASTEXITCODE } finally { $ErrorActionPreference=$oldEap }
+  $helperText = ($helperOut | Out-String).Trim()
+  [ordered]@{
+    ok = ($helperRc -eq 0)
+    action = 'FLOW_BRIDGE_CONNECT_PROBE_WRAPPER'
+    helperExit = $helperRc
+    helperSha = $helperActual
+    helperOutput = $helperText
+    diagnosticOnly = $true
+    generateClicked = $false
+    creditSpend = $false
+    at = (Get-Date).ToString('o')
+  } | ConvertTo-Json -Depth 50 -Compress
+  exit 0
 }
 
 function Find-CentralRoot {
