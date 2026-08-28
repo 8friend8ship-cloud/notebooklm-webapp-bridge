@@ -25,7 +25,7 @@ $ToolRoot=Join-Path $Base 'ManagedExtensions\Tools';New-Item -ItemType Directory
 $Legacy=Join-Path $ToolRoot 'ManagedExtensionAutopilot-v1.ps1'
 $Exact=Join-Path $ToolRoot 'ManagedExtensionExactTargetLauncher-v1.ps1'
 $LegacySha='6f4acb1f1c0d6f37fd675b55cd2f8a3a349f7ec4'
-$ExactSha='d352572c532aea3e2d76b580e2129bfa3fa4d68b'
+$ExactSha='e272246c0d1553c703095bdeae68f77ab259db57'
 function GitBlob([string]$p){$b=[IO.File]::ReadAllBytes($p);$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
 function Fetch([string]$rel,[string]$dest,[string]$sha){$tmp=$dest+'.download';$url='https://raw.githubusercontent.com/'+$Repo+'/main/'+$rel+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $tmp -TimeoutSec 30;$actual=(GitBlob $tmp).ToLowerInvariant();if($actual -ne $sha.ToLowerInvariant()){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw ('SOURCE_SHA_MISMATCH:'+ $rel+':'+$actual+':'+$sha)};Move-Item $tmp $dest -Force}
 Fetch 'local-agent/governor/ManagedExtensionAutopilot.ps1' $Legacy $LegacySha
@@ -34,7 +34,6 @@ function DefaultRoute([string]$svc){switch($svc){'NOTEBOOKLM'{return [pscustomob
 if($Mode -in @('Inventory','SyncRegistry','Stage','Rollback')){
   $args=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$Legacy,'-Mode',$Mode,'-RegistryUrl',$RegistryUrl)
   if($SourceZip){$args+=@('-SourceZip',$SourceZip)};if($SourceDir){$args+=@('-SourceDir',$SourceDir)};if($SourceUrl){$args+=@('-SourceUrl',$SourceUrl)};if($ManifestSubPath){$args+=@('-ManifestSubPath',$ManifestSubPath)};if($ExpectedExtensionId){$args+=@('-ExpectedExtensionId',$ExpectedExtensionId)};if($Apply){$args+='-Apply'}
-  # Deliberately do not pass RestartDedicatedChrome here. V2 forbids generic chrome://extensions launch as an execution success path.
   $out=& powershell.exe @args 2>&1;$exit=$LASTEXITCODE
   [pscustomobject]@{ok=($exit -eq 0);version=$Version;mode=$Mode;legacyStageOnly=$true;genericLaunchSuppressed=$true;output=($out|Out-String).Trim()}|ConvertTo-Json -Depth 30
   exit $exit
