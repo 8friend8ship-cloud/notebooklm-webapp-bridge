@@ -5,13 +5,15 @@ $host125Path=Join-Path $root 'local-agent/releases/1.2.5/HomeDesignLocalCommandH
 $agent31Path=Join-Path $root 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1'
 $agent32Path=Join-Path $root 'local-agent/releases/1.1.32/HomeDesignLocalAgent.ps1'
 $agent33Path=Join-Path $root 'local-agent/releases/1.1.33/HomeDesignLocalAgent.ps1'
+$agent34Path=Join-Path $root 'local-agent/releases/1.1.34/HomeDesignLocalAgent.ps1'
 $host126Path=Join-Path $root 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1'
+$host127Path=Join-Path $root 'local-agent/releases/1.2.7/HomeDesignLocalCommandHost.ps1'
 $stablePath=Join-Path $root 'local-agent/stable/agent.json'
 
-foreach($path in @($agent30Path,$host125Path,$agent31Path,$agent32Path,$agent33Path,$host126Path,$stablePath)){
+foreach($path in @($agent30Path,$host125Path,$agent31Path,$agent32Path,$agent33Path,$agent34Path,$host126Path,$host127Path,$stablePath)){
   if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "MISSING:$path"}
 }
-foreach($path in @($agent30Path,$host125Path,$agent31Path,$agent32Path,$agent33Path,$host126Path)){
+foreach($path in @($agent30Path,$host125Path,$agent31Path,$agent32Path,$agent33Path,$agent34Path,$host126Path,$host127Path)){
   $tokens=$null;$errors=$null
   [void][System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
   if($errors.Count -gt 0){throw ("PARSE_FAIL:{0}:{1}" -f $path,($errors.Message -join '|'))}
@@ -22,7 +24,9 @@ $host125=Get-Content -LiteralPath $host125Path -Raw -Encoding UTF8
 $agent31=Get-Content -LiteralPath $agent31Path -Raw -Encoding UTF8
 $agent32=Get-Content -LiteralPath $agent32Path -Raw -Encoding UTF8
 $agent33=Get-Content -LiteralPath $agent33Path -Raw -Encoding UTF8
+$agent34=Get-Content -LiteralPath $agent34Path -Raw -Encoding UTF8
 $host126=Get-Content -LiteralPath $host126Path -Raw -Encoding UTF8
+$host127=Get-Content -LiteralPath $host127Path -Raw -Encoding UTF8
 $stable=Get-Content -LiteralPath $stablePath -Raw -Encoding UTF8|ConvertFrom-Json
 
 # Preserve the known-good Host 1.2.5 / Agent 1.1.30 recovery contract as historical regression evidence.
@@ -63,9 +67,22 @@ foreach($needle in @('1.1.33','1.2.6','5d17bb233706897cd1706930cea9af3796f29488'
 }
 if($agent33 -match 'Stop-Process.+chrome' -or $agent33 -match 'taskkill.+chrome'){throw 'AGENT133_CHROME_KILL_FORBIDDEN'}
 
-if(@('1.1.32','1.1.33') -notcontains [string]$stable.version){throw "BAD_STABLE_VERSION:$($stable.version)"}
-$stableAgentPath=$(if([string]$stable.version -eq '1.1.33'){$agent33Path}else{$agent32Path})
+# Host 1.2.7 is a minimum-scope allowlist expansion for the already-approved ContentOS transactional repair.
+foreach($needle in @('1.2.7','tools/Switch-ContentOS-VercelGit.ps1','tools/Repair-ContentOS-DriveCacheAppsScript.ps1')){
+  if(-not $host127.Contains($needle)){throw "HOST127_MISSING:$needle"}
+}
+if($host127 -match "contents-os-git'.+scripts=@\([^\)]*\*" ){throw 'HOST127_CONTENTOS_WILDCARD_FORBIDDEN'}
+$host127Sha=(& git hash-object -- $host127Path).Trim()
+if($LASTEXITCODE -ne 0){throw 'HOST127_HASH_FAILED'}
+if($host127Sha -ne 'ac4aae953fae2219d393de2307ef655b0988c9f4'){throw "HOST127_SHA_MISMATCH:$host127Sha"}
+foreach($needle in @('1.1.34','1.2.7','ac4aae953fae2219d393de2307ef655b0988c9f4','CONTENTOS_REPAIR_ALLOWLIST_READY','tools/Repair-ContentOS-DriveCacheAppsScript.ps1','newOAuth=$false','newScope=$false','publicPublish=$false','destructive=$false')){
+  if(-not $agent34.Contains($needle)){throw "AGENT134_MISSING:$needle"}
+}
+
+if(@('1.1.32','1.1.33','1.1.34') -notcontains [string]$stable.version){throw "BAD_STABLE_VERSION:$($stable.version)"}
+$stableAgentPath=$(if([string]$stable.version -eq '1.1.34'){$agent34Path}elseif([string]$stable.version -eq '1.1.33'){$agent33Path}else{$agent32Path})
 $stableSha=(& git hash-object -- $stableAgentPath).Trim()
 if($LASTEXITCODE -ne 0){throw 'STABLE_AGENT_HASH_FAILED'}
 if($stableSha -ne [string]$stable.gitBlobSha1){throw ("AGENT_STABLE_SHA_MISMATCH:{0}:{1}" -f $stableSha,[string]$stable.gitBlobSha1)}
-Write-Host ('HOST125_AGENT130_HISTORY_AGENT131_HOST126_AGENT132_AND_AGENT133_CANDIDATE_PASS stable='+[string]$stable.version)
+if([string]$stable.version -eq '1.1.34' -and -not $agent34.Contains('ac4aae953fae2219d393de2307ef655b0988c9f4')){throw 'STABLE_AGENT134_HOST127_PIN_MISSING'}
+Write-Host ('HOST125_AGENT130_HISTORY_AGENT131_HOST126_AGENT132_AGENT133_AND_CONTENTOS_AGENT134_HOST127_PASS stable='+[string]$stable.version)
