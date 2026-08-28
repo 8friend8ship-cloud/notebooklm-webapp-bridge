@@ -1,4 +1,4 @@
-const CITV2_VERSION = 'CENTRAL_INTEGRATED_TRIGGER_V2_20260828';
+const CITV2_VERSION = 'CENTRAL_INTEGRATED_TRIGGER_V2_1_20260828';
 
 /**
  * One integrated daily path: local notebook truth first, central Pack QA second.
@@ -30,7 +30,9 @@ function installCentralIntegratedTriggersV2() {
 function runCentralDailyIntegratedGovernorV1() {
   const started = new Date();
   const notebook = runCentralNotebookRuntimeHubPreflightV1({source:'DAILY_INTEGRATED_TRIGGER', deep:true});
-  const centralQa = runCentralDailyQaAssetGovernor();
+  const centralQa = typeof runCentralDailyQaAssetGovernorV2 === 'function'
+    ? runCentralDailyQaAssetGovernorV2()
+    : runCentralDailyQaAssetGovernor();
   const notebookPass = notebook && notebook.status === 'PASS_PRECHECK';
   const qaPass = centralQa && /PASS/.test(String(centralQa.status || ''));
   const status = notebookPass && qaPass ? 'PASS_INTEGRATED_DAILY' : 'NEEDS_FIX_INTEGRATED_DAILY';
