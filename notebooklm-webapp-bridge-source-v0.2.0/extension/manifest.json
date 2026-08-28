@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.70",
-  "description": "D79 restores the main queue/background runtime import while retaining D78 real Chrome download evidence. Existing-artifact download succeeds only with a completed nonzero browser download; no path change or file move.",
+  "version": "0.2.71",
+  "description": "D92 exact-download handoff: verified Chrome download filenames flow into the local PowerShell mirror as exact SourcePath. Legacy scan remains fallback-only; FileSystemWatcher fallback copies stable completed files without moving originals.",
   "permissions": [
     "alarms",
     "downloads",
