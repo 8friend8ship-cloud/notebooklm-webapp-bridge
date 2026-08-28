@@ -2,10 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.39",
-  "releasedAt": "2026-08-28T18:36:00+09:00",
-  "gitBlobSha1": "9d5eb0c7ad6f44756fd254d6cdd21dbb0f7df930",
+  "version": "1.1.40",
+  "releasedAt": "2026-08-28T18:47:00+09:00",
+  "gitBlobSha1": "d491891efdf7039209e7334fa10dcd4123272a59",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Fixes managed Chrome automation false-positive behavior where LaunchDedicated opened chrome://extensions/ instead of the exact service workspace. Preserves Agent1.1.38 work, then runs hash-pinned NotebookLM exact-target x2 regression through dedicated Chrome/CDP: exact notebook URL, expected target verification, open-shadow input discovery, sentinel fill/readback/restore, normal Chrome untouched. Page-open/load-extension alone cannot PASS. No Generate, credits, new OAuth/scope/settings/project/public/destructive action. Receipts: Runtime_Readback/AGENT_1.1.39_EXACT_TARGET_CHROME_AUTOMATION.json and Runtime_Readback/Chrome_Exact_Target/NOTEBOOKLM_EXACT_TARGET_X2_REGRESSION.json."
+  "maxCycleSeconds": 900,
+  "notes": "Runtime-safe bridge automation repair for old 180s bootstrap installations. The agent itself stays short: hash-patches local AgentBootstrap.ps1 to configurable 900s cycle support, hash-fetches the NotebookLM exact-target x2 regression wrapper, dispatches it hidden in the background exactly once with a no-blind-retry marker, writes a central Drive dispatch receipt, and exits before the legacy parent timeout. Subsequent cycles only read the result/marker; they never duplicate the probe. Exact-target regression requires the known notebook URL, CDP target verification, input sentinel fill/readback/restore x2, and normal Chrome preservation. No Generate/credits/OAuth/scope/settings/public/destructive action."
 }
