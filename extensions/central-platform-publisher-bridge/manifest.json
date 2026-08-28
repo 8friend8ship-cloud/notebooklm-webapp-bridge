@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Central Platform Publisher Bridge",
+  "version": "0.1.0",
+  "description": "Central Agent platform QA/draft bridge. Public publish is fail-closed until explicit platform approval.",
+  "permissions": ["storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://www.blogger.com/*",
+    "https://studio.youtube.com/*",
+    "https://www.youtube.com/*",
+    "https://www.instagram.com/*",
+    "https://www.tiktok.com/*",
+    "https://blog.naver.com/*",
+    "https://cafe.naver.com/*",
+    "https://clip.naver.com/*",
+    "https://www.pinterest.com/*",
+    "https://kr.pinterest.com/*"
+  ],
+  "background": {"service_worker": "background.js"},
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.blogger.com/*",
+        "https://studio.youtube.com/*",
+        "https://www.youtube.com/*",
+        "https://www.instagram.com/*",
+        "https://www.tiktok.com/*",
+        "https://blog.naver.com/*",
+        "https://cafe.naver.com/*",
+        "https://clip.naver.com/*",
+        "https://www.pinterest.com/*",
+        "https://kr.pinterest.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {"default_title": "Central Platform Publisher Bridge"}
+}
