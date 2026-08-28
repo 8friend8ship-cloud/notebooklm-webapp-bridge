@@ -1,0 +1,138 @@
+name: test-central-governor-staged
+
+on:
+  push:
+    branches:
+      - 'feat/central-daily-qa-asset-governor-20260828'
+    paths:
+      - 'apps-script/**'
+      - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - 'local-agent/governor/CentralNotebookRuntimeHub.ps1'
+      - 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1'
+      - 'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+      - 'docs/CENTRAL_*'
+      - 'docs/D82_*'
+      - 'docs/RUNTIME_BLOCKER_INDEX_20260828.md'
+      - '.github/workflows/test-central-governor-staged.yml'
+  pull_request:
+    paths:
+      - 'apps-script/**'
+      - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - 'local-agent/governor/CentralNotebookRuntimeHub.ps1'
+      - 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1'
+      - 'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+      - 'docs/CENTRAL_*'
+      - 'docs/D82_*'
+      - 'docs/RUNTIME_BLOCKER_INDEX_20260828.md'
+      - '.github/workflows/test-central-governor-staged.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-regression:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apps Script JavaScript syntax
+        shell: pwsh
+        run: |
+          $files = @(
+            'apps-script/CentralAiPlatformTrendGovernor.gs',
+            'apps-script/CentralChatWorkFactory.gs',
+            'apps-script/CentralDailyWorkflowGovernor.gs',
+            'apps-script/CentralDataManagementHub.gs',
+            'apps-script/CentralIntegratedTriggerV2.gs',
+            'apps-script/CentralNotebookRuntimeHub.gs'
+          )
+          foreach ($f in $files) {
+            if (-not (Test-Path $f)) { throw "MISSING:$f" }
+            $tmp = Join-Path $env:RUNNER_TEMP ((Split-Path $f -Leaf) + '.js')
+            Copy-Item $f $tmp -Force
+            node --check $tmp
+            if ($LASTEXITCODE -ne 0) { throw "JS_SYNTAX_FAIL:$f" }
+          }
+
+      - name: PowerShell syntax
+        shell: pwsh
+        run: |
+          $files = @(
+            'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1',
+            'local-agent/governor/CentralNotebookRuntimeHub.ps1',
+            'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1',
+            'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+          )
+          foreach ($f in $files) {
+            if (-not (Test-Path $f)) { throw "MISSING:$f" }
+            $tokens=$null; $errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              throw "POWERSHELL_SYNTAX_FAIL:$f"
+            }
+          }
+
+      - name: Central Chat Factory classification guard
+        shell: pwsh
+        run: |
+          $text = Get-Content 'apps-script/CentralChatWorkFactory.gs' -Raw
+          $required = @(
+            "return 'HUMAN_GATE'",
+            "return 'LEARN_FAILURE'",
+            "return 'LEARN_SUCCESS'",
+            "if (active) return 'EXECUTE'",
+            "return 'IGNORE'"
+          )
+          foreach($r in $required){ if(-not $text.Contains($r)){ throw "MISSING_CLASSIFICATION_GUARD:$r" } }
+          $idxFail=$text.IndexOf("return 'LEARN_FAILURE'")
+          $idxSuccess=$text.IndexOf("return 'LEARN_SUCCESS'")
+          $idxExecute=$text.IndexOf("if (active) return 'EXECUTE'")
+          $idxDefault=$text.LastIndexOf("return 'IGNORE'")
+          if(-not ($idxFail -lt $idxSuccess -and $idxSuccess -lt $idxExecute -and $idxExecute -lt $idxDefault)) {
+            throw 'CLASSIFICATION_ORDER_UNSAFE'
+          }
+
+      - name: Guarded bound sync contract
+        shell: pwsh
+        run: |
+          $gate = Get-Content 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1' -Raw
+          $sync = Get-Content 'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1' -Raw
+          foreach($needle in @('D82','state.json','/health','STOP_NO_BLIND_RETRY')){
+            if(-not $gate.Contains($needle)){ throw "D82_GATE_CONTRACT_MISSING:$needle" }
+          }
+          foreach($needle in @('WEBAPP_TEMPLATE_03','ExpectedDeploymentId','clasp','pull','hash')){
+            if(-not $sync.ToLowerInvariant().Contains($needle.ToLowerInvariant())){ throw "SYNC_CONTRACT_MISSING:$needle" }
+          }
+
+      - name: Completion and approval policy contract
+        shell: pwsh
+        run: |
+          $docs = @(
+            'docs/CENTRAL_DAILY_QA_ASSET_GOVERNOR.md',
+            'docs/CENTRAL_CHAT_FACTORY_RUNTIME_GATE_20260828.md',
+            'docs/D82_CHAT_FACTORY_AUTOMATION_LINK_20260828.md',
+            'docs/RUNTIME_BLOCKER_INDEX_20260828.md'
+          )
+          $joined = ($docs | ForEach-Object { Get-Content $_ -Raw }) -join "`n"
+          foreach($needle in @('same-fixture','runtime','readback','No new Apps Script project','do not create duplicate','Merge remains prohibited until runtime x2')){
+            if(-not $joined.ToLowerInvariant().Contains($needle.ToLowerInvariant())){ throw "POLICY_CONTRACT_MISSING:$needle" }
+          }
+
+      - name: Secret-like literal guard
+        shell: pwsh
+        run: |
+          $targets = @(
+            'apps-script/CentralAiPlatformTrendGovernor.gs',
+            'apps-script/CentralChatWorkFactory.gs',
+            'apps-script/CentralDailyWorkflowGovernor.gs',
+            'apps-script/CentralDataManagementHub.gs',
+            'apps-script/CentralIntegratedTriggerV2.gs',
+            'apps-script/CentralNotebookRuntimeHub.gs',
+            'local-agent/governor/CentralNotebookRuntimeHub.ps1',
+            'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1',
+            'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+          )
+          $bad = Select-String -Path $targets -Pattern 'sk-proj-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|ghp_[A-Za-z0-9]{20,}' -AllMatches
+          if($bad){ $bad | ForEach-Object { Write-Error $_.Line }; throw 'SECRET_LIKE_LITERAL_FOUND' }
