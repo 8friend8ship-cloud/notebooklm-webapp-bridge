@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
+      - 'local-agent/capture/Setup-PowerContinuity.ps1'
       - '.github/workflows/persona-device-recovery-once-ci.yml'
   pull_request:
     paths:
       - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
+      - 'local-agent/capture/Setup-PowerContinuity.ps1'
 
 jobs:
   validate:
@@ -17,25 +19,31 @@ jobs:
       - name: Windows PowerShell 5.1 parse
         shell: powershell
         run: |
-          $tokens=$null;$errors=$null
-          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'),[ref]$tokens,[ref]$errors)
-          if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
+          $files=@('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1','local-agent/capture/Setup-PowerContinuity.ps1')
+          foreach($file in $files){
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
+            if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
+          }
       - name: Pinned and non-destructive recovery contract
         shell: python
         run: |
           from pathlib import Path
           t=Path('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1').read_text(encoding='utf-8')
+          p=Path('local-agent/capture/Setup-PowerContinuity.ps1').read_text(encoding='utf-8')
           required=[
             "$ExpectedAgent='1.1.46'",
             "$ExpectedAgentBlob='b72e57af70f77578fddb3de49f6581a37e2de792'",
             "$ExpectedV2Blob='a4b7967da7bc26f3cb49c88d3b3cb122ddf86c7c'",
-            "$ExpectedPowerBlob='3edde1fe1276052a084380a84fe27a2b2574e9ef'",
+            "$ExpectedPowerBlob='d1d80a0362a170f1c017c3e63a7d3c6d6b32a576'",
             "GitHubContent 'local-agent/stable/agent.json'",
             "FetchPinned 'local-agent/governor/RunChromeGovernorReadbackV2.ps1'",
             "FetchPinned 'local-agent/capture/Setup-PowerContinuity.ps1'",
             '-KickStableAgent',
-            "-Install -NightStart '02:00' -NightEnd '05:00'",
+            "-Install -NightStart '02:00' -NightEnd '05:00' -IdleDisplayMinutes 30",
             "POWER_CONTINUITY_WINDOW_MISMATCH",
+            "POWER_CONTINUITY_IDLE_MISMATCH",
+            "POWER_CONTINUITY_AC_SLEEP_MISMATCH",
             'newProjectCreated=$false',
             'oauthChanged=$false',
             'scopeChanged=$false',
@@ -44,8 +52,21 @@ jobs:
             'paidGeminiApiCalled=$false'
           ]
           missing=[x for x in required if x not in t]
-          if missing: raise SystemExit('MISSING_CONTRACT:'+repr(missing))
+          if missing: raise SystemExit('MISSING_RECOVERY_CONTRACT:'+repr(missing))
+          power_required=[
+            "[int]$IdleDisplayMinutes=30",
+            "monitor-timeout-ac $IdleDisplayMinutes",
+            "monitor-timeout-dc $IdleDisplayMinutes",
+            "standby-timeout-ac 0",
+            "hibernate-timeout-ac 0",
+            "idleDisplayMinutes=$IdleDisplayMinutes",
+            "idleDisplayApplies='AC_AND_BATTERY'",
+            "acAutomaticSleep='DISABLED'",
+            "batteryPolicy='DISPLAY_30_MIN_SLEEP_POLICY_NO_OVERRIDE'"
+          ]
+          pmissing=[x for x in power_required if x not in p]
+          if pmissing: raise SystemExit('MISSING_POWER_CONTRACT:'+repr(pmissing))
           forbidden=['clasp create','clasp deploy','ScriptApp.newTrigger','GOOGLE_AI_PAID_API_APPROVED=Y']
-          bad=[x for x in forbidden if x in t]
+          bad=[x for x in forbidden if x in t or x in p]
           if bad: raise SystemExit('FORBIDDEN_ACTION:'+repr(bad))
-          print('PINNED_PERSONA_DEVICE_RECOVERY_AND_POWER_CONTRACT_PASS')
+          print('PINNED_PERSONA_DEVICE_RECOVERY_AND_IDLE30_POWER_CONTRACT_PASS')
