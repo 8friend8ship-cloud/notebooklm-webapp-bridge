@@ -56,8 +56,8 @@ jobs:
             return $Parsed
           }'''
 
-          text, n1 = re.subn(r'(?m)^function RefreshV2 \{.*\}$', refresh, text, count=1)
-          text, n2 = re.subn(r'(?m)^function KickStableAgentRaw \{.*\}$', kick, text, count=1)
+          text, n1 = re.subn(r'(?m)^function RefreshV2 \{.*\}$', lambda _: refresh, text, count=1)
+          text, n2 = re.subn(r'(?m)^function KickStableAgentRaw \{.*\}$', lambda _: kick, text, count=1)
           if n1 != 1 or n2 != 1:
               raise SystemExit(f'PATCH_TARGET_COUNT refresh={n1} kick={n2}')
           p.write_text(text, encoding='utf-8', newline='\n')
