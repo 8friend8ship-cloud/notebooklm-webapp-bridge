@@ -21,18 +21,19 @@ function runCentralDataManagementHubCycleV1() {
   const fileSync = syncMasterFileCatalogToDataHubV1_();
   const publish = syncMasterPublishLedgerToDataHubV1_();
   const gates = evaluateAndQueueDataHubReadinessV1_();
+  const dispatch = dispatchForceQueueToMasterExecutionV1_(runId);
   const approvals = runCentralApprovalInboxScanV1();
   const modelQa = runConditionalDataGapAuditV1_(runId, gates);
-  const status = /PASS/.test(String(notebook.status || '')) || String(notebook.status || '') === 'PASS_PRECHECK' ?
-    (gates.blocked === 0 ? 'PASS_DATA_HUB' : 'PASS_WITH_FORCE_QUEUE') : 'DEGRADED_NOTEBOOK_RUNTIME';
+  const notebookPass = /PASS/.test(String(notebook.status || '')) || String(notebook.status || '') === 'PASS_PRECHECK';
+  const status = notebookPass ? (gates.blocked === 0 ? 'PASS_DATA_HUB' : 'PASS_WITH_FORCE_QUEUE') : 'DEGRADED_NOTEBOOK_RUNTIME';
   appendHubRowByHeader_('06_WORKFLOW_HEALTH', {
     CHECK_ID:runId, WORKFLOW_ID:'CENTRAL_DATA_MANAGEMENT_HUB', FRONT_APP:'ALL', NOTEBOOK_RUNTIME:String(notebook.status||''),
     APPS_SCRIPT:'CODE_STAGED_RUNTIME', CLASP:'RUNTIME_READBACK_REQUIRED', CHROME_EXTENSION:'RUNTIME_READBACK_REQUIRED', DRIVE_SYNC:fileSync.status,
     SEED_T1:gates.blocked===0?'READY':'FORCE_QUEUE_ACTIVE', PUBLISH_ROUTE:publish.status, OVERALL_STATUS:status,
-    LAST_CHECK:new Date(), ERROR_CODE:gates.blockers.slice(0,20).join('|'), LAST_GOOD:'MASTER_REGISTRY+81_ALL_FILE_CATALOG',
-    AUTO_FIX:'ANALYZE→SEED→T1→URL_POINTER; API only for blocker/quality/learning gap', USER_APPROVAL:approvals.userApprovalCount>0?'Y':'N'
+    LAST_CHECK:new Date(), ERROR_CODE:gates.blockers.slice(0,20).concat(dispatch.blockedRoutes||[]).join('|'), LAST_GOOD:'MASTER_REGISTRY+81_ALL_FILE_CATALOG',
+    AUTO_FIX:'ANALYZE→SEED→T1→URL_POINTER; route only to ACTIVE canonical functions; API only for blocker/quality/learning gap', USER_APPROVAL:approvals.userApprovalCount>0?'Y':'N'
   });
-  return {runId:runId,status:status,notebook:notebook,fileSync:fileSync,publish:publish,gates:gates,approvals:approvals,modelQa:modelQa,version:CDMH_VERSION};
+  return {runId:runId,status:status,notebook:notebook,fileSync:fileSync,publish:publish,gates:gates,dispatch:dispatch,approvals:approvals,modelQa:modelQa,version:CDMH_VERSION};
 }
 
 function syncMasterFileCatalogToDataHubV1_() {
@@ -78,7 +79,6 @@ function syncMasterPublishLedgerToDataHubV1_() {
     return [String(p.PUBLISH_ID||p.PLATFORM_RECORD_ID||''),String(p.SOURCE_DRIVE_IDS||''),String(p.APP_ID||''),String(p.PLATFORM_ID||''),'', '', url, String(p.PLATFORM_CONTENT_ID||''), url,
       url?'URL_VERIFIED':'URL_PENDING', url?'INDEX_CHECK_REQUIRED':'NOT_INDEXED', String(p.PUBLISHED_AT||''), String(p.METRIC_LAST_SYNC_AT||''), String(p.SEED_ID||''),'',String(p.NOTES||'')];
   });
-  const sh = SpreadsheetApp.openById(CDMH_HUB_ID).getSheetByName('04_PUBLISH_URL_LEDGER');
   const keep = [['PUB_PINTEREST_PENDING','','ALL','PINTEREST','ALL','','','','','EXTERNAL_REVIEW_PENDING','NOT_INDEXED','','','','','Pinterest API app review pending; real URL required'],['PUB_BLOGGER_ROUTE','','ALL','BLOGGER','TEXT_IMAGE','','','','','ROUTE_READY_URL_PENDING','NOT_CHECKED','','','','','Official API first; actual post URL required']];
   writeHubTable_('04_PUBLISH_URL_LEDGER', keep.concat(rows));
   return {status:'PASS_PUBLISH_LEDGER_SYNC', rows:rows.length};
@@ -98,6 +98,76 @@ function evaluateAndQueueDataHubReadinessV1_() {
   });
   writeHubTable_('10_FORCE_PROCESS_QUEUE', qRows.length?qRows:[['FORCE_NONE','','NO_BLOCKERS','DONE','','NONE','','','','','','EMPTY',0,'','','']]);
   return {blocked:blocked.length,total:catalog.length,blockers:blocked.slice(0,50).map(function(r){return String(r.DATA_ID||'');})};
+}
+
+/**
+ * Force-processing means canonical queue dispatch, not blind execution.
+ * Only ACTIVE functions already registered in 79_FUNCTION_DATA_USAGE_MAP are routable.
+ * Public publishing, OAuth, paid APIs, new secrets/scopes, deletion and payments remain gated.
+ */
+function dispatchForceQueueToMasterExecutionV1_(runId) {
+  const forceRows = sheetObjects_(CDMH_HUB_ID,'10_FORCE_PROCESS_QUEUE').filter(function(r){
+    return String(r.STATUS||'') === 'READY' && String(r.DATA_ID||'') && String(r.DATA_ID||'') !== 'FORCE_NONE';
+  });
+  const fileCatalog = sheetObjects_(CDMH_MASTER_ID,'81_ALL_FILE_CATALOG');
+  const functionMap = sheetObjects_(CDMH_MASTER_ID,'79_FUNCTION_DATA_USAGE_MAP');
+  const existingQueue = sheetObjects_(CDMH_MASTER_ID,'07_EXECUTION_QUEUE');
+  const fileByData = {};
+  fileCatalog.forEach(function(f){ if(f.DATA_ID) fileByData[String(f.DATA_ID)] = f; });
+  const activeFunctions = functionMap.filter(function(m){ return /^ACTIVE/i.test(String(m.ACTIVE_STATE||'')); });
+  const existingKeys = {};
+  existingQueue.forEach(function(q){
+    const key = String(q.TASK_TYPE||'')+'|'+String(q.TARGET_ID||'');
+    if(!/COMPLETED|VERIFIED|CANCELLED|REJECTED/i.test(String(q.STATUS||''))) existingKeys[key]=true;
+  });
+
+  let queued=0, skippedDuplicate=0;
+  const blockedRoutes=[];
+  forceRows.forEach(function(fr){
+    const dataId=String(fr.DATA_ID||'');
+    const key='DATA_ANALYZE_SEED_T1|'+dataId;
+    if(existingKeys[key]) { skippedDuplicate++; return; }
+    const file=fileByData[dataId]||{};
+    const linkedFunctions=String(file.LINKED_FUNCTION_IDS||'').split('|').filter(Boolean);
+    const linkedTriggers=String(file.LINKED_TRIGGER_IDS||'').split('|').filter(Boolean);
+    let route=null;
+    for(let i=0;i<activeFunctions.length && !route;i++){
+      const m=activeFunctions[i];
+      const fnId=String(m.FUNCTION_ID||'');
+      const fnName=String(m.FUNCTION_NAME||'');
+      const inputs=String(m.INPUT_DATA_IDS||'');
+      const trigger=String(m.TRIGGER_ID||'');
+      if(linkedFunctions.indexOf(fnId)>=0 || linkedFunctions.indexOf(fnName)>=0 || inputs.split('|').indexOf(dataId)>=0 || linkedTriggers.indexOf(trigger)>=0) route=m;
+    }
+    const routeReady=!!route;
+    if(!routeReady) blockedRoutes.push(dataId);
+    const taskId='CDMH_FORCE_'+safeId_(dataId).slice(0,72);
+    appendMasterByHeader_('07_EXECUTION_QUEUE', {
+      TASK_ID:taskId,
+      STAGE_NO:1,
+      TASK_TYPE:'DATA_ANALYZE_SEED_T1',
+      TARGET_ID:dataId,
+      ACTION:'ANALYZE_STORED_DATA→SEED→T1→URL_POINTER; PUBLIC_PUBLISH_SEPARATE_GATE',
+      PRIORITY:String(fr.REASON||'').indexOf('RIGHTS')>=0?'P0':'P1',
+      APPROVAL_STATUS:'POLICY_AUTO_APPROVED_SAFE_DATA_PROCESSING',
+      EXECUTION_METHOD:routeReady?('FUNCTION:'+String(route.FUNCTION_NAME||'')+'|TRIGGER:'+String(route.TRIGGER_ID||'')):'CENTRAL_ROUTE_RESOLUTION_REQUIRED',
+      STATUS:routeReady?'READY':'BLOCKED_ROUTE',
+      RETRY_COUNT:0,
+      CREATED_AT:new Date(),
+      UPDATED_AT:new Date(),
+      NOTES:'Source='+String(file.TITLE||'')+'; missing='+String(fr.MISSING||'')+'; run='+runId+'; no blind invocation; API conditional only after stored-data gap.',
+      OWNER:'CENTRAL_AGENT',
+      FIRST_REQUESTED_AT:new Date(),
+      LAST_REQUESTED_AT:new Date(),
+      REQUEST_COUNT:1,
+      BLOCKED_TASK_ID:'',
+      COMPLETION_EVIDENCE:'RUNTIME_RESULT+SEED_ID+T1_ID+URL_POINTER+READBACK_X2_REQUIRED',
+      APPROVAL_TYPE:'NONE_UNLESS_LOGIN_2FA_NEW_SECRET_SCOPE_PAID_PUBLIC_DESTRUCTIVE_PAYMENT'
+    });
+    existingKeys[key]=true;
+    queued++;
+  });
+  return {status:blockedRoutes.length?'QUEUED_WITH_ROUTE_GAPS':'QUEUED_CANONICAL',queued:queued,skippedDuplicate:skippedDuplicate,blockedRoutes:blockedRoutes};
 }
 
 function runConditionalDataGapAuditV1_(runId, gates) {
@@ -146,9 +216,14 @@ function appendHubRowByHeader_(sheetName,payload){
   const sh=SpreadsheetApp.openById(CDMH_HUB_ID).getSheetByName(sheetName); if(!sh) throw new Error('HUB_SHEET_NOT_FOUND:'+sheetName);
   const h=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0]; sh.appendRow(h.map(function(k){return Object.prototype.hasOwnProperty.call(payload,k)?payload[k]:'';}));
 }
+function appendMasterByHeader_(sheetName,payload){
+  const sh=SpreadsheetApp.openById(CDMH_MASTER_ID).getSheetByName(sheetName); if(!sh) throw new Error('MASTER_SHEET_NOT_FOUND:'+sheetName);
+  const h=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0]; sh.appendRow(h.map(function(k){return Object.prototype.hasOwnProperty.call(payload,k)?payload[k]:'';}));
+}
 function sheetObjects_(spreadsheetId,sheetName){
   const sh=SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName); if(!sh) return [];
   const lr=sh.getLastRow(), lc=sh.getLastColumn(); if(lr<2||lc<1) return [];
   const v=sh.getRange(1,1,lr,lc).getValues(), h=v[0].map(String);
   return v.slice(1).filter(function(r){return r.some(function(x){return x!=='';});}).map(function(r){const o={};h.forEach(function(k,i){o[k]=r[i];});return o;});
 }
+function safeId_(s){return String(s||'').replace(/[^A-Za-z0-9_-]+/g,'_').replace(/^_+|_+$/g,'') || Utilities.getUuid().slice(0,12);}
