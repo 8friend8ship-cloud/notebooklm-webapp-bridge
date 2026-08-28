@@ -3,11 +3,13 @@ name: test-host125-agent130
 on:
   push:
     branches:
+      - main
       - 'fix/notebooklm-host125-agent130-20260828'
     paths:
       - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
       - 'local-agent/stable/agent.json'
+      - 'local-agent/stable/host.json'
       - 'tests/host125-agent130.test.ps1'
       - '.github/workflows/test-host125-agent130.yml'
   pull_request:
@@ -15,6 +17,7 @@ on:
       - 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1'
       - 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1'
       - 'local-agent/stable/agent.json'
+      - 'local-agent/stable/host.json'
       - 'tests/host125-agent130.test.ps1'
       - '.github/workflows/test-host125-agent130.yml'
   workflow_dispatch:
