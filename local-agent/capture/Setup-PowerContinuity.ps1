@@ -14,6 +14,8 @@ $Night=Join-Path $Root 'NightDisplayOff.ps1'
 $State=Join-Path $Root 'state.json'
 $TaskWatch='HomeDesign-PowerContinuity-Watchdog'
 $TaskNight='HomeDesign-Night-Display-Off'
+$UsbSubGroup='2a737441-1930-4402-8d77-b2bebba308a3'
+$UsbSelectiveSuspend='48e6b7a6-50f5-4782-a5d4-53be6a7c11e8'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
 function TaskInfo([string]$Name){
@@ -93,6 +95,14 @@ if($LASTEXITCODE -ne 0){throw ('STANDBY_TIMEOUT_AC_FAILED:'+ $LASTEXITCODE)}
 & powercfg.exe /change hibernate-timeout-ac 0 | Out-Null
 if($LASTEXITCODE -ne 0){throw ('HIBERNATE_TIMEOUT_AC_FAILED:'+ $LASTEXITCODE)}
 
+# Prevent the previous "resume then keyboard is dead" class of failure on AC.
+# We intentionally do not alter the battery USB policy. On AC there is no system sleep/resume path,
+# and USB selective suspend is disabled so HID/USB input is not parked while the display is off.
+& powercfg.exe /setacvalueindex SCHEME_CURRENT $UsbSubGroup $UsbSelectiveSuspend 0 | Out-Null
+if($LASTEXITCODE -ne 0){throw ('USB_SELECTIVE_SUSPEND_AC_DISABLE_FAILED:'+ $LASTEXITCODE)}
+& powercfg.exe /setactive SCHEME_CURRENT | Out-Null
+if($LASTEXITCODE -ne 0){throw ('POWER_SCHEME_REACTIVATE_FAILED:'+ $LASTEXITCODE)}
+
 # Current-user logon watchdog. It is intentionally AC-safe: battery mode releases the sleep block.
 $watchCmd='powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "'+$Watchdog+'"'
 & schtasks.exe /Create /F /SC ONLOGON /TN $TaskWatch /TR $watchCmd | Out-Null
@@ -121,13 +131,15 @@ if(Test-NightWindow $NightStart $NightEnd){
 
 $displayReadback=((& powercfg.exe /query SCHEME_CURRENT SUB_VIDEO VIDEOIDLE 2>&1)|Out-String).Trim()
 $sleepReadback=((& powercfg.exe /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 2>&1)|Out-String).Trim()
+$usbReadback=((& powercfg.exe /query SCHEME_CURRENT $UsbSubGroup $UsbSelectiveSuspend 2>&1)|Out-String).Trim()
 $watch=TaskInfo $TaskWatch;$nightInfo=TaskInfo $TaskNight
 $stateObj=[ordered]@{
-  ok=$true;mode='AC_SYSTEM_AWAKE_DISPLAY_MAY_OFF';batteryPolicy='DISPLAY_30_MIN_SLEEP_POLICY_NO_OVERRIDE';nightStart=$NightStart;nightEnd=$NightEnd;
+  ok=$true;mode='AC_SYSTEM_AWAKE_DISPLAY_MAY_OFF';batteryPolicy='DISPLAY_30_MIN_SLEEP_AND_USB_POLICY_NO_OVERRIDE';nightStart=$NightStart;nightEnd=$NightEnd;
   idleDisplayMinutes=$IdleDisplayMinutes;idleDisplayApplies='AC_AND_BATTERY';acAutomaticSleep='DISABLED';acAutomaticHibernate='DISABLED';
-  keyboardMouseWake='DISPLAY_WAKE_NATIVE_WINDOWS_NO_SYSTEM_SLEEP';currentNightWindow=(Test-NightWindow $NightStart $NightEnd);currentWindowDisplayOffTriggered=$currentWindowTriggered;
-  powercfgDisplayReadback=$displayReadback;powercfgSleepReadback=$sleepReadback;watchdog=$watch;night=$nightInfo;
-  note='After the configured idle period Windows turns only the display off. While on AC, automatic sleep and hibernate are disabled so NotebookLM/download/Drive/triggers keep running. Battery system-sleep policy is not overridden. NightStart still forces a display-off run; NightEnd does not force the screen on. Normal keyboard/mouse activity wakes the display.';
+  acUsbSelectiveSuspend='DISABLED';keyboardMouseWake='DISPLAY_WAKE_NATIVE_WINDOWS_NO_SYSTEM_SLEEP';keyboardFreezeGuard='NO_AC_SLEEP_RESUME_PLUS_USB_SELECTIVE_SUSPEND_DISABLED';
+  currentNightWindow=(Test-NightWindow $NightStart $NightEnd);currentWindowDisplayOffTriggered=$currentWindowTriggered;
+  powercfgDisplayReadback=$displayReadback;powercfgSleepReadback=$sleepReadback;powercfgUsbSelectiveSuspendReadback=$usbReadback;watchdog=$watch;night=$nightInfo;
+  note='After the configured idle period Windows turns only the display off. While on AC, automatic sleep and hibernate are disabled so NotebookLM/download/Drive/triggers keep running. AC USB selective suspend is disabled to prevent HID/keyboard devices from being power-parked. Battery system-sleep and USB policies are not overridden. NightStart still forces a display-off run; NightEnd does not force the screen on. Normal keyboard/mouse activity wakes the display without a system resume.';
   installedAt=(Get-Date).ToString('o')
 }
 WriteState $stateObj
