@@ -1,0 +1,100 @@
+name: One-shot V1 Stable API Repair
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-governor-v1-api-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch only V1 stable helper functions
+        shell: python
+        run: |
+          import pathlib, re
+          p = pathlib.Path('local-agent/governor/RunChromeGovernorReadback.ps1')
+          text = p.read_text(encoding='utf-8')
+
+          refresh = r'''function RefreshV2 {
+            try{
+              $Headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}
+              $Resp=Invoke-RestMethod -Uri $Api -Headers $Headers -Method Get -TimeoutSec 10
+              $Bytes=[Convert]::FromBase64String(([string]$Resp.content -replace '\s',''))
+              $Tmp=$V2+'.download'
+              [IO.File]::WriteAllBytes($Tmp,$Bytes)
+              Move-Item -LiteralPath $Tmp -Destination $V2 -Force
+              return $true
+            }catch{
+              return (Test-Path -LiteralPath $V2)
+            }
+          }'''
+          kick = r'''function KickStableAgentRaw {
+            if(-not(RefreshV2)){throw 'V2_API_STABLE_HELPER_REFRESH_FAILED'}
+            $OldEap=$ErrorActionPreference
+            $ErrorActionPreference='Continue'
+            try{
+              $Out=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $V2 -KickStableAgent 2>&1 | Out-String
+              $Rc=$LASTEXITCODE
+            }finally{
+              $ErrorActionPreference=$OldEap
+            }
+            if($Rc -ne 0){throw ('V2_API_STABLE_KICK_FAILED_EXIT_'+$Rc+': '+$Out.Trim())}
+            $Parsed=$null
+            foreach($Line in @($Out -split "`r?`n")){
+              if(-not $Line -or -not $Line.Trim()){continue}
+              try{$Candidate=$Line.Trim()|ConvertFrom-Json;if($Candidate -and $null -ne $Candidate.ok){$Parsed=$Candidate}}catch{}
+            }
+            if(-not $Parsed -or -not [bool]$Parsed.ok){throw ('V2_API_STABLE_KICK_NO_PASS_JSON: '+$Out.Trim())}
+            return $Parsed
+          }'''
+
+          text, n1 = re.subn(r'(?m)^function RefreshV2 \{.*\}$', refresh, text, count=1)
+          text, n2 = re.subn(r'(?m)^function KickStableAgentRaw \{.*\}$', kick, text, count=1)
+          if n1 != 1 or n2 != 1:
+              raise SystemExit(f'PATCH_TARGET_COUNT refresh={n1} kick={n2}')
+          p.write_text(text, encoding='utf-8', newline='\n')
+
+      - name: PowerShell parse check
+        shell: pwsh
+        run: |
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'local-agent/governor/RunChromeGovernorReadback.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){ $errors | Format-List | Out-String | Write-Error; exit 1 }
+
+      - name: Stable repair contract checks
+        shell: python
+        run: |
+          import pathlib, re
+          t=pathlib.Path('local-agent/governor/RunChromeGovernorReadback.ps1').read_text(encoding='utf-8')
+          m=re.search(r'(?ms)^function KickStableAgentRaw \{.*?^\}',t)
+          if not m: raise SystemExit('KICK_FUNCTION_MISSING')
+          block=m.group(0)
+          assert 'RefreshV2' in block
+          assert '-KickStableAgent' in block
+          assert 'raw.githubusercontent.com' not in block
+          r=re.search(r'(?ms)^function RefreshV2 \{.*?^\}',t)
+          if not r: raise SystemExit('REFRESH_FUNCTION_MISSING')
+          assert 'Invoke-RestMethod -Uri $Api' in r.group(0)
+          assert 'FromBase64String' in r.group(0)
+          print('V1_API_STABLE_REPAIR_CONTRACT_PASS')
+
+      - name: Commit focused patch
+        shell: bash
+        run: |
+          if git diff --quiet -- local-agent/governor/RunChromeGovernorReadback.ps1; then
+            echo 'No patch needed.'
+            exit 0
+          fi
+          git config user.name '8friend8ship-cloud'
+          git config user.email 'homedesigntaedi@gmail.com'
+          git add local-agent/governor/RunChromeGovernorReadback.ps1
+          git commit -m 'Route V1 stable self-heal through GitHub API V2'
+          git push origin HEAD:main
