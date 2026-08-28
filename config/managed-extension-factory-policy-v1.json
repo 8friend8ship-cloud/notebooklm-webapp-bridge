@@ -1,0 +1,71 @@
+{
+  "schema": "CENTRAL_MANAGED_EXTENSION_FACTORY_POLICY_V1",
+  "updatedAt": "2026-08-28T18:46:00+09:00",
+  "enabled": true,
+  "decisionOrder": [
+    "CHECK_EXISTING_EXTENSION",
+    "CHECK_EXISTING_BRIDGE_CAPABILITY",
+    "CHECK_DUPLICATE_HOST_AND_SERVICE",
+    "REUSE_OR_EXTEND_EXISTING_IF_SAFE",
+    "CREATE_MINIMAL_EXTENSION_IF_MISSING",
+    "STATIC_QA",
+    "REGISTER_CENTRAL_REGISTRY",
+    "AUTOPILOT_STAGE",
+    "DEDICATED_CHROME_RUNTIME_READBACK",
+    "SAME_FIXTURE_X2",
+    "DRIVE_SHEETS_WRITEBACK",
+    "REQUEST_CHATGPT_SITE_PERMISSION_ONLY_IF_NEEDED"
+  ],
+  "autoCreate": {
+    "enabled": true,
+    "defaultManifestVersion": 3,
+    "defaultPermissions": ["storage"],
+    "broadAllUrlsForbidden": true,
+    "exactHttpsHostsOnly": true,
+    "credentialCaptureForbidden": true,
+    "cookieTokenCaptureForbidden": true,
+    "normalChromeRestartForbidden": true,
+    "publicPublishFailClosed": true,
+    "newOAuthScopeUserGate": true,
+    "paidApiOrCreditUserGate": true,
+    "destructiveActionUserGate": true
+  },
+  "autoRegister": {
+    "enabled": true,
+    "registry": "config/managed-extension-autopilot-v1.json",
+    "requiredBeforeRegister": [
+      "SOURCE_PRESENT",
+      "MANIFEST_V3_PASS",
+      "HOST_PERMISSION_MINIMAL",
+      "REQUIRED_FILES_PASS",
+      "NO_PUBLIC_PUBLISH_PATH_BY_DEFAULT"
+    ],
+    "runtimeCompletion": [
+      "STAGED_PATH_READBACK",
+      "TREE_SHA256_READBACK",
+      "EXTENSION_ID_READBACK",
+      "EXACT_TARGET_CONTEXT_VERIFIED",
+      "SAME_FIXTURE_X2_PASS",
+      "DRIVE_WRITEBACK_PASS",
+      "LAST_GOOD_RECORDED"
+    ]
+  },
+  "managedServices": [
+    "NOTEBOOKLM",
+    "FLOW",
+    "AI_STUDIO",
+    "CENTRAL_CAPTURE",
+    "FRONT_QA",
+    "PLATFORM_PUBLISH_QA",
+    "BLOGGER",
+    "YOUTUBE",
+    "INSTAGRAM",
+    "TIKTOK",
+    "NAVER_BLOG",
+    "NAVER_CAFE",
+    "NAVER_CLIP",
+    "PINTEREST",
+    "SKETCHUP"
+  ],
+  "futureRule": "When a workflow map introduces a browser capability not covered by an existing managed extension, Central Agent automatically generates the minimum-purpose extension, validates it, registers it in the central registry, stages it through ManagedExtensionAutopilotV2, records success/failure evidence, and only asks the user for the final ChatGPT exact-site-permission confirmation unless a higher-impact approval boundary applies."
+}
