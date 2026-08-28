@@ -117,7 +117,9 @@ foreach ($service in $Services) {
 $futureService = 'FutureManagedExtension'
 $futureSrc = Join-Path $smokeRoot 'future-managed-smoke.txt'
 Set-Content -LiteralPath $futureSrc -Value ('MANAGED_CHROME_CAPTURE_SMOKE ' + $futureService + ' ' + (Get-Date).ToString('o')) -Encoding UTF8
-$futureRaw = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Manager -ServiceKey $futureService -SourcePath $futureSrc -TaskId 'SETUP_SMOKE_FUTURE_MANAGED' -LocalInboxRoot $LocalInboxRoot
+$futureArgs = @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$Manager,'-ServiceKey',$futureService,'-SourcePath',$futureSrc,'-TaskId','SETUP_SMOKE_FUTURE_MANAGED','-LocalInboxRoot',$LocalInboxRoot)
+if ($CentralRootOverride) { $futureArgs += @('-CentralRootOverride',$CentralRoot) }
+$futureRaw = & powershell.exe @futureArgs
 if ($LASTEXITCODE -ne 0) { throw 'CAPTURE_SMOKE_FAILED:FUTURE_MANAGED' }
 $futureParsed = ($futureRaw | Select-Object -Last 1) | ConvertFrom-Json
 if (-not [bool]$futureParsed.ok -or [int]$futureParsed.processedCount -lt 1 -or [bool]$futureParsed.knownProfile -or [bool]$futureParsed.genericDownloadsScan) {
