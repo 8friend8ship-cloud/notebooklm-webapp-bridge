@@ -1,0 +1,47 @@
+name: Persona Device Recovery Once CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
+      - '.github/workflows/persona-device-recovery-once-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Windows PowerShell 5.1 parse
+        shell: powershell
+        run: |
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
+      - name: Pinned and non-destructive recovery contract
+        shell: python
+        run: |
+          from pathlib import Path
+          t=Path('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1').read_text(encoding='utf-8')
+          required=[
+            "$ExpectedAgent='1.1.46'",
+            "$ExpectedAgentBlob='b72e57af70f77578fddb3de49f6581a37e2de792'",
+            "$ExpectedV2Blob='a4b7967da7bc26f3cb49c88d3b3cb122ddf86c7c'",
+            "GitHubContent 'local-agent/stable/agent.json'",
+            "GitHubContent 'local-agent/governor/RunChromeGovernorReadbackV2.ps1'",
+            '-KickStableAgent',
+            'newProjectCreated=$false',
+            'oauthChanged=$false',
+            'scopeChanged=$false',
+            'newDeployment=$false',
+            'newTrigger=$false',
+            'paidGeminiApiCalled=$false'
+          ]
+          missing=[x for x in required if x not in t]
+          if missing: raise SystemExit('MISSING_CONTRACT:'+repr(missing))
+          forbidden=['clasp create','clasp deploy','ScriptApp.newTrigger','GOOGLE_AI_PAID_API_APPROVED=Y']
+          bad=[x for x in forbidden if x in t]
+          if bad: raise SystemExit('FORBIDDEN_ACTION:'+repr(bad))
+          print('PINNED_PERSONA_DEVICE_RECOVERY_CONTRACT_PASS')
