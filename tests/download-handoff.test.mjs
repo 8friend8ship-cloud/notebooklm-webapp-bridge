@@ -10,6 +10,9 @@ const watcherPs = fs.readFileSync('local-agent/governor/WatchNotebookLMDownloads
 const agent30Path = 'local-agent/releases/1.1.30/HomeDesignLocalAgent.ps1';
 const agent30Ps = fs.readFileSync(agent30Path, 'utf8');
 const host125Path = 'local-agent/releases/1.2.5/HomeDesignLocalCommandHost.ps1';
+const agent31Path = 'local-agent/releases/1.1.31/HomeDesignLocalAgent.ps1';
+const agent31Ps = fs.readFileSync(agent31Path, 'utf8');
+const host126Path = 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1';
 const stableAgent = JSON.parse(fs.readFileSync('local-agent/stable/agent.json', 'utf8'));
 const stableBridge = JSON.parse(fs.readFileSync('runtime/stable/release.json', 'utf8'));
 
@@ -64,13 +67,30 @@ test('Local Agent 1.1.30 restores Host 1.2.5 before AutoResume and stable Bridge
   assert.doesNotMatch(agent30Ps, /EXISTING_HOST_NOT_HEALTHY/);
 });
 
-test('Stable Agent manifest points to the exact 1.1.30 blob and verified Host 1.2.5 blob', () => {
-  assert.equal(stableAgent.version, '1.1.30');
-  assert.equal(stableAgent.gitBlobSha1.toLowerCase(), repositoryBlobSha1(agent30Path));
-  const hostExpected = agent30Ps.match(/\$HostExpected='([0-9a-f]{40})'/i)?.[1];
+test('Local Agent 1.1.31 targets Host 1.2.6 managed CaptureBridge allowlist', () => {
+  assert.match(agent31Ps, /1\.1\.31/);
+  assert.match(agent31Ps, /1\.2\.6/);
+  assert.match(agent31Ps, /5d17bb233706897cd1706930cea9af3796f29488/);
+  const host126Ps = fs.readFileSync(host126Path, 'utf8');
+  assert.match(host126Ps, /1\.2\.6/);
+  assert.match(host126Ps, /local-agent\/capture\/ManageChromeExtensionArtifacts\.ps1/);
+  assert.match(host126Ps, /local-agent\/capture\/Setup-ChromeExtensionCaptureBridge\.ps1/);
+});
+
+test('Stable Agent manifest points to its exact release blob and pinned Host blob', () => {
+  assert.ok(['1.1.30', '1.1.31'].includes(stableAgent.version), `unexpected stable agent ${stableAgent.version}`);
+  const stableAgentPath = `local-agent/releases/${stableAgent.version}/HomeDesignLocalAgent.ps1`;
+  assert.equal(stableAgent.gitBlobSha1.toLowerCase(), repositoryBlobSha1(stableAgentPath));
+  const stableAgentPs = fs.readFileSync(stableAgentPath, 'utf8');
+  const hostExpected = stableAgentPs.match(/\$HostExpected='([0-9a-f]{40})'/i)?.[1];
   assert.ok(hostExpected, 'Agent must pin HostExpected');
-  assert.equal(hostExpected.toLowerCase(), repositoryBlobSha1(host125Path));
-  assert.match(agent30Ps, /local-agent\/releases\/1\.2\.5\/HomeDesignLocalCommandHost\.ps1/);
+  const expectedHostPath = stableAgent.version === '1.1.31' ? host126Path : host125Path;
+  assert.equal(hostExpected.toLowerCase(), repositoryBlobSha1(expectedHostPath));
+  if (stableAgent.version === '1.1.31') {
+    assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.6\/HomeDesignLocalCommandHost\.ps1/);
+  } else {
+    assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.5\/HomeDesignLocalCommandHost\.ps1/);
+  }
 });
 
 test('Stable Bridge 0.2.71 release hashes match every declared repository blob', () => {
