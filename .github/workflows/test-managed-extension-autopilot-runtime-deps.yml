@@ -1,0 +1,44 @@
+name: test-managed-extension-autopilot-runtime-deps
+
+on:
+  push:
+    branches:
+      - 'feat/managed-extension-autopilot-20260828'
+    paths:
+      - 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
+      - 'local-agent/governor/ManagedExtensionAutopilot.ps1'
+      - 'docs/MANAGED_EXTENSION_AUTOPILOT_RUNTIME_GATE_20260828.md'
+      - '.github/workflows/test-managed-extension-autopilot-runtime-deps.yml'
+  pull_request:
+    paths:
+      - 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
+      - 'local-agent/governor/ManagedExtensionAutopilot.ps1'
+      - 'docs/MANAGED_EXTENSION_AUTOPILOT_RUNTIME_GATE_20260828.md'
+      - '.github/workflows/test-managed-extension-autopilot-runtime-deps.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell parse
+        shell: pwsh
+        run: |
+          foreach($f in @('local-agent/governor/ManagedExtensionAutopilot.ps1','local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1')){
+            if(-not(Test-Path $f)){ throw "MISSING:$f" }
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+            if($errors.Count){ $errors|%{Write-Error $_.Message}; throw "POWERSHELL_PARSE_FAIL:$f" }
+          }
+      - name: Runtime dependency contract
+        shell: pwsh
+        run: |
+          $auto=Get-Content 'local-agent/governor/ManagedExtensionAutopilot.ps1' -Raw
+          $mgr=Get-Content 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1' -Raw
+          foreach($n in @('InstallOrUpdateManagedChromeExtensions.ps1','SyncRegistry','LaunchDedicated')){if(-not $auto.Contains($n)){throw "AUTOPILOT_CONTRACT_MISSING:$n"}}
+          foreach($n in @('Expand-Archive','manifest.json','Get-TreeHash','previousPath','--load-extension','noNormalChromeRestart','preserveLastGood')){if(-not $mgr.Contains($n)){throw "MANAGER_CONTRACT_MISSING:$n"}}
+          if($mgr.Contains('Remove-Item -LiteralPath $previousPath')){throw 'LAST_GOOD_DESTRUCTIVE_DELETE_FORBIDDEN'}
