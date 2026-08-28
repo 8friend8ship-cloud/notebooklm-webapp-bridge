@@ -6,6 +6,7 @@ on:
       - 'feat/central-daily-qa-asset-governor-20260828'
     paths:
       - 'apps-script/**'
+      - 'tests/central-governor-policy.test.js'
       - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
       - 'local-agent/governor/CentralNotebookRuntimeHub.ps1'
       - 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1'
@@ -17,6 +18,7 @@ on:
   pull_request:
     paths:
       - 'apps-script/**'
+      - 'tests/central-governor-policy.test.js'
       - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
       - 'local-agent/governor/CentralNotebookRuntimeHub.ps1'
       - 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1'
@@ -114,6 +116,10 @@ jobs:
           }
           if(-not $integrated.Contains('runCentralDailyQaAssetGovernorV2')){ throw 'INTEGRATED_GOVERNOR_NOT_ROUTED_TO_V2' }
           if($v2.Contains('OPENAI_API_KEY') -or $v2.Contains('GEMINI_API_KEY')){ throw 'V2_MUST_NOT_REQUIRE_OR_EMBED_AI_KEYS' }
+
+      - name: API-free promotion behavior regression
+        shell: pwsh
+        run: node tests/central-governor-policy.test.js
 
       - name: Guarded bound sync contract
         shell: pwsh
