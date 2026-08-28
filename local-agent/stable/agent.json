@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.34",
-  "releasedAt": "2026-08-28T16:28:00+09:00",
-  "gitBlobSha1": "ad2adc3c1eeb9c3b9a6620069af8a64b9e8218ad",
+  "version": "1.1.35",
+  "releasedAt": "2026-08-28T16:42:00+09:00",
+  "gitBlobSha1": "e27b760b67933be05a5d6f1ac0af1afd6158b32b",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Minimum-scope ContentOS runtime unblock. Agent 1.1.34 promotes Host 1.2.7 while preserving Bridge 0.2.71 and the existing dedicated Chrome/runtime. Host 1.2.7 changes only the exact contents-os-git/main allowlist from Switch-ContentOS-VercelGit.ps1 to Switch-ContentOS-VercelGit.ps1 plus Repair-ContentOS-DriveCacheAppsScript.ps1. This enables the already-approved transactional WEBAPP_TEMPLATE_05 repair after fresh D82 evidence. No new OAuth, scope, project, deployment, public publish, paid API, generic shell, or wildcard repo/script access is added."
+  "notes": "Changed-route D115 after the central queue row was CLAIMED for more than 150 seconds with STARTED_AT empty. Agent 1.1.35 preserves Agent 1.1.34/Host 1.2.7/Bridge 0.2.71, verifies the Host official loopback async API, and submits exactly one fixed idempotent task ID CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01 with taskType LOCAL_POWERSHELL to run contents-os-git/main/tools/Repair-ContentOS-DriveCacheAppsScript.ps1. It polls the same Host result and never creates a duplicate task. No new OAuth, scope, Script project, deployment, trigger, Vercel action, paid API, wildcard permission, or public publish is added."
 }
