@@ -27,8 +27,12 @@ function GitHubContent([string]$Path){
   $headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}
   return Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers $headers -Method Get -TimeoutSec 20
 }
+function GitHubBlob([string]$BlobSha){
+  $headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}
+  return Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/git/blobs/'+$BlobSha+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers $headers -Method Get -TimeoutSec 20
+}
 function FetchPinned([string]$Path,[string]$Destination,[string]$ExpectedBlob){
-  $resp=GitHubContent $Path
+  $resp=GitHubBlob $ExpectedBlob
   $tmp=$Destination+'.recovery.download'
   [IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$resp.content -replace '\s','')))
   $sha=(GitBlobSha1 $tmp).ToLowerInvariant()
