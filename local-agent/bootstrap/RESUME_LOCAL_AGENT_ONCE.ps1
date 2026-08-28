@@ -19,9 +19,34 @@ function GitBlobSha1([string]$Path){$bytes=[IO.File]::ReadAllBytes($Path);$heade
 function TestHostHealth(){try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3;return [bool]$h.ok}catch{return $false}}
 function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
 function SafeKey([string]$Value){return ([string]$Value -replace '[^A-Za-z0-9_.-]','_')}
+function FindCentralRoot{
+  $centralName=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+  $myDriveKo=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
+  foreach($drv in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
+    $rr=[string]$drv.Root;if(-not $rr){continue}
+    foreach($cand in @((Join-Path $rr $centralName),(Join-Path $rr ($myDriveKo+'\'+$centralName)),(Join-Path $rr ('My Drive\'+$centralName)),(Join-Path $rr ('Google Drive\'+$centralName)))){
+      if(Test-Path -LiteralPath $cand -PathType Container){return $cand}
+    }
+  }
+  return ''
+}
+function WriteResumeHeartbeat([string]$Stage){
+  try{
+    $hb=[ordered]@{ok=$true;action='AUTO_RESUME_ENTRY_HEARTBEAT';version='RESUME_TELEMETRY_V1_20260828';stage=$Stage;pid=$PID;hostHealthy=(TestHostHealth);newOAuth=$false;newScope=$false;newProjectCreated=$false;newDeployment=$false;newTrigger=$false;normalChromeRestarted=$false;at=(Get-Date).ToString('o')}
+    $json=$hb|ConvertTo-Json -Depth 20
+    $local=Join-Path $Root 'AUTO_RESUME_ENTRY_1.1.46.json'
+    $json|Set-Content -LiteralPath $local -Encoding UTF8
+    $central=FindCentralRoot
+    if($central){
+      $dest=Join-Path $central 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $dest|Out-Null
+      $json|Set-Content -LiteralPath (Join-Path $dest 'AUTO_RESUME_ENTRY_1.1.46.json') -Encoding UTF8
+    }
+  }catch{}
+}
 
 Write-Host 'HomeDesign Local Agent - SAFE DIRECT RESUME'
 Write-Host 'No reinstall / no new OAuth / no Apps Script redeploy / normal Chrome untouched.'
+WriteResumeHeartbeat 'ENTRY_BEFORE_NETWORK_AND_AGENT_APPLY'
 
 # Only stale governor/readback processes are cleaned. Healthy Host/Bootstrap stay alive.
 StopTarget 'RunChromeGovernorReadback.ps1'
