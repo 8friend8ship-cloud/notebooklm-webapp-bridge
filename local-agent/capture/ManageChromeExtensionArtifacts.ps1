@@ -48,14 +48,15 @@ function Find-CentralRoot {
     throw ('CENTRAL_ROOT_OVERRIDE_NOT_FOUND:{0}' -f $CentralRootOverride)
   }
 
-  $target = '00_중앙에이전트'
+  $target = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+  $myDriveKo = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
   foreach ($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
     $root = [string]$drive.Root
     if (-not $root) { continue }
     foreach ($candidate in @(
       (Join-Path $root $target),
       (Join-Path $root ('My Drive\' + $target)),
-      (Join-Path $root ('내 드라이브\' + $target)),
+      (Join-Path $root ($myDriveKo + '\' + $target)),
       (Join-Path $root ('Google Drive\' + $target))
     )) {
       if (Test-Path -LiteralPath $candidate -PathType Container) { return $candidate }
