@@ -29,9 +29,13 @@ jobs:
             "$ExpectedAgent='1.1.46'",
             "$ExpectedAgentBlob='b72e57af70f77578fddb3de49f6581a37e2de792'",
             "$ExpectedV2Blob='a4b7967da7bc26f3cb49c88d3b3cb122ddf86c7c'",
+            "$ExpectedPowerBlob='3edde1fe1276052a084380a84fe27a2b2574e9ef'",
             "GitHubContent 'local-agent/stable/agent.json'",
-            "GitHubContent 'local-agent/governor/RunChromeGovernorReadbackV2.ps1'",
+            "FetchPinned 'local-agent/governor/RunChromeGovernorReadbackV2.ps1'",
+            "FetchPinned 'local-agent/capture/Setup-PowerContinuity.ps1'",
             '-KickStableAgent',
+            "-Install -NightStart '02:00' -NightEnd '05:00'",
+            "POWER_CONTINUITY_WINDOW_MISMATCH",
             'newProjectCreated=$false',
             'oauthChanged=$false',
             'scopeChanged=$false',
@@ -44,4 +48,4 @@ jobs:
           forbidden=['clasp create','clasp deploy','ScriptApp.newTrigger','GOOGLE_AI_PAID_API_APPROVED=Y']
           bad=[x for x in forbidden if x in t]
           if bad: raise SystemExit('FORBIDDEN_ACTION:'+repr(bad))
-          print('PINNED_PERSONA_DEVICE_RECOVERY_CONTRACT_PASS')
+          print('PINNED_PERSONA_DEVICE_RECOVERY_AND_POWER_CONTRACT_PASS')
