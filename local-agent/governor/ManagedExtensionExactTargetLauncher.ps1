@@ -43,6 +43,20 @@ function Get-ManagedPaths{
   $s=Read-Json $StatePath;if(-not $s){return @()}
   return @($s.extensions|Where-Object{$_.active -eq $true -and $_.activePath -and (Test-Path -LiteralPath ([string]$_.activePath))}|ForEach-Object{[string]$_.activePath}|Select-Object -Unique)
 }
+function Get-ServiceFallbackPaths([string]$Svc){
+  $out=@()
+  if($Svc -eq 'FLOW'){
+    foreach($p in @(
+      (Join-Path $env:USERPROFILE 'Downloads\flow-agent-bridge-v0.1.0\flow-agent-bridge-v0.1.0'),
+      (Join-Path $env:USERPROFILE 'Downloads\flow-agent-bridge-v0.1.0'),
+      (Join-Path $Base 'Extension\Flow-Agent-Bridge'),
+      (Join-Path $Base 'Extension\Google-AI-Local-Bridge-Flow')
+    )){
+      if($p -and (Test-Path -LiteralPath (Join-Path $p 'manifest.json') -PathType Leaf)){$out+=$p}
+    }
+  }
+  return @($out|Select-Object -Unique)
+}
 function Get-Architecture([string[]]$Paths,[string]$ExtId){
   $items=@();foreach($p in $Paths){$m=Read-Json (Join-Path $p 'manifest.json');if(-not $m){continue};$arch='extension_page';if($m.background -and $m.background.service_worker){$arch='background_service_worker'}elseif(@($m.content_scripts).Count -and $m.action -and $m.action.default_popup){$arch='content_script_plus_popup'}elseif(@($m.content_scripts).Count){$arch='content_script_only'};$items += [pscustomobject]@{path=$p;name=[string]$m.name;version=[string]$m.version;architecture=$arch;matches=@($m.content_scripts|ForEach-Object{@($_.matches)})|ForEach-Object{$_};js=@($m.content_scripts|ForEach-Object{@($_.js)})|ForEach-Object{$_};popup=$(if($m.action){[string]$m.action.default_popup}else{''});serviceWorker=$(if($m.background){[string]$m.background.service_worker}else{''})}}
   return $items
@@ -71,7 +85,10 @@ console.log(JSON.stringify({ok:true,...out}))
 }
 
 $normalBefore=@(Get-NormalChromeRoots)
-$paths=@(Get-ManagedPaths);if(!$paths.Count){throw 'NO_ACTIVE_MANAGED_EXTENSIONS'}
+$paths=@(Get-ManagedPaths)
+$pathSource='AUTOPILOT_STATE'
+if(!$paths.Count){$paths=@(Get-ServiceFallbackPaths $Service);if($paths.Count){$pathSource='VERIFIED_LOCAL_SERVICE_FALLBACK'}}
+if(!$paths.Count){throw 'NO_ACTIVE_MANAGED_EXTENSIONS'}
 $arch=@(Get-Architecture $paths $ExpectedExtensionId)
 $chrome=Find-Chrome;if(!$chrome){throw 'CHROME_EXE_NOT_FOUND'}
 if($RestartDedicatedChrome){Stop-Dedicated}
@@ -84,7 +101,7 @@ $dom=$null;if($target){$mark=$(if($Sentinel){$Sentinel}else{'CENTRAL_EXACT_TARGE
 $normalAfter=@(Get-NormalChromeRoots);$missing=@($normalBefore|Where-Object{$normalAfter -notcontains $_})
 $targetVerified=[bool]($target -and $dom -and $dom.ok)
 $inputGate=$(if($ProbeInput){[bool]($dom.inputFound -and $dom.inputVerified -and $dom.inputRestored)}else{$true})
-$result=[ordered]@{ok=[bool]($targetVerified -and $inputGate -and $missing.Count -eq 0);version=$Version;service=$Service;targetUrlRequested=$TargetUrl;targetUrlActual=$(if($target){[string]$target.url}else{''});targetContextOpened=[bool]$target;targetContextVerified=$targetVerified;expectedExtensionId=$ExpectedExtensionId;extensionContextTargets=@($extensionTargets|ForEach-Object{[ordered]@{type=$_.type;url=$_.url;title=$_.title}});extensionIdTargetObserved=$extensionIdActive;architecture=$arch;inputProbeRequested=[bool]$ProbeInput;inputFound=$(if($dom){[bool]$dom.inputFound}else{$false});inputVerified=$(if($dom){[bool]$dom.inputVerified}else{$false});inputRestored=$(if($dom){[bool]$dom.inputRestored}else{$false});dom=$dom;normalChromeUntouched=($missing.Count -eq 0);normalChromeMissingRoots=$missing;loadedPaths=$paths;remoteDebuggingPort=$RemoteDebuggingPort;generateClicked=$false;creditSpend=$false;oauthChanged=$false;scopeChanged=$false;chromeSettingsChanged=$false;at=(Get-Date).ToString('o')}
+$result=[ordered]@{ok=[bool]($targetVerified -and $inputGate -and $missing.Count -eq 0);version=$Version;service=$Service;targetUrlRequested=$TargetUrl;targetUrlActual=$(if($target){[string]$target.url}else{''});targetContextOpened=[bool]$target;targetContextVerified=$targetVerified;expectedExtensionId=$ExpectedExtensionId;extensionContextTargets=@($extensionTargets|ForEach-Object{[ordered]@{type=$_.type;url=$_.url;title=$_.title}});extensionIdTargetObserved=$extensionIdActive;architecture=$arch;pathSource=$pathSource;inputProbeRequested=[bool]$ProbeInput;inputFound=$(if($dom){[bool]$dom.inputFound}else{$false});inputVerified=$(if($dom){[bool]$dom.inputVerified}else{$false});inputRestored=$(if($dom){[bool]$dom.inputRestored}else{$false});dom=$dom;normalChromeUntouched=($missing.Count -eq 0);normalChromeMissingRoots=$missing;loadedPaths=$paths;remoteDebuggingPort=$RemoteDebuggingPort;generateClicked=$false;creditSpend=$false;oauthChanged=$false;scopeChanged=$false;chromeSettingsChanged=$false;at=(Get-Date).ToString('o')}
 $central=Find-Central;if($central){$ReadbackDir=Join-Path $central 'Runtime_Readback\Chrome_Exact_Target';New-Item -ItemType Directory -Force -Path $ReadbackDir|Out-Null;$name=('EXACT_TARGET_'+$Service+'_'+(Get-Date -Format 'yyyyMMdd_HHmmss')+'.json');$path=Join-Path $ReadbackDir $name;$result|ConvertTo-Json -Depth 50|Set-Content -LiteralPath $path -Encoding UTF8;$result['resultPath']=$path}
 $result|ConvertTo-Json -Depth 50 -Compress
 if($result.ok){exit 0}else{exit 2}
