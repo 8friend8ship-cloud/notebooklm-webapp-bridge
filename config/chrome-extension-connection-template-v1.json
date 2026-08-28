@@ -1,0 +1,113 @@
+{
+  "version": "1.0.0",
+  "purpose": "Reusable Central Agent contract for every managed Chrome extension connection. A page-open or --load-extension argument alone is never VERIFIED.",
+  "sourcePattern": "NOTEBOOKLM_VERIFIED_E2E_D34_PLUS_FLOW_20260828",
+  "historyFirst": {
+    "required": true,
+    "readBeforeAction": [
+      "central work instruction",
+      "history/library",
+      "extension registry",
+      "runtime health",
+      "approval state",
+      "LAST_GOOD",
+      "matching failure signatures",
+      "latest structured error evidence"
+    ],
+    "resumeRule": "RESUME_FROM_FIRST_FAILED_GATE_ONLY",
+    "noBlindRetry": true
+  },
+  "connectionContract": [
+    "INVENTORY_VERIFIED",
+    "CANONICAL_EXTENSION_PATH_VERIFIED",
+    "MANIFEST_AND_VERSION_VERIFIED",
+    "DEDICATED_BROWSER_STARTED",
+    "NORMAL_CHROME_UNTOUCHED",
+    "EXTENSION_CONTEXT_ACTIVE",
+    "TARGET_CONTEXT_OPENED",
+    "TARGET_CONTEXT_VERIFIED",
+    "INPUT_CONTROL_FOUND",
+    "INPUT_FILLED",
+    "INPUT_VERIFIED",
+    "INPUT_RESTORED_FOR_PROBE_MODE",
+    "CENTRAL_COMMAND_CLAIMED",
+    "ACTION_REQUESTED_WHEN_APPROVED",
+    "ACTION_CONFIRMED",
+    "RESULT_READY",
+    "RESULT_SAVED",
+    "RESULT_READBACK",
+    "ACK_TRUE",
+    "DEDICATED_DEFAULT_CONTEXT_RESTORED",
+    "SAME_FIXTURE_RETEST_X2"
+  ],
+  "falsePositiveGuards": [
+    "PAGE_OPEN_IS_NOT_BRIDGE_CONNECTED",
+    "LOAD_EXTENSION_ARGUMENT_IS_NOT_EXTENSION_ACTIVE",
+    "LOGIN_PAGE_ABSENT_IS_NOT_INPUT_READY",
+    "DRIVE_CAPTURE_SMOKE_IS_NOT_BROWSER_UI_E2E",
+    "GENERIC_RESULT_IS_NOT_OUTPUT_TYPE_SUCCESS"
+  ],
+  "extensionContextEvidence": {
+    "preferred": [
+      "expected extension service_worker target",
+      "expected extension page or popup target",
+      "content-script-specific marker when available"
+    ],
+    "manifestEvidence": [
+      "manifest_version",
+      "background.service_worker",
+      "content_scripts.matches",
+      "content_scripts.js",
+      "action.default_popup"
+    ]
+  },
+  "inputVerification": {
+    "strategy": "DEEP_DOM_AND_OPEN_SHADOW_DOM_SCAN",
+    "candidateTypes": [
+      "textarea",
+      "input[type=text]",
+      "contenteditable",
+      "role=textbox"
+    ],
+    "probeMode": "WRITE_SENTINEL_READBACK_THEN_RESTORE",
+    "neverClickGenerateDuringConnectivityProbe": true
+  },
+  "serviceRouteTemplate": {
+    "targetUrl": "SERVICE_SPECIFIC_EXACT_WORKSPACE_URL",
+    "targetContextRule": "Prefer exact existing project/notebook/workspace over product landing page",
+    "routeDiscovery": "Return visible project/create/workspace route hints when exact input surface is absent",
+    "taskPayloadMustCarry": [
+      "service",
+      "targetUrl",
+      "taskId",
+      "goal",
+      "inputPayload",
+      "successCriteria",
+      "savePolicy",
+      "readbackPolicy"
+    ]
+  },
+  "riskPolicy": {
+    "reuseExistingApproval": true,
+    "noNewOauth": true,
+    "noNewScope": true,
+    "noNormalChromeRestart": true,
+    "noChromeSettingsChange": true,
+    "noPaidGenerationDuringConnectivityProbe": true,
+    "paidActionRequiresServicePolicyGate": true
+  },
+  "failureLearning": {
+    "record": [
+      "failedGate",
+      "failureSignature",
+      "exactStructuredError",
+      "rootCause",
+      "minimumFix",
+      "retestEvidence",
+      "LAST_GOOD",
+      "resumePoint"
+    ],
+    "retryRule": "Only retry after a changed condition and begin at failedGate"
+  },
+  "completionRule": "VERIFIED only after extension context + exact target context + input verification + command/result/ACK evidence and x2 same-fixture regression; connectivity-only probes must not spend credits."
+}
