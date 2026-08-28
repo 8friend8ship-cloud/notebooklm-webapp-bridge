@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.36",
-  "releasedAt": "2026-08-28T17:23:00+09:00",
-  "gitBlobSha1": "20bb1a585dec23416204df71dc5e5701cdcf71f1",
+  "version": "1.1.37",
+  "releasedAt": "2026-08-28T17:27:00+09:00",
+  "gitBlobSha1": "c2a935673229450b5333649cdba72618216a58e0",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Changed-route Flow recovery after direct zero-credit CDP probes were CLAIMED with STARTED_AT empty and the queue recovery rows could not start. Agent 1.1.36 preserves Agent 1.1.35 behavior, then executes only the hash-pinned Recover-StaleFlowProbe.ps1 self-heal: terminate matching Flow probe PowerShell/Node plus HomeDesign dedicated Chrome, restore NotebookLM dedicated Chrome, and verify normal Chrome root PIDs remain untouched. No Generate/credits, OAuth/scope, Chrome settings, Host allowlist widening, public publish, or destructive action is added. Receipt: Runtime_Readback/AGENT_1.1.36_FLOW_STALE_PROBE_SELF_HEAL.json."
+  "notes": "After Flow stale-probe cleanup, Agent 1.1.37 runs a hash-pinned read-only inspection of the already-approved dedicated Google Flow session. It records visible account/email evidence and Flow/AI credit text to Runtime_Readback/Flow_Bridge_Direct/FLOW_APPROVED_ACCOUNT_CREDIT_READONLY.json, restores the NotebookLM dedicated window, and requires normal Chrome roots unchanged. It never clicks Generate and makes no credit spend, OAuth/scope, Chrome settings, Host allowlist, public, or destructive change."
 }
