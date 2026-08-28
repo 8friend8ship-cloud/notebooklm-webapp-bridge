@@ -1,12 +1,87 @@
-param([int]$Hours=48)
+param([int]$Hours=48,[int]$MaxItems=80)
 $ErrorActionPreference='Stop'
-$downloads=Join-Path $env:USERPROFILE 'Downloads'
-if(-not(Test-Path -LiteralPath $downloads)){throw 'WINDOWS_DOWNLOADS_NOT_FOUND'}
 $cut=(Get-Date).AddHours(-1*[Math]::Max(1,[Math]::Min(168,$Hours)))
-$exts=@('.mp3','.m4a','.wav','.ogg','.mp4','.webm','.mov','.pdf','.pptx','.xlsx','.csv','.png','.jpg','.jpeg','.webp','.docx')
-$items=@(Get-ChildItem -LiteralPath $downloads -File -ErrorAction SilentlyContinue |
-  Where-Object { $_.LastWriteTime -ge $cut -and $exts -contains $_.Extension.ToLowerInvariant() -and $_.Name -notlike '*.crdownload' } |
-  Sort-Object LastWriteTime -Descending |
-  Select-Object -First 80 |
-  ForEach-Object { [ordered]@{name=$_.Name;extension=$_.Extension.ToLowerInvariant();bytes=[int64]$_.Length;lastWrite=$_.LastWriteTime.ToString('o');fullName=$_.FullName} })
-[ordered]@{ok=$true;action='INSPECT_RECENT_NOTEBOOKLM_DOWNLOADS';hours=$Hours;downloads=$downloads;count=@($items).Count;items=$items;at=(Get-Date).ToString('o')} | ConvertTo-Json -Depth 8 -Compress
+$limit=[Math]::Max(1,[Math]::Min(300,$MaxItems))
+$exts=@('.mp3','.m4a','.wav','.ogg','.aac','.flac','.mp4','.webm','.mov','.pdf','.pptx','.xlsx','.csv','.png','.jpg','.jpeg','.webp','.docx','.txt','.json','.zip')
+
+function Expand-EnvPath([string]$Value){
+  if(-not $Value){return ''}
+  try{return [Environment]::ExpandEnvironmentVariables($Value)}catch{return $Value}
+}
+function Add-Candidate([System.Collections.Generic.List[object]]$List,[string]$Path,[string]$Source,[string]$Profile=''){
+  $expanded=Expand-EnvPath $Path
+  if(-not $expanded){return}
+  try{$full=[IO.Path]::GetFullPath($expanded)}catch{return}
+  if(-not($List|Where-Object{[string]$_.path -ieq $full}|Select-Object -First 1)){
+    $List.Add([pscustomobject]@{path=$full;source=$Source;profile=$Profile})
+  }
+}
+
+$candidates=New-Object 'System.Collections.Generic.List[object]'
+Add-Candidate $candidates (Join-Path $env:USERPROFILE 'Downloads') 'USERPROFILE_DOWNLOADS'
+
+try{
+  $shellKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders'
+  $downloadsGuid='{374DE290-123F-4565-9164-39C4925E467B}'
+  $shell=(Get-ItemProperty -Path $shellKey -Name $downloadsGuid -ErrorAction Stop).$downloadsGuid
+  Add-Candidate $candidates ([string]$shell) 'WINDOWS_KNOWN_FOLDER_DOWNLOADS'
+}catch{}
+
+$chromeUserData=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\ChromeUserData'
+$preferenceFiles=@()
+if(Test-Path -LiteralPath $chromeUserData -PathType Container){
+  $preferenceFiles=@(Get-ChildItem -LiteralPath $chromeUserData -Filter 'Preferences' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 40)
+}
+$profiles=@()
+foreach($pref in $preferenceFiles){
+  try{
+    $json=Get-Content -LiteralPath $pref.FullName -Raw -Encoding UTF8|ConvertFrom-Json
+    $profileName=Split-Path $pref.DirectoryName -Leaf
+    $downloadDir=[string]$json.download.default_directory
+    $saveDir=[string]$json.savefile.default_directory
+    if($downloadDir){Add-Candidate $candidates $downloadDir 'CHROME_PREFERENCES_DOWNLOAD_DEFAULT' $profileName}
+    if($saveDir){Add-Candidate $candidates $saveDir 'CHROME_PREFERENCES_SAVEFILE_DEFAULT' $profileName}
+    $profiles+= [ordered]@{profile=$profileName;preferences=$pref.FullName;downloadDefault=$downloadDir;savefileDefault=$saveDir}
+  }catch{
+    $profiles+= [ordered]@{profile=(Split-Path $pref.DirectoryName -Leaf);preferences=$pref.FullName;parseError=$_.Exception.Message}
+  }
+}
+
+$items=@()
+$checked=@()
+foreach($candidate in @($candidates)){
+  $exists=Test-Path -LiteralPath $candidate.path -PathType Container
+  $checked+= [ordered]@{path=$candidate.path;source=$candidate.source;profile=$candidate.profile;exists=[bool]$exists}
+  if(-not $exists){continue}
+  foreach($file in @(Get-ChildItem -LiteralPath $candidate.path -File -ErrorAction SilentlyContinue)){
+    if($file.LastWriteTime -lt $cut){continue}
+    if($file.Length -le 0){continue}
+    if($file.Name -like '*.crdownload' -or $file.Name -like '*.tmp'){continue}
+    if($exts -notcontains $file.Extension.ToLowerInvariant()){continue}
+    $items+= [ordered]@{
+      name=$file.Name
+      extension=$file.Extension.ToLowerInvariant()
+      bytes=[int64]$file.Length
+      lastWrite=$file.LastWriteTime.ToString('o')
+      fullName=$file.FullName
+      directory=$candidate.path
+      directorySource=$candidate.source
+      chromeProfile=$candidate.profile
+    }
+  }
+}
+$items=@($items|Sort-Object {[DateTime]$_.lastWrite} -Descending|Group-Object fullName|ForEach-Object{$_.Group|Select-Object -First 1}|Select-Object -First $limit)
+[ordered]@{
+  ok=$true
+  action='INSPECT_RECENT_NOTEBOOKLM_DOWNLOADS_CONFIGURED_PATHS'
+  hours=$Hours
+  cut=$cut.ToString('o')
+  chromeUserData=$chromeUserData
+  checkedDirectories=$checked
+  chromeProfiles=$profiles
+  count=@($items).Count
+  items=$items
+  genericFilesystemScan=$false
+  readOnly=$true
+  at=(Get-Date).ToString('o')
+}|ConvertTo-Json -Depth 10 -Compress
