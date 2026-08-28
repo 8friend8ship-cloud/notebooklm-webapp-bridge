@@ -6,11 +6,13 @@ on:
       - 'feat/central-daily-qa-asset-governor-20260828'
     paths:
       - 'apps-script/**'
+      - 'config/central-chrome-extension-manager-v1.json'
       - 'tests/central-governor-policy.test.js'
       - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
       - 'local-agent/governor/CentralNotebookRuntimeHub.ps1'
       - 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1'
       - 'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+      - 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
       - 'docs/CENTRAL_*'
       - 'docs/D82_*'
       - 'docs/RUNTIME_BLOCKER_INDEX_20260828.md'
@@ -18,11 +20,13 @@ on:
   pull_request:
     paths:
       - 'apps-script/**'
+      - 'config/central-chrome-extension-manager-v1.json'
       - 'tests/central-governor-policy.test.js'
       - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
       - 'local-agent/governor/CentralNotebookRuntimeHub.ps1'
       - 'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1'
       - 'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+      - 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
       - 'docs/CENTRAL_*'
       - 'docs/D82_*'
       - 'docs/RUNTIME_BLOCKER_INDEX_20260828.md'
@@ -48,7 +52,8 @@ jobs:
             'apps-script/CentralDailyWorkflowGovernorV2.gs',
             'apps-script/CentralDataManagementHub.gs',
             'apps-script/CentralIntegratedTriggerV2.gs',
-            'apps-script/CentralNotebookRuntimeHub.gs'
+            'apps-script/CentralNotebookRuntimeHub.gs',
+            'apps-script/CentralChromeExtensionAutomationManager.gs'
           )
           foreach ($f in $files) {
             if (-not (Test-Path $f)) { throw "MISSING:$f" }
@@ -65,7 +70,8 @@ jobs:
             'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1',
             'local-agent/governor/CentralNotebookRuntimeHub.ps1',
             'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1',
-            'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+            'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1',
+            'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
           )
           foreach ($f in $files) {
             if (-not (Test-Path $f)) { throw "MISSING:$f" }
@@ -121,6 +127,26 @@ jobs:
         shell: pwsh
         run: node tests/central-governor-policy.test.js
 
+      - name: Chrome extension manager contract
+        shell: pwsh
+        run: |
+          $policy = Get-Content 'config/central-chrome-extension-manager-v1.json' -Raw | ConvertFrom-Json
+          if($policy.schema -ne 'CENTRAL_CHROME_EXTENSION_MANAGER_V1'){ throw 'CCEM_SCHEMA_MISMATCH' }
+          if(-not $policy.principles.historyFirst){ throw 'CCEM_HISTORY_FIRST_REQUIRED' }
+          if(-not $policy.principles.noDuplicateExtensionInstall){ throw 'CCEM_DUPLICATE_GUARD_REQUIRED' }
+          if(-not $policy.principles.noNormalChromeRestart){ throw 'CCEM_NORMAL_CHROME_PROTECTION_REQUIRED' }
+          foreach($boundary in @('NEW_OAUTH','NEW_SCOPE','NEW_SECRET','NEW_PAID_API_OR_CREDIT','PUBLIC_PUBLISH','DESTRUCTIVE_CHANGE','PAYMENT_OR_CONTRACT')){
+            if($policy.approvalBoundaries -notcontains $boundary){ throw "CCEM_APPROVAL_BOUNDARY_MISSING:$boundary" }
+          }
+          $app = Get-Content 'apps-script/CentralChromeExtensionAutomationManager.gs' -Raw
+          foreach($needle in @('installCentralChromeExtensionAutomationTriggersV1','runCentralChromeExtensionHealthCycleV1','runCentralAssetIngestCycleV1','dispatchChromeWorkflowTaskV1','analyzeNewAssetV1','runCentralSeedPromotionCycleV1','runCentralTemplatePromotionCycleV1','registerPlatformResultUrlV1','runCentralChromeDataOrchestraAuditV1')){
+            if(-not $app.Contains($needle)){ throw "CCEM_APP_CONTRACT_MISSING:$needle" }
+          }
+          $ps = Get-Content 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1' -Raw
+          foreach($needle in @("[ValidateSet('Inventory','Stage','Rollback','LaunchDedicated')]",'Expand-Archive','manifest.json','--load-extension','noNormalChromeRestart','preserveLastGood')){
+            if(-not $ps.Contains($needle)){ throw "CCEM_PS_CONTRACT_MISSING:$needle" }
+          }
+
       - name: Guarded bound sync contract
         shell: pwsh
         run: |
@@ -158,9 +184,11 @@ jobs:
             'apps-script/CentralDataManagementHub.gs',
             'apps-script/CentralIntegratedTriggerV2.gs',
             'apps-script/CentralNotebookRuntimeHub.gs',
+            'apps-script/CentralChromeExtensionAutomationManager.gs',
             'local-agent/governor/CentralNotebookRuntimeHub.ps1',
             'local-agent/governor/RunCentralChatFactorySyncAfterD82Gate.ps1',
-            'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1'
+            'local-agent/governor/SyncCentralChatWorkFactoryBoundScript.ps1',
+            'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1'
           )
           $bad = Select-String -Path $targets -Pattern 'sk-proj-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|ghp_[A-Za-z0-9]{20,}' -AllMatches
           if($bad){ $bad | ForEach-Object { Write-Error $_.Line }; throw 'SECRET_LIKE_LITERAL_FOUND' }
