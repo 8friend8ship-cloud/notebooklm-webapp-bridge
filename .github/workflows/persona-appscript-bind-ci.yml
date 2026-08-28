@@ -20,7 +20,12 @@ jobs:
           $p='local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV1.ps1'
           $tokens=$null; $errors=$null
           [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p), [ref]$tokens, [ref]$errors)
-          if($errors.Count){$errors | Format-List | Out-String | Write-Error; exit 1}
+          if($errors.Count){
+            foreach($e in $errors){
+              Write-Host ("PARSER_ERROR line={0} col={1} endLine={2} endCol={3} id={4} message={5} extent=<{6}>" -f $e.Extent.StartLineNumber,$e.Extent.StartColumnNumber,$e.Extent.EndLineNumber,$e.Extent.EndColumnNumber,$e.ErrorId,$e.Message,$e.Extent.Text)
+            }
+            exit 1
+          }
       - name: Safety and x2 contract
         shell: powershell
         run: |
