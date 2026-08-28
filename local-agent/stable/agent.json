@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.30",
-  "releasedAt": "2026-08-28T12:10:00+09:00",
-  "gitBlobSha1": "4b3503005503f9e3fb91e2eb17c4baa47152935a",
+  "version": "1.1.31",
+  "releasedAt": "2026-08-28T15:04:00+09:00",
+  "gitBlobSha1": "837d7cdd337cc153c27f03903a42b198a58d6eaf",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Host 1.2.5 first, then AutoResume/Watchdog and current stable Bridge. Repairs or restarts only HomeDesignLocalCommandHost when Host 1.2.5 health/asyncJobs is missing, then verifies AutoResume dual persistence and applies the current stable Bridge dynamically. Host 1.2.5 adds exact NotebookLM artifact mirror and watcher scripts to the existing main allowlist. Preserves persistent ChromeUserData and normal Chrome. No new CMD, OAuth, clasp, download-path change, file move, NotebookLM generation, or repeated approval request."
+  "notes": "Host 1.2.6 first, then AutoResume/Watchdog and current stable Bridge 0.2.71. Host 1.2.6 preserves the prior NotebookLM exact SourcePath/watcher allowlist and additionally allows the separate managed CaptureBridge file-manager and setup scripts. Artifact management remains explicit-service only (NotebookLM/Flow/AIStudio/GoogleAI), copy-only, no blanket Downloads sync and no universal broad-permission Chrome extension. Physical-device setup of the managed 5-minute reconciler still requires fresh device readback before one guarded setup execution; CI is not physical E2E evidence. Preserves persistent ChromeUserData and normal Chrome. No new CMD, OAuth, clasp, download-path change, file move, NotebookLM generation, or repeated approval request."
 }
