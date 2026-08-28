@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.35",
-  "releasedAt": "2026-08-28T16:42:00+09:00",
-  "gitBlobSha1": "e27b760b67933be05a5d6f1ac0af1afd6158b32b",
+  "version": "1.1.36",
+  "releasedAt": "2026-08-28T17:23:00+09:00",
+  "gitBlobSha1": "20bb1a585dec23416204df71dc5e5701cdcf71f1",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Changed-route D115 after the central queue row was CLAIMED for more than 150 seconds with STARTED_AT empty. Agent 1.1.35 preserves Agent 1.1.34/Host 1.2.7/Bridge 0.2.71, verifies the Host official loopback async API, and submits exactly one fixed idempotent task ID CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01 with taskType LOCAL_POWERSHELL to run contents-os-git/main/tools/Repair-ContentOS-DriveCacheAppsScript.ps1. It polls the same Host result and never creates a duplicate task. No new OAuth, scope, Script project, deployment, trigger, Vercel action, paid API, wildcard permission, or public publish is added."
+  "notes": "Changed-route Flow recovery after direct zero-credit CDP probes were CLAIMED with STARTED_AT empty and the queue recovery rows could not start. Agent 1.1.36 preserves Agent 1.1.35 behavior, then executes only the hash-pinned Recover-StaleFlowProbe.ps1 self-heal: terminate matching Flow probe PowerShell/Node plus HomeDesign dedicated Chrome, restore NotebookLM dedicated Chrome, and verify normal Chrome root PIDs remain untouched. No Generate/credits, OAuth/scope, Chrome settings, Host allowlist widening, public publish, or destructive action is added. Receipt: Runtime_Readback/AGENT_1.1.36_FLOW_STALE_PROBE_SELF_HEAL.json."
 }
