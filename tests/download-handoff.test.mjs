@@ -18,6 +18,8 @@ const agent33Path = 'local-agent/releases/1.1.33/HomeDesignLocalAgent.ps1';
 const agent33Ps = fs.readFileSync(agent33Path, 'utf8');
 const agent34Path = 'local-agent/releases/1.1.34/HomeDesignLocalAgent.ps1';
 const agent34Ps = fs.readFileSync(agent34Path, 'utf8');
+const agent35Path = 'local-agent/releases/1.1.35/HomeDesignLocalAgent.ps1';
+const agent35Ps = fs.readFileSync(agent35Path, 'utf8');
 const host126Path = 'local-agent/releases/1.2.6/HomeDesignLocalCommandHost.ps1';
 const host127Path = 'local-agent/releases/1.2.7/HomeDesignLocalCommandHost.ps1';
 const stableAgent = JSON.parse(fs.readFileSync('local-agent/stable/agent.json', 'utf8'));
@@ -127,12 +129,44 @@ test('Local Agent 1.1.34 pins Host 1.2.7 with exact ContentOS repair allowlist',
   assert.doesNotMatch(host127Ps, /contents-os-git[^\n]+scripts=@\([^\)]*\*/);
 });
 
-test('Stable Agent manifest points to its exact release blob and pinned Host blob', () => {
-  assert.ok(['1.1.30', '1.1.31', '1.1.32', '1.1.33', '1.1.34'].includes(stableAgent.version), `unexpected stable agent ${stableAgent.version}`);
+test('Local Agent 1.1.35 uses official Host async API for one fixed idempotent ContentOS task203', () => {
+  assert.match(agent35Ps, /1\.1\.35/);
+  assert.match(agent35Ps, /1\.2\.7/);
+  assert.match(agent35Ps, /CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01/);
+  assert.match(agent35Ps, /http:\/\/127\.0\.0\.1:8765/);
+  assert.match(agent35Ps, /\/health/);
+  assert.match(agent35Ps, /\/run/);
+  assert.match(agent35Ps, /\/result\?taskId=/);
+  assert.match(agent35Ps, /taskType='LOCAL_POWERSHELL'/);
+  assert.match(agent35Ps, /tools\/Repair-ContentOS-DriveCacheAppsScript\.ps1/);
+  assert.match(agent35Ps, /timeoutSeconds=600/);
+  assert.match(agent35Ps, /idempotent=\$true/);
+  assert.match(agent35Ps, /AGENT_1\.1\.35_CONTENTOS_TASK203_DIRECT\.json/);
+  assert.match(agent35Ps, /AGENT_1\.1\.35_CONTENTOS_TASK203_SUBMITTED\.json/);
+  assert.match(agent35Ps, /newOAuth=\$false/);
+  assert.match(agent35Ps, /newScope=\$false/);
+  assert.match(agent35Ps, /newProject=\$false/);
+  assert.match(agent35Ps, /newDeployment=\$false/);
+  assert.match(agent35Ps, /newTrigger=\$false/);
+  assert.match(agent35Ps, /vercelAction=\$false/);
+  assert.doesNotMatch(agent35Ps, /LOCAL_POWERSHELL_ASYNC/);
+  assert.doesNotMatch(agent35Ps, /Stop-Process.+chrome/i);
+  assert.doesNotMatch(agent35Ps, /taskkill.+chrome/i);
+  assert.equal((agent35Ps.match(/CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01/g) || []).length, 1);
+});
+
+test('Stable Agent manifest points to its exact release blob and pinned Host/direct route', () => {
+  assert.ok(['1.1.30', '1.1.31', '1.1.32', '1.1.33', '1.1.34', '1.1.35'].includes(stableAgent.version), `unexpected stable agent ${stableAgent.version}`);
   const stableAgentPath = `local-agent/releases/${stableAgent.version}/HomeDesignLocalAgent.ps1`;
   assert.equal(stableAgent.gitBlobSha1.toLowerCase(), repositoryBlobSha1(stableAgentPath));
   const stableAgentPs = fs.readFileSync(stableAgentPath, 'utf8');
-  if (stableAgent.version === '1.1.34') {
+  if (stableAgent.version === '1.1.35') {
+    assert.equal(repositoryBlobSha1(agent35Path), 'e27b760b67933be05a5d6f1ac0af1afd6158b32b');
+    assert.match(stableAgentPs, /CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01/);
+    assert.match(stableAgentPs, /taskType='LOCAL_POWERSHELL'/);
+    assert.match(stableAgentPs, /\/run/);
+    assert.match(stableAgentPs, /\/result\?taskId=/);
+  } else if (stableAgent.version === '1.1.34') {
     assert.equal(repositoryBlobSha1(host127Path), 'ac4aae953fae2219d393de2307ef655b0988c9f4');
     assert.match(stableAgentPs, /local-agent\/releases\/1\.2\.7\/HomeDesignLocalCommandHost\.ps1/);
     assert.match(stableAgentPs, /ac4aae953fae2219d393de2307ef655b0988c9f4/);
