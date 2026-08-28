@@ -34,11 +34,12 @@ jobs:
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
             if($errors.Count){ $errors|%{Write-Error $_.Message}; throw "POWERSHELL_PARSE_FAIL:$f" }
           }
-      - name: Runtime dependency contract
+      - name: Runtime package contract
         shell: pwsh
         run: |
           $auto=Get-Content 'local-agent/governor/ManagedExtensionAutopilot.ps1' -Raw
           $mgr=Get-Content 'local-agent/governor/InstallOrUpdateManagedChromeExtensions.ps1' -Raw
-          foreach($n in @('InstallOrUpdateManagedChromeExtensions.ps1','SyncRegistry','LaunchDedicated')){if(-not $auto.Contains($n)){throw "AUTOPILOT_CONTRACT_MISSING:$n"}}
+          foreach($n in @('SyncRegistry','Stage-One','Expand-Archive','manifest.json','Get-TreeHash','previousPath','--load-extension','noNormalChromeRestart','preserveLastGood')){if(-not $auto.Contains($n)){throw "AUTOPILOT_CONTRACT_MISSING:$n"}}
           foreach($n in @('Expand-Archive','manifest.json','Get-TreeHash','previousPath','--load-extension','noNormalChromeRestart','preserveLastGood')){if(-not $mgr.Contains($n)){throw "MANAGER_CONTRACT_MISSING:$n"}}
           if($mgr.Contains('Remove-Item -LiteralPath $previousPath')){throw 'LAST_GOOD_DESTRUCTIVE_DELETE_FORBIDDEN'}
+          if($auto.Contains('<all_urls>')){throw 'AUTOPILOT_BROAD_HOST_PERMISSION_FORBIDDEN'}
