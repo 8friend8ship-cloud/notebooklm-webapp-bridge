@@ -29,11 +29,12 @@ function Get-GitBlobSha1([string]$Path) {
 
 function Find-CentralRoot {
   $name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+  $myDriveKo = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
   foreach ($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
     if (-not $drive.Root) { continue }
     foreach ($candidate in @(
       (Join-Path $drive.Root $name),
-      (Join-Path $drive.Root ('내 드라이브\' + $name)),
+      (Join-Path $drive.Root ($myDriveKo + '\' + $name)),
       (Join-Path $drive.Root ('My Drive\' + $name)),
       (Join-Path $drive.Root ('Google Drive\' + $name))
     )) {
@@ -57,7 +58,6 @@ function Invoke-Safe([string]$File, [string[]]$Args, [int]$Timeout = 90, [string
   $psi.RedirectStandardOutput = $true
   $psi.RedirectStandardError = $true
   if ($Cwd) { $psi.WorkingDirectory = $Cwd }
-  # All clasp arguments used by this governor are simple tokens with no spaces.
   $psi.Arguments = ($Args -join ' ')
   $process = New-Object Diagnostics.Process
   $process.StartInfo = $psi
@@ -353,13 +353,15 @@ try {
   }
   $status = 'FAILED'
   if ($rollback -and $rollback.ok) { $status = 'FAILED_ROLLED_BACK' }
+  $scriptIdValue = ''
+  if ($target) { $scriptIdValue = $target.scriptId }
   $result = [ordered]@{
     ok = $false
     status = $status
     contract = $Contract
     stage = $stage
     error = $errorText
-    scriptId = $(if ($target) { $target.scriptId } else { '' })
+    scriptId = $scriptIdValue
     deploymentId = $ExpectedDeploymentId
     spreadsheetId = $TargetSpreadsheetId
     backup = $backup
