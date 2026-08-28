@@ -1,6 +1,6 @@
-const fs = require('fs');
-const vm = require('vm');
-const assert = require('assert');
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
 
 const source = fs.readFileSync('apps-script/CentralDailyWorkflowGovernorV2.gs', 'utf8');
 const ctx = {};
