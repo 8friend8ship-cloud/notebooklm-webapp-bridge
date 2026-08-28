@@ -1,0 +1,1 @@
+Static CI must verify the runtime dependency chain itself, not only the top-level autopilot script. This follow-up specifically fixes the missing `InstallOrUpdateManagedChromeExtensions.ps1` dependency discovered after PR #16 merge.
