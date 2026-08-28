@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "purpose": "Reusable Central Agent contract for every managed Chrome extension connection. A page-open or --load-extension argument alone is never VERIFIED.",
+  "version": "1.1.0",
+  "purpose": "Reusable Central Agent contract for every managed Chrome extension connection. Page-open, login state, or --load-extension alone is never VERIFIED.",
   "sourcePattern": "NOTEBOOKLM_VERIFIED_E2E_D34_PLUS_FLOW_20260828",
   "historyFirst": {
     "required": true,
@@ -21,6 +21,7 @@
     "INVENTORY_VERIFIED",
     "CANONICAL_EXTENSION_PATH_VERIFIED",
     "MANIFEST_AND_VERSION_VERIFIED",
+    "EXTENSION_ARCHITECTURE_CLASSIFIED",
     "DEDICATED_BROWSER_STARTED",
     "NORMAL_CHROME_UNTOUCHED",
     "EXTENSION_CONTEXT_ACTIVE",
@@ -44,25 +45,56 @@
     "PAGE_OPEN_IS_NOT_BRIDGE_CONNECTED",
     "LOAD_EXTENSION_ARGUMENT_IS_NOT_EXTENSION_ACTIVE",
     "LOGIN_PAGE_ABSENT_IS_NOT_INPUT_READY",
+    "MV3_DOES_NOT_IMPLY_BACKGROUND_SERVICE_WORKER",
+    "SERVICE_WORKER_IS_NOT_A_UNIVERSAL_EXTENSION_GATE",
     "DRIVE_CAPTURE_SMOKE_IS_NOT_BROWSER_UI_E2E",
     "GENERIC_RESULT_IS_NOT_OUTPUT_TYPE_SUCCESS"
   ],
-  "extensionContextEvidence": {
-    "preferred": [
-      "expected extension service_worker target",
-      "expected extension page or popup target",
-      "content-script-specific marker when available"
-    ],
+  "extensionArchitecture": {
+    "classifyFromManifestBeforeProbe": true,
+    "strategies": {
+      "background_service_worker": "Require expected chrome-extension service_worker target plus service-specific roundtrip when available.",
+      "content_script_plus_popup": "Require popup-to-content or equivalent content-script message roundtrip, service-specific marker, or observable extension response on the target tab. Do not require a service worker when manifest has none.",
+      "content_script_only": "Require a content-script-specific message/marker/observable response on the exact target tab.",
+      "extension_page": "Require expected extension page target and service-specific command/readback evidence."
+    },
     "manifestEvidence": [
       "manifest_version",
       "background.service_worker",
       "content_scripts.matches",
       "content_scripts.js",
-      "action.default_popup"
+      "content_scripts.run_at",
+      "action.default_popup",
+      "permissions",
+      "host_permissions"
+    ]
+  },
+  "targetContext": {
+    "landingPagePolicy": "A product landing page is CONTEXT_OPENED only, never CONTEXT_VERIFIED when the real input surface lives in a project/notebook/workspace.",
+    "navigationPolicy": "Use service-specific exact URL when known; otherwise use guarded trusted navigation to the workspace and verify the resulting URL/UI state before input testing.",
+    "routeDiscovery": "Return visible project/create/workspace route hints when exact input surface is absent."
+  },
+  "cdpPolicy": {
+    "allowedExistingScope": "Dedicated ChromeForTesting + dedicated user-data + local loopback CDP through an already allowlisted central runner/governor route.",
+    "allowedProbeActions": [
+      "read target list and page state",
+      "trusted navigation clicks that do not generate paid output",
+      "deep DOM/open-shadow DOM inspection",
+      "sentinel input fill/readback/restore",
+      "result/readback verification"
+    ],
+    "prohibitedWithoutNewGate": [
+      "normal Chrome restart or settings change",
+      "Host allowlist widening",
+      "new OAuth or security scope",
+      "new Chrome extension permission/security prompt approval",
+      "paid generation",
+      "public publish",
+      "destructive action"
     ]
   },
   "inputVerification": {
-    "strategy": "DEEP_DOM_AND_OPEN_SHADOW_DOM_SCAN",
+    "strategy": "DEEP_DOM_AND_OPEN_SHADOW_DOM_SCAN_PLUS_SERVICE_SPECIFIC_SELECTORS",
     "candidateTypes": [
       "textarea",
       "input[type=text]",
@@ -75,7 +107,6 @@
   "serviceRouteTemplate": {
     "targetUrl": "SERVICE_SPECIFIC_EXACT_WORKSPACE_URL",
     "targetContextRule": "Prefer exact existing project/notebook/workspace over product landing page",
-    "routeDiscovery": "Return visible project/create/workspace route hints when exact input surface is absent",
     "taskPayloadMustCarry": [
       "service",
       "targetUrl",
@@ -86,6 +117,16 @@
       "savePolicy",
       "readbackPolicy"
     ]
+  },
+  "runnerSourceIntegrity": {
+    "requiredForChangedConditionRetest": true,
+    "evidence": [
+      "requested repo/branch or immutable ref",
+      "actual executed script SHA when runner exposes it",
+      "current GitHub blob SHA",
+      "cache/snapshot mismatch detection"
+    ],
+    "rule": "If the same pre-fix line/error appears after a verified source fix, stop blind retry and verify runner source freshness before rerunning the failed gate."
   },
   "riskPolicy": {
     "reuseExistingApproval": true,
@@ -104,10 +145,11 @@
       "rootCause",
       "minimumFix",
       "retestEvidence",
+      "executedSourceIdentity",
       "LAST_GOOD",
       "resumePoint"
     ],
     "retryRule": "Only retry after a changed condition and begin at failedGate"
   },
-  "completionRule": "VERIFIED only after extension context + exact target context + input verification + command/result/ACK evidence and x2 same-fixture regression; connectivity-only probes must not spend credits."
+  "completionRule": "VERIFIED only after architecture-correct extension activity + exact target context + input verification + command/result/ACK evidence and x2 same-fixture regression; connectivity-only probes must not spend credits."
 }
