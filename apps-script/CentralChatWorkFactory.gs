@@ -1,4 +1,4 @@
-const CCWF_VERSION = 'CENTRAL_CHAT_WORK_FACTORY_V1_20260828';
+const CCWF_VERSION = 'CENTRAL_CHAT_WORK_FACTORY_V1_1_20260828';
 const CCWF_MASTER_ID = '1C_CznU1Uo7dk-gKay3-oH8wFxutsGMlz27RSrbdVQwI';
 
 /**
@@ -41,6 +41,7 @@ function runCentralChatWorkFactoryV1() {
   let learned = 0;
   let bridged = 0;
   let held = 0;
+  let ignored = 0;
   const touched = [];
 
   recent.forEach(function(cmd) {
@@ -49,7 +50,7 @@ function runCentralChatWorkFactoryV1() {
     if (!cmdId) return;
 
     const classification = ccwfClassifyCommand_(cmd);
-    if (classification === 'IGNORE') return;
+    if (classification === 'IGNORE') { ignored++; return; }
 
     if (taskId && !queuedTaskIds[taskId] && classification === 'EXECUTE') {
       const work = ccwfBuildQueueRow_(cmd, taskId);
@@ -79,6 +80,7 @@ function runCentralChatWorkFactoryV1() {
     learned: learned,
     bridged: bridged,
     held: held,
+    ignored: ignored,
     unresolved: unresolved,
     conditionalQa: conditionalQa,
     touched: touched
@@ -90,6 +92,7 @@ function runCentralChatWorkFactoryV1() {
     learned: learned,
     bridged: bridged,
     humanGate: held,
+    ignored: ignored,
     unresolved: unresolved,
     conditionalQa: conditionalQa,
     version: CCWF_VERSION
@@ -119,19 +122,36 @@ function ccwfClassifyCommand_(cmd) {
   const status = String(cmd.STATUS || '').toUpperCase();
   const blocker = String(cmd.BLOCKER || '').toUpperCase();
   const evidence = String(cmd.EVIDENCE || '');
-  const next = String(cmd.NEXT_ACTION || '');
-  if (/COMPLETE|VERIFIED|PASS_/.test(status) && evidence) return 'LEARN_SUCCESS';
-  if (/FAILED|FAIL_|BLOCKED|DIAGNOSTIC_HOLD/.test(status) && (blocker || evidence || next)) return 'LEARN_FAILURE';
-  if (/USER_|HUMAN_|APPROVAL_REQUIRED|2FA|OAUTH|SECRET|PAYMENT|BILLING|PUBLIC_PUBLISH/.test(status + '|' + blocker + '|' + next)) return 'HUMAN_GATE';
-  if (/COMPLETE|VERIFIED/.test(status)) return 'IGNORE';
-  if (/QUEUED|READY|PENDING|REGISTERED|STAGED|REQUIRED|ACTIVE|RUNNING|IMPLEMENTING/.test(status) || !status) return 'EXECUTE';
-  return 'EXECUTE';
+  const next = String(cmd.NEXT_ACTION || '').toUpperCase();
+  const work = String(cmd.WORK_REQUIRED || '').trim().toUpperCase();
+
+  // Safety gates win over learning or execution classification.
+  if (ccwfNeedsHumanApproval_(cmd) || /USER_|HUMAN_|APPROVAL_REQUIRED|2FA|OAUTH|SECRET|PAYMENT|BILLING|PUBLIC_PUBLISH/.test(status + '|' + blocker + '|' + next)) {
+    return 'HUMAN_GATE';
+  }
+
+  // Explicit no-work rows are history only. Never resurrect them into 07.
+  if (/^(NO|FALSE|NONE|N\/A|NOT_REQUIRED)$/.test(work)) return 'IGNORE';
+
+  // Active/pending states are the only states that may create execution work.
+  if (/QUEUED|READY|PENDING|REGISTERED|STAGED|REQUIRED|ACTIVE|RUNNING|IMPLEMENTING|IN_PROGRESS|INSTALL_PENDING|SYNC_PENDING|RUNTIME_PENDING|E2E_PENDING|DEPLOYMENT_PENDING|REVIEW_REQUIRED/.test(status)) {
+    return 'EXECUTE';
+  }
+
+  if (/FAILED|FAIL_|DIAGNOSTIC_HOLD|ROOT_CAUSE/.test(status) && (blocker || evidence || next)) return 'LEARN_FAILURE';
+  if (/COMPLETE|VERIFIED|PASS|SUCCESS|RESOLVED/.test(status) && evidence) return 'LEARN_SUCCESS';
+
+  // Stored/canonical/closed historical rows must remain history even if their
+  // task is absent from 07. Default is IGNORE, never EXECUTE.
+  if (/COMPLETE|VERIFIED|CANCELLED|CLOSED|STORED|CANONICAL|SUPERSEDED|HOLD_RECOVERY/.test(status)) return 'IGNORE';
+  return 'IGNORE';
 }
 
 function ccwfBuildQueueRow_(cmd, taskId) {
   const route = String(cmd.ROUTE || 'CENTRAL_FACTORY');
   const project = String(cmd.PROJECT_ID || 'P00_AGENT_CORE');
   const priority = String(cmd.PRIORITY || 'P1');
+  const needsApproval = ccwfNeedsHumanApproval_(cmd);
   return {
     TASK_ID: taskId,
     STAGE_NO: 0,
@@ -139,26 +159,37 @@ function ccwfBuildQueueRow_(cmd, taskId) {
     TARGET_ID: project,
     ACTION: String(cmd.USER_REQUEST_SUMMARY || '').slice(0, 12000),
     PRIORITY: priority,
-    APPROVAL_STATUS: ccwfNeedsHumanApproval_(cmd) ? 'HUMAN_CONFIRM_REQUIRED' : 'APPROVED_BY_POLICY',
+    APPROVAL_STATUS: needsApproval ? 'HUMAN_CONFIRM_REQUIRED' : 'APPROVED_BY_POLICY',
     EXECUTION_METHOD: 'APPS_SCRIPT_WEBAPP_BRIDGE_FIRST|' + route,
-    STATUS: ccwfNeedsHumanApproval_(cmd) ? 'BLOCKED_APPROVAL' : 'READY',
+    STATUS: needsApproval ? 'BLOCKED_APPROVAL' : 'READY',
     RETRY_COUNT: 0,
     CREATED_AT: new Date(),
     UPDATED_AT: new Date(),
-    NOTES: 'PRE_CHECK→LAST_GOOD→MIN_FIX→SAME_FIXTURE_X2; OpenAI Work not default execution plane',
+    NOTES: 'PRE_CHECK→LAST_GOOD→MIN_FIX→SAME_FIXTURE_X2; historical rows never default to EXECUTE; OpenAI Work not default execution plane',
     OWNER: 'CENTRAL_AGENT',
     FIRST_REQUESTED_AT: cmd.RECEIVED_AT || new Date(),
     LAST_REQUESTED_AT: new Date(),
     REQUEST_COUNT: 1,
     BLOCKED_TASK_ID: '',
     COMPLETION_EVIDENCE: '',
-    APPROVAL_TYPE: ccwfNeedsHumanApproval_(cmd) ? 'HIGH_RISK_HUMAN_GATE' : 'EXISTING_POLICY_REUSE'
+    APPROVAL_TYPE: needsApproval ? 'HIGH_RISK_HUMAN_GATE' : 'EXISTING_POLICY_REUSE'
   };
 }
 
 function ccwfNeedsHumanApproval_(cmd) {
-  const s = [cmd.STATUS,cmd.BLOCKER,cmd.NEXT_ACTION,cmd.USER_REQUEST_SUMMARY].join('|').toUpperCase();
-  return /LOGIN|2FA|NEW_SECRET|NEW_SCOPE|OAUTH|PAID|BILLING|PAYMENT|CONTRACT|DELETE|IRREVERSIBLE|PUBLIC_PRODUCTION|PUBLIC_PUBLISH/.test(s);
+  const core = [cmd.STATUS, cmd.BLOCKER, cmd.NEXT_ACTION].join('|').toUpperCase();
+  if (/LOGIN|2FA|NEW[_ ]?SECRET|NEW[_ ]?SCOPE|OAUTH|PAID|BILLING|PAYMENT|CONTRACT|IRREVERSIBLE|PUBLIC[_ ]?(PRODUCTION|PUBLISH)|USER[_ ]?APPROVAL/.test(core)) return true;
+
+  // Summary is only a secondary safety net. Strip common negated phrases so
+  // instructions such as "do not delete" do not create a false approval gate.
+  let summary = String(cmd.USER_REQUEST_SUMMARY || '').toUpperCase();
+  summary = summary
+    .replace(/DO NOT\s+(DELETE|REMOVE|PUBLISH|DEPLOY|PAY|PURCHASE)/g, '')
+    .replace(/DON'T\s+(DELETE|REMOVE|PUBLISH|DEPLOY|PAY|PURCHASE)/g, '')
+    .replace(/NEVER\s+(DELETE|REMOVE|PUBLISH|DEPLOY|PAY|PURCHASE)/g, '')
+    .replace(/삭제\s*(금지|하지\s*말\w*|하지마\w*)/g, '')
+    .replace(/공개\s*(배포|발행)\s*(금지|하지\s*말\w*|하지마\w*)/g, '');
+  return /\b(DELETE|REMOVE|PUBLIC PUBLISH|PUBLIC PRODUCTION|DEPLOY TO PRODUCTION|PAYMENT|PURCHASE|ENABLE PAID|NEW SECRET|NEW SCOPE|OAUTH)\b/.test(summary) || /결제|유료\s*(API|서비스)\s*(활성|추가)|공개\s*(배포|발행)|삭제\s*(실행|진행|요청)/.test(summary);
 }
 
 function ccwfPublishWorkEvent_(cmd, taskId) {
