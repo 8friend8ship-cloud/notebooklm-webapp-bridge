@@ -35,7 +35,7 @@ jobs:
             "$ExpectedAgent='1.1.46'",
             "$ExpectedAgentBlob='b72e57af70f77578fddb3de49f6581a37e2de792'",
             "$ExpectedV2Blob='a4b7967da7bc26f3cb49c88d3b3cb122ddf86c7c'",
-            "$ExpectedPowerBlob='d1d80a0362a170f1c017c3e63a7d3c6d6b32a576'",
+            "$ExpectedPowerBlob='b98ed149d91cdec4ff75ccf4b03aa7b9e09f241f'",
             "GitHubContent 'local-agent/stable/agent.json'",
             "FetchPinned 'local-agent/governor/RunChromeGovernorReadbackV2.ps1'",
             "FetchPinned 'local-agent/capture/Setup-PowerContinuity.ps1'",
@@ -44,6 +44,8 @@ jobs:
             "POWER_CONTINUITY_WINDOW_MISMATCH",
             "POWER_CONTINUITY_IDLE_MISMATCH",
             "POWER_CONTINUITY_AC_SLEEP_MISMATCH",
+            "POWER_CONTINUITY_USB_SUSPEND_MISMATCH",
+            "POWER_CONTINUITY_KEYBOARD_GUARD_MISMATCH",
             'newProjectCreated=$false',
             'oauthChanged=$false',
             'scopeChanged=$false',
@@ -59,14 +61,17 @@ jobs:
             "monitor-timeout-dc $IdleDisplayMinutes",
             "standby-timeout-ac 0",
             "hibernate-timeout-ac 0",
+            "/setacvalueindex SCHEME_CURRENT $UsbSubGroup $UsbSelectiveSuspend 0",
             "idleDisplayMinutes=$IdleDisplayMinutes",
             "idleDisplayApplies='AC_AND_BATTERY'",
             "acAutomaticSleep='DISABLED'",
-            "batteryPolicy='DISPLAY_30_MIN_SLEEP_POLICY_NO_OVERRIDE'"
+            "acUsbSelectiveSuspend='DISABLED'",
+            "keyboardFreezeGuard='NO_AC_SLEEP_RESUME_PLUS_USB_SELECTIVE_SUSPEND_DISABLED'",
+            "batteryPolicy='DISPLAY_30_MIN_SLEEP_AND_USB_POLICY_NO_OVERRIDE'"
           ]
           pmissing=[x for x in power_required if x not in p]
           if pmissing: raise SystemExit('MISSING_POWER_CONTRACT:'+repr(pmissing))
           forbidden=['clasp create','clasp deploy','ScriptApp.newTrigger','GOOGLE_AI_PAID_API_APPROVED=Y']
           bad=[x for x in forbidden if x in t or x in p]
           if bad: raise SystemExit('FORBIDDEN_ACTION:'+repr(bad))
-          print('PINNED_PERSONA_DEVICE_RECOVERY_AND_IDLE30_POWER_CONTRACT_PASS')
+          print('PINNED_PERSONA_DEVICE_RECOVERY_IDLE30_KEYBOARD_GUARD_PASS')
