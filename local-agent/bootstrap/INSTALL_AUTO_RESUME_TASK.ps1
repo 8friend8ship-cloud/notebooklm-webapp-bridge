@@ -57,6 +57,18 @@ $xml|Set-Content -LiteralPath $tmp -Encoding Unicode
 if($LASTEXITCODE -ne 0){throw "schtasks create failed: $LASTEXITCODE"}
 Remove-Item $tmp -Force -ErrorAction SilentlyContinue
 
+# D99: install an independent per-user logon fallback at bootstrap time too.
+# Agent 1.1.30 also repairs this key, but the installer must not depend on the Agent
+# having already run successfully. This breaks the Scheduled-Task-only bootstrap
+# dependency without adding a new OAuth, service, admin privilege, or browser profile.
+$runKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+$runName='HomeDesignAutomationAutoResume'
+$runCommand='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"'
+New-Item -Path $runKey -Force|Out-Null
+Set-ItemProperty -Path $runKey -Name $runName -Value $runCommand -Type String
+$runVerify=(Get-ItemProperty -Path $runKey -Name $runName -ErrorAction Stop).$runName
+if([string]$runVerify -ne $runCommand){throw 'HKCU_RUN_FALLBACK_VERIFY_FAILED'}
+
 # Run once immediately so installation/update is also an end-to-end watchdog check.
 & schtasks.exe /Run /TN $taskName | Out-Host
 Write-Host 'AUTO RESUME WATCHDOG INSTALLED'
@@ -65,4 +77,5 @@ Write-Host ('AutoResume: '+$Runner)
 Write-Host ('Watchdog: '+$Watchdog)
 Write-Host ('User: '+$userName)
 Write-Host 'Triggers: Windows logon + resume from sleep + every 5 minutes'
+Write-Host ('HKCU Run fallback: '+$runName)
 Write-Host 'Chrome login policy: preserve HomeDesignAutomationV7\ChromeUserData; never create a new automation profile during normal recovery.'
