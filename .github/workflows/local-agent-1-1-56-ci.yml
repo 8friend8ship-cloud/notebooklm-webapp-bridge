@@ -1,0 +1,30 @@
+name: Local Agent 1.1.56 CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/releases/1.1.56/**'
+      - '.github/workflows/local-agent-1-1-56-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  parser-and-policy:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell parser preflight
+        shell: powershell
+        run: |
+          $path = 'local-agent/releases/1.1.56/HomeDesignLocalAgent.ps1'
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
+          if($errors.Count){ $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }
+          Write-Host 'PARSER_PASS'
+      - name: Guardrails
+        shell: powershell
+        run: |
+          $t = Get-Content 'local-agent/releases/1.1.56/HomeDesignLocalAgent.ps1' -Raw
+          $required = @('1.1.56','CHATGPT_IMAGE_AUTO_LIVE_READBACK','normalChromeTouched=$false','flowTouched=$false','newOAuth=$false','generateClicked=$false')
+          foreach($m in $required){ if(-not $t.Contains($m)){ throw "MISSING_GUARDRAIL:$m" } }
+          if($t -match 'Remove-Item.+Google\\Chrome\\User Data'){ throw 'UNSAFE_CHROME_DELETE_PATTERN' }
+          Write-Host 'GUARDRAILS_PASS'
