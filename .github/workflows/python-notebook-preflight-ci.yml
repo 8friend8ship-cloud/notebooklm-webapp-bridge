@@ -1,0 +1,45 @@
+name: Python notebook preflight CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/python/notebook_python_preflight_v0_1.py'
+      - 'local-agent/python/cdp_probe_v0_1.py'
+      - '.github/workflows/python-notebook-preflight-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile
+        shell: pwsh
+        run: |
+          python -m py_compile local-agent/python/cdp_probe_v0_1.py
+          python -m py_compile local-agent/python/notebook_python_preflight_v0_1.py
+      - name: Run with ports unavailable
+        shell: pwsh
+        run: |
+          $out=Join-Path $env:RUNNER_TEMP 'preflight.json'
+          Push-Location local-agent/python
+          python notebook_python_preflight_v0_1.py --out $out --timeout 0.2
+          Pop-Location
+          $r=Get-Content $out -Raw | ConvertFrom-Json
+          if(-not $r.ok){ throw 'preflight runtime should still be ok when CDP ports are absent' }
+          if(-not $r.pythonVersion){ throw 'missing pythonVersion' }
+          if(-not $r.pythonExecutable){ throw 'missing pythonExecutable' }
+          if($r.browserMutated -or $r.browserRestarted -or $r.navigationPerformed -or $r.generateClicked -or $r.credentialsTouched){ throw 'read-only guard failed' }
+      - name: Safety guards
+        shell: pwsh
+        run: |
+          $s=Get-Content -LiteralPath 'local-agent/python/notebook_python_preflight_v0_1.py' -Raw
+          foreach($x in @('readOnly','browserMutated','browserRestarted','navigationPerformed','generateClicked','credentialsTouched','9223','9224')){
+            if(-not $s.Contains($x)){ throw "missing guard $x" }
+          }
+          foreach($x in @('subprocess','chrome.exe','schtasks','Runtime.evaluate','Page.navigate')){
+            if($s.Contains($x)){ throw "forbidden mutation token $x" }
+          }
