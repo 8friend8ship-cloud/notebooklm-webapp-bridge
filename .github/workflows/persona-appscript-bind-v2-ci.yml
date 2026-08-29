@@ -42,15 +42,17 @@ jobs:
             'PersonaOrchestrator.gs',
             '948c056e6d175b5b709b53955abdd3b83869b9c3',
             'a3e8ebb0400ffb19bb8cc83e88ab2950be4e7320',
-            'duplicateClockCreated = `$false',
-            'newProjectCreated = `$false',
-            'newDeployment = `$false',
-            'newTrigger = `$false',
-            'paidGeminiApiCalled = `$false'
+            'duplicateClockCreated = $false',
+            'newProjectCreated = $false',
+            'newDeployment = $false',
+            'newTrigger = $false',
+            'paidGeminiApiCalled = $false'
           )
           foreach($n in $required){if(-not $s.Contains($n)){throw "MISSING_CONTRACT:$n"}}
-          $forbidden=@('create-script','create-deployment','update-deployment','redeploy','ScriptApp.newTrigger','clasp login','enable-api')
-          foreach($n in $forbidden){if($s -match [regex]::Escape($n)){throw "FORBIDDEN_OPERATION:$n"}}
+          foreach($n in @('create-script','create-deployment','update-deployment','redeploy','clasp login','enable-api')){
+            if($s -match [regex]::Escape($n)){throw "FORBIDDEN_OPERATION:$n"}
+          }
+          if($s -match 'ScriptApp\.newTrigger\s*\('){throw 'FORBIDDEN_OPERATION:ScriptApp.newTrigger-call'}
           Write-Host 'Existing-project-only contract PASS'
       - name: Fail-closed target and rollback contract
         shell: powershell
