@@ -1,0 +1,24 @@
+name: Validate Agent 1.1.59
+on:
+  push:
+    paths:
+      - 'local-agent/releases/1.1.59/HomeDesignLocalAgent.ps1'
+      - '.github/workflows/validate-agent-1-1-59.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell parser and safety preflight
+        shell: powershell
+        run: |
+          $path='local-agent/releases/1.1.59/HomeDesignLocalAgent.ps1'
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};exit 2}
+          $t=Get-Content $path -Raw
+          foreach($needle in @('AgentVersion=''1.1.59''','PrevBlob=''ec1d1f28d7a83c5563028c253db9acc6d8a886b4''','CHATGPT_IMAGE_AUTO_LIVE_READBACK.json','normalChromeTouched=$false','generateClicked=$false','creditSpend=$false')){if(-not $t.Contains($needle)){throw "MISSING:$needle"}}
+          Write-Host 'AGENT_1_1_59_PARSE_AND_POLICY_PASS'
