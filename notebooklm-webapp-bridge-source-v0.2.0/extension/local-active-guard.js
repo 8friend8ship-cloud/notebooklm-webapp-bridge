@@ -6,7 +6,7 @@ const GUARD_HOST = "http://127.0.0.1:8765";
 const GUARD_API = "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec";
 const GUARD_DEFAULT_TIMEOUT = 600;
 const GUARD_PENDING_STAGE = "CLAIMED_PENDING_HOST";
-const GUARD_PENDING_GRACE_MS = 60000;
+const GUARD_PENDING_GRACE_MS = 120000;
 
 async function guardReadActive() {
   try { return (await chrome.storage.local.get(GUARD_ACTIVE_KEY))[GUARD_ACTIVE_KEY] || null; }
@@ -110,13 +110,7 @@ async function guardStaleActive(reason = "alarm") {
   const ageMs = ageBase ? Date.now() - ageBase : 0;
   const state = String(host?.state || "").toUpperCase();
 
-  if (state === "DONE") {
-    if (ageMs > GUARD_PENDING_GRACE_MS) {
-      await guardWriteActive(null);
-      return { ok: true, action: "stale_done_active_cleared", taskId, ageMs, reason };
-    }
-    return { ok: true, skipped: "done_pending_normal_finalize", taskId, reason };
-  }
+  if (state === "DONE") return { ok: true, skipped: "done_pending_normal_finalize", taskId, reason };
 
   if (pendingHandoff && (state === "NOT_FOUND" || hostError)) {
     if (ageMs && ageMs <= GUARD_PENDING_GRACE_MS) {

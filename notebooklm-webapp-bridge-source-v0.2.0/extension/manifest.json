@@ -1,11 +1,10 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.71",
-  "description": "D92 exact-download handoff: verified Chrome download filenames flow into the local PowerShell mirror as exact SourcePath. Legacy scan remains fallback-only; FileSystemWatcher fallback copies stable completed files without moving originals.",
+  "version": "0.2.39",
+  "description": "D42 adds shared Studio state-machine support for Slides, Mind Map, Flashcards, Quiz, and Infographic with type-specific artifact evidence before DONE. Preserves Chat, Audio, Video, Report, and Data Table paths. No new permissions or approvals.",
   "permissions": [
     "alarms",
-    "downloads",
     "identity",
     "identity.email",
     "scripting",

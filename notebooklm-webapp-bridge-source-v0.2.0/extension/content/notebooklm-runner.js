@@ -85,24 +85,6 @@
       }) || null;
   }
 
-  function findTextControl(words, root = null, excludeDialogs = false) {
-    const selector = "button,[role='button'],[role='tab'],a,[tabindex],div,span";
-    const raw = root ? [...root.querySelectorAll(selector)] : deepQueryAll(selector);
-    const candidates = raw
-      .filter(el => visible(el) && (!excludeDialogs || !el.closest("[role='dialog'],dialog")))
-      .map(el => ({
-        el,
-        text: norm([el.innerText, el.textContent, el.getAttribute?.("aria-label"), el.getAttribute?.("title"), el.getAttribute?.("data-testid")].join(" "))
-      }))
-      .filter(x => x.text && x.text.length <= 500 && words.some(w => x.text === norm(w) || x.text.includes(norm(w))))
-      .sort((a,b) => a.text.length - b.text.length);
-    for (const x of candidates) {
-      const clickable = x.el.closest("button,[role='button'],a,[tabindex]") || x.el;
-      if (visible(clickable)) return clickable;
-    }
-    return null;
-  }
-
   function nativeValue(el, value) {
     const proto = el instanceof HTMLTextAreaElement
       ? HTMLTextAreaElement.prototype
@@ -147,18 +129,18 @@
 
     let choice = null;
     for (const d of dialogs()) {
-      choice = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d) || findTextControl(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
+      choice = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
       if (choice) break;
     }
 
     if (!choice) {
-      const add = findButton(["소스 추가","자료 추가","출처 추가","add source","add sources"]) || findTextControl(["소스 추가","자료 추가","출처 추가","add source","add sources"], null, true);
+      const add = findButton(["소스 추가","자료 추가","출처 추가","add source","add sources"]);
       if (!add) return {ok:false, skipped:true, reason:"add source control not found"};
       add.click();
 
       choice = await waitFor(() => {
         for (const d of dialogs()) {
-          const b = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d) || findTextControl(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
+          const b = findButton(["복사된 텍스트","복사한 텍스트","붙여넣은 텍스트","copied text","paste text"], d);
           if (b) return b;
         }
         return null;
@@ -174,7 +156,7 @@
 
     const confirm = await waitFor(() => {
       for (const d of dialogs()) {
-        const b = findButton(["삽입","추가","저장","완료","insert","add","save","submit"], d) || findTextControl(["삽입","추가","저장","완료","insert","add","save","submit"], d);
+        const b = findButton(["삽입","추가","저장","완료","insert","add","save","submit"], d);
         if (b) return b;
       }
       return null;
@@ -465,208 +447,17 @@
   }
 
   function audioOverviewReady() {
-    // D63: only treat a real generated audio artifact as ready.
-    // The Studio catalog itself contains AI 오디오 오버뷰/share/menu text and must never count as an artifact.
     for (const el of deepQueryAll("audio")) {
       try {
-        if (el.currentSrc || el.src || (Number.isFinite(el.duration) && el.duration > 0)) return el;
+        if (el.currentSrc || el.src || Number.isFinite(el.duration)) return el;
       } catch {}
     }
-
-    const card = audioArtifactCardRoot(null);
-    if (card) {
-      const text = norm(card.innerText || card.textContent || "");
-      const controls = [...card.querySelectorAll("button,[role='button'],a")].filter(visible)
-        .map(el => actionLabel(el)).join(" ");
-      const hasPlayback = /play_arrow|(^|\s)(play|재생)(\s|$)|pause|일시정지/.test(controls + " " + text);
-      const hasDuration = /\b\d{1,2}:\d{2}\b/.test(text + " " + controls);
-      const catalogHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"]
-        .filter(w => text.includes(w)).length;
-      if ((hasPlayback || hasDuration) && catalogHits < 4 && !/generating|생성 중|creating|만드는 중/.test(text)) return card;
-    }
+    const c = audioOverviewContainer();
+    if (!c) return null;
+    const t = norm(c.innerText || c.textContent || "");
+    const labels = [...c.querySelectorAll("button,[role=button]")].filter(visible).map(b => norm([b.innerText,b.textContent,b.getAttribute("aria-label"),b.getAttribute("title")].join(" "))).join(" ");
+    if (/play|재생|download|다운로드|share|공유/.test(labels) && !/generating|생성 중|creating|만드는 중/.test(t)) return c;
     return null;
-  }
-
-  
-  function actionLabel(el) {
-    return norm([el?.innerText,el?.textContent,el?.getAttribute?.("aria-label"),el?.getAttribute?.("title"),el?.getAttribute?.("data-testid")].join(" "));
-  }
-
-  function artifactMenuButtonWithin(root) {
-    if (!root?.querySelectorAll) return null;
-    const direct = [...root.querySelectorAll("button,[role='button'],a")]
-      .filter(visible)
-      .find(el => /more_vert|more_horiz|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)));
-    if (direct) return direct;
-    for (const icon of [...root.querySelectorAll("*")].filter(visible)) {
-      const t = norm([icon.innerText,icon.textContent,icon.getAttribute?.("aria-label"),icon.getAttribute?.("title")].join(" "));
-      if (!/(^|\\s)(more_vert|more_horiz)(\\s|$)|더보기|옵션/.test(t)) continue;
-      const clickable = icon.closest?.("button,[role='button'],a");
-      if (clickable && visible(clickable)) return clickable;
-    }
-    return null;
-  }
-
-  function audioArtifactCardRoot(readyNode) {
-    const candidates = [];
-    const iconNodes = deepQueryAll("*").filter(visible).filter(el => {
-      const t = norm([el.innerText,el.textContent,el.getAttribute?.("aria-label"),el.getAttribute?.("title")].join(" "));
-      return /(^|\\s)(more_vert|more_horiz)(\\s|$)|더보기|옵션/.test(t);
-    });
-
-    const menuButtons = [];
-    const seen = new Set();
-    for (const icon of iconNodes) {
-      const clickable = icon.closest?.("button,[role='button'],a") || icon;
-      if (!seen.has(clickable)) { seen.add(clickable); menuButtons.push(clickable); }
-    }
-    for (const el of deepQueryAll("button,[role='button'],a").filter(visible)) {
-      if (/more_vert|more_horiz|more options|more actions|더보기|옵션|메뉴/.test(actionLabel(el)) && !seen.has(el)) {
-        seen.add(el); menuButtons.push(el);
-      }
-    }
-
-    for (const menu of menuButtons) {
-      let cur = menu.parentElement;
-      for (let depth = 0; depth < 14 && cur; depth++, cur = cur.parentElement) {
-        const raw = (cur.innerText || cur.textContent || "").trim();
-        const t = norm(raw);
-        if (raw.length < 4 || raw.length > 4000) continue;
-        const descendants = [...cur.querySelectorAll?.("*") || []]
-          .filter(visible)
-          .map(el => norm([el.innerText,el.textContent,el.getAttribute?.("aria-label"),el.getAttribute?.("title")].join(" ")))
-          .join(" ");
-        const hasPlay = /play_arrow|(^|\\s)(play|재생)(\\s|$)|pause|일시정지/.test(descendants);
-        const duration = /\\b\\d{1,2}:\\d{2}\\b/.test(t) || /\\b\\d{1,2}:\\d{2}\\b/.test(descendants);
-        const sourceSignal = /소스\\s*\\d+개|sources?\\s*\\d+|딥 다이브|deep dive/.test(t);
-        const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"]
-          .filter(w => t.includes(w)).length;
-        if ((hasPlay || duration) && studioMenuHits < 5) {
-          const score = (hasPlay ? 5 : 0) + (duration ? 4 : 0) + (sourceSignal ? 2 : 0) + Math.max(0, 3 - depth);
-          candidates.push({el:cur, score, len:raw.length, depth});
-          break;
-        }
-      }
-    }
-
-    if (candidates.length) return candidates.sort((a,b) => b.score - a.score || a.len - b.len || a.depth - b.depth)[0].el;
-
-    for (const node of deepQueryAll("*").filter(visible)) {
-      const tx = norm([node.innerText,node.textContent,node.getAttribute?.("aria-label"),node.getAttribute?.("title")].join(" "));
-      if (!/play_arrow|(^|\\s)(play|재생)(\\s|$)|pause|일시정지|\\b\\d{1,2}:\\d{2}\\b/.test(tx)) continue;
-      let cur = node.closest?.("button,[role='button'],a") || node;
-      for (let depth = 0; depth < 12 && cur; depth++, cur = cur.parentElement) {
-        if (artifactMenuButtonWithin(cur)) return cur;
-      }
-    }
-
-    let cur = readyNode instanceof HTMLElement ? readyNode : null;
-    for (let depth = 0; depth < 12 && cur; depth++, cur = cur.parentElement) {
-      if (artifactMenuButtonWithin(cur)) return cur;
-    }
-    return null;
-  }
-
-  function audioArtifactDomDiagnostic() {
-    const out = [];
-    const seen = new Set();
-    for (const el of deepQueryAll("*").filter(visible)) {
-      const text = (el.innerText || el.textContent || "").trim();
-      const aria = el.getAttribute?.("aria-label") || "";
-      const title = el.getAttribute?.("title") || "";
-      const dataTest = el.getAttribute?.("data-testid") || "";
-      const combined = norm([text, aria, title, dataTest].join(" "));
-      if (!/more|play|pause|재생|일시정지|다운로드|download|\b\d{1,2}:\d{2}\b/.test(combined)) continue;
-      const p1 = (el.parentElement?.innerText || el.parentElement?.textContent || "").trim().slice(0,240);
-      const p2 = (el.parentElement?.parentElement?.innerText || el.parentElement?.parentElement?.textContent || "").trim().slice(0,360);
-      const key = [el.tagName, aria, title, text.slice(0,120), p1].join("|");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({
-        tag: el.tagName,
-        role: el.getAttribute?.("role") || "",
-        aria: aria.slice(0,160),
-        title: title.slice(0,160),
-        dataTest: dataTest.slice(0,160),
-        text: text.slice(0,180),
-        p1,
-        p2
-      });
-      if (out.length >= 24) break;
-    }
-    return out;
-  }
-
-  function openArtifactDownloadAction() {
-    const overlays = deepQueryAll("[role='menu'],[role='listbox'],.mat-mdc-menu-panel,.mat-menu-panel,.cdk-overlay-pane").filter(visible);
-    for (const overlay of overlays) {
-      const candidates = [...overlay.querySelectorAll("[role='menuitem'],button,[role='button'],a,div,span")].filter(visible);
-      const hit = candidates.find(el => /(^|\s)(download|다운로드)(\s|$)/.test(actionLabel(el)));
-      if (hit) return hit.closest?.("[role='menuitem'],button,[role='button'],a") || hit;
-    }
-    return null;
-  }
-
-  async function requestAudioArtifactDownload(readyNode) {
-    const startedAtEpochMs = Date.now();
-    const root = audioArtifactCardRoot(readyNode);
-    if (!root) return {requested:false, reason:`audio final player card not found DOM=${JSON.stringify(audioArtifactDomDiagnostic())}`, startedAtEpochMs};
-    const cardText=(root.innerText || root.textContent || "").trim().slice(0,500);
-    const controls=[...root.querySelectorAll("button,[role='button'],a")].filter(visible).map(el=>actionLabel(el)).join(" ");
-    const isAudioPlayer=/play_arrow|(^|\s)(play|재생)(\s|$)|pause|일시정지|\b\d{1,2}:\d{2}\b/.test(norm(cardText+" "+controls));
-    if (!isAudioPlayer) return {requested:false, reason:"target card is not an audio player card", startedAtEpochMs};
-    const menu = artifactMenuButtonWithin(root);
-    if (!menu) return {requested:false, reason:"audio player card kebab menu not found", startedAtEpochMs};
-    try { menu.click(); } catch {}
-    await sleep(700);
-    const download = await waitFor(() => openArtifactDownloadAction(), 8000, 250);
-    if (!download) return {requested:false, reason:"download action not found inside audio player card menu", startedAtEpochMs};
-    try { download.click(); } catch {}
-    await sleep(1200);
-    return {requested:true, method:"AUDIO_PLAYER_CARD_MENU_DOWNLOAD", startedAtEpochMs, cardText};
-  }
-
-  async function mirrorNotebookArtifactToDrive(task, artifactType, startedAtEpochMs) {
-    return await new Promise((resolve) => {
-      let settled=false;
-      let timer=null;
-      try {
-        const port=chrome.runtime.connect({name:"NLM_ARTIFACT_MIRROR_V3"});
-        const finish=(value)=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);try{port.disconnect();}catch{}resolve(value);};
-        timer=setTimeout(()=>finish({ok:false,error:"ARTIFACT_MIRROR_PORT_TIMEOUT"}),165000);
-        port.onMessage.addListener(msg=>finish(msg));
-        port.onDisconnect.addListener(()=>{if(!settled)finish({ok:false,error:chrome.runtime.lastError?.message||"ARTIFACT_MIRROR_PORT_DISCONNECTED"});});
-        port.postMessage({source:SOURCE,type:"MIRROR_ARTIFACT_TO_DRIVE_V3",taskId:task.taskId,artifactType,startedAtEpochMs});
-      } catch (error) {
-        if(timer)clearTimeout(timer);
-        resolve({ok:false,error:String(error?.message||error)});
-      }
-    });
-  }
-  
-    async function runExistingAudioArtifactDownload(task) {
-    const studio = findDeepControl(["studio","스튜디오"]);
-    if (studio) { try { studio.click(); } catch {} await sleep(900); }
-    const ready = await waitFor(() => audioOverviewReady(), 30000, 500);
-    if (!ready) throw new Error("AUDIO_EXISTING_ARTIFACT_NOT_FOUND_NO_GENERATION");
-    const download = await requestAudioArtifactDownload(ready);
-    if (!download?.requested) throw new Error(`AUDIO_EXISTING_DOWNLOAD_NOT_TRIGGERED:${download?.reason || "unknown"}`);
-    const downloadEvidence = await chrome.runtime.sendMessage({
-      source: SOURCE,
-      type: "VERIFY_DOWNLOAD_AFTER_CLICK",
-      startedAtEpochMs: download.startedAtEpochMs,
-      timeoutMs: Math.min(45000, Math.max(15000, Number(task.timeoutSeconds || 30) * 1000))
-    });
-    if (!downloadEvidence?.ok) throw new Error(`AUDIO_EXISTING_REAL_DOWNLOAD_NOT_VERIFIED:${downloadEvidence?.error || "UNKNOWN"}`);
-    return {
-      resultText:"AUDIO_EXISTING_DOWNLOAD_VERIFIED",
-      resultUrls:[location.href],
-      captureMode:"AUDIO_EXISTING_DOWNLOAD_VERIFIED",
-      artifactType:"AUDIO_OVERVIEW",
-      actualArtifact:{requested:true,download,downloadEvidence},
-      notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),
-      status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||"AUDIO_EXISTING_DOWNLOAD"
-    };
   }
 
   async function runAudioOverview(task) {
@@ -676,25 +467,11 @@
     const studio = findDeepControl(["studio","스튜디오"]);
     if (studio) { try { studio.click(); } catch {} await sleep(1200); }
 
+    const audioControl = await waitFor(() => findDeepControl(["audio overview","ai 오디오 오버뷰","오디오 오버뷰","오디오 개요","음성 개요"]), 30000, 500);
+    if (!audioControl) throw new Error(`AUDIO_OVERVIEW_CONTROL_NOT_FOUND: ${location.href}`);
+
     const before = audioOverviewReady();
-    let audioControl = null;
     if (!before) {
-      const audioWords = ["audio overview","ai 오디오 오버뷰","오디오 오버뷰","오디오 개요","음성 개요"];
-      audioControl = await waitFor(() => {
-        const direct = findDeepControl(audioWords);
-        if (direct) return direct;
-        const candidates = deepQueryAll("div,span,[tabindex]")
-          .filter(el => visible(el) && !el.closest("[role='dialog'],dialog"))
-          .map(el => ({el, text:norm([el.innerText,el.textContent,el.getAttribute?.("aria-label"),el.getAttribute?.("title")].join(" "))}))
-          .filter(x => x.text && audioWords.some(w => x.text === norm(w) || x.text.includes(norm(w))))
-          .sort((a,b) => a.text.length - b.text.length);
-        for (const x of candidates) {
-          const clickable = x.el.closest("button,[role='button'],a,[tabindex]") || x.el;
-          if (visible(clickable)) return clickable;
-        }
-        return null;
-      }, 30000, 500);
-      if (!audioControl) throw new Error(`AUDIO_OVERVIEW_CONTROL_NOT_FOUND: ${location.href}`);
       try { audioControl.click(); } catch {}
       await sleep(1200);
 
@@ -717,10 +494,8 @@
     const ready = await waitFor(() => audioOverviewReady(), timeoutMs, 2500);
     if (!ready) throw new Error("AUDIO_OVERVIEW_GENERATION_TIMEOUT_OR_PLAYER_NOT_FOUND");
 
-    const download = await requestAudioArtifactDownload(ready);
-    if (!download?.requested) throw new Error(`AUDIO_ARTIFACT_DOWNLOAD_NOT_TRIGGERED: ${download?.reason || "unknown"}`);
     return {
-      resultText:"AUDIO_OVERVIEW_DOWNLOAD_TRIGGERED",
+      resultText:"AUDIO_OVERVIEW_READY",
       resultUrls:[location.href],
       captureMode:"AUDIO_PLAYER_READY",
       notebookUrl:location.href,
@@ -730,8 +505,6 @@
       taskId:task.taskId,
       contentId:task.contentId || "",
       taskType:task.taskType || "AUDIO_OVERVIEW",
-      artifactMirrorRequest:{artifactType:"AUDIO_OVERVIEW",startedAtEpochMs:download.startedAtEpochMs},
-      actualArtifact:{download},
       source: {...source, existingNotebookFallback: sourceFallback}
     };
   }
@@ -812,10 +585,7 @@
       const t = (el.innerText || el.textContent || "").trim();
       const n = norm(t);
       if (!t || t.length > 12000 || seen.has(t)) continue;
-      const reportLabel = /보고서|report|브리핑 문서|briefing document|briefing doc|학습 가이드|study guide|faq|자주 묻는 질문/.test(n);
-      const reportArtifactSignal = /소스\s*\d+개|sources?\s*\d+|읽지 않음|unread|more_vert|다운로드|download|briefing doc/.test(n);
-      const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(w => n.includes(w)).length;
-      if (reportLabel && reportArtifactSignal && studioMenuHits < 5) {
+      if (/보고서|report|브리핑 문서|briefing document|학습 가이드|study guide|faq|자주 묻는 질문/.test(n)) {
         seen.add(t); out.push(t);
       }
     }
@@ -827,7 +597,7 @@
     const fresh = current.filter(t => !baseline.has(t));
     return fresh.find(t => {
       const n = norm(t);
-      return t.length > 20 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);
+      return t.length > 40 && !/생성 중|generating|만드는 중|create|생성하기/.test(n);
     }) || null;
   }
 
@@ -921,93 +691,9 @@
       const n = norm(t);
       if (!words.some(w => n.includes(norm(w)))) continue;
       if (/생성 중|generating|creating|만드는 중|준비 중|preparing/.test(n)) continue;
-      const studioMenuHits = ["ai 오디오 오버뷰","슬라이드 자료","동영상 개요","마인드맵","보고서","플래시카드","퀴즈","인포그래픽","데이터 표"].filter(x => n.includes(x)).length;
-      if (studioMenuHits >= 4) continue;
-      const artifactSignal = /소스\s*\d+개|sources?\s*\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|\b\d{1,2}:\d{2}\b/.test(n);
-      if (artifactSignal) { seen.add(t); out.push(t); }
+      if (/소스\s*\d+개|sources?\s*\d+|읽지 않음|unread|다운로드|download|more_vert|재생|play|cards?|questions?|slides?|pages?/.test(n) || t.length > 40) { seen.add(t); out.push(t); }
     }
     return out;
-  }
-
-  function studioArtifactCardRoot(words, readyText) {
-    const target = norm(readyText || "");
-    const nodes = deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);
-    const candidates = [];
-    for (const el of nodes) {
-      const text=(el.innerText || el.textContent || "").trim();
-      if (!text || text.length < 8 || text.length > 5000) continue;
-      const n=norm(text);
-      if (!words.some(w => n.includes(norm(w)))) continue;
-      if (target && !n.includes(target.slice(0,Math.min(80,target.length))) && !target.includes(n.slice(0,Math.min(80,n.length)))) continue;
-      const menu=artifactMenuButtonWithin(el);
-      if (!menu) continue;
-      candidates.push({el,len:text.length});
-    }
-    if (candidates.length) return candidates.sort((a,b)=>a.len-b.len)[0].el;
-    for (const el of nodes) {
-      const n=norm(el.innerText || el.textContent || "");
-      if (!words.some(w => n.includes(norm(w)))) continue;
-      if (artifactMenuButtonWithin(el)) return el;
-    }
-    return null;
-  }
-
-  async function requestStudioArtifactDownload(task, spec, readyText) {
-    const startedAtEpochMs=Date.now();
-    const root=studioArtifactCardRoot(spec.evidenceWords, readyText);
-    if (!root) return {ok:false,error:`${spec.code}_FINAL_CARD_NOT_FOUND`};
-    const menu=artifactMenuButtonWithin(root);
-    if (!menu) return {ok:false,error:`${spec.code}_FINAL_CARD_MENU_NOT_FOUND`};
-    try { menu.click(); } catch {}
-    await sleep(700);
-    const download=await waitFor(()=>openArtifactDownloadAction(),8000,250);
-    if (!download) return {ok:false,error:`${spec.code}_DOWNLOAD_ACTION_NOT_FOUND`};
-    try { download.click(); } catch {}
-    await sleep(1000);
-    return {ok:true,method:`${spec.code}_FINAL_CARD_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs};
-  }
-
-  function existingArtifactCard(matchWords) {
-    const nodes=deepQueryAll("section,article,div,[role=group],[role=region]").filter(visible);
-    const hits=[];
-    for (const el of nodes) {
-      const t=(el.innerText||el.textContent||"").trim();
-      if (!t || t.length>5000) continue;
-      const n=norm(t);
-      if (!matchWords.some(w=>n.includes(norm(w)))) continue;
-      if (/생성 중|generating|creating|만드는 중|준비 중|preparing/.test(n)) continue;
-      const menu=artifactMenuButtonWithin(el);
-      if (!menu) continue;
-      hits.push({el,t});
-    }
-    hits.sort((a,b)=>a.t.length-b.t.length);
-    return hits[0]?.el||null;
-  }
-
-  async function runExistingStudioArtifactDownload(task, spec) {
-    const studio=findDeepControl(["studio","스튜디오"]);
-    if (studio) { try { studio.click(); } catch {} await sleep(900); }
-    const root=await waitFor(()=>existingArtifactCard(spec.matchWords),30000,500);
-    if (!root) throw new Error(`${spec.code}_EXISTING_ARTIFACT_CARD_NOT_FOUND`);
-    const startedAtEpochMs=Date.now();
-    const menu=artifactMenuButtonWithin(root);
-    if (!menu) throw new Error(`${spec.code}_EXISTING_ARTIFACT_MENU_NOT_FOUND`);
-    try { menu.click(); } catch {}
-    await sleep(700);
-    const download=await waitFor(()=>openArtifactDownloadAction(),8000,250);
-    if (!download) throw new Error(`${spec.code}_EXISTING_DOWNLOAD_ACTION_NOT_FOUND`);
-    try { download.click(); } catch {}
-    const downloadEvidence = await chrome.runtime.sendMessage({ source: SOURCE, type: "VERIFY_DOWNLOAD_AFTER_CLICK", startedAtEpochMs, timeoutMs: Math.min(45000, Math.max(15000, Number(task.timeoutSeconds || 30) * 1000)) });
-    if (!downloadEvidence?.ok) throw new Error(`${spec.code}_REAL_DOWNLOAD_NOT_VERIFIED:${downloadEvidence?.error || "UNKNOWN"}`);
-    return {
-      resultText:(root.innerText||root.textContent||"").trim().slice(0,1200),
-      resultUrls:[location.href],
-      captureMode:`${spec.code}_EXISTING_DOWNLOAD_CLICKED`,
-      artifactType:spec.code,
-      actualArtifact:{requested:true,method:`${spec.code}_EXISTING_MENU_DOWNLOAD_CLICKED`,startedAtEpochMs,downloadEvidence},
-      notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),
-      status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||`${spec.code}_EXISTING_DOWNLOAD`
-    };
   }
 
   async function runStudioArtifact(task, spec) {
@@ -1026,9 +712,7 @@
     const timeoutMs = Math.max(spec.minTimeoutMs, Number(task.timeoutSeconds || spec.defaultTimeoutSec) * 1000);
     const ready = await waitFor(() => studioArtifactCandidates(spec.evidenceWords).find(t => !baseline.has(t)) || null, timeoutMs, spec.pollMs);
     if (!ready) throw new Error(`${spec.code}_GENERATION_TIMEOUT_OR_RESULT_NOT_FOUND`);
-    const actualArtifact = await requestStudioArtifactDownload(task, spec, ready);
-    if (!actualArtifact?.ok) throw new Error(actualArtifact?.error || `${spec.code}_ARTIFACT_DOWNLOAD_FAILED`);
-    return {resultText:ready,resultUrls:[location.href],captureMode:`${spec.code}_READY_AND_DOWNLOADED`,artifactType:spec.code,actualArtifact,notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||spec.code,source:{...source,existingNotebookFallback:sourceFallback}};
+    return {resultText:ready,resultUrls:[location.href],captureMode:`${spec.code}_READY`,artifactType:spec.code,notebookUrl:location.href,pageTitle:document.title,capturedAt:new Date().toISOString(),status:"DONE",taskId:task.taskId,contentId:task.contentId||"",taskType:task.taskType||spec.code,source:{...source,existingNotebookFallback:sourceFallback}};
   }
 
   const STUDIO_ARTIFACT_SPECS = Object.freeze({
@@ -1044,17 +728,12 @@
     if (!task?.taskId) throw new Error("TASK_ID가 없습니다.");
 
     const normalizedTaskType = String(task.taskType || "CHAT").toUpperCase();
-    if (["AUDIO_EXISTING_DOWNLOAD","NOTEBOOKLM_AUDIO_EXISTING_DOWNLOAD"].includes(normalizedTaskType)) return runExistingAudioArtifactDownload(task);
-
     if (["AUDIO","AUDIO_OVERVIEW","NOTEBOOKLM_AUDIO"].includes(normalizedTaskType)) return runAudioOverview(task);
 
     if (["VIDEO","VIDEO_OVERVIEW","NOTEBOOKLM_VIDEO"].includes(normalizedTaskType)) return runVideoOverview(task);
 
     if (["REPORT","NOTEBOOKLM_REPORT","NOTEBOOKLM_REPORT_PDF"].includes(normalizedTaskType)) return runReport(task);
 
-    if (["DATA_TABLE_EXISTING_DOWNLOAD","NOTEBOOKLM_DATA_TABLE_EXISTING_DOWNLOAD"].includes(normalizedTaskType)) return runExistingStudioArtifactDownload(task,{code:"DATA_TABLE",matchWords:["contentos-stage-table.xlsx",".xlsx",".csv"]});
-    if (["REPORT_EXISTING_DOWNLOAD","NOTEBOOKLM_REPORT_EXISTING_DOWNLOAD"].includes(normalizedTaskType)) return runExistingStudioArtifactDownload(task,{code:"REPORT",matchWords:["보고서","report",".pdf",".docx"]});
-    if (["SLIDES_EXISTING_DOWNLOAD","NOTEBOOKLM_SLIDES_EXISTING_DOWNLOAD"].includes(normalizedTaskType)) return runExistingStudioArtifactDownload(task,{code:"SLIDES",matchWords:["슬라이드","slides",".pptx",".pdf"]});
     if (["DATA_TABLE","NOTEBOOKLM_DATA_TABLE"].includes(normalizedTaskType)) return runDataTable(task);
 
     if (["SLIDES","SLIDE_DECK","NOTEBOOKLM_SLIDES"].includes(normalizedTaskType)) return runStudioArtifact(task, STUDIO_ARTIFACT_SPECS.SLIDES);
