@@ -57,13 +57,8 @@ jobs:
             exit 0
           }
           $p='local-agent/releases/1.1.51/HomeDesignLocalAgent.ps1'
-          $bytes=[IO.File]::ReadAllBytes($p)
-          $header=[Text.Encoding]::ASCII.GetBytes(('blob '+$bytes.Length+[char]0))
-          $all=New-Object byte[] ($header.Length+$bytes.Length)
-          [Buffer]::BlockCopy($header,0,$all,0,$header.Length)
-          [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
-          $sha=[Security.Cryptography.SHA1]::Create()
-          try{$actual=(($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$sha.Dispose()}
+          $actual=(git rev-parse ("HEAD:"+$p)).Trim()
+          if($LASTEXITCODE -ne 0 -or -not $actual){throw 'GIT_BLOB_LOOKUP_FAILED'}
           if($actual -ne [string]$m.gitBlobSha1){throw "STABLE_SHA_MISMATCH actual=$actual expected=$($m.gitBlobSha1)"}
           if([string]$m.file -ne 'HomeDesignLocalAgent.ps1'){throw 'STABLE_FILE_MISMATCH'}
-          Write-Host 'Stable manifest 1.1.51 SHA contract PASS'
+          Write-Host 'Stable manifest 1.1.51 Git blob SHA contract PASS'
