@@ -42,7 +42,7 @@ jobs:
             'NOTEBOOKLM_BOUND_SCRIPT_ID_RECOVERY_1.1.52.json',
             'UNIQUE_BOUND_SCRIPT_CANDIDATE_VERIFIED_READONLY',
             "@('list')",
-            "@('clone',$ScriptId)",
+            '@(''clone'',$ScriptId)',
             'remoteWriteStarted=$false',
             'browserLaunched=$false',
             'queueTaskCreated=$false',
