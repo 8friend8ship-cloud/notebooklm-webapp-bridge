@@ -37,14 +37,12 @@ MAGIC = (
     (b"RIFF", "application/riff", None),
 )
 
-
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
-
 
 def detect_type(path: Path) -> dict:
     with path.open("rb") as f:
@@ -65,9 +63,32 @@ def detect_type(path: Path) -> dict:
                 mime, canonical_ext = m, ext
                 break
 
+    # ISO Base Media / MP4 family has an ftyp box at byte 4.
+    # NotebookLM audio may use DASH/MP4 containers, so ftyp alone cannot tell
+    # whether the payload is audio or video. Inspect early `hdlr` boxes and
+    # prefer the actual media handler (`soun` / `vide`) when present.
     if len(head) >= 12 and head[4:8] == b"ftyp":
         brand = head[8:12]
-        if brand in {b"qt  "}:
+        scan_limit = min(path.stat().st_size, 2 * 1024 * 1024)
+        with path.open("rb") as f:
+            probe = f.read(scan_limit)
+        handlers = set()
+        pos = 0
+        while True:
+            i = probe.find(b"hdlr", pos)
+            if i < 0:
+                break
+            # FullBox: type(4) + version/flags(4) + pre_defined(4) + handler_type(4)
+            handler = probe[i + 12:i + 16]
+            if handler in {b"soun", b"vide"}:
+                handlers.add(handler)
+            pos = i + 4
+
+        if b"vide" in handlers:
+            mime, canonical_ext = ("video/quicktime", ".mov") if brand == b"qt  " else ("video/mp4", ".mp4")
+        elif b"soun" in handlers:
+            mime, canonical_ext = "audio/mp4", ".m4a"
+        elif brand == b"qt  ":
             mime, canonical_ext = "video/quicktime", ".mov"
         else:
             mime, canonical_ext = "video/mp4", ".mp4"
@@ -79,14 +100,12 @@ def detect_type(path: Path) -> dict:
         "magicVerified": mime != "application/octet-stream",
     }
 
-
 def is_complete_candidate(path: Path) -> bool:
     return (
         path.is_file()
         and path.suffix.lower() not in PARTIAL_SUFFIXES
         and not path.name.endswith(".receipt.json")
     )
-
 
 def wait_stable(path: Path, checks: int = 3, interval: float = 0.5) -> bool:
     last = None
@@ -105,7 +124,6 @@ def wait_stable(path: Path, checks: int = 3, interval: float = 0.5) -> bool:
         time.sleep(interval)
     return False
 
-
 def newest_candidate(download_dir: Path, since: float = 0.0) -> Optional[Path]:
     candidates = []
     for p in download_dir.iterdir():
@@ -117,7 +135,6 @@ def newest_candidate(download_dir: Path, since: float = 0.0) -> Optional[Path]:
     candidates.sort(reverse=True, key=lambda x: x[0])
     return candidates[0][1] if candidates else None
 
-
 def unique_destination(dest_dir: Path, name: str) -> Path:
     target = dest_dir / name
     if not target.exists():
@@ -128,7 +145,6 @@ def unique_destination(dest_dir: Path, name: str) -> Path:
         if not alt.exists():
             return alt
     raise RuntimeError("destination naming exhausted")
-
 
 def capture_file(source: Path, dest_dir: Path) -> dict:
     if not wait_stable(source):
@@ -163,7 +179,6 @@ def capture_file(source: Path, dest_dir: Path) -> dict:
     receipt["receiptPath"] = str(receipt_path)
     return receipt
 
-
 def watch_once(download_dir: Path, dest_dir: Path, since: float, timeout: int) -> dict:
     deadline = time.time() + timeout
     while time.time() <= deadline:
@@ -173,8 +188,8 @@ def watch_once(download_dir: Path, dest_dir: Path, since: float, timeout: int) -
         time.sleep(1)
     return {"ok": False, "status": "NO_COMPLETED_DOWNLOAD_WITHIN_TIMEOUT"}
 
-
 def self_test() -> dict:
+    # Minimal valid PNG-like binary header + opaque payload; verifies byte-for-byte preservation.
     png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + bytes(range(32)) + b"\x00IEND\xaeB`\x82"
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -195,7 +210,6 @@ def self_test() -> dict:
             "sha256": result["sha256"],
             "mime": result["detected"]["mime"],
         }
-
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -221,7 +235,6 @@ def main() -> int:
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result.get("ok") else 2
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
