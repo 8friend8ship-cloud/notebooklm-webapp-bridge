@@ -3,15 +3,13 @@ name: Persona Device Recovery Once CI
 on:
   push:
     paths:
-      - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
       - 'local-agent/capture/Setup-PowerContinuity.ps1'
-      - 'local-agent/releases/1.1.49/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.50/HomeDesignLocalAgent.ps1'
       - '.github/workflows/persona-device-recovery-once-ci.yml'
   pull_request:
     paths:
-      - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
       - 'local-agent/capture/Setup-PowerContinuity.ps1'
-      - 'local-agent/releases/1.1.49/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.50/HomeDesignLocalAgent.ps1'
 
 jobs:
   validate:
@@ -21,52 +19,48 @@ jobs:
       - name: Windows PowerShell 5.1 parse
         shell: powershell
         run: |
-          $files=@('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1','local-agent/capture/Setup-PowerContinuity.ps1','local-agent/releases/1.1.49/HomeDesignLocalAgent.ps1')
+          $files=@('local-agent/capture/Setup-PowerContinuity.ps1','local-agent/releases/1.1.50/HomeDesignLocalAgent.ps1')
           foreach($file in $files){
             $tokens=$null;$errors=$null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
             if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
           }
-      - name: Power continuity and argument forwarding contract
+      - name: User-level power continuity contract
         shell: python
         run: |
           from pathlib import Path
           p=Path('local-agent/capture/Setup-PowerContinuity.ps1').read_text(encoding='utf-8')
-          a=Path('local-agent/releases/1.1.49/HomeDesignLocalAgent.ps1').read_text(encoding='utf-8')
-          power_required=[
-            "[int]$IdleDisplayMinutes=30",
-            "$UsbSubGroup='2a737441-1930-4402-8d77-b2bebba308a3'",
+          a=Path('local-agent/releases/1.1.50/HomeDesignLocalAgent.ps1').read_text(encoding='utf-8')
+          req=[
             "$UsbSelectiveSuspend='48e6b7a6-50f5-4782-a5d4-53bb8f07e226'",
+            "$RunKey='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'",
+            "$RunName='HomeDesign-PowerContinuity-Watchdog'",
+            "Set-ItemProperty -LiteralPath $RunKey -Name $RunName -Value $runCmd -Type String",
+            "Start-Process -FilePath 'powershell.exe'",
+            "persistenceMode='HKCU_RUN_RESIDENT_WATCHER'",
+            "scheduledTaskCreationRequired=$false",
+            "nightTriggerMode='RESIDENT_WINDOW_ONCE_PER_DAY'",
             "monitor-timeout-ac $IdleDisplayMinutes",
             "monitor-timeout-dc $IdleDisplayMinutes",
             "standby-timeout-ac 0",
             "hibernate-timeout-ac 0",
             "/setacvalueindex SCHEME_CURRENT $UsbSubGroup $UsbSelectiveSuspend 0",
-            "idleDisplayMinutes=$IdleDisplayMinutes",
-            "idleDisplayApplies='AC_AND_BATTERY'",
-            "acAutomaticSleep='DISABLED'",
-            "acAutomaticHibernate='DISABLED'",
-            "acUsbSelectiveSuspend='DISABLED'",
             "keyboardFreezeGuard='NO_AC_SLEEP_RESUME_PLUS_USB_SELECTIVE_SUSPEND_DISABLED'",
             "batteryPolicy='DISPLAY_30_MIN_SLEEP_AND_USB_POLICY_NO_OVERRIDE'"
           ]
-          missing=[x for x in power_required if x not in p]
-          if missing: raise SystemExit('MISSING_POWER_CONTRACT:'+repr(missing))
-          if '48e6b7a6-50f5-4782-a5d4-53be6a7c11e8' in p:
-            raise SystemExit('WRONG_USB_SELECTIVE_SUSPEND_GUID_REGRESSION')
-          agent_required=[
-            "$AgentVersion='1.1.49'",
-            "$PowerHelperSha='d570a7e84a8d3e4d72f8f95e40deaf63e6b90fa4'",
+          missing=[x for x in req if x not in p]
+          if missing: raise SystemExit('MISSING_USER_POWER_CONTRACT:'+repr(missing))
+          if 'schtasks.exe /Create' in p: raise SystemExit('SCHEDULED_TASK_ELEVATION_REGRESSION')
+          if '48e6b7a6-50f5-4782-a5d4-53be6a7c11e8' in p: raise SystemExit('WRONG_USB_GUID_REGRESSION')
+          areq=[
+            "$AgentVersion='1.1.50'",
+            "$PowerHelperSha='7d6e2578fbbc78c12687dd0f701778517d204f51'",
             "function InvokeChild([string]$Path,[string[]]$ScriptArgs)",
-            "+@($ScriptArgs)",
             "InvokeChild $PowerHelper @('-StatusOnly')",
             "InvokeChild $PowerHelper @('-Install','-NightStart','02:00','-NightEnd','05:00','-IdleDisplayMinutes','30')",
-            "AGENT_1.1.49_POWER_CONTINUITY_SELF_HEAL",
+            "persistenceMode='HKCU_RUN_RESIDENT_WATCHER'",
+            "AGENT_1.1.50_POWER_CONTINUITY_SELF_HEAL",
             "POWER_CONTINUITY_RUNTIME_READBACK.json",
-            "acAutomaticSleep='DISABLED'",
-            "acAutomaticHibernate='DISABLED'",
-            "acUsbSelectiveSuspend='DISABLED'",
-            "keyboardFreezeGuard='NO_AC_SLEEP_RESUME_PLUS_USB_SELECTIVE_SUSPEND_DISABLED'",
             "batterySleepAndUsbPolicyOverride=$false",
             "newProjectCreated=$false",
             "oauthChanged=$false",
@@ -75,14 +69,12 @@ jobs:
             "newTrigger=$false",
             "paidGeminiApiCalled=$false"
           ]
-          amissing=[x for x in agent_required if x not in a]
-          if amissing: raise SystemExit('MISSING_AGENT_1149_CONTRACT:'+repr(amissing))
-          if 'function InvokeChild([string]$Path,[string[]]$Args)' in a:
-            raise SystemExit('AUTOMATIC_ARGS_COLLISION_REGRESSION')
+          missing=[x for x in areq if x not in a]
+          if missing: raise SystemExit('MISSING_AGENT_1150_CONTRACT:'+repr(missing))
           forbidden=['clasp create','clasp deploy','ScriptApp.newTrigger','GOOGLE_AI_PAID_API_APPROVED=Y']
           bad=[x for x in forbidden if x in p or x in a]
           if bad: raise SystemExit('FORBIDDEN_ACTION:'+repr(bad))
-          print('LOCAL_AGENT_1149_CORRECT_USB_GUID_CONTRACT_PASS')
+          print('LOCAL_AGENT_1150_USER_LEVEL_POWER_CONTRACT_PASS')
       - name: Argument forwarding smoke
         shell: powershell
         run: |
