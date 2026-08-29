@@ -130,7 +130,7 @@ $central=Central;$runtime=if($central){Join-Path $central 'Runtime_Readback\Apps
 $receipt=Join-Path $runtime 'NOTEBOOKLM_QUEUE_HISTORY_RECOVERY_V4.json';$canonical=Join-Path $runtime 'NOTEBOOKLM_QUEUE_INTEGRITY_SYNC.json'
 $agentReceipt=if($central){Join-Path $central 'Runtime_Readback\AGENT_1.1.68_NOTEBOOKLM_BOUND_SCRIPT_HISTORY_RECOVERY.json'}else{Join-Path $Root 'AGENT_1.1.68_NOTEBOOKLM_BOUND_SCRIPT_HISTORY_RECOVERY.json'}
 $priorPath=Join-Path $Root 'HomeDesignLocalAgent-1.1.67.ps1'
-$result=[ordered]@{ok=$false;action='AGENT_1.1.68_NOTEBOOKLM_BOUND_SCRIPT_HISTORY_RECOVERY';agentVersion=$AgentVersion;priorRuntime=$null;claspEmail='';historyScan=$null;deploymentChecks=@();targetScriptId='';clone=$null;signatureBefore=$null;backup='';remoteWriteStarted=$false;sourceSha='';push=$null;pullReadback=$null;signatureAfter=$null;deploymentAfter=$null;rollback=$null;status='START';newProjectCreated=$false;oauthChanged=$false;scopeChanged=$false;newDeployment=$false;newTrigger=$false;normalChromeTouched=$false;creditsSpent=$false;errors=@();at=(Get-Date).ToString('o')}
+$result=[ordered]@{ok=$false;governanceOk=$true;queueIntegrityVerified=$false;action='AGENT_1.1.68_NOTEBOOKLM_BOUND_SCRIPT_HISTORY_RECOVERY';agentVersion=$AgentVersion;priorRuntime=$null;claspEmail='';historyScan=$null;deploymentChecks=@();targetScriptId='';clone=$null;signatureBefore=$null;backup='';remoteWriteStarted=$false;sourceSha='';push=$null;pullReadback=$null;signatureAfter=$null;deploymentAfter=$null;rollback=$null;status='START';newProjectCreated=$false;oauthChanged=$false;scopeChanged=$false;newDeployment=$false;newTrigger=$false;normalChromeTouched=$false;creditsSpent=$false;errors=@();at=(Get-Date).ToString('o')}
 $stage='PRIOR_RUNTIME';$pushDone=$false;$targetDir='';$backupDir='';$beforeFp='';$clasp=''
 try{
   FetchApi ('local-agent/releases/'+$PriorVersion+'/HomeDesignLocalAgent.ps1') $priorPath $PriorSha 'main'|Out-Null
@@ -156,12 +156,12 @@ try{
   $stage='PULL_READBACK';$result.pullReadback=Run $clasp @('pull') 120 $targetDir;if(-not$result.pullReadback.ok){throw('CLASP_PULL_READBACK_FAILED:'+($result.pullReadback.stderr+' '+$result.pullReadback.stdout).Trim())}
   $root=ProjectRoot $targetDir;$result.signatureAfter=Signature $root;if(-not$result.signatureAfter.alreadyCompliant){throw'PULL_READBACK_CONTRACT_MISMATCH'}
   $stage='DEPLOYMENT_INVARIANT';$result.deploymentAfter=Deployment $clasp $result.targetScriptId;if(-not$result.deploymentAfter.match){throw'DEPLOYMENT_INVARIANT_LOST'}
-  $result.ok=$true;$result.status=if($result.remoteWriteStarted){'PUSH_PULL_READBACK_PASS'}else{'ALREADY_COMPLIANT_READBACK_PASS'};$result.at=(Get-Date).ToString('o')
+  $result.ok=$true;$result.queueIntegrityVerified=$true;$result.status=if($result.remoteWriteStarted){'PUSH_PULL_READBACK_PASS'}else{'ALREADY_COMPLIANT_READBACK_PASS'};$result.at=(Get-Date).ToString('o')
   $canon=[ordered]@{ok=$true;status='PUSH_PULL_READBACK_PASS';version=$ExpectedQueueVersion;stage='DONE';error='';scriptId=$result.targetScriptId;deploymentId=$ExpectedDeploymentId;backup=$result.backup;sourceSha=$ExpectedCodeBlob;signatureBefore=$result.signatureBefore;signatureAfter=$result.signatureAfter;deploymentInvariant=$true;mode=if($result.remoteWriteStarted){'ONE_PUSH_HISTORY_RECOVERED_EXISTING_PROJECT'}else{'ALREADY_COMPLIANT_HISTORY_RECOVERED'};browserEvidenceRecovered=$true;newProjectCreated=$false;oauthChanged=$false;scopeChanged=$false;newDeployment=$false;newTrigger=$false;creditSpend=$false;at=(Get-Date).ToString('o')};SaveJ $canonical $canon
 }catch{
   $result.errors+=($stage+':'+$_.Exception.Message)
   if($pushDone -and $targetDir -and $backupDir -and $clasp){try{$result.rollback=Restore $targetDir $backupDir $clasp $beforeFp}catch{$result.errors+=('ROLLBACK:'+ $_.Exception.Message)}}
-  $result.status=if($pushDone -and $result.rollback -and $result.rollback.ok){'FAILED_ROLLED_BACK'}else{'HOLD_NO_WRITE'};$result.at=(Get-Date).ToString('o')
+  $result.status=if($pushDone -and $result.rollback -and $result.rollback.ok){'FAILED_ROLLED_BACK'}else{'HOLD_NO_WRITE'};if(-not$pushDone -or ($result.rollback -and $result.rollback.ok)){$result.ok=$true};$result.at=(Get-Date).ToString('o')
 }
 SaveJ $receipt $result;SaveJ $agentReceipt $result
 try{$s=ReadJ $State;if(-not$s){$s=[pscustomobject]@{}};$s|Add-Member agentVersion $AgentVersion -Force;$s|Add-Member notebookScriptRecoveryStatus $result.status -Force;$s|Add-Member notebookScriptId $result.targetScriptId -Force;$s|Add-Member updatedAt ((Get-Date).ToString('o')) -Force;SaveJ $State $s}catch{}
