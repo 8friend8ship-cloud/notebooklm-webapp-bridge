@@ -1,5 +1,5 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
 const files={
   bootstrap:'local-agent/bootstrap/AgentBootstrap.ps1',
   resume:'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1',
@@ -31,10 +31,10 @@ if(!/^1\.1\.\d+$/.test(String(stable.version||'')))throw new Error(`invalid stab
 if(stable.channel!=='stable'||stable.enabled!==true)throw new Error('stable manifest channel/enabled mismatch');
 const stablePath=`local-agent/releases/${stable.version}/${stable.file||'HomeDesignLocalAgent.ps1'}`;
 if(!fs.existsSync(stablePath))throw new Error(`stable release file missing ${stablePath}`);
-const stableBytes=fs.readFileSync(stablePath);
-const header=Buffer.from(`blob ${stableBytes.length}\0`,'ascii');
-const blobSha=crypto.createHash('sha1').update(Buffer.concat([header,stableBytes])).digest('hex');
+// Use the repository blob object instead of working-tree bytes. Windows checkout
+// may materialize CRLF, which must not change the Git blob identity pinned by the manifest.
+const blobSha=execFileSync('git',['rev-parse',`HEAD:${stablePath}`],{encoding:'utf8'}).trim().toLowerCase();
 if(blobSha!==String(stable.gitBlobSha1||'').toLowerCase())throw new Error(`stable manifest SHA mismatch expected=${stable.gitBlobSha1} actual=${blobSha}`);
-const stableAgent=stableBytes.toString('utf8');
+const stableAgent=fs.readFileSync(stablePath,'utf8');
 if(!stableAgent.includes(`$AgentVersion='${stable.version}'`))throw new Error(`stable release version marker missing ${stable.version}`);
 console.log(JSON.stringify({ok:true,action:'BOOTSTRAP_CONTENTS_API_STATIC',stable:stable.version,checks:must.length,noMutableRaw:true,stableBlobVerified:true}));
