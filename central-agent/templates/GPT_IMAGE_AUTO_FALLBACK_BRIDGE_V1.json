@@ -1,6 +1,6 @@
 {
   "templateId": "GPT_IMAGE_AUTO_FALLBACK_BRIDGE_V1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "role": "image_generation_fallback_bridge",
   "priority": {
     "primary": "Flow Agent Bridge",
@@ -20,15 +20,26 @@
     "requiresChangedEvidenceBeforeRetry": true,
     "parallelDuplicateGeneration": false
   },
+  "generationContract": {
+    "generator": "CHATGPT_DIRECT_IMAGE_GENERATION",
+    "bridge": "ChatGPT Image Auto CANONICAL v8.6.0",
+    "generationOccursIn": "existing authenticated ChatGPT browser session",
+    "pythonGeneratesImage": false,
+    "pythonRole": ["post_download_verification", "mime_extension_validation", "nonzero_byte_check", "hashing_if_available", "drive_queens_registration_helper"],
+    "browserExtensionRole": ["submit_image_task", "detect_generation_complete", "download_original_image_file", "write_download_evidence", "handoff_to_drive_registration"],
+    "downloadOwner": "CHROME_EXTENSION",
+    "originalImageRequired": true
+  },
   "queueContract": {
     "queue": "Image_Task_Queue",
-    "states": ["READY", "CLAIMED", "STARTED", "GENERATED", "DOWNLOADED", "DRIVE_REGISTERED", "RESULT_ACK", "DONE"],
+    "states": ["READY", "CLAIMED", "STARTED", "GENERATED", "DOWNLOADED", "PYTHON_VERIFIED", "DRIVE_REGISTERED", "RESULT_ACK", "DONE"],
     "requiredTaskFields": ["taskId", "prompt", "sourceWorkflow", "fallbackReason", "createdAt"],
     "optionalTaskFields": ["referenceImageAssetIds", "aspectRatio", "outputHint"]
   },
   "downloadContract": {
+    "method": "CHROME_EXTENSION_DOWNLOAD_ORIGINAL",
     "acceptedExtensions": [".png", ".jpg", ".jpeg", ".webp"],
-    "reject": ["html_page", "text_placeholder", "link_only", "zero_byte_file", "thumbnail_only"],
+    "reject": ["html_page", "text_placeholder", "link_only", "zero_byte_file", "thumbnail_only", "screenshot_substitute"],
     "preserveOriginal": true,
     "overwriteOriginal": false,
     "localInbox": "C:/HomeDesignAutomationV7/CaptureBridge/INBOX/ChatGPTImage",
@@ -40,12 +51,12 @@
     "requiredFields": ["SOURCE_URL_OR_SOURCE_CONTEXT", "DRIVE_FILE_ID", "DRIVE_PATH", "MIME_TYPE", "BYTES", "CONTENT_HASH_IF_AVAILABLE", "OWNER", "USAGE_SCOPE", "SOURCE_ASSET_ID_IF_DERIVED"],
     "derivedEditsBecomeNewAssets": true
   },
-  "lineage": ["Image_Task_Queue", "local_download", "Drive_asset", "Queens_raw", "Seed_candidate", "RESULT_ACK"],
+  "lineage": ["Image_Task_Queue", "ChatGPT_direct_generation", "Chrome_extension_original_download", "Python_verify", "Drive_asset", "Queens_raw", "Seed_candidate", "RESULT_ACK"],
   "verification": {
     "installationEvidenceIsNotFunctionalPass": true,
     "requiredFunctionalRuns": 2,
     "sameFixture": true,
-    "completionGate": "image_generated + real_image_file_downloaded + nonzero_bytes + Drive_file_id + asset_metadata + RESULT_ACK x2"
+    "completionGate": "chatgpt_direct_image_generated + chrome_extension_original_download + python_file_verification + nonzero_bytes + Drive_file_id + asset_metadata + Queens_registration + RESULT_ACK x2"
   },
   "errorPolicy": {
     "blindRetry": false,
