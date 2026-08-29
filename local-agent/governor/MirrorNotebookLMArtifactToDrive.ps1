@@ -19,15 +19,65 @@ function Get-ExpectedExtensions([string]$type) {
     'MIND_MAP' { return @('.pdf','.png','.json') }
     'FLASHCARDS' { return @('.pdf','.csv','.txt') }
     'QUIZ' { return @('.pdf','.txt','.csv') }
-    default { return @('.mp3','.wav','.m4a','.mp4','.webm','.pdf','.pptx','.xlsx','.csv','.png','.jpg','.jpeg','.webp','.docx','.txt','.json') }
+    default { return @('.mp3','.wav','.m4a','.mp4','.webm','.mov','.pdf','.pptx','.xlsx','.csv','.png','.jpg','.jpeg','.webp','.docx','.txt','.json') }
+  }
+}
+
+function Get-DetectedExtension([string]$path, [string]$artifactType) {
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return '' }
+  $stream = [IO.File]::OpenRead($path)
+  try {
+    $buffer = New-Object byte[] 32
+    $read = $stream.Read($buffer,0,$buffer.Length)
+    if ($read -ge 8 -and $buffer[0] -eq 0x89 -and $buffer[1] -eq 0x50 -and $buffer[2] -eq 0x4E -and $buffer[3] -eq 0x47 -and $buffer[4] -eq 0x0D -and $buffer[5] -eq 0x0A -and $buffer[6] -eq 0x1A -and $buffer[7] -eq 0x0A) { return '.png' }
+    if ($read -ge 3 -and $buffer[0] -eq 0xFF -and $buffer[1] -eq 0xD8 -and $buffer[2] -eq 0xFF) { return '.jpg' }
+    if ($read -ge 12 -and [Text.Encoding]::ASCII.GetString($buffer,0,4) -eq 'RIFF' -and [Text.Encoding]::ASCII.GetString($buffer,8,4) -eq 'WEBP') { return '.webp' }
+    if ($read -ge 5 -and [Text.Encoding]::ASCII.GetString($buffer,0,5) -eq '%PDF-') { return '.pdf' }
+    if ($read -ge 12 -and [Text.Encoding]::ASCII.GetString($buffer,4,4) -eq 'ftyp') {
+      if ($artifactType.ToUpperInvariant() -eq 'AUDIO_OVERVIEW') { return '.m4a' }
+      return '.mp4'
+    }
+    if ($read -ge 4 -and $buffer[0] -eq 0x50 -and $buffer[1] -eq 0x4B -and $buffer[2] -eq 0x03 -and $buffer[3] -eq 0x04) {
+      switch ($artifactType.ToUpperInvariant()) {
+        'SLIDES' { return '.pptx' }
+        'DATA_TABLE' { return '.xlsx' }
+        'REPORT' { return '.docx' }
+      }
+    }
+  } finally { $stream.Dispose() }
+  return ''
+}
+
+function Resolve-ArtifactExtension([IO.FileInfo]$candidate, [string]$artifactType, [string[]]$expected) {
+  $original = $candidate.Extension.ToLowerInvariant()
+  $detected = Get-DetectedExtension $candidate.FullName $artifactType
+  $generic = @('', '.dat', '.bin', '.blob', '.download')
+  $resolved = $original
+  $repaired = $false
+
+  if ($generic -contains $original) {
+    if ($detected -and ($expected -contains $detected)) {
+      $resolved = $detected
+      $repaired = $true
+    }
+  } elseif ($expected -notcontains $original) {
+    if ($detected -and ($expected -contains $detected)) {
+      $resolved = $detected
+      $repaired = $true
+    }
+  }
+
+  [pscustomobject]@{
+    OriginalExtension = $original
+    DetectedExtension = $detected
+    ResolvedExtension = $resolved
+    Repaired = $repaired
   }
 }
 
 function Find-GoogleDriveMyDrive {
   $koMyDrive = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
   $centralName = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
-
-  # Prefer the already-proven central root when the local runner exposes it.
   if ($env:HDCENTRAL) {
     try {
       if (Test-Path -LiteralPath $env:HDCENTRAL) {
@@ -37,17 +87,10 @@ function Find-GoogleDriveMyDrive {
       }
     } catch {}
   }
-
   $candidates = New-Object System.Collections.Generic.List[string]
   foreach ($d in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
     if (-not $d.Root) { continue }
-
-    # Strongest probe: locate the known central folder and derive My Drive as its parent.
-    foreach ($centralCandidate in @(
-      (Join-Path $d.Root $centralName),
-      (Join-Path (Join-Path $d.Root 'My Drive') $centralName),
-      (Join-Path (Join-Path $d.Root $koMyDrive) $centralName)
-    )) {
+    foreach ($centralCandidate in @((Join-Path $d.Root $centralName),(Join-Path (Join-Path $d.Root 'My Drive') $centralName),(Join-Path (Join-Path $d.Root $koMyDrive) $centralName))) {
       try {
         if (Test-Path -LiteralPath $centralCandidate) {
           $resolvedCentral = (Resolve-Path -LiteralPath $centralCandidate).Path
@@ -56,21 +99,16 @@ function Find-GoogleDriveMyDrive {
         }
       } catch {}
     }
-
     $candidates.Add((Join-Path $d.Root 'My Drive'))
     $candidates.Add((Join-Path $d.Root $koMyDrive))
   }
-
   if ($env:USERPROFILE) {
     $candidates.Add((Join-Path $env:USERPROFILE 'My Drive'))
     $candidates.Add((Join-Path $env:USERPROFILE 'Google Drive\My Drive'))
     $candidates.Add((Join-Path (Join-Path $env:USERPROFILE 'Google Drive') $koMyDrive))
   }
-
   foreach ($p in @($candidates | Select-Object -Unique)) {
-    try {
-      if ($p -and (Test-Path -LiteralPath $p)) { return (Resolve-Path -LiteralPath $p).Path }
-    } catch {}
+    try { if ($p -and (Test-Path -LiteralPath $p)) { return (Resolve-Path -LiteralPath $p).Path } } catch {}
   }
   throw ('GOOGLE_DRIVE_MY_DRIVE_NOT_FOUND:candidates=' + (($candidates | Select-Object -Unique) -join '|'))
 }
@@ -80,11 +118,7 @@ function Get-NotebookLMDownloadDirectories {
   $canonical = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX\NotebookLM'
   New-Item -ItemType Directory -Path $canonical -Force | Out-Null
   $dirs.Add($canonical)
-
-  if ($env:USERPROFILE) {
-    $dirs.Add((Join-Path $env:USERPROFILE 'Downloads'))
-  }
-
+  if ($env:USERPROFILE) { $dirs.Add((Join-Path $env:USERPROFILE 'Downloads')) }
   $pref = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\ChromeUserData\Default\Preferences'
   if (Test-Path -LiteralPath $pref) {
     try {
@@ -93,78 +127,63 @@ function Get-NotebookLMDownloadDirectories {
       if ($configured) { $dirs.Add($configured) }
     } catch {}
   }
-
   $docs = [Environment]::GetFolderPath('MyDocuments')
   if ($docs) {
     $dirs.Add((Join-Path $docs '_365-3.30\CaptureBridge\INBOX\NotebookLM'))
     $dirs.Add((Join-Path $docs '365-3.30\CaptureBridge\INBOX\NotebookLM'))
   }
-
   return @($dirs | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique)
 }
 
 $localCaptureDir = 'C:\HomeDesignAutomationV7\CaptureBridge\INBOX\NotebookLM'
 $exts = Get-ExpectedExtensions $ArtifactType
+$genericExts = @('', '.dat', '.bin', '.blob', '.download')
 $found = $null
 $sourceMode = 'LEGACY_SCAN_FALLBACK'
 $sourceDirs = @()
+$extensionInfo = $null
 
 if ($SourcePath) {
-  if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
-    throw ("NOTEBOOKLM_EXACT_SOURCE_PATH_NOT_FOUND:{0}" -f $SourcePath)
-  }
+  if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) { throw ("NOTEBOOKLM_EXACT_SOURCE_PATH_NOT_FOUND:{0}" -f $SourcePath) }
   $candidate = Get-Item -LiteralPath $SourcePath -ErrorAction Stop
-  $candidateExt = $candidate.Extension.ToLowerInvariant()
-  if ($candidate.Name -like '*.crdownload' -or $candidate.Name -like '*.tmp') {
-    throw ("NOTEBOOKLM_EXACT_SOURCE_INCOMPLETE:{0}" -f $candidate.FullName)
-  }
-  if ($exts -notcontains $candidateExt) {
-    throw ("NOTEBOOKLM_EXACT_SOURCE_EXTENSION_MISMATCH:{0}:expected={1}" -f $candidateExt,($exts -join ','))
-  }
-  if ($candidate.Length -le 0) {
-    throw ("NOTEBOOKLM_EXACT_SOURCE_ZERO_BYTES:{0}" -f $candidate.FullName)
-  }
+  if ($candidate.Name -like '*.crdownload' -or $candidate.Name -like '*.tmp') { throw ("NOTEBOOKLM_EXACT_SOURCE_INCOMPLETE:{0}" -f $candidate.FullName) }
+  if ($candidate.Length -le 0) { throw ("NOTEBOOKLM_EXACT_SOURCE_ZERO_BYTES:{0}" -f $candidate.FullName) }
+  $extensionInfo = Resolve-ArtifactExtension $candidate $ArtifactType $exts
+  if ($exts -notcontains $extensionInfo.ResolvedExtension) { throw ("NOTEBOOKLM_EXACT_SOURCE_EXTENSION_MISMATCH:{0}:detected={1}:expected={2}" -f $extensionInfo.OriginalExtension,$extensionInfo.DetectedExtension,($exts -join ',')) }
   $found = $candidate
-  $sourceMode = 'EXACT_SOURCE_PATH'
+  $sourceMode = if ($extensionInfo.Repaired) { 'EXACT_SOURCE_PATH_EXTENSION_REPAIRED' } else { 'EXACT_SOURCE_PATH' }
 } else {
   $sourceDirs = @(Get-NotebookLMDownloadDirectories)
   if ($sourceDirs.Count -eq 0) { throw 'NOTEBOOKLM_DOWNLOAD_SOURCE_DIRECTORIES_NOT_FOUND' }
-
   $startedUtc = if ($StartedAtEpochMs -gt 0) { [DateTimeOffset]::FromUnixTimeMilliseconds($StartedAtEpochMs).UtcDateTime.AddSeconds(-5) } else { [DateTime]::UtcNow.AddSeconds(-15) }
   $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(30,[Math]::Min(600,$TimeoutSeconds)))
-
   while ([DateTime]::UtcNow -lt $deadline) {
     $candidates = @()
     foreach ($dir in $sourceDirs) {
       try {
-        $candidates += @(Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue |
-          Where-Object {
-            $_.LastWriteTimeUtc -ge $startedUtc -and
-            $exts -contains $_.Extension.ToLowerInvariant() -and
-            $_.Name -notlike '*.crdownload' -and
-            $_.Name -notlike '*.tmp' -and
-            $_.Length -gt 0
-          })
+        $candidates += @(Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue | Where-Object {
+          $_.LastWriteTimeUtc -ge $startedUtc -and $_.Name -notlike '*.crdownload' -and $_.Name -notlike '*.tmp' -and $_.Length -gt 0 -and (($exts -contains $_.Extension.ToLowerInvariant()) -or ($genericExts -contains $_.Extension.ToLowerInvariant()))
+        })
       } catch {}
     }
-    $found = $candidates | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+    foreach ($candidate in @($candidates | Sort-Object LastWriteTimeUtc -Descending)) {
+      $probe = Resolve-ArtifactExtension $candidate $ArtifactType $exts
+      if ($exts -contains $probe.ResolvedExtension) { $found = $candidate; $extensionInfo = $probe; break }
+    }
     if ($found) { break }
     Start-Sleep -Seconds 2
   }
-  if (-not $found) {
-    throw ("NOTEBOOKLM_ARTIFACT_DOWNLOAD_NOT_FOUND:{0}:searched={1}" -f $ArtifactType,($sourceDirs -join '|'))
-  }
+  if (-not $found) { throw ("NOTEBOOKLM_ARTIFACT_DOWNLOAD_NOT_FOUND:{0}:searched={1}" -f $ArtifactType,($sourceDirs -join '|')) }
 }
 
+if (-not $extensionInfo) { $extensionInfo = Resolve-ArtifactExtension $found $ArtifactType $exts }
+$resolvedExt = [string]$extensionInfo.ResolvedExtension
 New-Item -ItemType Directory -Path $localCaptureDir -Force | Out-Null
 $localSafeTask = ($TaskId -replace '[^A-Za-z0-9_.-]','_')
-$localCaptureName = "${localSafeTask}__$($found.Name)"
+$sourceBase = [IO.Path]::GetFileNameWithoutExtension($found.Name)
+$localCaptureName = "${localSafeTask}__${sourceBase}${resolvedExt}"
 $localCapturePath = Join-Path $localCaptureDir $localCaptureName
-if ([IO.Path]::GetFullPath($found.FullName) -ne [IO.Path]::GetFullPath($localCapturePath)) {
-  Copy-Item -LiteralPath $found.FullName -Destination $localCapturePath -Force
-} else {
-  $localCapturePath = $found.FullName
-}
+if ([IO.Path]::GetFullPath($found.FullName) -ne [IO.Path]::GetFullPath($localCapturePath)) { Copy-Item -LiteralPath $found.FullName -Destination $localCapturePath -Force } else { $localCapturePath = $found.FullName }
 $localCaptured = Get-Item -LiteralPath $localCapturePath
 if ($localCaptured.Length -le 0) { throw 'LOCAL_CAPTURE_COPY_ZERO_BYTES' }
 
@@ -183,10 +202,8 @@ $typeFolder = switch ($ArtifactType.ToUpperInvariant()) {
 }
 $destDir = Join-Path (Join-Path $myDrive 'NotebookLM_Artifacts') $typeFolder
 New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-$base = [IO.Path]::GetFileNameWithoutExtension($found.Name)
-$ext = $found.Extension
 $safeTask = ($TaskId -replace '[^A-Za-z0-9_.-]','_')
-$destName = "${safeTask}__${base}${ext}"
+$destName = "${safeTask}__${sourceBase}${resolvedExt}"
 $destPath = Join-Path $destDir $destName
 Copy-Item -LiteralPath $localCaptured.FullName -Destination $destPath -Force
 $copied = Get-Item -LiteralPath $destPath
@@ -202,6 +219,10 @@ if ($copied.Length -le 0) { throw 'DRIVE_SYNC_COPY_ZERO_BYTES' }
   sourcePath = $found.FullName
   sourceName = $found.Name
   sourceBytes = $found.Length
+  originalExtension = $extensionInfo.OriginalExtension
+  detectedExtension = $extensionInfo.DetectedExtension
+  resolvedExtension = $extensionInfo.ResolvedExtension
+  extensionRepaired = [bool]$extensionInfo.Repaired
   canonicalLocalDirectory = $localCaptureDir
   localCapturePath = $localCaptured.FullName
   localCaptureName = $localCaptured.Name
