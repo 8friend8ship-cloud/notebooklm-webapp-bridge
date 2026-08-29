@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.61",
-  "releasedAt": "2026-08-29T15:38:00+09:00",
-  "gitBlobSha1": "e6ec1b1dff239da489941ab54cc3dd45bfe18c10",
+  "version": "1.1.62",
+  "releasedAt": "2026-08-29T16:07:00+09:00",
+  "gitBlobSha1": "e57e061f3797e90a314483d12494845d3eb7fa32",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Compatibility merge preserving Agent 1.1.59 Host-1.3.0 plus ChatGPT Image readback, then executing Agent 1.1.60 Flow unified recovery. Applies stable Bridge 0.2.74, verifies Host 1.3.0 and restarts only dedicated Chrome-for-Testing. Normal Chrome, OAuth/scope/project/deployment/trigger, Flow Generate, and credits remain untouched. PASS requires recorded 1.1.59 readback plus 1.1.60 Flow recovery PASS."
+  "notes": "Flow watchdog recovery build. Applies stable Bridge 0.2.75 with exact source SHA verification, restores Host 1.3.0, and restarts only dedicated Chrome-for-Testing on CDP 9224. It preserves normal Chrome and does not change OAuth/scopes/projects/deployments/triggers or click Flow Generate/spend credits. Intended to recover stalled READY queue pickup through the installed 5-minute HomeDesignAutomation-AutoResume watchdog."
 }
