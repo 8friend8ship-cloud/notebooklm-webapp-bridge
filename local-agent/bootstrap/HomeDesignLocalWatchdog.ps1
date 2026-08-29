@@ -8,7 +8,10 @@ $AutoResume=Join-Path $Root 'HomeDesignAutoResume.ps1'
 $Log=Join-Path $Root 'watchdog.log'
 $Receipt=Join-Path $Root 'WATCHDOG_LAST.json'
 $MaxStateAgeSeconds=420
-$AutoResumeTimeoutSeconds=180
+# RESUME_LOCAL_AGENT_ONCE can spend up to 120s verifying the bootstrap loop and
+# up to 180s waiting for runtime readback, in addition to Contents API work.
+# 180s killed healthy recovery in flight. Keep the watchdog above that bounded cycle.
+$AutoResumeTimeoutSeconds=360
 $StableMetaUrl='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/stable/agent.json'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
@@ -56,14 +59,14 @@ $versionOk=(!$targetVersion -or ($currentVersion -eq $targetVersion))
 # that process to remain alive. Persistent health is Host + Bootstrap loop + fresh state + stable version.
 if($hostOk -and $bootstrapOk -and $stateOk -and $versionOk){
   Log ('PASS host=1 bootstrap=1 stateFresh=1 current='+$currentVersion+' target='+$targetVersion)
-  SaveReceipt ([ordered]@{ok=$true;action='WATCHDOG_PASS_V2';version='WATCHDOG_ONE_SHOT_AGENT_FIX_20260829';startedAt=$started;completedAt=(Get-Date).ToString('o');hostHealthy=$true;bootstrapLoopPresent=$true;stateFresh=$true;currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$false;timedOut=$false;exitCode=0})
+  SaveReceipt ([ordered]@{ok=$true;action='WATCHDOG_PASS_V3';version='WATCHDOG_TIMEOUT_ALIGNED_20260829';startedAt=$started;completedAt=(Get-Date).ToString('o');hostHealthy=$true;bootstrapLoopPresent=$true;stateFresh=$true;currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$false;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=0})
   exit 0
 }
 
 Log ("RECOVERY_NEEDED host="+[int]$hostOk+" bootstrap="+[int]$bootstrapOk+" stateFresh="+[int]$stateOk+" versionOk="+[int]$versionOk+" current="+$currentVersion+" target="+$targetVersion)
 if(-not(Test-Path -LiteralPath $AutoResume)){
   Log 'AUTO_RESUME_MISSING'
-  SaveReceipt ([ordered]@{ok=$false;action='AUTO_RESUME_MISSING';startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$false;timedOut=$false;exitCode=2})
+  SaveReceipt ([ordered]@{ok=$false;action='AUTO_RESUME_MISSING';startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$false;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=2})
   exit 2
 }
 
@@ -71,8 +74,8 @@ try{
   $psi=New-Object Diagnostics.ProcessStartInfo
   $psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$AutoResume+'"'
   $p=New-Object Diagnostics.Process;$p.StartInfo=$psi;[void]$p.Start();$finished=$p.WaitForExit($AutoResumeTimeoutSeconds*1000)
-  if(-not $finished){$pidToKill=[int]$p.Id;KillTree $pidToKill;try{[void]$p.WaitForExit(5000)}catch{};Log ('AUTO_RESUME_TIMEOUT seconds='+$AutoResumeTimeoutSeconds+' pid='+$pidToKill);SaveReceipt ([ordered]@{ok=$false;action='AUTO_RESUME_TIMEOUT';startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$true;timedOut=$true;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=124;hostAfter=(HostHealthy)});exit 124}
+  if(-not $finished){$pidToKill=[int]$p.Id;KillTree $pidToKill;try{[void]$p.WaitForExit(5000)}catch{};Log ('AUTO_RESUME_TIMEOUT seconds='+$AutoResumeTimeoutSeconds+' pid='+$pidToKill);SaveReceipt ([ordered]@{ok=$false;action='AUTO_RESUME_TIMEOUT';version='WATCHDOG_TIMEOUT_ALIGNED_20260829';startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$true;timedOut=$true;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=124;hostAfter=(HostHealthy)});exit 124}
   $rc=$p.ExitCode;$hostAfter=HostHealthy;$bootstrapAfter=BootstrapLoopPresent;Log ("AUTO_RESUME_EXIT=$rc hostAfter="+[int]$hostAfter+" bootstrapAfter="+[int]$bootstrapAfter)
-  SaveReceipt ([ordered]@{ok=[bool]($rc -eq 0);action='AUTO_RESUME_COMPLETED_V2';version='WATCHDOG_ONE_SHOT_AGENT_FIX_20260829';startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$true;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=$rc;hostAfter=$hostAfter;bootstrapAfter=$bootstrapAfter})
+  SaveReceipt ([ordered]@{ok=[bool]($rc -eq 0);action='AUTO_RESUME_COMPLETED_V3';version='WATCHDOG_TIMEOUT_ALIGNED_20260829';startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$true;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=$rc;hostAfter=$hostAfter;bootstrapAfter=$bootstrapAfter})
   exit $rc
-}catch{Log ('WATCHDOG_EXCEPTION '+$_.Exception.Message);SaveReceipt ([ordered]@{ok=$false;action='WATCHDOG_EXCEPTION';startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$true;timedOut=$false;exitCode=3;error=$_.Exception.Message});exit 3}
+}catch{Log ('WATCHDOG_EXCEPTION '+$_.Exception.Message);SaveReceipt ([ordered]@{ok=$false;action='WATCHDOG_EXCEPTION';version='WATCHDOG_TIMEOUT_ALIGNED_20260829';startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$true;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=3;error=$_.Exception.Message});exit 3}
