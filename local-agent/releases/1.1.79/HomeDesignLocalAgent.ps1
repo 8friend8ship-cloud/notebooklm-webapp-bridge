@@ -64,27 +64,28 @@ function StopOnlyStaleFreshHelpers{
   }catch{}
 }
 function KillTree([int]$ProcessId){try{& taskkill.exe /PID $ProcessId /T /F 2>$null|Out-Null}catch{try{Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue}catch{}}}
+function ReleaseLock($Mutex,[bool]$Locked){if($Locked){try{$Mutex.ReleaseMutex()}catch{}};try{$Mutex.Dispose()}catch{}}
 
 $mutex=New-Object System.Threading.Mutex($false,'HomeDesignFreshNotebook1179V3')
 $locked=$false
 try{$locked=$mutex.WaitOne(0,$false)}catch{$locked=$false}
 if(-not $locked){
   $skip=[ordered]@{ok=$false;action='AGENT_1.1.79_FRESH_NOTEBOOK_V3';state='SKIP_CONCURRENT';agentVersion=$AgentVersion;at=(Get-Date).ToString('o');normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false}
-  $skip|ConvertTo-Json -Depth 20 -Compress;exit 0
+  $skip|ConvertTo-Json -Depth 20 -Compress;ReleaseLock $mutex $locked;exit 0
+}
+
+if(Test-Path -LiteralPath $ResultMarker){
+  $prior=ReadJson $ResultMarker
+  if($prior){[void](SaveCentral 'AGENT_1.1.79_FRESH_NOTEBOOK_V3_RESULT.json' $prior);$prior|ConvertTo-Json -Depth 40 -Compress;$priorOk=[bool]$prior.ok;ReleaseLock $mutex $locked;if($priorOk){exit 0}else{exit 2}}
+}
+if(Test-Path -LiteralPath $DispatchMarker){
+  $pending=[ordered]@{ok=$false;action='AGENT_1.1.79_FRESH_NOTEBOOK_V3';state='DISPATCH_MARKER_PRESENT_NO_RESULT';agentVersion=$AgentVersion;at=(Get-Date).ToString('o');normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false}
+  [void](SaveCentral 'AGENT_1.1.79_FRESH_NOTEBOOK_V3_PENDING.json' $pending);$pending|ConvertTo-Json -Depth 20 -Compress;ReleaseLock $mutex $locked;exit 2
 }
 
 $result=[ordered]@{ok=$false;action='AGENT_1.1.79_FRESH_NOTEBOOK_V3';state='STARTING';agentVersion=$AgentVersion;startedAt=(Get-Date).ToString('o');helperSha=$ExpectedFreshSha;freshNotebook=$false;sourceAdded=$false;sourceVerified=$false;notebookUrl='';notebookId='';previousNotebookId=$OldNotebookId;marker='NLM_FRESH_ALL_20260829_1915';normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;helperExit=$null;helperTimedOut=$false;helperStage='';adoptedExistingFreshTab=$false;error='';centralPath=''}
 try{
   WriteAgentState 'FRESH_NOTEBOOK_V3_ONE_SHOT'
-  if(Test-Path -LiteralPath $ResultMarker){
-    $prior=ReadJson $ResultMarker
-    if($prior){[void](SaveCentral 'AGENT_1.1.79_FRESH_NOTEBOOK_V3_RESULT.json' $prior);$prior|ConvertTo-Json -Depth 40 -Compress;if([bool]$prior.ok){exit 0}else{exit 2}}
-  }
-  if(Test-Path -LiteralPath $DispatchMarker){
-    $pending=[ordered]@{ok=$false;action='AGENT_1.1.79_FRESH_NOTEBOOK_V3';state='DISPATCH_MARKER_PRESENT_NO_RESULT';agentVersion=$AgentVersion;at=(Get-Date).ToString('o');normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false}
-    [void](SaveCentral 'AGENT_1.1.79_FRESH_NOTEBOOK_V3_PENDING.json' $pending);$pending|ConvertTo-Json -Depth 20 -Compress;exit 2
-  }
-
   StopOnlyStaleFreshHelpers
   FetchFreshScript
   $dispatch=[ordered]@{ok=$true;action='AGENT_1.1.79_FRESH_NOTEBOOK_V3_DISPATCH';state='DISPATCHED_ONCE';agentVersion=$AgentVersion;helperSha=$ExpectedFreshSha;at=(Get-Date).ToString('o');oldNotebookId=$OldNotebookId;marker='NLM_FRESH_ALL_20260829_1915';processTimeoutSeconds=$ProcessTimeoutSeconds;bridgeGenerationLane='0.2.39_UNCHANGED';normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false}
@@ -93,7 +94,8 @@ try{
 
   $stdout=Join-Path $Root 'AGENT_1.1.79_FRESH_NOTEBOOK_V3.stdout.log';$stderr=Join-Path $Root 'AGENT_1.1.79_FRESH_NOTEBOOK_V3.stderr.log'
   Remove-Item $stdout,$stderr -Force -ErrorAction SilentlyContinue
-  $proc=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',('"'+$FreshScript+'"')) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
+  $quotedFresh='"'+$FreshScript+'"'
+  $proc=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$quotedFresh) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
   $finished=$proc.WaitForExit($ProcessTimeoutSeconds*1000)
   if(-not $finished){$result.helperTimedOut=$true;KillTree ([int]$proc.Id);try{[void]$proc.WaitForExit(5000)}catch{};throw ('FRESH_V3_PROCESS_TIMEOUT seconds='+$ProcessTimeoutSeconds)}
   $result.helperExit=[int]$proc.ExitCode
@@ -115,7 +117,7 @@ finally{
   $result|ConvertTo-Json -Depth 40|Set-Content -LiteralPath $ResultMarker -Encoding UTF8
   $result.centralPath=SaveCentral 'AGENT_1.1.79_FRESH_NOTEBOOK_V3_RESULT.json' $result
   $result|ConvertTo-Json -Depth 40|Set-Content -LiteralPath $ResultMarker -Encoding UTF8
-  if($locked){try{$mutex.ReleaseMutex()}catch{}};try{$mutex.Dispose()}catch{}
+  ReleaseLock $mutex $locked
 }
 $result|ConvertTo-Json -Depth 40 -Compress
 if($result.ok){exit 0}else{exit 2}
