@@ -1,0 +1,33 @@
+name: Python local worker CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/python/central_queue_worker_v0_1.py'
+      - '.github/workflows/python-local-worker-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile
+        shell: pwsh
+        run: python -m py_compile local-agent/python/central_queue_worker_v0_1.py
+      - name: State-machine self test
+        shell: pwsh
+        run: python local-agent/python/central_queue_worker_v0_1.py --self-test
+      - name: Safety guards
+        shell: pwsh
+        run: |
+          $s=Get-Content -LiteralPath 'local-agent/python/central_queue_worker_v0_1.py' -Raw
+          foreach($x in @('EXECUTABLE_STATES = {"READY", "RETRY"}','"CLAIMED"','"STARTED"','"DONE"','"ERROR"','NO_ERROR_AUTORETRY')){
+            if(-not $s.Contains($x)){ throw "missing required guard: $x" }
+          }
+          foreach($x in @('chrome.exe','Secure Preferences','Cookies','password')){
+            if($s -match [regex]::Escape($x)){ throw "forbidden direct-browser-data token: $x" }
+          }
