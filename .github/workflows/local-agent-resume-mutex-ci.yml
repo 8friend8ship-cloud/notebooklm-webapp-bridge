@@ -1,0 +1,44 @@
+name: Local Agent Resume Mutex CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
+      - '.github/workflows/local-agent-resume-mutex-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
+      - '.github/workflows/local-agent-resume-mutex-ci.yml'
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: WinPS 5.1 parse
+        shell: powershell
+        run: |
+          $p='local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
+          $null=[scriptblock]::Create((Get-Content -LiteralPath $p -Raw -Encoding UTF8))
+          Write-Host 'WinPS5.1 parse PASS'
+      - name: Mutex-safe bootstrap-loop contract
+        shell: powershell
+        run: |
+          $s=Get-Content -LiteralPath 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' -Raw -Encoding UTF8
+          $required=@(
+            'function EnsureBootstrapLoop',
+            'HomeDesignLocalAgentBootstrapV1',
+            'WaitOne(0,$false)',
+            'BootstrapLoopProcesses',
+            "'-Loop'",
+            'EXISTING_LOOP_VERIFIED',
+            'NEW_LOOP_STARTED_VERIFIED',
+            'BOOTSTRAP_LOOP_VERIFY_TIMEOUT',
+            'BOOTSTRAP_LOOP_NOT_VERIFIED',
+            'RESUME_TELEMETRY_V2_20260829'
+          )
+          foreach($n in $required){if(-not $s.Contains($n)){throw "MISSING_CONTRACT:$n"}}
+          if($s -match 'schtasks\.exe\s+/Create'){throw 'FORBIDDEN_NEW_TASK_CREATION'}
+          if($s -match '(?i)clasp\s+login'){throw 'FORBIDDEN_NEW_CLASP_LOGIN'}
+          Write-Host 'Mutex-safe loop contract PASS'
