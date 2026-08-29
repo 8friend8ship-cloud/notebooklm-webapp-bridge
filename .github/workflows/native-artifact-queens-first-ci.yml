@@ -1,0 +1,35 @@
+name: Native Artifact Queens First CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
+      - 'local-agent/governor/MirrorNotebookLMArtifactQueensFirst.ps1'
+      - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
+      - 'tests/**'
+      - 'package.json'
+      - '.github/workflows/native-artifact-queens-first-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
+      - 'local-agent/governor/MirrorNotebookLMArtifactQueensFirst.ps1'
+      - 'notebooklm-webapp-bridge-source-v0.2.0/extension/artifact-drive-mirror.js'
+      - 'tests/**'
+      - 'package.json'
+      - '.github/workflows/native-artifact-queens-first-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run artifact regression tests
+        run: npm test
