@@ -1,4 +1,4 @@
-const VERSION = "0.2.10-queue-lock";
+const VERSION = "0.2.11-native-result-routing";
 const DEFAULT_SHEET = "NotebookLM_Task_Queue";
 const HEADERS = [
   "TASK_ID","CONTENT_ID","TASK_DATE","TASK_TYPE","TITLE","SOURCE_TEXT","INSTRUCTION","LANGUAGE",
@@ -7,186 +7,39 @@ const HEADERS = [
   "ERROR_MESSAGE","CALLBACK_URL","CALLBACK_TOKEN","CREATED_AT","UPDATED_AT"
 ];
 const QUEUE_LOCK_TIMEOUT_MS = 30000;
-
-function doGet(e){
-  return json_({ok:true,method:"GET",template:true,legacyCompatible:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});
-}
-
-function doPost(e){
-  try{
-    const raw=(e&&e.postData&&e.postData.contents)||"{}";
-    let body={};
-    try{ body=JSON.parse(raw||"{}"); }catch(_e){ body=(e&&e.parameter)||{}; }
-    const action=String(body.action||"").trim();
-    if(!action){return json_({ok:true,method:"POST",template:true,legacyCompatible:true,bridgeReady:true,version:VERSION,time:new Date().toISOString()});}
-    if(action==="health") return json_({ok:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});
-    if(action==="login") return json_(login_(body));
-    if(action==="enqueueFromWriter") return json_(enqueueFromWriter_(body));
-    const session=verifySession_(body.sessionToken);
-    if(action==="listTasks") return json_(listTasks_(session,body));
-    if(action==="claimTask") return json_(claimTask_(session,body));
-    if(action==="updateTask") return json_(updateTask_(session,body));
-    if(action==="completeTask") return json_(completeTask_(session,body));
-    if(action==="createTask") return json_(createTask_(session,body.task||{}));
-    throw new Error("지원되지 않는 action입니다: "+action);
-  }catch(error){return json_({ok:false,error:error&&error.message?error.message:String(error)});}
-}
-
-function authorizeCore_(){
-  const spreadsheetId=SpreadsheetApp.getActiveSpreadsheet().getId();
-  const driveRootName=DriveApp.getRootFolder().getName();
-  Logger.log({spreadsheetId,driveRootName});
-  return {spreadsheetId,driveRootName};
-}
-
-function json_(data){ return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON); }
-function props_(){ return PropertiesService.getScriptProperties(); }
-function requiredProp_(name){ const value=props_().getProperty(name); if(!value) throw new Error(`Script Property ${name}가 없습니다.`); return value; }
-function b64url_(bytes){ return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g,""); }
-function sign_(text){ return b64url_(Utilities.computeHmacSha256Signature(text,requiredProp_("SESSION_SECRET"))); }
-function issueSession_(profile){
-  const payload={email:profile.email,name:profile.name||"",iat:Date.now(),exp:Date.now()+8*60*60*1000};
-  const encoded=b64url_(Utilities.newBlob(JSON.stringify(payload)).getBytes()); return `${encoded}.${sign_(encoded)}`;
-}
-function verifySession_(token){
-  if(!token||token.indexOf(".")<0) throw new Error("로그인 세션이 없습니다.");
-  const parts=token.split("."); if(sign_(parts[0])!==parts[1]) throw new Error("세션 서명이 올바르지 않습니다.");
-  const payload=JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString());
-  if(Number(payload.exp)<Date.now()) throw new Error("로그인 세션이 만료되었습니다.");
-  assertAllowedEmail_(payload.email); return payload;
-}
-function assertAllowedEmail_(email){
-  const allowed=(props_().getProperty("ALLOWED_EMAILS")||"").split(",").map(s=>s.trim().toLowerCase()).filter(Boolean);
-  if(allowed.length&&allowed.indexOf(String(email||"").toLowerCase())<0) throw new Error("허용되지 않은 Google 계정입니다.");
-}
-function login_(body){
-  if(!body.credential) throw new Error("Google ID credential이 없습니다.");
-  const url="https://oauth2.googleapis.com/tokeninfo?id_token="+encodeURIComponent(body.credential);
-  const response=UrlFetchApp.fetch(url,{muteHttpExceptions:true});
-  if(response.getResponseCode()!==200) throw new Error("Google 로그인 토큰 검증에 실패했습니다.");
-  const profile=JSON.parse(response.getContentText());
-  if(profile.aud!==requiredProp_("GOOGLE_CLIENT_ID")) throw new Error("Google OAuth Client ID가 일치하지 않습니다.");
-  if(String(profile.email_verified)!=="true") throw new Error("검증되지 않은 Google 이메일입니다.");
-  assertAllowedEmail_(profile.email);
-  return {ok:true,sessionToken:issueSession_(profile),user:{email:profile.email,name:profile.name||""}};
-}
-function spreadsheet_(){ return SpreadsheetApp.openById(requiredProp_("SPREADSHEET_ID")); }
-function sheet_(){
-  const name=props_().getProperty("TASK_SHEET_NAME")||DEFAULT_SHEET; const ss=spreadsheet_(); let sh=ss.getSheetByName(name);
-  if(!sh) sh=ss.insertSheet(name); if(sh.getLastRow()===0) sh.getRange(1,1,1,HEADERS.length).setValues([HEADERS]);
-  return sh;
-}
-function rows_(){
-  const sh=sheet_(); const values=sh.getDataRange().getValues(); const headers=values.shift().map(String);
-  return values.map((row,index)=>({rowNumber:index+2,data:Object.fromEntries(headers.map((h,i)=>[h,row[i]]))}));
-}
-function findTask_(taskId){ const found=rows_().find(item=>String(item.data.TASK_ID)===String(taskId)); if(!found) throw new Error("TASK_ID를 찾지 못했습니다: "+taskId); return found; }
-function withQueueLock_(fn){
-  const lock=LockService.getScriptLock();
-  if(!lock.tryLock(QUEUE_LOCK_TIMEOUT_MS)) throw new Error("TASK_QUEUE_LOCK_TIMEOUT");
-  try{return fn();}finally{lock.releaseLock();}
-}
-function assertTaskRow_(sh,rowNumber,taskId){
-  const actual=String(sh.getRange(rowNumber,1).getValue()||"");
-  if(actual!==String(taskId)) throw new Error(`TASK_ROW_ID_MISMATCH expected=${taskId} actual=${actual||"EMPTY"} row=${rowNumber}`);
-}
-function setTask_(rowNumber,patch,expectedTaskId){
-  const sh=sheet_();
-  if(expectedTaskId) assertTaskRow_(sh,rowNumber,expectedTaskId);
-  const map=Object.fromEntries(HEADERS.map((h,i)=>[h,i+1])); patch.UPDATED_AT=new Date();
-  const current=sh.getRange(rowNumber,1,1,HEADERS.length).getValues()[0];
-  const next=current.slice();
-  Object.keys(patch).forEach(key=>{if(map[key]) next[map[key]-1]=patch[key];});
-  if(expectedTaskId&&String(next[0])!==String(expectedTaskId)) throw new Error("TASK_ROW_ID_MUTATION_BLOCKED");
-  sh.getRange(rowNumber,1,1,HEADERS.length).setValues([next]);
-  if(expectedTaskId) assertTaskRow_(sh,rowNumber,expectedTaskId);
-}
+function doGet(e){return json_({ok:true,method:"GET",template:true,legacyCompatible:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});}
+function doPost(e){try{const raw=(e&&e.postData&&e.postData.contents)||"{}";let body={};try{body=JSON.parse(raw||"{}");}catch(_e){body=(e&&e.parameter)||{};}const action=String(body.action||"").trim();if(!action)return json_({ok:true,method:"POST",template:true,legacyCompatible:true,bridgeReady:true,version:VERSION,time:new Date().toISOString()});if(action==="health")return json_({ok:true,version:VERSION,service:"NotebookLM WebApp Bridge",time:new Date().toISOString()});if(action==="login")return json_(login_(body));if(action==="enqueueFromWriter")return json_(enqueueFromWriter_(body));const session=verifySession_(body.sessionToken);if(action==="listTasks")return json_(listTasks_(session,body));if(action==="claimTask")return json_(claimTask_(session,body));if(action==="updateTask")return json_(updateTask_(session,body));if(action==="completeTask")return json_(completeTask_(session,body));if(action==="createTask")return json_(createTask_(session,body.task||{}));throw new Error("지원되지 않는 action입니다: "+action);}catch(error){return json_({ok:false,error:error&&error.message?error.message:String(error)});}}
+function authorizeCore_(){const spreadsheetId=SpreadsheetApp.getActiveSpreadsheet().getId();const driveRootName=DriveApp.getRootFolder().getName();Logger.log({spreadsheetId,driveRootName});return {spreadsheetId,driveRootName};}
+function json_(data){return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);}
+function props_(){return PropertiesService.getScriptProperties();}
+function requiredProp_(name){const value=props_().getProperty(name);if(!value)throw new Error(`Script Property ${name}가 없습니다.`);return value;}
+function b64url_(bytes){return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g,"");}
+function sign_(text){return b64url_(Utilities.computeHmacSha256Signature(text,requiredProp_("SESSION_SECRET")));}
+function issueSession_(profile){const payload={email:profile.email,name:profile.name||"",iat:Date.now(),exp:Date.now()+8*60*60*1000};const encoded=b64url_(Utilities.newBlob(JSON.stringify(payload)).getBytes());return `${encoded}.${sign_(encoded)}`;}
+function verifySession_(token){if(!token||token.indexOf(".")<0)throw new Error("로그인 세션이 없습니다.");const parts=token.split(".");if(sign_(parts[0])!==parts[1])throw new Error("세션 서명이 올바르지 않습니다.");const payload=JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString());if(Number(payload.exp)<Date.now())throw new Error("로그인 세션이 만료되었습니다.");assertAllowedEmail_(payload.email);return payload;}
+function assertAllowedEmail_(email){const allowed=(props_().getProperty("ALLOWED_EMAILS")||"").split(",").map(s=>s.trim().toLowerCase()).filter(Boolean);if(allowed.length&&allowed.indexOf(String(email||"").toLowerCase())<0)throw new Error("허용되지 않은 Google 계정입니다.");}
+function login_(body){if(!body.credential)throw new Error("Google ID credential이 없습니다.");const url="https://oauth2.googleapis.com/tokeninfo?id_token="+encodeURIComponent(body.credential);const response=UrlFetchApp.fetch(url,{muteHttpExceptions:true});if(response.getResponseCode()!==200)throw new Error("Google 로그인 토큰 검증에 실패했습니다.");const profile=JSON.parse(response.getContentText());if(profile.aud!==requiredProp_("GOOGLE_CLIENT_ID"))throw new Error("Google OAuth Client ID가 일치하지 않습니다.");if(String(profile.email_verified)!=="true")throw new Error("검증되지 않은 Google 이메일입니다.");assertAllowedEmail_(profile.email);return {ok:true,sessionToken:issueSession_(profile),user:{email:profile.email,name:profile.name||""}};}
+function spreadsheet_(){return SpreadsheetApp.openById(requiredProp_("SPREADSHEET_ID"));}
+function sheet_(){const name=props_().getProperty("TASK_SHEET_NAME")||DEFAULT_SHEET;const ss=spreadsheet_();let sh=ss.getSheetByName(name);if(!sh)sh=ss.insertSheet(name);if(sh.getLastRow()===0)sh.getRange(1,1,1,HEADERS.length).setValues([HEADERS]);return sh;}
+function rows_(){const sh=sheet_();const values=sh.getDataRange().getValues();const headers=values.shift().map(String);return values.map((row,index)=>({rowNumber:index+2,data:Object.fromEntries(headers.map((h,i)=>[h,row[i]]))}));}
+function findTask_(taskId){const found=rows_().find(item=>String(item.data.TASK_ID)===String(taskId));if(!found)throw new Error("TASK_ID를 찾지 못했습니다: "+taskId);return found;}
+function withQueueLock_(fn){const lock=LockService.getScriptLock();if(!lock.tryLock(QUEUE_LOCK_TIMEOUT_MS))throw new Error("TASK_QUEUE_LOCK_TIMEOUT");try{return fn();}finally{lock.releaseLock();}}
+function assertTaskRow_(sh,rowNumber,taskId){const actual=String(sh.getRange(rowNumber,1).getValue()||"");if(actual!==String(taskId))throw new Error(`TASK_ROW_ID_MISMATCH expected=${taskId} actual=${actual||"EMPTY"} row=${rowNumber}`);}
+function setTask_(rowNumber,patch,expectedTaskId){const sh=sheet_();if(expectedTaskId)assertTaskRow_(sh,rowNumber,expectedTaskId);const map=Object.fromEntries(HEADERS.map((h,i)=>[h,i+1]));patch.UPDATED_AT=new Date();const current=sh.getRange(rowNumber,1,1,HEADERS.length).getValues()[0];const next=current.slice();Object.keys(patch).forEach(key=>{if(map[key])next[map[key]-1]=patch[key];});if(expectedTaskId&&String(next[0])!==String(expectedTaskId))throw new Error("TASK_ROW_ID_MUTATION_BLOCKED");sh.getRange(rowNumber,1,1,HEADERS.length).setValues([next]);if(expectedTaskId)assertTaskRow_(sh,rowNumber,expectedTaskId);}
 function isoOrEmpty_(value){return value instanceof Date?value.toISOString():String(value||"");}
-function taskDto_(data){ return {
-  taskId:String(data.TASK_ID||""),contentId:String(data.CONTENT_ID||""),taskDate:fmtDate_(data.TASK_DATE),
-  taskType:String(data.TASK_TYPE||"CHAT"),title:String(data.TITLE||""),sourceText:String(data.SOURCE_TEXT||""),
-  instruction:String(data.INSTRUCTION||""),language:String(data.LANGUAGE||"ko-KR"),notebookUrl:String(data.NOTEBOOK_URL||"https://notebooklm.google.com/"),
-  driveFolderId:String(data.DRIVE_FOLDER_ID||""),autoSubmit:String(data.AUTO_SUBMIT).toUpperCase()!=="FALSE",
-  timeoutSeconds:Number(data.TIMEOUT_SECONDS||180),status:String(data.STATUS||"READY"),ownerEmail:String(data.OWNER_EMAIL||""),
-  claimedAt:isoOrEmpty_(data.CLAIMED_AT),startedAt:isoOrEmpty_(data.STARTED_AT),createdAt:isoOrEmpty_(data.CREATED_AT),updatedAt:isoOrEmpty_(data.UPDATED_AT)
-}; }
-function fmtDate_(value){ return value instanceof Date?Utilities.formatDate(value,"Asia/Seoul","yyyy-MM-dd"):String(value||""); }
-function listTasks_(session,body){
-  const date=String(body.date||Utilities.formatDate(new Date(),"Asia/Seoul","yyyy-MM-dd"));
-  const allowed=["READY","RETRY","ERROR"];
-  if(body.includeClaimed===true||String(body.includeClaimed||"").toUpperCase()==="TRUE") allowed.push("CLAIMED");
-  const tasks=rows_().filter(item=>allowed.indexOf(String(item.data.STATUS||"READY"))>=0)
-    .filter(item=>!date||fmtDate_(item.data.TASK_DATE)===date).map(item=>taskDto_(item.data));
-  return {ok:true,tasks,user:session.email,includeClaimed:allowed.indexOf("CLAIMED")>=0};
-}
-function claimTask_(session,body){
-  return withQueueLock_(()=>{
-    const item=findTask_(body.taskId); const status=String(item.data.STATUS||"READY");
-    if(["READY","RETRY","ERROR"].indexOf(status)<0) throw new Error("현재 실행할 수 없는 상태입니다: "+status);
-    if(body.chromeProfileEmail&&String(body.chromeProfileEmail).toLowerCase()!==String(session.email).toLowerCase()) throw new Error("프런트앱 Google 계정과 Chrome Google 계정이 다릅니다.");
-    const claimedAt=new Date();
-    setTask_(item.rowNumber,{STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:"",ERROR_MESSAGE:""},body.taskId);
-    return {ok:true,task:taskDto_({...item.data,STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:""})};
-  });
-}
-function updateTask_(session,body){
-  return withQueueLock_(()=>{
-    const item=findTask_(body.taskId); if(item.data.OWNER_EMAIL&&String(item.data.OWNER_EMAIL)!==session.email) throw new Error("다른 사용자가 수령한 작업입니다.");
-    const patch=body.patch||{}; const status=String(body.status||item.data.STATUS); const write={STATUS:status,ERROR_MESSAGE:String(patch.error||"")};
-    if(status==="RETRY"||patch.clearClaim===true||patch.claimedAt===""){write.CLAIMED_AT="";write.STARTED_AT="";}
-    else if(!item.data.STARTED_AT){write.STARTED_AT=new Date();}
-    setTask_(item.rowNumber,write,body.taskId);
-    return {ok:true,taskId:body.taskId,status};
-  });
-}
-function completeTask_(session,body){
-  let notifyData=null,notifyResult=null;
-  const out=withQueueLock_(()=>{
-    const item=findTask_(body.taskId);
-    if(item.data.OWNER_EMAIL&&String(item.data.OWNER_EMAIL)!==session.email) throw new Error("다른 사용자가 수령한 작업입니다.");
-    if(String(item.data.STATUS)==="DONE"){
-      return {ok:true,idempotent:true,result:{resultUrl:String(item.data.RESULT_URL||""),driveUrl:String(item.data.RESULT_URL||""),resultFileId:String(item.data.RESULT_FILE_ID||"")}};
-    }
-    const result=body.result||{}; const folder=resolveFolder_(item.data.DRIVE_FOLDER_ID);
-    const manifest={taskId:body.taskId,contentId:item.data.CONTENT_ID,taskType:item.data.TASK_TYPE,completedAt:new Date().toISOString(),result};
-    const file=folder.createFile(`notebooklm_${body.taskId}_result.json`,JSON.stringify(manifest,null,2),MimeType.PLAIN_TEXT);
-    let textFile=null; if(result.resultText){ textFile=folder.createFile(`notebooklm_${body.taskId}_result.txt`,String(result.resultText),MimeType.PLAIN_TEXT); }
-    const resultUrl=(result.resultUrls&&result.resultUrls[0])||result.notebookUrl||file.getUrl();
-    setTask_(item.rowNumber,{STATUS:"DONE",COMPLETED_AT:new Date(),RESULT_TYPE:String(item.data.TASK_TYPE||"RESULT"),RESULT_URL:resultUrl,RESULT_FILE_ID:(textFile||file).getId(),RESULT_TEXT:String(result.resultText||"").slice(0,45000),ERROR_MESSAGE:""},body.taskId);
-    notifyData=item.data; notifyResult={status:"DONE",resultUrl,resultFileId:(textFile||file).getId()};
-    return {ok:true,result:{resultUrl,driveUrl:(textFile||file).getUrl(),resultFileId:(textFile||file).getId()}};
-  });
-  if(notifyData&&notifyResult) notifyWriter_(notifyData,notifyResult);
-  return out;
-}
-function resolveFolder_(folderId){
-  if(folderId) try{return DriveApp.getFolderById(String(folderId));}catch(_e){}
-  const root=props_().getProperty("DRIVE_ROOT_FOLDER_ID"); return root?DriveApp.getFolderById(root):DriveApp.getRootFolder();
-}
-function createTask_(session,task){ return appendTask_(task,session.email); }
-function enqueueFromWriter_(body){
-  if(String(body.writerSecret||"")!==requiredProp_("WRITER_SHARED_SECRET")) throw new Error("Writer shared secret가 올바르지 않습니다.");
-  return appendTask_(body.task||{},String(body.ownerEmail||""));
-}
-function appendTask_(task,ownerEmail){
-  return withQueueLock_(()=>{
-    const now=new Date(); const taskId=String(task.taskId||`NLM_${Utilities.formatDate(now,"Asia/Seoul","yyyyMMdd_HHmmss")}_${Utilities.getUuid().slice(0,6)}`);
-    const duplicate=rows_().find(item=>String(item.data.TASK_ID)===taskId);
-    if(duplicate) return {ok:true,taskId,status:String(duplicate.data.STATUS||"READY"),idempotent:true,rowNumber:duplicate.rowNumber};
-    const row={TASK_ID:taskId,CONTENT_ID:task.contentId||"",TASK_DATE:task.taskDate||Utilities.formatDate(now,"Asia/Seoul","yyyy-MM-dd"),TASK_TYPE:task.taskType||"CHAT",TITLE:task.title||"",SOURCE_TEXT:task.sourceText||"",INSTRUCTION:task.instruction||"",LANGUAGE:task.language||"ko-KR",NOTEBOOK_URL:task.notebookUrl||"https://notebooklm.google.com/",DRIVE_FOLDER_ID:task.driveFolderId||"",AUTO_SUBMIT:task.autoSubmit===false?"FALSE":"TRUE",TIMEOUT_SECONDS:task.timeoutSeconds||180,STATUS:"READY",OWNER_EMAIL:ownerEmail||"",CALLBACK_URL:task.callbackUrl||"",CALLBACK_TOKEN:task.callbackToken||"",CREATED_AT:now,UPDATED_AT:now};
-    const sh=sheet_(); const rowNumber=sh.getLastRow()+1;
-    sh.getRange(rowNumber,1,1,HEADERS.length).setValues([HEADERS.map(h=>row[h]||"")]);
-    assertTaskRow_(sh,rowNumber,taskId);
-    return {ok:true,taskId,status:"READY",rowNumber};
-  });
-}
-function notifyWriter_(data,result){
-  if(!data.CALLBACK_URL) return; try{UrlFetchApp.fetch(String(data.CALLBACK_URL),{method:"post",contentType:"application/json",payload:JSON.stringify({taskId:data.TASK_ID,contentId:data.CONTENT_ID,callbackToken:data.CALLBACK_TOKEN,...result}),muteHttpExceptions:true});}catch(_e){}
-}
-function setupNotebookLMBridge(){
-  const p=props_();
-  if(!p.getProperty("SESSION_SECRET")) p.setProperty("SESSION_SECRET",Utilities.getUuid()+Utilities.getUuid());
-  if(!p.getProperty("WRITER_SHARED_SECRET")) p.setProperty("WRITER_SHARED_SECRET",Utilities.getUuid()+Utilities.getUuid());
-  const sh=sheet_();
-  return {version:VERSION,sheet:sh.getName(),headers:HEADERS,sessionSecretReady:!!p.getProperty("SESSION_SECRET"),writerSecretReady:!!p.getProperty("WRITER_SHARED_SECRET")};
-}
+function taskDto_(data){return {taskId:String(data.TASK_ID||""),contentId:String(data.CONTENT_ID||""),taskDate:fmtDate_(data.TASK_DATE),taskType:String(data.TASK_TYPE||"CHAT"),title:String(data.TITLE||""),sourceText:String(data.SOURCE_TEXT||""),instruction:String(data.INSTRUCTION||""),language:String(data.LANGUAGE||"ko-KR"),notebookUrl:String(data.NOTEBOOK_URL||"https://notebooklm.google.com/"),driveFolderId:String(data.DRIVE_FOLDER_ID||""),autoSubmit:String(data.AUTO_SUBMIT).toUpperCase()!=="FALSE",timeoutSeconds:Number(data.TIMEOUT_SECONDS||180),status:String(data.STATUS||"READY"),ownerEmail:String(data.OWNER_EMAIL||""),claimedAt:isoOrEmpty_(data.CLAIMED_AT),startedAt:isoOrEmpty_(data.STARTED_AT),createdAt:isoOrEmpty_(data.CREATED_AT),updatedAt:isoOrEmpty_(data.UPDATED_AT)};}
+function fmtDate_(value){return value instanceof Date?Utilities.formatDate(value,"Asia/Seoul","yyyy-MM-dd"):String(value||"");}
+function listTasks_(session,body){const date=String(body.date||Utilities.formatDate(new Date(),"Asia/Seoul","yyyy-MM-dd"));const allowed=["READY","RETRY","ERROR"];if(body.includeClaimed===true||String(body.includeClaimed||"").toUpperCase()==="TRUE")allowed.push("CLAIMED");const tasks=rows_().filter(item=>allowed.indexOf(String(item.data.STATUS||"READY"))>=0).filter(item=>!date||fmtDate_(item.data.TASK_DATE)===date).map(item=>taskDto_(item.data));return {ok:true,tasks,user:session.email,includeClaimed:allowed.indexOf("CLAIMED")>=0};}
+function claimTask_(session,body){return withQueueLock_(()=>{const item=findTask_(body.taskId);const status=String(item.data.STATUS||"READY");if(["READY","RETRY","ERROR"].indexOf(status)<0)throw new Error("현재 실행할 수 없는 상태입니다: "+status);if(body.chromeProfileEmail&&String(body.chromeProfileEmail).toLowerCase()!==String(session.email).toLowerCase())throw new Error("프런트앱 Google 계정과 Chrome Google 계정이 다릅니다.");const claimedAt=new Date();setTask_(item.rowNumber,{STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:"",ERROR_MESSAGE:""},body.taskId);return {ok:true,task:taskDto_({...item.data,STATUS:"CLAIMED",OWNER_EMAIL:session.email,CLAIMED_AT:claimedAt,STARTED_AT:""})};});}
+function updateTask_(session,body){return withQueueLock_(()=>{const item=findTask_(body.taskId);if(item.data.OWNER_EMAIL&&String(item.data.OWNER_EMAIL)!==session.email)throw new Error("다른 사용자가 수령한 작업입니다.");const patch=body.patch||{};const status=String(body.status||item.data.STATUS);const write={STATUS:status,ERROR_MESSAGE:String(patch.error||"")};if(status==="RETRY"||patch.clearClaim===true||patch.claimedAt===""){write.CLAIMED_AT="";write.STARTED_AT="";}else if(!item.data.STARTED_AT){write.STARTED_AT=new Date();}setTask_(item.rowNumber,write,body.taskId);return {ok:true,taskId:body.taskId,status};});}
+function parseLastJsonLine_(text){const lines=String(text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);for(let i=lines.length-1;i>=0;i--){if(lines[i].charAt(0)!=='{')continue;try{return JSON.parse(lines[i]);}catch(_e){}}return null;}
+function domainResultFromExecution_(result){if(result&&result.domainResult&&typeof result.domainResult==='object')return result.domainResult;const raw=String(result&&result.resultText||"");if(!raw)return null;try{const host=JSON.parse(raw);if(host&&typeof host==='object'){if(host.domainResult&&typeof host.domainResult==='object')return host.domainResult;const parsed=parseLastJsonLine_(host.stdout||'');if(parsed)return parsed;}}catch(_e){}return parseLastJsonLine_(raw);}
+function resultLooksLikeNativeArtifact_(taskType,result,domain){const t=String(taskType||'').toUpperCase();if(domain&&domain.nativeOriginalVerified===true)return true;if(domain&&String(domain.queensStatus||'').toUpperCase()==='QUEENS_INBOX')return true;if(domain&&String(domain.status||'').toUpperCase()==='SEED_CAPTURE_READY')return true;if(result&&result.nativeOriginalVerified===true)return true;return ['INFOGRAPHIC','AUDIO_OVERVIEW','VIDEO_OVERVIEW','SLIDES','DATA_TABLE'].indexOf(t)>=0;}
+function chooseArtifactPointer_(item,result,domain){const urls=(result&&Array.isArray(result.resultUrls))?result.resultUrls.filter(Boolean):[];const nativeUrl=String((result&&result.nativeDriveUrl)||(domain&&domain.nativeDriveUrl)||(domain&&domain.driveUrl)||'');const nativeFileId=String((result&&result.nativeDriveFileId)||(domain&&domain.nativeDriveFileId)||(domain&&domain.driveFileId)||'');const viewUrl=String((result&&result.notebookUrl)||(domain&&domain.viewUrl)||item.data.NOTEBOOK_URL||'');return {resultUrl:nativeUrl||urls[0]||viewUrl,resultFileId:nativeFileId};}
+function completeTask_(session,body){let notifyData=null,notifyResult=null;const out=withQueueLock_(()=>{const item=findTask_(body.taskId);if(item.data.OWNER_EMAIL&&String(item.data.OWNER_EMAIL)!==session.email)throw new Error("다른 사용자가 수령한 작업입니다.");if(String(item.data.STATUS)==="DONE")return {ok:true,idempotent:true,result:{resultUrl:String(item.data.RESULT_URL||""),driveUrl:String(item.data.RESULT_URL||""),resultFileId:String(item.data.RESULT_FILE_ID||"")}};const result=body.result||{};const folder=resolveFolder_(item.data.DRIVE_FOLDER_ID);const manifest={taskId:body.taskId,contentId:item.data.CONTENT_ID,taskType:item.data.TASK_TYPE,completedAt:new Date().toISOString(),result};const file=folder.createFile(`notebooklm_${body.taskId}_result.json`,JSON.stringify(manifest,null,2),MimeType.PLAIN_TEXT);let textFile=null;if(result.resultText)textFile=folder.createFile(`notebooklm_${body.taskId}_result.txt`,String(result.resultText),MimeType.PLAIN_TEXT);const domain=domainResultFromExecution_(result);const artifactResult=resultLooksLikeNativeArtifact_(item.data.TASK_TYPE,result,domain);let resultUrl='',resultFileId='';if(artifactResult){const pointer=chooseArtifactPointer_(item,result,domain);resultUrl=pointer.resultUrl;resultFileId=pointer.resultFileId;}else{resultUrl=(result.resultUrls&&result.resultUrls[0])||result.notebookUrl||file.getUrl();resultFileId=(textFile||file).getId();}const resultType=artifactResult?String((domain&&domain.artifactType)||item.data.TASK_TYPE||"ARTIFACT"):String(item.data.TASK_TYPE||"RESULT");setTask_(item.rowNumber,{STATUS:"DONE",COMPLETED_AT:new Date(),RESULT_TYPE:resultType,RESULT_URL:resultUrl,RESULT_FILE_ID:resultFileId,RESULT_TEXT:String(result.resultText||"").slice(0,45000),ERROR_MESSAGE:""},body.taskId);notifyData=item.data;notifyResult={status:"DONE",resultUrl,resultFileId,receiptJsonFileId:file.getId(),receiptTextFileId:textFile?textFile.getId():"",artifactResult};return {ok:true,result:{resultUrl,driveUrl:artifactResult?resultUrl:(textFile||file).getUrl(),resultFileId,receiptJsonFileId:file.getId(),receiptTextFileId:textFile?textFile.getId():"",artifactResult}};});if(notifyData&&notifyResult)notifyWriter_(notifyData,notifyResult);return out;}
+function resolveFolder_(folderId){if(folderId)try{return DriveApp.getFolderById(String(folderId));}catch(_e){}const root=props_().getProperty("DRIVE_ROOT_FOLDER_ID");return root?DriveApp.getFolderById(root):DriveApp.getRootFolder();}
+function createTask_(session,task){return appendTask_(task,session.email);}
+function enqueueFromWriter_(body){if(String(body.writerSecret||"")!==requiredProp_("WRITER_SHARED_SECRET"))throw new Error("Writer shared secret가 올바르지 않습니다.");return appendTask_(body.task||{},String(body.ownerEmail||""));}
+function appendTask_(task,ownerEmail){return withQueueLock_(()=>{const now=new Date();const taskId=String(task.taskId||`NLM_${Utilities.formatDate(now,"Asia/Seoul","yyyyMMdd_HHmmss")}_${Utilities.getUuid().slice(0,6)}`);const duplicate=rows_().find(item=>String(item.data.TASK_ID)===taskId);if(duplicate)return {ok:true,taskId,status:String(duplicate.data.STATUS||"READY"),idempotent:true,rowNumber:duplicate.rowNumber};const row={TASK_ID:taskId,CONTENT_ID:task.contentId||"",TASK_DATE:task.taskDate||Utilities.formatDate(now,"Asia/Seoul","yyyy-MM-dd"),TASK_TYPE:task.taskType||"CHAT",TITLE:task.title||"",SOURCE_TEXT:task.sourceText||"",INSTRUCTION:task.instruction||"",LANGUAGE:task.language||"ko-KR",NOTEBOOK_URL:task.notebookUrl||"https://notebooklm.google.com/",DRIVE_FOLDER_ID:task.driveFolderId||"",AUTO_SUBMIT:task.autoSubmit===false?"FALSE":"TRUE",TIMEOUT_SECONDS:task.timeoutSeconds||180,STATUS:"READY",OWNER_EMAIL:ownerEmail||"",CALLBACK_URL:task.callbackUrl||"",CALLBACK_TOKEN:task.callbackToken||"",CREATED_AT:now,UPDATED_AT:now};const sh=sheet_();const rowNumber=sh.getLastRow()+1;sh.getRange(rowNumber,1,1,HEADERS.length).setValues([HEADERS.map(h=>row[h]||"")]);assertTaskRow_(sh,rowNumber,taskId);return {ok:true,taskId,status:"READY",rowNumber};});}
+function notifyWriter_(data,result){if(!data.CALLBACK_URL)return;try{UrlFetchApp.fetch(String(data.CALLBACK_URL),{method:"post",contentType:"application/json",payload:JSON.stringify({taskId:data.TASK_ID,contentId:data.CONTENT_ID,callbackToken:data.CALLBACK_TOKEN,...result}),muteHttpExceptions:true});}catch(_e){}}
+function setupNotebookLMBridge(){const p=props_();if(!p.getProperty("SESSION_SECRET"))p.setProperty("SESSION_SECRET",Utilities.getUuid()+Utilities.getUuid());if(!p.getProperty("WRITER_SHARED_SECRET"))p.setProperty("WRITER_SHARED_SECRET",Utilities.getUuid()+Utilities.getUuid());const sh=sheet_();return {version:VERSION,sheet:sh.getName(),headers:HEADERS,sessionSecretReady:!!p.getProperty("SESSION_SECRET"),writerSecretReady:!!p.getProperty("WRITER_SHARED_SECRET")};}
