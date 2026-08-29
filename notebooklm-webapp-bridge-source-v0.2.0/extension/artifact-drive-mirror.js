@@ -40,13 +40,17 @@ function nlmArtifactExpectedExtensions(artifactType) {
     FLASHCARDS: [".pdf", ".csv", ".txt"],
     QUIZ: [".pdf", ".txt", ".csv"]
   };
-  return map[String(artifactType || "OTHER").toUpperCase()] || [".mp3", ".wav", ".m4a", ".mp4", ".webm", ".pdf", ".pptx", ".xlsx", ".csv", ".png", ".jpg", ".jpeg", ".webp", ".docx", ".txt", ".json"];
+  return map[String(artifactType || "OTHER").toUpperCase()] || [".mp3", ".wav", ".m4a", ".mp4", ".webm", ".mov", ".pdf", ".pptx", ".xlsx", ".csv", ".png", ".jpg", ".jpeg", ".webp", ".docx", ".txt", ".json"];
 }
 
 function nlmArtifactExtension(filename) {
   const clean = String(filename || "").split(/[?#]/, 1)[0].toLowerCase();
   const index = clean.lastIndexOf(".");
   return index >= 0 ? clean.slice(index) : "";
+}
+
+function nlmArtifactIsGenericExtension(ext) {
+  return new Set(["", ".dat", ".bin", ".blob", ".download"]).has(String(ext || "").toLowerCase());
 }
 
 async function nlmFindCompletedDownload(startedAtEpochMs, artifactType, timeoutMs = 120000) {
@@ -75,7 +79,7 @@ async function nlmFindCompletedDownload(startedAtEpochMs, artifactType, timeoutM
       if (item.state !== "complete" || !item.exists || Math.max(item.fileSize, item.totalBytes) <= 0) return false;
       if (!item.filename || /\.crdownload$|\.tmp$/i.test(item.filename)) return false;
       const ext = nlmArtifactExtension(item.filename);
-      return expected.has(ext);
+      return expected.has(ext) || nlmArtifactIsGenericExtension(ext);
     });
     if (complete) return { ok:true, sourcePath:complete.filename, download:complete, recent:recent.slice(0,5) };
 
@@ -124,9 +128,7 @@ async function nlmMirrorArtifact(message) {
   let downloadEvidence = null;
   if (!sourcePath) {
     downloadEvidence = await nlmFindCompletedDownload(message?.startedAtEpochMs, artifactType, Number(message?.downloadTimeoutMs || 120000));
-    if (!downloadEvidence?.ok || !downloadEvidence?.sourcePath) {
-      throw new Error(downloadEvidence?.error || "ARTIFACT_EXACT_DOWNLOAD_PATH_NOT_FOUND");
-    }
+    if (!downloadEvidence?.ok || !downloadEvidence?.sourcePath) throw new Error(downloadEvidence?.error || "ARTIFACT_EXACT_DOWNLOAD_PATH_NOT_FOUND");
     sourcePath = downloadEvidence.sourcePath;
   }
 
@@ -141,6 +143,7 @@ async function nlmMirrorArtifact(message) {
   const stdout = String(inner?.stdout || "").trim();
   let mirror = null;
   try { mirror = stdout ? JSON.parse(stdout.split(/\r?\n/).filter(Boolean).at(-1)) : null; } catch {}
+  if (!mirror?.destinationPath || Number(mirror?.destinationBytes || 0) <= 0) throw new Error("ARTIFACT_NATIVE_FILE_NOT_VERIFIED");
   return { ok:true, localTaskId:prepared.localTaskId, sourcePath, downloadEvidence, started, finalState:final?.state || "DONE", mirror, raw:inner };
 }
 
