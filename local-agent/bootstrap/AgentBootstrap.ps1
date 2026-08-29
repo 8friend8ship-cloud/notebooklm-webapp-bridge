@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 $Root = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $AgentFile = Join-Path $Root 'HomeDesignLocalAgent.ps1'
+$StateFile = Join-Path $Root 'state.json'
 $AgentMetaUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/stable/agent.json'
 $AgentBaseUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases'
 $BootstrapLog = Join-Path $Root 'bootstrap.log'
@@ -16,6 +17,10 @@ function GitBlobSha1([string]$Path) {
   $sha = [Security.Cryptography.SHA1]::Create(); try { return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() }
 }
 function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
+function CurrentStateVersion {
+  if(-not(Test-Path -LiteralPath $StateFile)){ return '' }
+  try { return [string]((Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json).agentVersion) } catch { return '' }
+}
 function StopStaleAgentProcesses([int]$MaxAgeSeconds=1800){
   $killed=@();$now=Get-Date
   try{
@@ -57,10 +62,9 @@ try {
 
       if ($meta.enabled) {
         $expected=([string]$meta.gitBlobSha1).ToLowerInvariant()
-        $needs = -not (Test-Path -LiteralPath $AgentFile)
-        if (-not $needs) { $needs = (GitBlobSha1 $AgentFile) -ne $expected }
-
-        if ($needs) {
+        $needsFile = -not (Test-Path -LiteralPath $AgentFile)
+        if (-not $needsFile) { $needsFile = (GitBlobSha1 $AgentFile) -ne $expected }
+        if ($needsFile) {
           $tmp = $AgentFile + '.download'
           $url = Bust ("$AgentBaseUrl/$($meta.version)/HomeDesignLocalAgent.ps1") $expected
           Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing -TimeoutSec 60
@@ -69,9 +73,16 @@ try {
           BLog "Agent updated to $($meta.version) sha=$expected."
         }
 
+        $stateVersion=CurrentStateVersion
+        $needsApply = $needsFile -or ($stateVersion -ne [string]$meta.version)
         [void](StopStaleAgentProcesses ([Math]::Max(1800,$maxCycleSeconds+300)))
-        $rc=RunAgentBounded $AgentFile $maxCycleSeconds
-        if($rc -ne 0){BLog "Agent cycle exit=$rc maxCycleSeconds=$maxCycleSeconds."}
+        if($needsApply){
+          $rc=RunAgentBounded $AgentFile $maxCycleSeconds
+          if($rc -ne 0){BLog "Agent cycle exit=$rc maxCycleSeconds=$maxCycleSeconds."}
+          else{BLog "Agent apply complete version=$($meta.version)."}
+        }else{
+          BLog "Stable unchanged; skip one-shot Agent reapply version=$($meta.version)."
+        }
       } else { BLog 'Agent stable channel is disabled.' }
     } catch { BLog ("Bootstrap cycle error: " + $_.Exception.Message) }
 
