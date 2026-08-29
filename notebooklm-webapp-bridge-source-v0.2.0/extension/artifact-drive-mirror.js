@@ -40,7 +40,7 @@ function nlmArtifactExpectedExtensions(artifactType) {
     FLASHCARDS: [".pdf", ".csv", ".txt"],
     QUIZ: [".pdf", ".txt", ".csv"]
   };
-  return map[String(artifactType || "OTHER").toUpperCase()] || [".mp3", ".wav", ".m4a", ".mp4", ".webm", ".mov", ".pdf", ".pptx", ".xlsx", ".csv", ".png", ".jpg", ".jpeg", ".webp", ".docx", ".txt", ".json"];
+  return map[String(artifactType || "OTHER").toUpperCase()] || [".mp3", ".wav", ".m4a", ".mp4", ".webm", ".pdf", ".pptx", ".xlsx", ".csv", ".png", ".jpg", ".jpeg", ".webp", ".docx", ".txt", ".json"];
 }
 
 function nlmArtifactExtension(filename) {
@@ -49,20 +49,11 @@ function nlmArtifactExtension(filename) {
   return index >= 0 ? clean.slice(index) : "";
 }
 
-function nlmArtifactIsGenericExtension(ext) {
-  return new Set(["", ".dat", ".bin", ".blob", ".download"]).has(String(ext || "").toLowerCase());
-}
-
-function nlmArtifactAllowsGenericRepair(artifactType) {
-  return String(artifactType || "").toUpperCase() === "INFOGRAPHIC";
-}
-
 async function nlmFindCompletedDownload(startedAtEpochMs, artifactType, timeoutMs = 120000) {
   if (!chrome.downloads?.search) return { ok:false, error:"CHROME_DOWNLOADS_API_UNAVAILABLE" };
   const startMs = Math.max(0, Number(startedAtEpochMs || Date.now()) - 3000);
   const startedAfter = new Date(startMs).toISOString();
   const expected = new Set(nlmArtifactExpectedExtensions(artifactType));
-  const allowGenericRepair = nlmArtifactAllowsGenericRepair(artifactType);
   const deadline = Date.now() + Math.max(5000, Number(timeoutMs || 120000));
   let recent = [];
 
@@ -84,7 +75,7 @@ async function nlmFindCompletedDownload(startedAtEpochMs, artifactType, timeoutM
       if (item.state !== "complete" || !item.exists || Math.max(item.fileSize, item.totalBytes) <= 0) return false;
       if (!item.filename || /\.crdownload$|\.tmp$/i.test(item.filename)) return false;
       const ext = nlmArtifactExtension(item.filename);
-      return expected.has(ext) || (allowGenericRepair && nlmArtifactIsGenericExtension(ext));
+      return expected.has(ext);
     });
     if (complete) return { ok:true, sourcePath:complete.filename, download:complete, recent:recent.slice(0,5) };
 
@@ -111,7 +102,7 @@ function nlmArtifactTask(originalTaskId, artifactType, startedAtEpochMs, sourceP
       sourceText: JSON.stringify({
         repo: "8friend8ship-cloud/notebooklm-webapp-bridge",
         branch: "main",
-        script: "local-agent/governor/MirrorNotebookLMArtifactQueensFirst.ps1",
+        script: "local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1",
         args: {
           TaskId: String(originalTaskId || ""),
           ArtifactType: String(artifactType || "OTHER"),
@@ -133,7 +124,9 @@ async function nlmMirrorArtifact(message) {
   let downloadEvidence = null;
   if (!sourcePath) {
     downloadEvidence = await nlmFindCompletedDownload(message?.startedAtEpochMs, artifactType, Number(message?.downloadTimeoutMs || 120000));
-    if (!downloadEvidence?.ok || !downloadEvidence?.sourcePath) throw new Error(downloadEvidence?.error || "ARTIFACT_EXACT_DOWNLOAD_PATH_NOT_FOUND");
+    if (!downloadEvidence?.ok || !downloadEvidence?.sourcePath) {
+      throw new Error(downloadEvidence?.error || "ARTIFACT_EXACT_DOWNLOAD_PATH_NOT_FOUND");
+    }
     sourcePath = downloadEvidence.sourcePath;
   }
 
@@ -148,10 +141,6 @@ async function nlmMirrorArtifact(message) {
   const stdout = String(inner?.stdout || "").trim();
   let mirror = null;
   try { mirror = stdout ? JSON.parse(stdout.split(/\r?\n/).filter(Boolean).at(-1)) : null; } catch {}
-  const nativePath = mirror?.nativeOriginalPath || mirror?.mirror?.destinationPath || "";
-  const nativeBytes = Number(mirror?.nativeOriginalBytes || mirror?.mirror?.destinationBytes || 0);
-  if (!nativePath || nativeBytes <= 0) throw new Error("ARTIFACT_NATIVE_FILE_NOT_VERIFIED");
-  if (mirror?.sourceImmutable !== true || mirror?.nativeOriginalVerified !== true) throw new Error("ARTIFACT_QUEENS_GATE_NOT_VERIFIED");
   return { ok:true, localTaskId:prepared.localTaskId, sourcePath, downloadEvidence, started, finalState:final?.state || "DONE", mirror, raw:inner };
 }
 

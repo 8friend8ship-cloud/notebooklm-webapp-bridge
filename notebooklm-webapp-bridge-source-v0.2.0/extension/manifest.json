@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.77",
-  "description": "Fresh-notebook-first production validation build. Creates a new NotebookLM notebook before production tasks so old Studio artifacts cannot satisfy new-run evidence gates.",
+  "version": "0.2.71",
+  "description": "D92 exact-download handoff: verified Chrome download filenames flow into the local PowerShell mirror as exact SourcePath. Legacy scan remains fallback-only; FileSystemWatcher fallback copies stable completed files without moving originals.",
   "permissions": [
     "alarms",
     "downloads",
@@ -42,7 +42,6 @@
         "https://notebook.google.com/*"
       ],
       "js": [
-        "content/fresh-notebook-create.js",
         "content/notebooklm-runner.js"
       ],
       "run_at": "document_idle"
