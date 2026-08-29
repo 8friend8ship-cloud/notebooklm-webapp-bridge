@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-const code=fs.readFileSync('notebooklm-webapp-bridge-source-v0.2.0/apps-script/Code.gs','utf8');
+const code=fs.readFileSync('notebooklm-webapp-bridge-source-v0.2.0/apps-script/Code.gs','utf8').replace(/\r\n/g,'\n');
 const required=[
   ['version','0.2.10-queue-lock'],
   ['script lock','LockService.getScriptLock()'],
