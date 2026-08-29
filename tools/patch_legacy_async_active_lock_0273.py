@@ -7,12 +7,17 @@ manifest_path = ROOT / 'notebooklm-webapp-bridge-source-v0.2.0/extension/manifes
 release_path = ROOT / 'runtime/stable/release.json'
 
 runner = runner_path.read_text(encoding='utf-8')
-old = '''async function pollCore(reason="alarm"){
-  const cfg=await config();const token=await sessionToken();if(!token){await wakeControlCenter(cfg,"NO_SESSION");return {ok:true,skipped:"no_session",authRefreshRequested:true};}
-  const active=await getActive();if(active)return {ok:true,reason,active:await finalize(cfg,token,active)};
-  let listed;try{listed=await api(cfg.appsScriptUrl,{action:"listTasks",sessionToken:token,includeClaimed:true});}catch(error){if(isSessionError(error)){await clearExpiredSessionAndWake(cfg,error);return {ok:true,reason,skipped:"session_refresh_requested"};}throw error;}
-'''
-new = '''function activeStableTime(active){
+start_marker = 'async function pollCore(reason="alarm")'
+end_marker = '  await recoverStale(cfg,token,listedTasks);'
+start = runner.find(start_marker)
+if start < 0:
+    raise SystemExit('pollCore start not found')
+end = runner.find(end_marker, start)
+if end < 0:
+    raise SystemExit('recoverStale anchor not found')
+end += len(end_marker)
+
+replacement = '''function activeStableTime(active){
   const direct=Number(active?.startedAtMs||active?.claimedAtMs||0);
   if(Number.isFinite(direct)&&direct>0)return direct;
   const derived=taskTime(active?.task||{});
@@ -55,12 +60,9 @@ async function pollCore(reason="alarm"){
     const reconciled=await reconcileActive(cfg,token,active,listedTasks);
     if(!reconciled.cleared)return {ok:true,reason,active:await finalize(cfg,token,reconciled.active)};
   }
-'''
-if old not in runner:
-    raise SystemExit('pollCore anchor not found')
-runner = runner.replace(old, new, 1)
-# remove duplicate listedTasks declaration now that listing happens before active reconciliation
-runner = runner.replace('''  const listedTasks=Array.isArray(listed.tasks)?listed.tasks:[];\n  await recoverStale(cfg,token,listedTasks);''','''  await recoverStale(cfg,token,listedTasks);''',1)
+  await recoverStale(cfg,token,listedTasks);'''
+
+runner = runner[:start] + replacement + runner[end:]
 runner_path.write_text(runner, encoding='utf-8')
 
 manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
