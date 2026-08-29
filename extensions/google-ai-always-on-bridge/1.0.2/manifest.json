@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Google AI Local Bridge v1",
+  "version": "1.0.2",
+  "description": "Apps Script 작업표와 NotebookLM/Flow 탭을 연결합니다. Flow 0.1.0 검토 로직 기반 자동 진입·프롬프트 입력을 지원하며 생성은 승인 게이트를 통과한 작업만 실행합니다.",
+  "permissions": [
+    "alarms",
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*",
+    "https://notebooklm.google.com/*",
+    "https://labs.google/fx/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://notebooklm.google.com/*"
+      ],
+      "js": [
+        "content/notebooklm.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://labs.google/fx/*"
+      ],
+      "js": [
+        "content/flow.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
