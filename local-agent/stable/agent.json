@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.48",
-  "releasedAt": "2026-08-29T09:14:00+09:00",
-  "gitBlobSha1": "8feada02c469eeaa2fb99eb544b8869fd809d0e7",
+  "version": "1.1.49",
+  "releasedAt": "2026-08-29T09:22:00+09:00",
+  "gitBlobSha1": "405a94b4bf5552f5392b79c19bd34c16e044b311",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Fixes Local Agent 1.1.47 PowerShell child-argument forwarding by replacing the conflicting Args parameter with ScriptArgs and explicitly forwarding the array. Preserves the 1.1.47 self-heal design: pinned legacy 1.1.46 governance, exactly-once abandoned marker recovery, SHA-pinned Setup-PowerContinuity blob b98ed149d91cdec4ff75ccf4b03aa7b9e09f241f, StatusOnly-before-install, and central Runtime_Readback. Required power policy remains 30-minute display-only idle on AC/DC, AC automatic sleep/hibernate disabled, AC USB selective suspend disabled, daily 02:00 display-off with no forced 05:00 display-on, native keyboard/mouse display wake, battery sleep/USB policy not overridden. No new Apps Script project, OAuth/scope, deployment, trigger, paid Gemini API, browser Generate, credit action, or manual PowerShell approval is created."
+  "notes": "Corrects the USB selective suspend setting GUID to Windows power-setting GUID 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 and pins Setup-PowerContinuity blob d570a7e84a8d3e4d72f8f95e40deaf63e6b90fa4. Preserves fixed ScriptArgs child argument forwarding and the stable-agent self-heal route. Required policy: 30-minute idle display-only off on AC/DC; AC automatic sleep and hibernate disabled; AC USB selective suspend disabled; daily 02:00 display-off; no forced 05:00 display-on; keyboard/mouse wakes display without system resume; battery sleep/USB policy not overridden. Completion still requires laptop Runtime_Readback. No new Apps Script project, OAuth/scope, deployment, trigger, paid Gemini API, browser Generate, credit action, or manual PowerShell approval is created."
 }
