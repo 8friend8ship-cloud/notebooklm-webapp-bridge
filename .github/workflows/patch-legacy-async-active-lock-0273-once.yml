@@ -1,0 +1,23 @@
+name: Patch legacy async active lock 0.2.73 once
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-legacy-async-active-lock-0273-once.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch stable extension
+        run: python tools/patch_legacy_async_active_lock_0273.py
+      - name: Commit generated stable files
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notebooklm-webapp-bridge-source-v0.2.0/extension/local-powershell-runner.js notebooklm-webapp-bridge-source-v0.2.0/extension/manifest.json runtime/stable/release.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'Fix legacy async active lock starvation in 0.2.73'
+          git push
