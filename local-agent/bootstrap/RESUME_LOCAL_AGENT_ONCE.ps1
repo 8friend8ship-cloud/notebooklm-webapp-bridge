@@ -1,292 +1,71 @@
 param()
+$ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
+$Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
+$Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
+$Bootstrap=Join-Path $Root 'AgentBootstrap.ps1'
+$AgentFile=Join-Path $Root 'HomeDesignLocalAgent.ps1'
+$StateFile=Join-Path $Root 'state.json'
+New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-$Root = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
-$Base = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
-$UserData = Join-Path $Base 'ChromeUserData'
-$ExtensionRoot = Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
-$CftRoot = Join-Path $Base 'ChromeForTesting'
-$RemoteDebuggingPort = 9223
-$NotebookHomeUrl = 'https://notebook.google.com/'
-$HistoricalId = '69e055e5-c8d0-4e9c-8686-58cc6da35a51'
-$Marker = Join-Path $Root 'NLM_FRESH_RESUME_CDP_20260829_2045.attempted'
-$ResultPath = Join-Path $Root 'NLM_FRESH_RESUME_CDP_20260829_2045.json'
-New-Item -ItemType Directory -Force -Path $Root | Out-Null
-
-function FindCentralRoot {
-    $centralName = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
-    $myDriveKo = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
-    foreach ($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
-        $rootPath = [string]$drive.Root
-        if (-not $rootPath) { continue }
-        foreach ($candidate in @(
-            (Join-Path $rootPath $centralName),
-            (Join-Path $rootPath ($myDriveKo + '\' + $centralName)),
-            (Join-Path $rootPath ('My Drive\' + $centralName)),
-            (Join-Path $rootPath ('Google Drive\' + $centralName))
-        )) {
-            if (Test-Path -LiteralPath $candidate -PathType Container) { return $candidate }
-        }
-    }
-    return ''
+function ApiContent([string]$Path){
+  $headers=@{'User-Agent'='HomeDesign-Local-Agent-Resume';'Accept'='application/vnd.github+json'}
+  $url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec 30
+}
+function DecodeText($R){[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$R.content-replace'\s','')))}
+function WriteApiFile($R,[string]$Path){[IO.File]::WriteAllBytes($Path,[Convert]::FromBase64String(([string]$R.content-replace'\s','')))}
+function Proc([string]$Needle){try{return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name -match 'powershell|pwsh' -and $_.CommandLine -and $_.CommandLine -like "*$Needle*"})}catch{return @()}}
+function KillTree([int]$ProcessId){try{& taskkill.exe /PID $ProcessId /T /F 2>$null|Out-Null}catch{try{Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue}catch{}}}
+function StopTarget([string]$Needle){foreach($procItem in @(Proc $Needle)){KillTree -ProcessId ([int]$procItem.ProcessId)}}
+function GitBlobSha1([string]$Path){$bytes=[IO.File]::ReadAllBytes($Path);$header=[Text.Encoding]::ASCII.GetBytes(("blob "+$bytes.Length+[char]0));$all=New-Object byte[] ($header.Length+$bytes.Length);[Buffer]::BlockCopy($header,0,$all,0,$header.Length);[Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length);$sha=[Security.Cryptography.SHA1]::Create();try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$sha.Dispose()}}
+function TestHostHealth(){try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3;return [bool]$h.ok}catch{return $false}}
+function SafeKey([string]$Value){return ([string]$Value -replace '[^A-Za-z0-9_.-]','_')}
+function FindCentralRoot{
+  $centralName=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+  $myDriveKo=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
+  foreach($drv in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
+    $rr=[string]$drv.Root;if(-not $rr){continue}
+    foreach($cand in @((Join-Path $rr $centralName),(Join-Path $rr ($myDriveKo+'\'+$centralName)),(Join-Path $rr ('My Drive\'+$centralName)),(Join-Path $rr ('Google Drive\'+$centralName)))){if(Test-Path -LiteralPath $cand -PathType Container){return $cand}}
+  };return ''
+}
+function WriteResumeHeartbeat([string]$Stage){
+  try{$hb=[ordered]@{ok=$true;action='AUTO_RESUME_ENTRY_HEARTBEAT';version='RESUME_CONTENTS_API_V3_20260829';stage=$Stage;pid=$PID;hostHealthy=(TestHostHealth);newOAuth=$false;newScope=$false;newProjectCreated=$false;newDeployment=$false;newTrigger=$false;normalChromeRestarted=$false;at=(Get-Date).ToString('o')};$json=$hb|ConvertTo-Json -Depth 20;$local=Join-Path $Root 'AUTO_RESUME_ENTRY_LATEST.json';$json|Set-Content -LiteralPath $local -Encoding UTF8;$central=FindCentralRoot;if($central){$dest=Join-Path $central 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $dest|Out-Null;$json|Set-Content -LiteralPath (Join-Path $dest 'AUTO_RESUME_ENTRY_LATEST.json') -Encoding UTF8}}catch{}
+}
+function BootstrapLoopProcesses{try{return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name -match 'powershell|pwsh' -and $_.CommandLine -and $_.CommandLine -like '*AgentBootstrap.ps1*' -and $_.CommandLine -match '(?i)(?:^|\s)-Loop(?:\s|$)'})}catch{return @()}}
+function EnsureBootstrapLoop([string]$BootstrapPath,[int]$TimeoutSeconds=120){
+  $deadline=(Get-Date).AddSeconds($TimeoutSeconds);$attempts=0
+  while((Get-Date)-lt $deadline){$loops=@(BootstrapLoopProcesses);if($loops.Count -gt 0){Start-Sleep -Milliseconds 900;$loops2=@(BootstrapLoopProcesses);if($loops2.Count -gt 0){return [ordered]@{ok=$true;state='EXISTING_LOOP_VERIFIED';attempts=$attempts;pids=@($loops2|ForEach-Object{[int]$_.ProcessId})}}};$m=$null;$free=$false;try{$m=New-Object System.Threading.Mutex($false,'HomeDesignLocalAgentBootstrapV1');$free=$m.WaitOne(0,$false);if($free){try{$m.ReleaseMutex()}catch{}}}catch{$free=$false}finally{if($m){$m.Dispose()}};if($free){$attempts++;Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$BootstrapPath`"",'-Loop') -WindowStyle Hidden;Start-Sleep -Seconds 2;$started=@(BootstrapLoopProcesses);if($started.Count -gt 0){Start-Sleep -Seconds 2;$stable=@(BootstrapLoopProcesses);if($stable.Count -gt 0){return [ordered]@{ok=$true;state='NEW_LOOP_STARTED_VERIFIED';attempts=$attempts;pids=@($stable|ForEach-Object{[int]$_.ProcessId})}}}};Start-Sleep -Seconds 3}
+  [ordered]@{ok=$false;state='BOOTSTRAP_LOOP_VERIFY_TIMEOUT';attempts=$attempts;pids=@()}
 }
 
-function SaveReceipt($Object) {
-    $json = $Object | ConvertTo-Json -Depth 50
-    $json | Set-Content -LiteralPath $ResultPath -Encoding UTF8
-    $central = FindCentralRoot
-    if ($central) {
-        $dest = Join-Path $central 'Runtime_Readback\NotebookLM'
-        New-Item -ItemType Directory -Force -Path $dest | Out-Null
-        $json | Set-Content -LiteralPath (Join-Path $dest 'NLM_FRESH_RESUME_CDP_20260829_2045.json') -Encoding UTF8
-    }
-}
+WriteResumeHeartbeat 'ENTRY_BEFORE_CONTENTS_API_RESOLVE'
+StopTarget 'RunChromeGovernorReadback.ps1';StopTarget 'ChromeExtensionGovernor.ps1';StopTarget 'GovernorDriveSync.ps1';Start-Sleep -Milliseconds 500
 
-function DebugReady {
-    try {
-        $v = Invoke-RestMethod -Uri ("http://127.0.0.1:$RemoteDebuggingPort/json/version") -TimeoutSec 2
-        return [bool]$v.webSocketDebuggerUrl
-    }
-    catch { return $false }
-}
+Write-Host '[1/5] Refreshing bootstrap through GitHub Contents API...'
+$b=ApiContent 'local-agent/bootstrap/AgentBootstrap.ps1';$tmp=$Bootstrap+'.download';WriteApiFile $b $tmp;if((GitBlobSha1 $tmp).ToLowerInvariant()-ne([string]$b.sha).ToLowerInvariant()){throw'BOOTSTRAP_CONTENTS_API_SHA_MISMATCH'};Move-Item $tmp $Bootstrap -Force
 
-function DedicatedProcesses {
-    try {
-        return @(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue | Where-Object {
-            $_.CommandLine -and $_.CommandLine -like "*$UserData*"
-        })
-    }
-    catch { return @() }
-}
+Write-Host '[2/5] Resolving current stable Agent + Bridge through GitHub Contents API...'
+$metaResp=ApiContent 'local-agent/stable/agent.json';$meta=(DecodeText $metaResp)|ConvertFrom-Json
+$bridgeResp=ApiContent 'runtime/stable/release.json';$bridge=(DecodeText $bridgeResp)|ConvertFrom-Json
+if(-not $meta.enabled){throw'Local Agent stable channel disabled.'};if(-not $bridge.enabled){throw'NotebookLM bridge stable channel disabled.'}
+$targetAgent=[string]$meta.version;$targetBridge=[string]$bridge.version;Write-Host ("targetAgent="+$targetAgent+" targetBridge="+$targetBridge)
 
-function FindChrome {
-    if (Test-Path -LiteralPath $CftRoot) {
-        $found = Get-ChildItem -LiteralPath $CftRoot -Recurse -Filter chrome.exe -File -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
-        if ($found) { return [string]$found.FullName }
-    }
-    foreach ($candidate in @(
-        (Join-Path ${env:ProgramFiles} 'Google\Chrome\Application\chrome.exe'),
-        (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
-        (Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe')
-    )) {
-        if ($candidate -and (Test-Path -LiteralPath $candidate)) { return [string]$candidate }
-    }
-    throw 'CHROME_EXE_NOT_FOUND'
-}
+Write-Host '[3/5] Downloading and SHA-verifying stable Agent from Contents API...'
+$expectedSha=([string]$meta.gitBlobSha1).ToLowerInvariant();$agentResp=ApiContent ('local-agent/releases/'+$targetAgent+'/HomeDesignLocalAgent.ps1');if(([string]$agentResp.sha).ToLowerInvariant()-ne$expectedSha){throw('AGENT_CONTENTS_API_SHA_MISMATCH api='+[string]$agentResp.sha+' expected='+$expectedSha)};$agentTmp=$AgentFile+'.resume.download';WriteApiFile $agentResp $agentTmp;$actualSha=GitBlobSha1 $agentTmp;if($actualSha-ne$expectedSha){Remove-Item $agentTmp -Force -ErrorAction SilentlyContinue;throw("Agent SHA mismatch: actual=$actualSha expected=$expectedSha")};Move-Item $agentTmp $AgentFile -Force
 
-function StartDedicatedChrome {
-    if (DebugReady) { return }
-    foreach ($proc in @(DedicatedProcesses)) {
-        try { Stop-Process -Id ([int]$proc.ProcessId) -Force -ErrorAction SilentlyContinue } catch {}
-    }
-    Start-Sleep -Milliseconds 700
-    $chrome = FindChrome
-    $args = @(
-        "--remote-debugging-port=$RemoteDebuggingPort",
-        '--remote-allow-origins=*',
-        "--user-data-dir=$UserData",
-        '--profile-directory=Default',
-        "--load-extension=$ExtensionRoot",
-        '--new-window',
-        '--no-first-run',
-        '--no-default-browser-check',
-        '--disable-session-crashed-bubble',
-        $NotebookHomeUrl
-    )
-    Start-Process -FilePath $chrome -ArgumentList $args | Out-Null
-    $deadline = (Get-Date).AddSeconds(20)
-    do {
-        Start-Sleep -Milliseconds 400
-        if (DebugReady) { return }
-    } while ((Get-Date) -lt $deadline)
-    throw 'CDP_PORT_NOT_READY'
-}
+Write-Host '[4/5] Applying stable Agent directly...'
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $AgentFile;$directExit=$LASTEXITCODE;Write-Host ("directAgentExit="+$directExit)
 
-function GetTabs {
-    return @(Invoke-RestMethod -Uri ("http://127.0.0.1:$RemoteDebuggingPort/json/list") -TimeoutSec 3)
-}
+$verifyKey='A'+(SafeKey $targetAgent)+'_B'+(SafeKey $targetBridge);$verifyMarker=Join-Path $Root ('NOTEBOOKLM_CDP_DOWNLOAD_'+$verifyKey+'.attempted');$verifyResult=Join-Path $Root ('NOTEBOOKLM_CDP_DOWNLOAD_'+$verifyKey+'.json')
+if(-not(Test-Path -LiteralPath $verifyMarker)){
+  $attempt=[ordered]@{ok=$false;action='NOTEBOOKLM_CDP_DOWNLOAD_VERSIONED_RETEST';changedCondition=$true;agentVersion=$targetAgent;bridgeVersion=$targetBridge;releaseActionId=[string]$bridge.actionId;verifyKey=$verifyKey;startedAt=(Get-Date).ToString('o');stdout='';exitCode=$null;error=''}
+  try{$helper=Join-Path $Root 'RunNotebookLMExistingDownloadViaCDP.ps1';$hr=ApiContent 'local-agent/governor/RunNotebookLMExistingDownloadViaCDP.ps1';WriteApiFile $hr $helper;if((GitBlobSha1 $helper).ToLowerInvariant()-ne([string]$hr.sha).ToLowerInvariant()){throw'CDP_HELPER_CONTENTS_API_SHA_MISMATCH'};$out=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $helper 2>&1|Out-String;$attempt.stdout=$out.Trim();$attempt.exitCode=$LASTEXITCODE;$attempt.ok=($LASTEXITCODE-eq0)}catch{$attempt.error=$_.Exception.Message;$attempt.ok=$false};$attempt.completedAt=(Get-Date).ToString('o');$json=$attempt|ConvertTo-Json -Depth 30;$json|Set-Content -LiteralPath $verifyResult -Encoding UTF8;Set-Content -LiteralPath $verifyMarker -Value $attempt.completedAt -Encoding ASCII;try{$central=FindCentralRoot;if($central){$dest=Join-Path $central 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $dest|Out-Null;$json|Set-Content -LiteralPath (Join-Path $dest ('NOTEBOOKLM_CDP_DOWNLOAD_'+$verifyKey+'.json')) -Encoding UTF8}}catch{}
+}else{Write-Host ('CDP versioned retest already attempted for '+$verifyKey+'; same-condition retry blocked.')}
 
-function GetNotebookTab {
-    return @(GetTabs | Where-Object {
-        [string]$_.type -eq 'page' -and [string]$_.url -like 'https://notebook.google.com/*'
-    } | Select-Object -First 1)[0]
-}
+Write-Host '[5/5] Ensuring future bootstrap loop (mutex-safe)...'
+$loopState=EnsureBootstrapLoop $Bootstrap 120;Write-Host ('bootstrapLoop='+($loopState|ConvertTo-Json -Compress));if(-not $loopState.ok){throw('BOOTSTRAP_LOOP_NOT_VERIFIED:'+($loopState|ConvertTo-Json -Compress))};WriteResumeHeartbeat ('BOOTSTRAP_LOOP_'+[string]$loopState.state)
 
-function GetAnyPageTab {
-    return @(GetTabs | Where-Object { [string]$_.type -eq 'page' } | Select-Object -First 1)[0]
-}
-
-function ReceiveCdp([System.Net.WebSockets.ClientWebSocket]$Ws) {
-    $buffer = New-Object byte[] 65536
-    $stream = New-Object IO.MemoryStream
-    try {
-        do {
-            $segment = New-Object ArraySegment[byte] -ArgumentList @(,$buffer)
-            $received = $Ws.ReceiveAsync($segment, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
-            if ($received.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) { throw 'CDP_WEBSOCKET_CLOSED' }
-            $stream.Write($buffer, 0, $received.Count)
-        } while (-not $received.EndOfMessage)
-        return [Text.Encoding]::UTF8.GetString($stream.ToArray()) | ConvertFrom-Json
-    }
-    finally { $stream.Dispose() }
-}
-
-function SendCdp([System.Net.WebSockets.ClientWebSocket]$Ws, [ref]$Sequence, [string]$Method, [hashtable]$Params = @{}) {
-    $Sequence.Value++
-    $id = $Sequence.Value
-    $json = @{ id=$id; method=$Method; params=$Params } | ConvertTo-Json -Depth 30 -Compress
-    $bytes = [Text.Encoding]::UTF8.GetBytes($json)
-    $segment = New-Object ArraySegment[byte] -ArgumentList @(,$bytes)
-    $Ws.SendAsync($segment, [System.Net.WebSockets.WebSocketMessageType]::Text, $true, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
-    while ($true) {
-        $message = ReceiveCdp $Ws
-        if ($message.id -eq $id) {
-            if ($message.error) { throw ('CDP_' + $Method + ':' + ($message.error | ConvertTo-Json -Compress)) }
-            return $message.result
-        }
-    }
-}
-
-function EvalCdp($Ws, [ref]$Sequence, [string]$Expression) {
-    $response = SendCdp $Ws $Sequence 'Runtime.evaluate' @{
-        expression = $Expression
-        returnByValue = $true
-        awaitPromise = $true
-        userGesture = $true
-    }
-    return $response.result.value
-}
-
-if (Test-Path -LiteralPath $Marker) {
-    if (Test-Path -LiteralPath $ResultPath) {
-        $prior = Get-Content -LiteralPath $ResultPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ([bool]$prior.ok) { exit 0 }
-        exit 2
-    }
-    exit 2
-}
-Set-Content -LiteralPath $Marker -Value ((Get-Date).ToString('o')) -Encoding ASCII
-
-$result = [ordered]@{
-    ok = $false
-    action = 'NLM_FRESH_RESUME_CDP_DIRECT'
-    startedAt = (Get-Date).ToString('o')
-    initialTabUrl = ''
-    previousUrl = ''
-    previousNotebookId = ''
-    navigatedToNotebookHome = $false
-    clickedLabel = ''
-    notebookUrl = ''
-    notebookId = ''
-    normalChromeTouched = $false
-    flowPrerequisite = $false
-    error = ''
-}
-$ws = $null
-
-try {
-    StartDedicatedChrome
-    Start-Sleep -Milliseconds 800
-    $tab = GetNotebookTab
-    if (-not $tab) { $tab = GetAnyPageTab }
-    if (-not $tab) {
-        $encoded = [Uri]::EscapeDataString($NotebookHomeUrl)
-        $tab = Invoke-RestMethod -Uri ("http://127.0.0.1:$RemoteDebuggingPort/json/new?$encoded") -Method Put -TimeoutSec 5
-    }
-    if (-not $tab) { throw 'NO_CDP_PAGE_TARGET' }
-
-    $result.initialTabUrl = [string]$tab.url
-    $uri = [Uri]([string]$tab.webSocketDebuggerUrl)
-    $ws = New-Object System.Net.WebSockets.ClientWebSocket
-    $ws.ConnectAsync($uri, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
-    $sequence = 0
-    [void](SendCdp $ws ([ref]$sequence) 'Runtime.enable' @{})
-    [void](SendCdp $ws ([ref]$sequence) 'Page.enable' @{})
-    [void](SendCdp $ws ([ref]$sequence) 'Page.bringToFront' @{})
-
-    $currentUrl = [string](EvalCdp $ws ([ref]$sequence) 'location.href')
-    if ($currentUrl -notlike 'https://notebook.google.com/*') {
-        [void](SendCdp $ws ([ref]$sequence) 'Page.navigate' @{url=$NotebookHomeUrl})
-        $deadline = (Get-Date).AddSeconds(30)
-        do {
-            Start-Sleep -Milliseconds 500
-            $currentUrl = [string](EvalCdp $ws ([ref]$sequence) 'location.href')
-            if ($currentUrl -like 'https://notebook.google.com/*') { break }
-        } while ((Get-Date) -lt $deadline)
-        if ($currentUrl -notlike 'https://notebook.google.com/*') { throw 'NOTEBOOK_HOME_NAVIGATION_FAILED' }
-        $result.navigatedToNotebookHome = $true
-        Start-Sleep -Seconds 2
-    }
-
-    $result.previousUrl = $currentUrl
-    if ($currentUrl -match '/notebook/([0-9a-fA-F-]+)') { $result.previousNotebookId = $Matches[1] }
-
-    $clickExpression = @"
-(() => {
-  const visible = e => {
-    if (!(e instanceof HTMLElement)) return false;
-    const r = e.getBoundingClientRect();
-    const s = getComputedStyle(e);
-    return r.width > 2 && r.height > 2 && s.display !== 'none' && s.visibility !== 'hidden';
-  };
-  const preferred = [
-    '\uC0C8 \uB178\uD2B8 \uB9CC\uB4E4\uAE30',
-    '\uC0C8 \uB178\uD2B8\uBD81 \uB9CC\uB4E4\uAE30',
-    'create new notebook',
-    'new notebook',
-    '\uC0C8\uB85C \uB9CC\uB4E4\uAE30'
-  ];
-  const items = [...document.querySelectorAll('button,[role=button],a')].filter(visible);
-  for (const wanted of preferred) {
-    const hit = items.find(e => {
-      const raw = String([e.innerText,e.textContent,e.getAttribute('aria-label'),e.getAttribute('title')].join(' ')).trim();
-      return raw.toLowerCase().includes(wanted.toLowerCase());
-    });
-    if (hit) {
-      const label = String([hit.innerText,hit.textContent,hit.getAttribute('aria-label'),hit.getAttribute('title')].join(' ')).trim().slice(0,200);
-      hit.click();
-      return {ok:true,label};
-    }
-  }
-  return {ok:false,error:'CREATE_CONTROL_NOT_FOUND'};
-})()
-"@
-    $clicked = EvalCdp $ws ([ref]$sequence) $clickExpression
-    if (-not $clicked.ok) { throw [string]$clicked.error }
-    $result.clickedLabel = [string]$clicked.label
-
-    $newUrl = ''
-    $newId = ''
-    $deadline = (Get-Date).AddSeconds(90)
-    do {
-        Start-Sleep -Milliseconds 500
-        $newUrl = [string](EvalCdp $ws ([ref]$sequence) 'location.href')
-        if ($newUrl -match '^https://notebook\.google\.com/notebook/([0-9a-fA-F-]+)') {
-            $newId = $Matches[1]
-            if ($newId -and $newId -ne $result.previousNotebookId -and $newId -ne $HistoricalId) { break }
-        }
-    } while ((Get-Date) -lt $deadline)
-
-    if (-not $newId) { throw 'NEW_NOTEBOOK_ID_NOT_OBSERVED' }
-    if ($newId -eq $result.previousNotebookId) { throw 'NOTEBOOK_ID_DID_NOT_CHANGE' }
-    if ($newId -eq $HistoricalId) { throw 'HISTORICAL_NOTEBOOK_REUSED' }
-
-    $result.notebookUrl = $newUrl
-    $result.notebookId = $newId
-    $result.ok = $true
-    $result.status = 'FRESH_NOTEBOOK_CREATED'
-    $result.completedAt = (Get-Date).ToString('o')
-    SaveReceipt $result
-    exit 0
-}
-catch {
-    $result.error = $_.Exception.Message
-    $result.status = 'FAILED_FAIL_CLOSED'
-    $result.completedAt = (Get-Date).ToString('o')
-    SaveReceipt $result
-    exit 2
-}
-finally {
-    if ($ws) { try { $ws.Dispose() } catch {} }
-}
+$deadline=(Get-Date).AddSeconds(180)
+while((Get-Date)-lt$deadline){Start-Sleep -Seconds 3;if(Test-Path -LiteralPath $StateFile){try{$last=Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8|ConvertFrom-Json;$av=[string]$last.agentVersion;$hv=[string]$last.commandHostVersion;$hr=TestHostHealth;$bv=[string]$last.extensionVersion;if(-not$bv){$bv=[string]$last.installedVersion};$gov=[bool]$last.governorCycleOk;$sync=[bool]$last.governorDriveSyncOk;Write-Host("agent="+$av+" host="+$hv+" hostHealth="+$hr+" bridge="+$bv+" status="+[string]$last.status+" governor="+$gov+" driveSync="+$sync);if($av-eq$targetAgent-and$hr-and$bv-eq$targetBridge-and$gov-and$sync){Write-Host'RESUME RESULT: ACTIVE + GOVERNOR VERIFIED';exit 0};if($av-eq$targetAgent-and$hr-and$bv-eq$targetBridge-and$directExit-eq0){Write-Host'RESUME RESULT: ACTIVE; GOVERNOR READBACK STILL SYNCING';exit 0}}catch{}}}
+Write-Host 'RESUME RESULT: STARTED, RUNTIME READBACK STILL PENDING';Write-Host 'Do not reinstall or reauthorize. Bootstrap loop was verified and remains enabled.';exit 2
