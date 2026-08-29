@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.62",
-  "releasedAt": "2026-08-29T16:07:00+09:00",
-  "gitBlobSha1": "e57e061f3797e90a314483d12494845d3eb7fa32",
+  "version": "1.1.63",
+  "releasedAt": "2026-08-29T16:12:00+09:00",
+  "gitBlobSha1": "f316587dffeb482d0fc8c6567f611790eba1aa77",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Flow watchdog recovery build. Applies stable Bridge 0.2.75 with exact source SHA verification, restores Host 1.3.0, and restarts only dedicated Chrome-for-Testing on CDP 9224. It preserves normal Chrome and does not change OAuth/scopes/projects/deployments/triggers or click Flow Generate/spend credits. Intended to recover stalled READY queue pickup through the installed 5-minute HomeDesignAutomation-AutoResume watchdog."
+  "notes": "Fixes watchdog false recovery caused by treating the one-shot HomeDesignLocalAgent process as a persistent health requirement. Agent 1.1.63 first applies pinned 1.1.62 (Bridge 0.2.75 + Host 1.3.0 + dedicated CFT), then refreshes the installed watchdog to WATCHDOG_ONE_SHOT_AGENT_FIX_20260829, updates state to 1.1.63, and writes a central recovery receipt. New watchdog health is Host + Bootstrap loop + fresh state + stable version, preventing repeated 5-minute dedicated-CFT restart churn. Normal Chrome, OAuth/scopes, Flow Generate and credits remain untouched."
 }
