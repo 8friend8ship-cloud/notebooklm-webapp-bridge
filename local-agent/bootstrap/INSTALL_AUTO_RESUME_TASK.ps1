@@ -16,21 +16,56 @@ function FindCentral{$name=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64
 function SaveReceipt($o){$json=$o|ConvertTo-Json -Depth 30;$json|Set-Content -LiteralPath (Join-Path $Root 'AUTO_RESUME_INSTALL_V3.json') -Encoding UTF8;$central=FindCentral;if($central){$dir=Join-Path $central 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $dir|Out-Null;$json|Set-Content -LiteralPath (Join-Path $dir 'AUTO_RESUME_INSTALL_V3.json') -Encoding UTF8}}
 function RunDirectWatchdog([int]$TimeoutSeconds=$DirectWatchdogTimeoutSeconds){$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Watchdog+'"';$p=New-Object Diagnostics.Process;$p.StartInfo=$psi;[void]$p.Start();if(-not $p.WaitForExit($TimeoutSeconds*1000)){try{& taskkill.exe /PID $p.Id /T /F 2>$null|Out-Null}catch{};return 124};return [int]$p.ExitCode}
 
-$started=(Get-Date).ToString('o');$errors=@();$runnerSha='';$watchdogSha='';$taskCreated=$false;$runKeySet=$false;$scheduledRunExit=$null;$directExit=$null;$immediateMode=''
+$started=(Get-Date).ToString('o');$errors=@();$runnerSha='';$watchdogSha='';$taskCreated=$false;$runKeySet=$false;$scheduledRunExit=$null;$directExit=$null;$immediateMode='';$triggerContract='LOGON+RESUME+5MIN'
 try{$runnerSha=InstallVerified 'local-agent/bootstrap/HomeDesignAutoResume.ps1' $Runner}catch{$errors+=('RUNNER_INSTALL:'+ $_.Exception.Message)}
 try{$watchdogSha=InstallVerified 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$errors+=('WATCHDOG_INSTALL:'+ $_.Exception.Message)}
 
 $runKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';$runName='HomeDesignAutomationAutoResume';$runCommand='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"'
 try{New-Item -Path $runKey -Force|Out-Null;Set-ItemProperty -Path $runKey -Name $runName -Value $runCommand -Type String;$runVerify=(Get-ItemProperty -Path $runKey -Name $runName -ErrorAction Stop).$runName;if([string]$runVerify-ne$runCommand){throw'HKCU_RUN_FALLBACK_VERIFY_FAILED'};$runKeySet=$true}catch{$errors+=('HKCU_RUN:'+ $_.Exception.Message)}
 
+# One canonical task, not duplicate tasks: logon + power-resume + every 5 minutes.
 $taskName='HomeDesignAutomation-AutoResume'
+$userSid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$start=(Get-Date).Date.ToString('s')
+$xml=@"
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>HomeDesign automation watchdog/self-heal. Existing user scope only. Runs at logon, resume from sleep, and every 5 minutes.</Description></RegistrationInfo>
+  <Triggers>
+    <LogonTrigger><Enabled>true</Enabled><UserId>$userSid</UserId><Delay>PT10S</Delay></LogonTrigger>
+    <EventTrigger>
+      <Enabled>true</Enabled>
+      <Subscription>&lt;QueryList&gt;&lt;Query Id="0" Path="System"&gt;&lt;Select Path="System"&gt;*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1]]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription>
+      <Delay>PT15S</Delay>
+    </EventTrigger>
+    <CalendarTrigger>
+      <StartBoundary>$start</StartBoundary><Enabled>true</Enabled>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+      <Repetition><Interval>PT5M</Interval><Duration>P1D</Duration><StopAtDurationEnd>false</StopAtDurationEnd></Repetition>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals><Principal id="Author"><UserId>$userSid</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+  <Settings>
+    <MultipleInstancesPolicy>StopExisting</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings><StopOnIdleEnd>false</StopOnIdleEnd><RestartOnIdle>false</RestartOnIdle></IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><Hidden>true</Hidden><WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT10M</ExecutionTimeLimit><Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author"><Exec><Command>powershell.exe</Command><Arguments>-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$Watchdog&quot;</Arguments></Exec></Actions>
+</Task>
+"@
+$tmpXml=Join-Path $env:TEMP 'HomeDesignAutomation-AutoResume-v3.xml'
 try{
-  $action=New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"')
-  $trigger=New-ScheduledTaskTrigger -AtLogOn
-  $settings=New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes $ScheduledExecutionLimitMinutes)
-  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+  $xml|Set-Content -LiteralPath $tmpXml -Encoding Unicode
+  & schtasks.exe /Create /TN $taskName /XML $tmpXml /F | Out-Null
+  if($LASTEXITCODE-ne0){throw('SCHTASKS_CREATE_'+$LASTEXITCODE)}
   $taskCreated=$true
-}catch{$errors+=('SCHEDULED_TASK_CREATE:'+ $_.Exception.Message)}
+}catch{$errors+=('SCHEDULED_TASK_CREATE:'+ $_.Exception.Message)}finally{Remove-Item $tmpXml -Force -ErrorAction SilentlyContinue}
 
 if($taskCreated){try{& schtasks.exe /Run /TN $taskName | Out-Null;$scheduledRunExit=$LASTEXITCODE;if($scheduledRunExit-ne0){throw('SCHTASKS_RUN_'+$scheduledRunExit)}}catch{$errors+=('SCHEDULED_TASK_RUN:'+ $_.Exception.Message)}}
 
@@ -41,7 +76,7 @@ if(Test-Path -LiteralPath $Watchdog -PathType Leaf){
 $persistenceReady=[bool]($taskCreated-or$runKeySet)
 $immediateStarted=[bool]($directExit-ne$null)
 $ok=[bool]($runnerSha-and$watchdogSha-and$persistenceReady-and$immediateStarted-and($directExit-eq0))
-$rec=[ordered]@{ok=$ok;action='INSTALL_AUTO_RESUME_V3';installerRevision='V3.1_TIMEOUT_ALIGNED';startedAt=$started;completedAt=(Get-Date).ToString('o');runnerSha=$runnerSha;watchdogSha=$watchdogSha;scheduledTaskCreated=$taskCreated;scheduledRunExit=$scheduledRunExit;scheduledExecutionLimitMinutes=$ScheduledExecutionLimitMinutes;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;immediateMode=$immediateMode;directWatchdogTimeoutSeconds=$DirectWatchdogTimeoutSeconds;directWatchdogExit=$directExit;immediateExecutionVerified=[bool]($directExit-eq0);normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;errors=$errors}
+$rec=[ordered]@{ok=$ok;action='INSTALL_AUTO_RESUME_V3';installerRevision='V3.2_TRIGGER_RESTORED_TIMEOUT_ALIGNED';startedAt=$started;completedAt=(Get-Date).ToString('o');runnerSha=$runnerSha;watchdogSha=$watchdogSha;scheduledTaskCreated=$taskCreated;scheduledRunExit=$scheduledRunExit;scheduledExecutionLimitMinutes=$ScheduledExecutionLimitMinutes;triggerContract=$triggerContract;triggerLogon=$true;triggerResume=$true;triggerIntervalMinutes=5;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;immediateMode=$immediateMode;directWatchdogTimeoutSeconds=$DirectWatchdogTimeoutSeconds;directWatchdogExit=$directExit;immediateExecutionVerified=[bool]($directExit-eq0);normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;errors=$errors}
 SaveReceipt $rec
 $rec|ConvertTo-Json -Depth 30 -Compress
 if($ok){exit 0}else{exit 2}
