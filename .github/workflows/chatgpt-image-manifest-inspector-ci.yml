@@ -1,0 +1,30 @@
+name: ChatGPT Image Manifest Inspector CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1'
+      - '.github/workflows/chatgpt-image-manifest-inspector-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  parser-and-guardrails:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell parser preflight
+        shell: powershell
+        run: |
+          $path='local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1'
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};exit 1}
+          Write-Host 'PARSER_PASS'
+      - name: Privacy and mutation guardrails
+        shell: powershell
+        run: |
+          $t=Get-Content 'local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1' -Raw
+          $required=@('gedfnhdibkfgacmkbjgpfjihacalnlpn','manifest.json','side_panel','service_worker','NO_PREFERENCES_NO_SECURE_PREFERENCES_NO_COOKIES_NO_TOKENS_NO_HISTORY','chromeMutation=$false','generateClicked=$false','creditSpend=$false')
+          foreach($m in $required){if(-not $t.Contains($m)){throw "MISSING_GUARDRAIL:$m"}}
+          if($t -match 'Preferences|Secure Preferences|Cookies|Login Data'){if($t -notmatch 'NO_PREFERENCES_NO_SECURE_PREFERENCES_NO_COOKIES_NO_TOKENS_NO_HISTORY'){throw 'PRIVACY_GUARD_MISSING'}}
+          Write-Host 'GUARDRAILS_PASS'
