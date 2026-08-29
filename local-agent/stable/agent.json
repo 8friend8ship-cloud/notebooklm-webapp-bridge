@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.75",
-  "releasedAt": "2026-08-29T20:10:00+09:00",
-  "gitBlobSha1": "e568eccc786cf61d20bb97ed77905729978d3481",
+  "version": "1.1.76",
+  "releasedAt": "2026-08-29T20:24:00+09:00",
+  "gitBlobSha1": "f6dac57acd9b7f5b04d7efb1c08c12efd8baf9c6",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 60,
   "maxCycleSeconds": 300,
-  "notes": "Bridge 0.2.75 is already verified on-device. This one-shot executes the separately fixed fresh-notebook CDP helper after renaming its reserved $HOME collision to $NotebookHome and writing it with UTF-8 BOM. It creates exactly one fresh NotebookLM notebook via dedicated CDP 9223; generation/download runner remains untouched; Flow is not a prerequisite; normal Chrome/OAuth/scope/paid actions are untouched."
+  "notes": "Syntax-safe one-shot fresh NotebookLM creation validation. Writes an ENTRY receipt before work, verifies the already-restored bridge 0.2.75, SHA-verifies the isolated fresh-notebook CDP helper, writes it with UTF-8 BOM, and requires a genuinely new /notebook/<id> different from the historical notebook. Existing generation/download runner is untouched. Flow is not a prerequisite; normal Chrome, OAuth, scopes and paid actions are untouched."
 }
