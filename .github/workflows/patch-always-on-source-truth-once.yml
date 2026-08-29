@@ -1,0 +1,59 @@
+name: Patch Always-On source truth once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-always-on-source-truth-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch source truth without touching runtime policy
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          old_blob='7a0509a4cff6b987a5c5b36fd22024ce88a87a5f'
+          new_blob='c6ead8195c8fc1a48aab20c96587622ca76a3c38'
+          old_sha='bc522b5ccf93b754cdba2454b96e08ce0323b470414058b7dd8657623550a602'
+          new_sha='689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44'
+          nlm_sha='8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c'
+
+          updater=Path('local-agent/governor/Sync-GoogleAIAlwaysOnBridgeV102.ps1')
+          text=updater.read_text(encoding='utf-8')
+          assert old_blob in text and old_sha in text, 'OLD_SERVICE_WORKER_PIN_NOT_FOUND'
+          text=text.replace(old_blob,new_blob).replace(old_sha,new_sha)
+          updater.write_text(text,encoding='utf-8',newline='\n')
+
+          ci=Path('.github/workflows/local-executor-flow-recovery-ci.yml')
+          text=ci.read_text(encoding='utf-8')
+          assert old_sha in text, 'OLD_CI_SERVICE_WORKER_SHA_NOT_FOUND'
+          text=text.replace(old_sha,new_sha)
+          old="if(-not($canon.preserveFiles -contains 'content/notebooklm.js')){throw 'NOTEBOOKLM_PRESERVE_CONTRACT_MISSING'}"
+          new=("if(-not$canon.source.files.'content/notebooklm.js'){throw 'NOTEBOOKLM_MANAGED_SOURCE_MISSING'}\n"
+               "          if($canon.source.files.'content/notebooklm.js'.sha256-ne'"+nlm_sha+"'){throw 'NOTEBOOKLM_CANONICAL_SHA_MISMATCH'}\n"
+               "          if($canon.fallbackCapabilities.primaryNotebookBridgeVersion-ne'0.2.71_LAST_GOOD'){throw 'PRIMARY_NOTEBOOK_LAST_GOOD_CONTRACT_MISMATCH'}")
+          assert old in text, 'OLD_NOTEBOOKLM_PRESERVE_CHECK_NOT_FOUND'
+          text=text.replace(old,new)
+          ci.write_text(text,encoding='utf-8',newline='\n')
+          PY
+      - name: Commit source-truth patch
+        shell: bash
+        run: |
+          git config user.name 'central-agent-bot'
+          git config user.email 'homedesigntaedi@gmail.com'
+          git add local-agent/governor/Sync-GoogleAIAlwaysOnBridgeV102.ps1 .github/workflows/local-executor-flow-recovery-ci.yml
+          if git diff --cached --quiet; then
+            echo 'NO_CHANGES'
+            exit 0
+          fi
+          git commit -m 'Align Always-On updater with Drive-applied NotebookLM fallback'
+          git push origin HEAD:main
