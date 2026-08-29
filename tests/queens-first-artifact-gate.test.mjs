@@ -20,11 +20,20 @@ test('Queens-first gate hashes native original and writes QUEENS_INBOX sidecar',
   assert.match(ps, /assetId = \$assetId/);
 });
 
-test('Seed and Johnson are gated after native original preservation', () => {
-  assert.match(ps, /seedDerivativeAllowed = \$true/);
+test('Seed stays ineligible until Queens URL readback is verified', () => {
+  assert.match(ps, /queensUrlVerified = \$false/);
+  assert.match(ps, /seedDerivativeAllowed = \$false/);
   assert.match(ps, /seedDerivativeVerified = \$false/);
+  assert.match(ps, /seedEligible = \$false/);
   assert.match(ps, /johnsonDeliveryAllowed = \$false/);
   assert.match(ps, /nextGate = 'QUEENS_URL_VERIFIED'/);
+  assert.doesNotMatch(ps, /seedDerivativeAllowed = \$true/);
+});
+
+test('PowerShell script chaining does not trust LASTEXITCODE for the base mirror', () => {
+  assert.doesNotMatch(ps, /\$exitCode\s*=\s*\$LASTEXITCODE/);
+  assert.match(ps, /NOTEBOOKLM_BASE_MIRROR_NO_JSON/);
+  assert.match(ps, /NOTEBOOKLM_BASE_MIRROR_NOT_OK/);
 });
 
 test('extension routes all mirrored artifacts through Queens-first registration', () => {
