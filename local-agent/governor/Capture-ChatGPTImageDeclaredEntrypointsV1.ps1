@@ -58,7 +58,10 @@ foreach($rel in $targets){
   [void]$captured.Add([pscustomobject]@{relativePath=$rel;copiedPath=$dst;bytes=$item.Length;sha256=$sha})
   if($side -and $rel -eq $side -and ([IO.Path]::GetExtension($rel) -match '^\.html?$')){
     $html=Get-Content -LiteralPath $src -Raw -Encoding UTF8
-    foreach($match in [regex]::Matches($html,'<script[^>]+src=["'"']([^"'"']+)["'"']','IgnoreCase')){
+    $matches=@()
+    $matches += [regex]::Matches($html,'<script[^>]+src\s*=\s*"([^"]+)"',[System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    $matches += [regex]::Matches($html,"<script[^>]+src\s*=\s*'([^']+)'",[System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    foreach($match in $matches){
       $v=[string]$match.Groups[1].Value
       if($v -and $v -notmatch '^(https?:|//|data:|chrome-extension:)') {[void]$sideLocalScripts.Add($v)}
     }
