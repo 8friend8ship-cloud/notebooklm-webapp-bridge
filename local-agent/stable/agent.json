@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.68",
-  "releasedAt": "2026-08-29T17:49:00+09:00",
-  "gitBlobSha1": "49cf6a07cd7f39bb76a6f26526b89b21dbdf4c25",
+  "version": "1.1.69",
+  "releasedAt": "2026-08-29T17:55:00+09:00",
+  "gitBlobSha1": "9dce2a7bb83d96a3d846a92e24f468b7a67cb38a",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Preserves the verified 1.1.67 NotebookLM native runtime recovery, then recovers the existing WEBAPP_TEMPLATE_03 bound Apps Script ID read-only from dedicated Chrome, normal Chrome, or Edge History/Sessions. It requires the known project URL prefix, exact existing deployment ID, canonical clasp account, NotebookLM code signature, backup, one push at most, pull readback, and deployment invariant. Safe HOLD_NO_WRITE is terminal for this cycle to prevent blind retries. No new Apps Script project/deployment, OAuth/scope, trigger, normal-Chrome mutation, paid API, or credits are allowed."
+  "notes": "Preserves current 1.1.68 recovery, then performs the requested no-credit Flow R10 full-entry verification directly through CDP 9224 using pinned V8: landing/cookie if present -> Create with Google Flow -> project list -> + New Project -> actual /project/<id> workspace. This bypasses the stalled Sheet queue worker when AgentBootstrap is still alive. Writes FLOW_DIRECT_BOOTSTRAP_R10_1.1.69.json locally and to central Drive. Never clicks Generate, spends credits, enters credentials, changes OAuth/scopes, or touches normal Chrome."
 }
