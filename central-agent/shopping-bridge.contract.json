@@ -1,86 +1,37 @@
 {
-  "schemaVersion": "CENTRAL_SHOPPING_BRIDGE_CONTRACT_V2",
+  "schemaVersion": "CENTRAL_SHOPPING_BRIDGE_CONTRACT_V3",
   "bridgeId": "BRG_032",
-  "name": "Central Shopping Research & Affiliate Bridge",
+  "name": "Central Shopping Research, Affiliate & Content Placement Bridge",
   "allFrontQueensCheck": {
     "required": true,
     "template": "central-agent/front-shopping-needs.template.json",
     "statusEnum": ["NONE", "OPTIONAL", "REQUIRED", "UNKNOWN"],
-    "rule": "Every front request must classify shopping/procurement needs during Queens. NONE continues the normal app pipeline with zero commerce calls. OPTIONAL/REQUIRED routes only the matched need to its domain lane.",
-    "hourlyControl": "Reuse the existing processTaskQueue physical trigger and perform one logical hourly due check; never create a separate browser crawl timer."
+    "rule": "Every front request classifies shopping/procurement/content-placement need during Queens. NONE continues with zero commerce calls. OPTIONAL/REQUIRED routes only matched needs to the correct app domain.",
+    "hourlyControl": "Reuse an existing central physical wake/processTaskQueue. Perform a logical due check only; never create a separate blind shopping crawl timer."
   },
-  "physicalShoppingApps": {
-    "APP_KFOOD": {
-      "domain": "FOOD",
-      "categories": ["INGREDIENT", "PACKAGED_FOOD", "KITCHEN_TOOL", "STORAGE", "SERVING_ITEM"],
-      "research": ["reviews", "price", "delivery", "unit_cost", "local_availability"],
-      "seedTargets": ["ingredient_value", "recipe_reuse", "quality_risk", "delivery_fit"]
-    },
-    "APP_INTERIOR": {
-      "domain": "INTERIOR",
-      "categories": ["MATERIAL", "FURNITURE", "DECOR", "APPLIANCE", "LIFESTYLE_GOOD", "TOOL", "INSTALLATION_PART"],
-      "research": ["reviews", "price", "delivery", "unit_cost", "local_availability"],
-      "seedTargets": ["material_value", "installation_feedback", "defect_risk", "lead_time"]
-    },
-    "APP_TRAVEL": {
-      "domain": "TRAVEL_GOODS_ONLY",
-      "categories": ["TRAVEL_GEAR", "LOCAL_GOOD", "SIM_CONNECTIVITY", "TRANSPORT_ITEM"],
-      "research": ["reviews", "price", "delivery_or_pickup", "local_availability"],
-      "seedTargets": ["local_product_value", "travel_goods_value", "availability_risk", "visitor_fit"],
-      "domainSeparation": "TICKET/PASS/RESERVATION use official Travel live/booking lane; do not mix venue/hotel/restaurant reviews into BRG_032."
-    },
-    "APP_BOTS": {
-      "domain": "PERSONA",
-      "categories": ["CLOTHING", "COSTUME", "ACCESSORY", "PROP", "MAKEUP", "CHARACTER_ITEM", "VOICE_STREAM_GEAR"],
-      "seedTargets": ["persona_style_fit", "wardrobe_reuse", "prop_fit", "production_cost"]
-    },
-    "APP_BOTS_FRONTEND": {
-      "domain": "PERSONA_FRONT",
-      "categories": ["CLOTHING", "COSTUME", "ACCESSORY", "PROP", "MAKEUP", "CHARACTER_ITEM", "VOICE_STREAM_GEAR"],
-      "seedTargets": ["persona_style_fit", "wardrobe_reuse", "prop_fit", "production_cost"]
-    },
-    "APP_VTUBE": {
-      "domain": "VIDEO_PERSONA",
-      "categories": ["COSTUME", "PROP", "CAMERA_LIGHTING", "AUDIO_GEAR", "BACKDROP", "STREAM_ACCESSORY"],
-      "seedTargets": ["visual_style_fit", "production_quality", "reuse_fit", "production_cost"]
-    },
-    "APP_SHORTS": {
-      "domain": "SHORT_VIDEO",
-      "categories": ["COSTUME", "PROP", "SET_DECOR", "LIGHTING", "CAMERA_AUDIO_ACCESSORY"],
-      "seedTargets": ["scene_fit", "trend_style_fit", "reuse_fit", "production_cost"]
-    },
-    "APP_BIBLE": {
-      "domain": "BIBLE_CONTENT",
-      "categories": ["BOOK", "STUDY_MATERIAL", "PRINT_GIFT", "TEACHING_PROP"],
-      "seedTargets": ["study_use_fit", "teaching_use_fit", "cost_value"],
-      "highStakesRule": "Doctrinal/scriptural claims remain official/canonical-source evidence; shopping reviews never establish scripture facts."
-    },
-    "APP_LECTURE": {
-      "domain": "LECTURE",
-      "categories": ["BOOK", "COURSE_MATERIAL", "TEACHING_PROP", "PRESENTATION_EQUIPMENT"],
-      "seedTargets": ["learning_fit", "teaching_reuse", "cost_value"]
-    },
-    "APP_DRYWRITE": {
-      "domain": "WRITING",
-      "categories": ["REFERENCE_BOOK", "PHYSICAL_REFERENCE", "PROP", "SET_ITEM"],
-      "seedTargets": ["story_reference_fit", "production_prop_fit", "cost_value"]
-    },
-    "APP_ANALYZER": {
-      "domain": "ANALYSIS",
-      "categories": ["TARGET_PHYSICAL_PRODUCT"],
-      "seedTargets": ["comparison_evidence", "value_signal"],
-      "activationRule": "Only when the analysis target is explicitly a physical product."
-    }
+  "eligibleApps": {
+    "APP_CONTENT_OS": {"mode":"CONTENT_AUGMENTATION","categories":["ARTICLE_RELATED_PRODUCT","CONTENT_TOOL","REFERENCE_PRODUCT","CREATOR_GEAR","AFFILIATE_LINK_OPPORTUNITY","VIDEO_PPL_OPPORTUNITY"]},
+    "APP_ANALYZER": {"mode":"RESEARCH_OR_CONTENT_AUGMENTATION","categories":["TARGET_PHYSICAL_PRODUCT","CONTENT_RELATED_PRODUCT","AFFILIATE_LINK_OPPORTUNITY"]},
+    "APP_KFOOD": {"mode":"PHYSICAL_GOODS","categories":["INGREDIENT","PACKAGED_FOOD","KITCHEN_TOOL","STORAGE","SERVING_ITEM"]},
+    "APP_INTERIOR": {"mode":"PHYSICAL_GOODS","categories":["MATERIAL","FURNITURE","DECOR","APPLIANCE","LIFESTYLE_GOOD","TOOL","INSTALLATION_PART"]},
+    "APP_TRAVEL": {"mode":"GOODS_ONLY_PLUS_SEPARATE_BOOKING","categories":["TRAVEL_GEAR","LOCAL_GOOD","SIM_CONNECTIVITY","TRANSPORT_ITEM"]},
+    "APP_VTUBE_1011B": {"mode":"VIDEO_PPL_AND_PRODUCTION_GOODS","categories":["COSTUME","PROP","CAMERA_LIGHTING","AUDIO_GEAR","BACKDROP","STREAM_ACCESSORY","VIDEO_PPL_OPPORTUNITY"]},
+    "APP_VTUBE": {"mode":"ALIAS_TO_APP_VTUBE_1011B"},
+    "APP_SHORTS": {"mode":"SHORT_VIDEO_PPL_AND_PRODUCTION_GOODS","categories":["COSTUME","PROP","SET_DECOR","LIGHTING","CAMERA_AUDIO_ACCESSORY","SHORTS_PPL_OPPORTUNITY"]},
+    "APP_ANIMATION": {"mode":"MEDIA_PPL_OPTIONAL","categories":["PROP","SET_ITEM","REFERENCE_PRODUCT","VIDEO_PPL_OPPORTUNITY"]},
+    "APP_DRYWRITE": {"mode":"ARTICLE_STORY_AUGMENTATION","categories":["REFERENCE_BOOK","PHYSICAL_REFERENCE","PROP","SET_ITEM","ARTICLE_RELATED_PRODUCT"]},
+    "APP_WRITE": {"mode":"ARTICLE_AUGMENTATION","categories":["ARTICLE_RELATED_PRODUCT","REFERENCE_PRODUCT","AFFILIATE_LINK_OPPORTUNITY"]},
+    "APP_BOTS": {"mode":"PERSONA_PRODUCTION_GOODS","categories":["CLOTHING","COSTUME","ACCESSORY","PROP","MAKEUP","CHARACTER_ITEM","VOICE_STREAM_GEAR"]},
+    "APP_BOTS_FRONTEND": {"mode":"PERSONA_PRODUCTION_GOODS","categories":["CLOTHING","COSTUME","ACCESSORY","PROP","MAKEUP","CHARACTER_ITEM","VOICE_STREAM_GEAR"]},
+    "APP_BIBLE365": {"mode":"OPTIONAL_PHYSICAL_SUPPORT","categories":["BOOK","STUDY_MATERIAL","PRINT_GIFT","TEACHING_PROP"]},
+    "APP_LECTURE": {"mode":"OPTIONAL_PHYSICAL_SUPPORT","categories":["BOOK","COURSE_MATERIAL","TEACHING_PROP","PRESENTATION_EQUIPMENT"]},
+    "APP_PUBLISHER_CORE": {"mode":"PUBLISH_VERIFIED_PACKAGE_ONLY"}
   },
-  "nonPhysicalOrSupportApps": {
-    "APP_ARSENAL": "DIGITAL_TOOL/SERVICE_SUBSCRIPTION uses tool/service evaluation lane; physical tool only if explicit.",
-    "APP_NBLAB": "DIGITAL_RESEARCH_RESOURCE uses research lane; physical reference/lab tool only if explicit.",
-    "APP_DRYSEED": "Check is required but defaults NONE; this internal app never starts affiliate routing by itself.",
-    "APP_QUEENS": "Check is required but defaults NONE; it receives/normalizes research tasks rather than inventing shopping needs.",
-    "APP_SEED": "Check is required but defaults NONE; it qualifies evidence and never creates a product need by itself.",
-    "APP_NEW": "Classify domain first, then register an explicit shopping-need profile before provider routing."
+  "domainIsolation": {
+    "travelBooking": "TICKET/PASS/RESERVATION use official Travel live/booking lane; do not mix venue/hotel/restaurant reviews into BRG_032 physical-goods review evidence.",
+    "highStakes": "Food safety/nutrition, structural/safety, legal, financial or doctrinal claims require official/canonical sources; shopping reviews are supporting experience signals only.",
+    "internalApps": "Queens/Seed/internal control apps do not invent shopping needs; they only normalize, qualify and route evidence."
   },
-  "futureAppRule": "NO_IMPLICIT_PROVIDER_ADOPTION. Every front may run the Queens need check, but a new app may enter BRG_032/provider comparison only after its canonical APP_ID and commerce-domain profile are registered.",
   "providers": ["COUPANG", "ALIEXPRESS", "AMAZON", "LOCAL_MAP"],
   "queensRules": {
     "searchQualifiedSeedFirst": true,
@@ -92,7 +43,8 @@
     "boundedScroll": true,
     "singleReviewNeverFact": true,
     "keepSourceUrlAndTimestamp": true,
-    "noBlindHourlyExternalCrawl": true
+    "noBlindHourlyExternalCrawl": true,
+    "onlyResearchConcreteCandidate": true
   },
   "seedPromotion": {
     "deduplicate": true,
@@ -102,7 +54,8 @@
     "requireFreshness": true,
     "preserveDomainAndAppLineage": true,
     "safetyClaimsNeedOfficialCrossCheck": true,
-    "failedCandidatesMayBecomeNegativeSeed": true
+    "failedCandidatesMayBecomeNegativeSeed": true,
+    "affiliateClickAloneNeverPromotes": true
   },
   "recommendationGate": {
     "livePriceRequired": true,
@@ -114,6 +67,15 @@
     "affiliateDisclosureRequired": true,
     "appStyleSpecificReason": true
   },
+  "contentIntegration": {
+    "policy": "central-agent/platform-shopping-ppl.policy.json",
+    "contentOs": "ContentOS text/video packages call the shopping-need classifier after editorial intent is known. A shopping link/PPL slot is added only when it increases usefulness and the offer is verified.",
+    "article": "context/problem → evidence/content value → optional verified product/material/ingredient recommendation → alternatives → disclosure",
+    "video": "story/value first → natural PPL prop/usage moment → evidence-backed reason → short CTA → disclosure metadata",
+    "vtube": "persona snapshot and storyboard stay primary; PPL product/prop is a scene asset with placement reason, visibility window, dialogue optionality, fatigue cap and disclosure flag.",
+    "publicPublish": "Publisher Core receives draft package. Public post remains human-gated under existing policy."
+  },
+  "platformTargets": ["BLOGGER", "YOUTUBE", "INSTAGRAM", "TIKTOK", "NAVER_BLOG", "NAVER_CAFE", "NAVER_CLIP", "PINTEREST"],
   "runtimeGate": {
     "logicalHourlyFunctionBound": true,
     "localExtensionX2": true,
@@ -121,6 +83,8 @@
     "queensIngestX2": true,
     "seedDecisionX2": true,
     "providerOfferReadbackX2": true,
-    "frontReasonCardX2": true
+    "frontReasonCardX2": true,
+    "contentDraftX2": true,
+    "pplDisclosureQaX2": true
   }
 }
