@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.47",
-  "releasedAt": "2026-08-29T09:08:00+09:00",
-  "gitBlobSha1": "da1ed80c4bee3496b551765815ce8399e2a6856f",
+  "version": "1.1.48",
+  "releasedAt": "2026-08-29T09:14:00+09:00",
+  "gitBlobSha1": "8feada02c469eeaa2fb99eb544b8869fd809d0e7",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Preserves Agent 1.1.46 Queue Integrity V2 + Persona binding behavior through a pinned legacy child, adds exactly-once recovery for abandoned dispatch markers when no result exists, and makes power continuity a stable-agent self-heal responsibility. Every cycle SHA-verifies Setup-PowerContinuity.ps1 blob b98ed149d91cdec4ff75ccf4b03aa7b9e09f241f, checks status first, and installs only when required. Required policy: 30-minute idle display-off on AC/DC, AC automatic sleep/hibernate disabled, AC USB selective suspend disabled, daily 02:00 display-off with 05:00 no forced display-on, keyboard/mouse native display wake without system resume, battery sleep/USB policy not overridden. Writes AGENT_1.1.47_POWER_CONTINUITY_SELF_HEAL.json and POWER_CONTINUITY_RUNTIME_READBACK.json to central Runtime_Readback. No new Apps Script project, OAuth/scope, deployment, trigger, paid Gemini API, browser Generate, credit action, or manual PowerShell approval is created."
+  "notes": "Fixes Local Agent 1.1.47 PowerShell child-argument forwarding by replacing the conflicting Args parameter with ScriptArgs and explicitly forwarding the array. Preserves the 1.1.47 self-heal design: pinned legacy 1.1.46 governance, exactly-once abandoned marker recovery, SHA-pinned Setup-PowerContinuity blob b98ed149d91cdec4ff75ccf4b03aa7b9e09f241f, StatusOnly-before-install, and central Runtime_Readback. Required power policy remains 30-minute display-only idle on AC/DC, AC automatic sleep/hibernate disabled, AC USB selective suspend disabled, daily 02:00 display-off with no forced 05:00 display-on, native keyboard/mouse display wake, battery sleep/USB policy not overridden. No new Apps Script project, OAuth/scope, deployment, trigger, paid Gemini API, browser Generate, credit action, or manual PowerShell approval is created."
 }
