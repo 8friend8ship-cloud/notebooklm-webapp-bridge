@@ -34,7 +34,7 @@ $xml=@"
   </Triggers>
   <Principals><Principal id="Author"><UserId>$userSid</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings>
-    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <MultipleInstancesPolicy>StopExisting</MultipleInstancesPolicy>
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
     <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
     <AllowHardTerminate>true</AllowHardTerminate>
@@ -45,7 +45,7 @@ $xml=@"
     <Enabled>true</Enabled>
     <Hidden>true</Hidden>
     <WakeToRun>false</WakeToRun>
-    <ExecutionTimeLimit>PT10M</ExecutionTimeLimit>
+    <ExecutionTimeLimit>PT5M</ExecutionTimeLimit>
     <Priority>7</Priority>
   </Settings>
   <Actions Context="Author"><Exec><Command>powershell.exe</Command><Arguments>-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$Watchdog&quot;</Arguments></Exec></Actions>
