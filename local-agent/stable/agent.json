@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.32",
-  "releasedAt": "2026-08-29T23:06:00+09:00",
-  "gitBlobSha1": "a38da31ff6aad74c43839a7b010909fec041342d",
+  "version": "1.1.81",
+  "releasedAt": "2026-08-30T08:07:00+09:00",
+  "gitBlobSha1": "5c9dff56ac07df6bb5c1c313530f080f8aec35d9",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Restored proven healthy transport/runtime lane after isolated fresh-notebook diagnostics. NotebookLM generation/download remains Bridge 0.2.39 LAST_GOOD. No fresh production PASS is claimed until a new notebook URL plus native artifact Drive readback are verified."
+  "notes": "Minimal recovery wake for the existing canonical NotebookLM fresh task row450. Delegates to proven Agent 1.1.32 exactly, then wakes only the dedicated automation Chrome/control-center with a new one-shot marker. Bridge 0.2.39 generation/download LAST_GOOD is unchanged; normal Chrome, OAuth, scopes and permissions are unchanged. No duplicate fresh task is created."
 }
