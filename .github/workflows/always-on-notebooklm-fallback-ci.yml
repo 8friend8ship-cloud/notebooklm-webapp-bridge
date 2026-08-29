@@ -1,0 +1,47 @@
+name: Always-On NotebookLM fallback CI
+
+on:
+  push:
+    paths:
+      - 'extensions/google-ai-always-on-bridge/1.0.2/service-worker.js'
+      - 'extensions/google-ai-always-on-bridge/1.0.2/content/notebooklm.js'
+      - 'local-agent/governor/Sync-GoogleAIAlwaysOnNotebookLMFallbackV1.ps1'
+      - '.github/workflows/always-on-notebooklm-fallback-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell updater
+        shell: powershell
+        run: |
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'local-agent/governor/Sync-GoogleAIAlwaysOnNotebookLMFallbackV1.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
+      - name: Verify JS and fallback safety contract
+        shell: powershell
+        run: |
+          node --check 'extensions/google-ai-always-on-bridge/1.0.2/service-worker.js'
+          if($LASTEXITCODE-ne0){throw 'SERVICE_WORKER_PARSE_FAILED'}
+          node --check 'extensions/google-ai-always-on-bridge/1.0.2/content/notebooklm.js'
+          if($LASTEXITCODE-ne0){throw 'NOTEBOOKLM_FALLBACK_PARSE_FAILED'}
+          $sw=Get-Content 'extensions/google-ai-always-on-bridge/1.0.2/service-worker.js' -Raw
+          foreach($x in @('NLM_FALLBACK_ROUTE_20260829','__GOOGLE_AI_ALWAYS_ON_BUILD__','task?.notebookUrl','notebooklm.google.com','generateClicked:false','creditSpend:false')){if(-not$sw.Contains($x)){throw "SW_CONTRACT_MISSING:$x"}}
+          $n=Get-Content 'extensions/google-ai-always-on-bridge/1.0.2/content/notebooklm.js' -Raw
+          foreach($x in @('NLM_FALLBACK_LAST_GOOD_ADAPTER_20260829','NOTEBOOKLM_NO_CREDIT_PREFLIGHT','FRESH_NOTEBOOK_CREATE','BLOCKED_APPROVAL_GATE','CHAT_GENERATION_REQUIRES_EXPLICIT_APPROVAL','CHAT_SUBMITTED_NO_FALSE_DONE','ALWAYS_ON_NOTEBOOKLM_UNSUPPORTED_USE_PRIMARY_0.2.71','primaryBridgeRequired: true','generateClicked: false','creditSpend: false')){if(-not$n.Contains($x)){throw "NLM_CONTRACT_MISSING:$x"}}
+          if($n.Contains('selector calibration required')){throw 'OLD_UNCONDITIONAL_TODO_MUST_BE_REMOVED'}
+          if($n.Contains("status: 'DONE'" ) -and -not$n.Contains("resultText: 'FRESH_NOTEBOOK_CREATED'")){throw 'UNSCOPED_DONE_DETECTED'}
+      - name: Verify updater hashes and no-secret/no-normal-Chrome contract
+        shell: powershell
+        run: |
+          $u=Get-Content 'local-agent/governor/Sync-GoogleAIAlwaysOnNotebookLMFallbackV1.ps1' -Raw
+          foreach($x in @('c6ead8195c8fc1a48aab20c96587622ca76a3c38','689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44','9d1337dbf2318cd3c22d451dd919dd5bb2ee01f1','8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c','CONFIG_MUTATION_DETECTED','configContentRead=$false','normalChromeTouched=$false','primaryNotebookBridgeChanged=$false','GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1.json','__GOOGLE_AI_ALWAYS_ON_BUILD__')){if(-not$u.Contains($x)){throw "UPDATER_CONTRACT_MISSING:$x"}}
+          if($u.Contains('Stop-Process')){throw 'NLM_FALLBACK_UPDATER_MUST_NOT_STOP_CHROME'}
+          if($u.Contains('Get-Content -LiteralPath $config')){throw 'NLM_FALLBACK_UPDATER_MUST_NOT_READ_CONFIG_CONTENT'}
+          $swHash=(Get-FileHash 'extensions/google-ai-always-on-bridge/1.0.2/service-worker.js' -Algorithm SHA256).Hash.ToLowerInvariant()
+          $nHash=(Get-FileHash 'extensions/google-ai-always-on-bridge/1.0.2/content/notebooklm.js' -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($swHash-ne'689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44'){throw 'SERVICE_WORKER_SHA256_MISMATCH'}
+          if($nHash-ne'8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c'){throw 'NOTEBOOKLM_SHA256_MISMATCH'}
+          Write-Host 'ALWAYS_ON_NOTEBOOKLM_FALLBACK_CONTRACT_PASS'
