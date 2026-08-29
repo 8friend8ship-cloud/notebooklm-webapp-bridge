@@ -29,20 +29,25 @@ jobs:
 
           updater=Path('local-agent/governor/Sync-GoogleAIAlwaysOnBridgeV102.ps1')
           text=updater.read_text(encoding='utf-8')
-          assert old_blob in text and old_sha in text, 'OLD_SERVICE_WORKER_PIN_NOT_FOUND'
-          text=text.replace(old_blob,new_blob).replace(old_sha,new_sha)
-          updater.write_text(text,encoding='utf-8',newline='\n')
+          if old_blob in text or old_sha in text:
+              assert old_blob in text and old_sha in text, 'PARTIAL_OLD_SERVICE_WORKER_PIN'
+              text=text.replace(old_blob,new_blob).replace(old_sha,new_sha)
+              updater.write_text(text,encoding='utf-8',newline='\n')
+          else:
+              assert new_blob in text and new_sha in text, 'SERVICE_WORKER_PIN_UNKNOWN'
 
           ci=Path('.github/workflows/local-executor-flow-recovery-ci.yml')
           text=ci.read_text(encoding='utf-8')
-          assert old_sha in text, 'OLD_CI_SERVICE_WORKER_SHA_NOT_FOUND'
-          text=text.replace(old_sha,new_sha)
+          if old_sha in text:
+              text=text.replace(old_sha,new_sha)
+          assert new_sha in text, 'NEW_CI_SERVICE_WORKER_SHA_MISSING'
           old="if(-not($canon.preserveFiles -contains 'content/notebooklm.js')){throw 'NOTEBOOKLM_PRESERVE_CONTRACT_MISSING'}"
           new=("if(-not$canon.source.files.'content/notebooklm.js'){throw 'NOTEBOOKLM_MANAGED_SOURCE_MISSING'}\n"
                "          if($canon.source.files.'content/notebooklm.js'.sha256-ne'"+nlm_sha+"'){throw 'NOTEBOOKLM_CANONICAL_SHA_MISMATCH'}\n"
                "          if($canon.fallbackCapabilities.primaryNotebookBridgeVersion-ne'0.2.71_LAST_GOOD'){throw 'PRIMARY_NOTEBOOK_LAST_GOOD_CONTRACT_MISMATCH'}")
-          assert old in text, 'OLD_NOTEBOOKLM_PRESERVE_CHECK_NOT_FOUND'
-          text=text.replace(old,new)
+          if old in text:
+              text=text.replace(old,new)
+          assert 'NOTEBOOKLM_MANAGED_SOURCE_MISSING' in text, 'NOTEBOOKLM_MANAGED_CHECK_MISSING'
           ci.write_text(text,encoding='utf-8',newline='\n')
           PY
       - name: Commit source-truth patch
@@ -56,6 +61,16 @@ jobs:
             exit 0
           fi
           git commit -m 'Align Always-On updater with Drive-applied NotebookLM fallback'
-          git push origin HEAD:main
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then
+              echo "PUSH_PASS_ATTEMPT=$attempt"
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep 2
+          done
+          echo 'PATCH_PUSH_FAILED_AFTER_REBASE_RETRIES'
+          exit 2
 
-# trigger 2026-08-29T21:18 KST
+# trigger 2026-08-29T21:20 KST
