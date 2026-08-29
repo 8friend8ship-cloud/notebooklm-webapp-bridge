@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.73",
-  "releasedAt": "2026-08-29T20:06:00+09:00",
-  "gitBlobSha1": "8c58413418717bcb402fe95f0e502799fce93e5c",
+  "version": "1.1.74",
+  "releasedAt": "2026-08-29T20:08:00+09:00",
+  "gitBlobSha1": "99d6df9de382effd14bfafd70ed76a65124666bf",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 60,
   "maxCycleSeconds": 300,
-  "notes": "Minimal fix to one-shot NotebookLM recovery: replace invalid PowerShell regex path conversion with literal string Replace only. All other behavior remains the same: restore exact 0.2.75 files, preserve successful generation/download runner, create exactly one fresh notebook through dedicated CDP 9223, no Flow prerequisite, no normal Chrome/OAuth/scope/paid changes. Separate 1.1.73 attempt marker prevents duplicate fresh notebooks."
+  "notes": "0.2.75 rollback already verified on-device. This one-shot only verifies bridge 0.2.75, SHA-verifies the fresh-notebook CDP helper, rewrites that helper as Windows PowerShell UTF-8 with BOM, and creates exactly one fresh NotebookLM notebook on dedicated CDP 9223. No generation/download runner changes, no Flow prerequisite, no normal Chrome/OAuth/scope/paid changes. Separate attempt marker prevents duplicate fresh notebooks."
 }
