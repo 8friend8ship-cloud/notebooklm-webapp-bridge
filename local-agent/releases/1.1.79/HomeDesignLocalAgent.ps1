@@ -94,8 +94,8 @@ try{
 
   $stdout=Join-Path $Root 'AGENT_1.1.79_FRESH_NOTEBOOK_V3.stdout.log';$stderr=Join-Path $Root 'AGENT_1.1.79_FRESH_NOTEBOOK_V3.stderr.log'
   Remove-Item $stdout,$stderr -Force -ErrorAction SilentlyContinue
-  $quotedFresh='"'+$FreshScript+'"'
-  $proc=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$quotedFresh) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
+  $argLine='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$FreshScript+'"'
+  $proc=Start-Process -FilePath 'powershell.exe' -ArgumentList $argLine -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
   $finished=$proc.WaitForExit($ProcessTimeoutSeconds*1000)
   if(-not $finished){$result.helperTimedOut=$true;KillTree ([int]$proc.Id);try{[void]$proc.WaitForExit(5000)}catch{};throw ('FRESH_V3_PROCESS_TIMEOUT seconds='+$ProcessTimeoutSeconds)}
   $result.helperExit=[int]$proc.ExitCode
