@@ -1,0 +1,43 @@
+name: ChatGPT Image contract analyzer CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1'
+      - '.github/workflows/chatgpt-image-contract-analyzer-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: pwsh
+        run: |
+          $p='local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1'
+          $tokens=$null; $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Host;exit 1}
+      - name: Safety guards
+        shell: pwsh
+        run: |
+          $s=Get-Content -LiteralPath 'local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1' -Raw
+          $required=@('STATIC_CAPTURED_ENTRYPOINTS_ONLY_NO_EXECUTION','NO_CODE_EXECUTION_FROM_EXTENSION','NO_BROWSER_PROFILE_READ','NO_COOKIE_TOKEN_PASSWORD_READ','NO_GENERATE','CONTRACT_CANDIDATES_FOUND')
+          foreach($x in $required){if(-not $s.Contains($x)){throw "missing guard: $x"}}
+      - name: Fixture contract candidates found
+        shell: pwsh
+        run: |
+          $root=Join-Path $env:RUNNER_TEMP 'chatgpt-image-contract-fixture'
+          $dir=Join-Path $root 'Runtime_Readback\CHROME'
+          $cap=Join-Path $dir 'CHATGPT_IMAGE_DECLARED_ENTRYPOINTS_V1'
+          New-Item -ItemType Directory -Force -Path $cap|Out-Null
+          $js=Join-Path $cap 'background.js'
+          Set-Content -LiteralPath $js -Value "chrome.runtime.onMessage.addListener(()=>{}); chrome.storage.local.get('imageQueue'); chrome.downloads.download({});" -Encoding UTF8
+          $receipt=[ordered]@{ok=$true;status='DECLARED_ENTRYPOINTS_CAPTURED';extensionId='gedfnhdibkfgacmkbjgpfjihacalnlpn';version='8.6.0';captured=@([ordered]@{relativePath='background.js';copiedPath=$js;bytes=(Get-Item $js).Length;sha256=(Get-FileHash $js -Algorithm SHA256).Hash.ToLowerInvariant()})}
+          $receipt|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_DECLARED_ENTRYPOINTS_V1.json') -Encoding UTF8
+          $proc=Start-Process -FilePath pwsh -ArgumentList @('-NoProfile','-File','local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1','-CentralRootOverride',$root) -Wait -PassThru -NoNewWindow
+          if($proc.ExitCode -ne 0){throw "expected exit 0, got $($proc.ExitCode)"}
+          $r=Get-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_ENTRYPOINT_CONTRACT_V1.json') -Raw|ConvertFrom-Json
+          if(-not $r.ok -or $r.status -ne 'CONTRACT_CANDIDATES_FOUND'){throw 'contract candidate fixture failed'}
+          if($r.runtimeMessageHitCount -lt 1 -or $r.storageHitCount -lt 1){throw 'expected message/storage hits'}
