@@ -1,0 +1,22 @@
+name: test-agent1168-bound-script-history-recovery
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'local-agent/releases/1.1.68/HomeDesignLocalAgent.ps1'
+      - 'tests/agent1168-bound-script-history-recovery.test.ps1'
+      - '.github/workflows/test-agent1168-bound-script-history-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Agent 1.1.68 syntax and safety contract
+        shell: pwsh
+        run: ./tests/agent1168-bound-script-history-recovery.test.ps1
