@@ -5,13 +5,13 @@ on:
     paths:
       - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
       - 'local-agent/capture/Setup-PowerContinuity.ps1'
-      - 'local-agent/releases/1.1.47/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.48/HomeDesignLocalAgent.ps1'
       - '.github/workflows/persona-device-recovery-once-ci.yml'
   pull_request:
     paths:
       - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
       - 'local-agent/capture/Setup-PowerContinuity.ps1'
-      - 'local-agent/releases/1.1.47/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.48/HomeDesignLocalAgent.ps1'
 
 jobs:
   validate:
@@ -21,7 +21,7 @@ jobs:
       - name: Windows PowerShell 5.1 parse
         shell: powershell
         run: |
-          $files=@('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1','local-agent/capture/Setup-PowerContinuity.ps1','local-agent/releases/1.1.47/HomeDesignLocalAgent.ps1')
+          $files=@('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1','local-agent/capture/Setup-PowerContinuity.ps1','local-agent/releases/1.1.48/HomeDesignLocalAgent.ps1')
           foreach($file in $files){
             $tokens=$null;$errors=$null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
@@ -33,7 +33,7 @@ jobs:
           from pathlib import Path
           t=Path('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1').read_text(encoding='utf-8')
           p=Path('local-agent/capture/Setup-PowerContinuity.ps1').read_text(encoding='utf-8')
-          a=Path('local-agent/releases/1.1.47/HomeDesignLocalAgent.ps1').read_text(encoding='utf-8')
+          a=Path('local-agent/releases/1.1.48/HomeDesignLocalAgent.ps1').read_text(encoding='utf-8')
           required=[
             "$ExpectedAgent='1.1.46'",
             "$ExpectedAgentBlob='b72e57af70f77578fddb3de49f6581a37e2de792'",
@@ -75,14 +75,17 @@ jobs:
           pmissing=[x for x in power_required if x not in p]
           if pmissing: raise SystemExit('MISSING_POWER_CONTRACT:'+repr(pmissing))
           agent_required=[
-            "$AgentVersion = '1.1.47'",
+            "$AgentVersion = '1.1.48'",
             "$LegacyAgentSha = 'b72e57af70f77578fddb3de49f6581a37e2de792'",
             "$PowerHelperSha = 'b98ed149d91cdec4ff75ccf4b03aa7b9e09f241f'",
+            "function Invoke-PowerShellCaptured([string]$Path, [string[]]$ScriptArgs)",
+            "+ @($ScriptArgs)",
+            "Invoke-PowerShellCaptured $PowerHelper @('-StatusOnly')",
+            "Invoke-PowerShellCaptured $PowerHelper @('-Install','-NightStart','02:00','-NightEnd','05:00','-IdleDisplayMinutes','30')",
             "Recover-AbandonedMarkerOnce",
             "queue-integrity-sync-v2-1.1.45-marker-recovery.once.json",
             "persona-bind-v1-1.1.46-marker-recovery.once.json",
-            "'-Install','-NightStart','02:00','-NightEnd','05:00','-IdleDisplayMinutes','30'",
-            "AGENT_1.1.47_POWER_CONTINUITY_SELF_HEAL",
+            "AGENT_1.1.48_POWER_CONTINUITY_SELF_HEAL",
             "POWER_CONTINUITY_RUNTIME_READBACK.json",
             "acAutomaticSleep = 'DISABLED'",
             "acAutomaticHibernate = 'DISABLED'",
@@ -97,8 +100,10 @@ jobs:
             "paidGeminiApiCalled = $false"
           ]
           amissing=[x for x in agent_required if x not in a]
-          if amissing: raise SystemExit('MISSING_AGENT_1147_CONTRACT:'+repr(amissing))
+          if amissing: raise SystemExit('MISSING_AGENT_1148_CONTRACT:'+repr(amissing))
+          if "function Invoke-PowerShellCaptured([string]$Path, [string[]]$Args)" in a:
+            raise SystemExit('AUTOMATIC_ARGS_COLLISION_REGRESSION')
           forbidden=['clasp create','clasp deploy','ScriptApp.newTrigger','GOOGLE_AI_PAID_API_APPROVED=Y']
           bad=[x for x in forbidden if x in t or x in p or x in a]
           if bad: raise SystemExit('FORBIDDEN_ACTION:'+repr(bad))
-          print('LOCAL_AGENT_1147_POWER_SELF_HEAL_CONTRACT_PASS')
+          print('LOCAL_AGENT_1148_POWER_ARGUMENT_FORWARDING_CONTRACT_PASS')
