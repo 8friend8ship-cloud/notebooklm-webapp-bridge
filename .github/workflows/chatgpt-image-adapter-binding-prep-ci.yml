@@ -6,6 +6,7 @@ on:
       - 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
       - 'local-agent/governor/Run-ChatGPTImagePostRecoveryInspect.ps1'
       - 'local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1'
+      - 'local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1'
       - '.github/workflows/chatgpt-image-adapter-binding-prep-ci.yml'
   workflow_dispatch:
 
@@ -20,29 +21,33 @@ jobs:
           $files=@(
             'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1',
             'local-agent/governor/Run-ChatGPTImagePostRecoveryInspect.ps1',
-            'local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1'
+            'local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1',
+            'local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1'
           )
           foreach($p in $files){
             $tokens=$null; $errors=$null
             [System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$tokens,[ref]$errors)|Out-Null
             if($errors.Count -gt 0){ $errors | Format-List | Out-String | Write-Host; throw "parse failed: $p" }
           }
-      - name: Safety guards
+      - name: Safety guards and storage policy
         shell: pwsh
         run: |
-          $p='local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
-          $s=Get-Content -LiteralPath $p -Raw
+          $s=Get-Content -LiteralPath 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1' -Raw
           $required=@(
             'CHATGPT_IMAGE_AUTO_MANIFEST_INSPECT.json',
-            'extensionVersion',
-            'sidePanelDefaultPath',
+            'CHATGPT_IMAGE_ENTRYPOINT_CONTRACT_V1.json',
             'HOLD_MANIFEST_RECEIPT_MISSING',
             'HOLD_DECLARED_RESOURCE_MISSING',
-            'READY_FOR_ADAPTER_BINDING',
+            'HOLD_ENTRYPOINT_CONTRACT_MISSING',
+            'HOLD_ENTRYPOINT_CONTRACT_NOT_READY',
+            'READY_FOR_EXACT_INTERFACE_BINDING',
+            'CHROME_ORIGINAL_DOWNLOAD_DIRECT_TO_GOOGLE_DRIVE_DESKTOP_SYNCED_PROJECT_FOLDER',
+            'NOT_IN_DEFAULT_TRANSFER_PATH_EXCEPTION_VALIDATION_ONLY',
+            'NO_PYTHON_COPY_UPLOAD_BY_DEFAULT',
             'NO_REINSTALL',
             'NO_NEW_OAUTH',
             'NO_PASSWORD_OR_COOKIE_READ',
-            'NO_GENERATE_UNTIL_INTERFACE_VERIFIED',
+            'NO_GENERATE_UNTIL_EXACT_INTERFACE_VERIFIED',
             'normalChromeTouched = $false',
             'extensionMutated = $false',
             'generateClicked = $false',
@@ -60,48 +65,36 @@ jobs:
           if($proc.ExitCode -ne 2){ throw "expected exit 2, got $($proc.ExitCode)" }
           $r=Get-Content -LiteralPath (Join-Path $root 'Runtime_Readback\CHROME\CHATGPT_IMAGE_ADAPTER_BINDING_PLAN_V1.json') -Raw|ConvertFrom-Json
           if($r.status -ne 'HOLD_MANIFEST_RECEIPT_MISSING' -or $r.ok){ throw 'missing-manifest fail-closed check failed' }
-      - name: Fixture valid manifest becomes ready
+      - name: Fixture manifest without contract fails closed
         shell: pwsh
         run: |
-          $root=Join-Path $env:RUNNER_TEMP 'chatgpt-image-bind-valid'
-          $dir=Join-Path $root 'Runtime_Readback\CHROME'
-          New-Item -ItemType Directory -Force -Path $dir|Out-Null
-          $m=[ordered]@{
-            ok=$true
-            extensionId='gedfnhdibkfgacmkbjgpfjihacalnlpn'
-            extensionVersion='8.6.0'
-            sidePanelDefaultPath='sidepanel.html'
-            serviceWorker='background.js'
-            contentScripts=@()
-            permissions=@('downloads','storage')
-            hostPermissions=@('https://chatgpt.com/*')
-            referencedResources=@(
-              [ordered]@{relativePath='sidepanel.html';exists=$true;bytes=100},
-              [ordered]@{relativePath='background.js';exists=$true;bytes=200}
-            )
-          }
+          $root=Join-Path $env:RUNNER_TEMP 'chatgpt-image-bind-no-contract'
+          $dir=Join-Path $root 'Runtime_Readback\CHROME';New-Item -ItemType Directory -Force -Path $dir|Out-Null
+          $m=[ordered]@{ok=$true;extensionId='gedfnhdibkfgacmkbjgpfjihacalnlpn';extensionVersion='8.6.0';sidePanelDefaultPath='sidepanel.html';serviceWorker='background.js';contentScripts=@();permissions=@('downloads','storage');hostPermissions=@('https://chatgpt.com/*');referencedResources=@([ordered]@{relativePath='sidepanel.html';exists=$true;bytes=100},[ordered]@{relativePath='background.js';exists=$true;bytes=200})}
           $m|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_AUTO_MANIFEST_INSPECT.json') -Encoding UTF8
+          $proc=Start-Process -FilePath pwsh -ArgumentList @('-NoProfile','-File','local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1','-CentralRootOverride',$root) -Wait -PassThru -NoNewWindow
+          if($proc.ExitCode -ne 8){throw "expected exit 8, got $($proc.ExitCode)"}
+          $r=Get-Content (Join-Path $dir 'CHATGPT_IMAGE_ADAPTER_BINDING_PLAN_V1.json') -Raw|ConvertFrom-Json
+          if($r.status -ne 'HOLD_ENTRYPOINT_CONTRACT_MISSING' -or $r.ok){throw 'missing-contract fail-closed check failed'}
+      - name: Fixture valid manifest and contract becomes ready
+        shell: pwsh
+        run: |
+          $root=Join-Path $env:RUNNER_TEMP 'chatgpt-image-bind-valid';$dir=Join-Path $root 'Runtime_Readback\CHROME';New-Item -ItemType Directory -Force -Path $dir|Out-Null
+          $m=[ordered]@{ok=$true;extensionId='gedfnhdibkfgacmkbjgpfjihacalnlpn';extensionVersion='8.6.0';sidePanelDefaultPath='sidepanel.html';serviceWorker='background.js';contentScripts=@();permissions=@('downloads','storage');hostPermissions=@('https://chatgpt.com/*');referencedResources=@([ordered]@{relativePath='sidepanel.html';exists=$true;bytes=100},[ordered]@{relativePath='background.js';exists=$true;bytes=200})}
+          $c=[ordered]@{ok=$true;status='CONTRACT_CANDIDATES_FOUND';extensionId='gedfnhdibkfgacmkbjgpfjihacalnlpn';version='8.6.0';runtimeMessageHitCount=2;storageHitCount=3;files=@()}
+          $m|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_AUTO_MANIFEST_INSPECT.json') -Encoding UTF8
+          $c|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_ENTRYPOINT_CONTRACT_V1.json') -Encoding UTF8
           $proc=Start-Process -FilePath pwsh -ArgumentList @('-NoProfile','-File','local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1','-CentralRootOverride',$root) -Wait -PassThru -NoNewWindow
           if($proc.ExitCode -ne 0){ throw "expected exit 0, got $($proc.ExitCode)" }
           $r=Get-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_ADAPTER_BINDING_PLAN_V1.json') -Raw|ConvertFrom-Json
-          if($r.status -ne 'READY_FOR_ADAPTER_BINDING' -or -not $r.ok){ throw 'valid-manifest readiness check failed' }
+          if($r.status -ne 'READY_FOR_EXACT_INTERFACE_BINDING' -or -not $r.ok){ throw 'valid manifest+contract readiness check failed' }
+          if($r.storagePolicy -ne 'CHROME_ORIGINAL_DOWNLOAD_DIRECT_TO_GOOGLE_DRIVE_DESKTOP_SYNCED_PROJECT_FOLDER'){throw 'storage policy mismatch'}
+          if($r.pythonPolicy -ne 'NOT_IN_DEFAULT_TRANSFER_PATH_EXCEPTION_VALIDATION_ONLY'){throw 'python policy mismatch'}
       - name: Fixture missing declared resource fails closed
         shell: pwsh
         run: |
-          $root=Join-Path $env:RUNNER_TEMP 'chatgpt-image-bind-resource-missing'
-          $dir=Join-Path $root 'Runtime_Readback\CHROME'
-          New-Item -ItemType Directory -Force -Path $dir|Out-Null
-          $m=[ordered]@{
-            ok=$true
-            extensionId='gedfnhdibkfgacmkbjgpfjihacalnlpn'
-            extensionVersion='8.6.0'
-            sidePanelDefaultPath='sidepanel.html'
-            serviceWorker='background.js'
-            contentScripts=@()
-            permissions=@()
-            hostPermissions=@()
-            referencedResources=@([ordered]@{relativePath='background.js';exists=$false;bytes=0})
-          }
+          $root=Join-Path $env:RUNNER_TEMP 'chatgpt-image-bind-resource-missing';$dir=Join-Path $root 'Runtime_Readback\CHROME';New-Item -ItemType Directory -Force -Path $dir|Out-Null
+          $m=[ordered]@{ok=$true;extensionId='gedfnhdibkfgacmkbjgpfjihacalnlpn';extensionVersion='8.6.0';sidePanelDefaultPath='sidepanel.html';serviceWorker='background.js';contentScripts=@();permissions=@();hostPermissions=@();referencedResources=@([ordered]@{relativePath='background.js';exists=$false;bytes=0})}
           $m|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_AUTO_MANIFEST_INSPECT.json') -Encoding UTF8
           $proc=Start-Process -FilePath pwsh -ArgumentList @('-NoProfile','-File','local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1','-CentralRootOverride',$root) -Wait -PassThru -NoNewWindow
           if($proc.ExitCode -ne 7){ throw "expected exit 7, got $($proc.ExitCode)" }
