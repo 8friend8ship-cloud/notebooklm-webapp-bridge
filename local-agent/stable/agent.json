@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.57",
-  "releasedAt": "2026-08-29T15:25:00+09:00",
-  "gitBlobSha1": "2c780c6e315b3c124b6ac73897d6d1ec19d49ad5",
+  "version": "1.1.58",
+  "releasedAt": "2026-08-29T15:21:00+09:00",
+  "gitBlobSha1": "ec1d1f28d7a83c5563028c253db9acc6d8a886b4",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Apply the current runtime/stable extension release through GitHub Contents API with per-file Git blob SHA verification, then cold-restart only the dedicated Chrome-for-Testing profile so MV3 reloads the stable extension. Current target is NotebookLM WebApp Bridge 0.2.73 legacy async active-lock recovery. Preserve normal Chrome, existing auth/session, OAuth, Apps Script project/deployment, settings, Generate and credits. Write STABLE_EXTENSION_RELEASE_APPLY_1.1.57.json to local and central Runtime_Readback when available."
+  "notes": "Replace HomeDesign Local Command Host 1.2.9 with Host 1.3.0, whose allowlisted script transport uses GitHub Contents API plus local Git blob SHA verification instead of raw.githubusercontent.com. Capture the current Flow X2 local CommandResults before handoff, restart only the local command host on 127.0.0.1:8765, and write central Runtime_Readback receipts. No Chrome restart, Generate, credit spend, OAuth, project, deployment, scope or settings changes."
 }
