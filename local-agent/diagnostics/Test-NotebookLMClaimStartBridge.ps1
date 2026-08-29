@@ -37,15 +37,14 @@ if($KickAgent1155HostRepair){
     New-Item -ItemType Directory -Force -Path $Root|Out-Null
     $agent=Join-Path $Root 'HomeDesignLocalAgent-1.1.55-direct.ps1'
     $expected='90acc698096e3d94f2f6a695410b8344f79c60ab'
-    $headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}
-    $resp=Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/git/blobs/'+$expected+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers $headers -Method Get -TimeoutSec 20
+    $url='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/releases/1.1.55/HomeDesignLocalAgent.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $tmp=$agent+'.download'
-    [IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$resp.content -replace '\s','')))
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $tmp -TimeoutSec 20
     $actual=(GitBlobSha1 $tmp).ToLowerInvariant()
     if($actual -ne $expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw ('AGENT1155_BLOB_MISMATCH actual='+$actual+' expected='+$expected)}
     Move-Item -LiteralPath $tmp -Destination $agent -Force
     $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$true;$psi.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$agent+'"';$proc=[Diagnostics.Process]::Start($psi)
-    [ordered]@{ok=$true;action='AGENT1155_IMMUTABLE_HOST_RECOVERY_DISPATCHED';taskId=$TaskId;agentSha=$actual;pid=[int]$proc.Id;expectedAgent='1.1.55';expectedHost='1.2.9';sourceFetchMode='IMMUTABLE_GIT_BLOB_API';normalChromeRestarted=$false;generateClicked=$false;creditSpend=$false;oauthChanged=$false;scopeChanged=$false;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress
+    [ordered]@{ok=$true;action='AGENT1155_IMMUTABLE_HOST_RECOVERY_DISPATCHED';taskId=$TaskId;agentSha=$actual;pid=[int]$proc.Id;expectedAgent='1.1.55';expectedHost='1.2.9';sourceFetchMode='RAW_MAIN_RELEASE_PLUS_GIT_BLOB_SHA1_VERIFY';normalChromeRestarted=$false;generateClicked=$false;creditSpend=$false;oauthChanged=$false;scopeChanged=$false;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress
     exit 0
   }catch{
     [ordered]@{ok=$false;action='AGENT1155_IMMUTABLE_HOST_RECOVERY_DISPATCHED';taskId=$TaskId;error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
