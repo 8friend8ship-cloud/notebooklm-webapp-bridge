@@ -9,7 +9,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
-$Version='FLOW_MEDIA_OPTIONS_V7_20260829'
+$Version='FLOW_PROJECT_LIST_NEW_PROJECT_V8_20260829'
 function FindCentral {
   if($CentralRootOverride -and (Test-Path -LiteralPath $CentralRootOverride)){ return $CentralRootOverride }
   $name=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
@@ -51,18 +51,25 @@ try{
     const url=location.href;
     let state='OTHER';
     const flowRoute=/labs\\.google\/fx\/(?:[a-z]{2}(?:-[A-Z]{2})?\/)?tools\/flow(?:\/|$)/i;
+    const projectRoute=/labs\\.google\/fx\/(?:[a-z]{2}(?:-[A-Z]{2})?\/)?tools\/flow\/project\/[A-Za-z0-9-]+\/?(?:[?#].*)?$/i;
+    const hasNewProject=items.some(it=>/^(new project|새\\s*프로젝트)$/i.test(it.text)||/new project|새\\s*프로젝트/i.test(it.ariaLabel));
+    const hasCreateFlow=items.some(it=>/^create with google flow$/i.test(it.text));
     if(/accounts\\.google\\.com/i.test(url))state='GOOGLE_LOGIN';
-    else if(flowRoute.test(url))state=ins.length?'FLOW_WORKSPACE':'FLOW_LANDING';
-    else if(/flow\\.google/i.test(url))state=ins.length?'FLOW_WORKSPACE':'FLOW_INTERMEDIATE';
+    else if(projectRoute.test(url))state=ins.length?'FLOW_WORKSPACE':'FLOW_PROJECT_LOADING';
+    else if(flowRoute.test(url)&&hasNewProject)state='FLOW_PROJECT_LIST';
+    else if(flowRoute.test(url)&&hasCreateFlow)state='FLOW_LANDING';
+    else if(flowRoute.test(url))state='FLOW_INTERMEDIATE';
+    else if(/flow\\.google/i.test(url))state='FLOW_INTERMEDIATE';
     else if(/labs\\.google/i.test(url))state='LABS_INTERMEDIATE';
     let clicked=null,clickKind='';
     if(${allowClick?'true':'false'}&&state!=='FLOW_WORKSPACE'){
       const groups=[
         {kind:'COOKIE_CONSENT',rx:[/^agree$/i]},
         {kind:'FLOW_PRIMARY_CTA',rx:[/^create with google flow$/i,/^create with flow$/i,/^start creating$/i,/^enter flow$/i,/^try flow$/i,/^open flow$/i]},
-        {kind:'SAFE_CONTINUE',rx:[/^continue$/i,/^allow$/i,/^get started$/i,/^confirm$/i,/resume/i,/recent/i,/open project/i,/new project/i,/create project/i]}
+        {kind:'FLOW_NEW_PROJECT',rx:[/^new project$/i,/^새\\s*프로젝트$/i]},
+        {kind:'SAFE_CONTINUE',rx:[/^continue$/i,/^allow$/i,/^get started$/i,/^confirm$/i,/resume/i,/recent/i,/open project/i,/create project/i]}
       ];
-      outer:for(const g of groups){for(const it of items){if(g.rx.some(r=>r.test(it.text))){try{controls[it.i].click();clicked=it;clickKind=g.kind;break outer}catch{}}}}
+      outer:for(const g of groups){for(const it of items){if(g.rx.some(r=>r.test(it.text)||r.test(it.ariaLabel))){try{const el=controls[it.i];el.scrollIntoView({block:'center',inline:'center',behavior:'instant'});el.focus({preventScroll:true});el.click();clicked=it;clickKind=g.kind;break outer}catch{}}}}
     }
     let mediaOptions=null;
     if(${mediaScan?'true':'false'}){
@@ -72,17 +79,9 @@ try{
       const counts=items.filter(it=>/^x[1-4]$/i.test(it.text));
       const models=items.filter(it=>/(nano banana|veo|imagen|gemini|banana)/i.test(it.text));
       const optionText=items.filter(it=>/(image|video|이미지|동영상|16:9|4:3|1:1|3:4|9:16|x1|x2|x3|x4|nano banana|veo|imagen)/i.test(it.text));
-      mediaOptions={
-        mediaType:mediaType.map(it=>({...it,selected:selected(it)})),
-        aspectRatios:aspectRatios.map(it=>({...it,selected:selected(it)})),
-        counts:counts.map(it=>({...it,selected:selected(it)})),
-        models:models.map(it=>({...it,selected:selected(it)})),
-        optionCandidates:optionText.map(it=>({...it,selected:selected(it)})),
-        promptInputs:ins,
-        promptReady:ins.length>0
-      };
+      mediaOptions={mediaType:mediaType.map(it=>({...it,selected:selected(it)})),aspectRatios:aspectRatios.map(it=>({...it,selected:selected(it)})),counts:counts.map(it=>({...it,selected:selected(it)})),models:models.map(it=>({...it,selected:selected(it)})),optionCandidates:optionText.map(it=>({...it,selected:selected(it)})),promptInputs:ins,promptReady:projectRoute.test(url)&&ins.length>0};
     }
-    return {url,title:document.title,state,inputs:ins,buttons:items.slice(0,160),clicked,clickKind,passwordPrompt:!!document.querySelector('input[type="password"]'),emailPrompt:!!document.querySelector('input[type="email"]'),mediaOptions};
+    return {url,title:document.title,state,inputs:ins,buttons:items.slice(0,160),clicked,clickKind,passwordPrompt:!!document.querySelector('input[type="password"]'),emailPrompt:!!document.querySelector('input[type="email"]'),hasNewProject,hasCreateFlow,mediaOptions};
   })()`;
   const r=await c.send('Runtime.evaluate',{expression:expr,returnByValue:true,awaitPromise:true,userGesture:true});
   console.log(JSON.stringify(r.result?.value||{}));
@@ -113,10 +112,7 @@ if($CurrentScreenOnly){
 }
 if($InspectMediaOptions){
   $directNav=$false
-  if($DirectProjectUrl){
-    if(-not(ValidateProjectUrl $DirectProjectUrl)){throw 'DIRECT_PROJECT_URL_REJECTED'}
-    $pages=@(Pages);$page=FlowPage $pages;if($page){[void](Navigate ([string]$page.webSocketDebuggerUrl) $DirectProjectUrl);$directNav=$true;Start-Sleep -Seconds 2}
-  }
+  if($DirectProjectUrl){if(-not(ValidateProjectUrl $DirectProjectUrl)){throw 'DIRECT_PROJECT_URL_REJECTED'};$pages=@(Pages);$page=FlowPage $pages;if($page){[void](Navigate ([string]$page.webSocketDebuggerUrl) $DirectProjectUrl);$directNav=$true;Start-Sleep -Seconds 2}}
   $deadline=(Get-Date).AddSeconds($TimeoutSeconds);$scan=$null
   while((Get-Date)-lt$deadline){$pages=@(Pages);$page=FlowPage $pages;if(-not$page){Start-Sleep -Milliseconds 500;continue};$scan=MediaScan ([string]$page.webSocketDebuggerUrl);if([string]$scan.state-eq'FLOW_WORKSPACE'-and$scan.mediaOptions-and[bool]$scan.mediaOptions.promptReady){break};Start-Sleep -Seconds 1}
   $allTargets=@(Targets);$extTargets=@($allTargets|Where-Object{([string]$_.url)-like'chrome-extension://*'}|ForEach-Object{[ordered]@{type=[string]$_.type;url=[string]$_.url;title=[string]$_.title}})
@@ -125,12 +121,9 @@ if($InspectMediaOptions){
 }
 if($NavigateWorkspace){
   $deadline=(Get-Date).AddSeconds($TimeoutSeconds);$history=@();$final=$null;$credential=$false;$directNav=$false
-  if($DirectProjectUrl){
-    if(-not(ValidateProjectUrl $DirectProjectUrl)){throw 'DIRECT_PROJECT_URL_REJECTED'}
-    $pages=@(Pages);$page=FlowPage $pages;if($page){[void](Navigate ([string]$page.webSocketDebuggerUrl) $DirectProjectUrl);$directNav=$true;Start-Sleep -Seconds 2}
-  }
+  if($DirectProjectUrl){if(-not(ValidateProjectUrl $DirectProjectUrl)){throw 'DIRECT_PROJECT_URL_REJECTED'};$pages=@(Pages);$page=FlowPage $pages;if($page){[void](Navigate ([string]$page.webSocketDebuggerUrl) $DirectProjectUrl);$directNav=$true;Start-Sleep -Seconds 2}}
   while((Get-Date)-lt$deadline){$pages=@(Pages);$page=FlowPage $pages;if(-not$page){Start-Sleep -Milliseconds 600;continue};$scan=Scan ([string]$page.webSocketDebuggerUrl) $true;$history+=[ordered]@{at=(Get-Date).ToString('o');url=[string]$scan.url;title=[string]$scan.title;state=[string]$scan.state;inputCount=@($scan.inputs).Count;clickKind=[string]$scan.clickKind;clicked=$scan.clicked};$final=$scan;if([string]$scan.state-eq'FLOW_WORKSPACE'-and@($scan.inputs).Count){break};if([string]$scan.state-eq'GOOGLE_LOGIN'-and($scan.passwordPrompt-or$scan.emailPrompt)){$credential=$true;break};Start-Sleep -Seconds 2}
   $allTargets=@(Targets);$extTargets=@($allTargets|Where-Object{([string]$_.url)-like'chrome-extension://*'}|ForEach-Object{[ordered]@{type=[string]$_.type;url=[string]$_.url;title=[string]$_.title}});$ok=[bool]($final-and[string]$final.state-eq'FLOW_WORKSPACE'-and@($final.inputs).Count)
-  $result=[ordered]@{ok=$ok;action='FLOW_DIRECT_PROJECT_TO_WORKSPACE';version=$Version;directProjectUrl=$DirectProjectUrl;directNavigationAttempted=$directNav;workspaceReached=$ok;credentialEntryRequired=$credential;finalState=$(if($final){[string]$final.state}else{'NO_PAGE'});pageUrl=$(if($final){[string]$final.url}else{''});pageTitle=$(if($final){[string]$final.title}else{''});inputs=$(if($final){@($final.inputs)}else{@()});extensionTargets=$extTargets;history=$history;cookieConsentHandled=[bool](@($history|Where-Object{$_.clickKind-eq'COOKIE_CONSENT'}).Count);flowPrimaryCtaHandled=[bool](@($history|Where-Object{$_.clickKind-eq'FLOW_PRIMARY_CTA'}).Count);generateClicked=$false;creditSpend=$false;credentialEnteredByAutomation=$false;checkedAt=(Get-Date).ToString('o')};WriteReceipt $result 'FLOW_DIRECT_PROJECT_TO_WORKSPACE.json';$result|ConvertTo-Json -Depth 40 -Compress;if($ok){exit 0}elseif($credential){exit 3}else{exit 2}
+  $result=[ordered]@{ok=$ok;action='FLOW_LANDING_PROJECT_LIST_TO_WORKSPACE';version=$Version;directProjectUrl=$DirectProjectUrl;directNavigationAttempted=$directNav;workspaceReached=$ok;credentialEntryRequired=$credential;finalState=$(if($final){[string]$final.state}else{'NO_PAGE'});pageUrl=$(if($final){[string]$final.url}else{''});pageTitle=$(if($final){[string]$final.title}else{''});inputs=$(if($final){@($final.inputs)}else{@()});extensionTargets=$extTargets;history=$history;cookieConsentHandled=[bool](@($history|Where-Object{$_.clickKind-eq'COOKIE_CONSENT'}).Count);flowPrimaryCtaHandled=[bool](@($history|Where-Object{$_.clickKind-eq'FLOW_PRIMARY_CTA'}).Count);newProjectHandled=[bool](@($history|Where-Object{$_.clickKind-eq'FLOW_NEW_PROJECT'}).Count);generateClicked=$false;creditSpend=$false;credentialEnteredByAutomation=$false;checkedAt=(Get-Date).ToString('o')};WriteReceipt $result 'FLOW_LANDING_PROJECT_LIST_TO_WORKSPACE.json';$result|ConvertTo-Json -Depth 40 -Compress;if($ok){exit 0}elseif($credential){exit 3}else{exit 2}
 }
 throw 'MODE_REQUIRED'
