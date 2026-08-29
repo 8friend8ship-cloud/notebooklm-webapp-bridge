@@ -30,8 +30,8 @@ function BootstrapLoops{try{return @(Get-CimInstance Win32_Process -Filter "Name
 function HostHealthy{try{$h=Invoke-RestMethod 'http://127.0.0.1:8765/health' -TimeoutSec 3;return [bool]$h.ok}catch{return $false}}
 function FreshReceipt([string]$Path,[datetime]$Since){try{return ((Test-Path -LiteralPath $Path -PathType Leaf) -and ((Get-Item -LiteralPath $Path).LastWriteTime -ge $Since.AddSeconds(-2)))}catch{return $false}}
 
-$startedAt=Get-Date;$started=$startedAt.ToString('o');$errors=@();$installed=@{};$loopStarted=$false;$resumeExit=$null
-$autoResumeInstallExit=$null;$autoResumeReceiptFresh=$false;$autoResumeImmediateVerified=$false;$autoResumeDirectWatchdogExit=$null;$taskCreated=$false;$runKeySet=$false;$persistenceReady=$false
+$startedAt=Get-Date;$started=$startedAt.ToString('o');$errors=@();$installed=@{};$loopStarted=$false;$resumeExit=$null;$resumeSkippedBecauseAutoResumeVerified=$false
+$autoResumeInstallExit=$null;$autoResumeReceiptFresh=$false;$autoResumeInstallerRevision='';$autoResumeImmediateVerified=$false;$autoResumeDirectWatchdogExit=$null;$taskCreated=$false;$runKeySet=$false;$persistenceReady=$false;$periodicTriggerReady=$false;$fullTriggerContractReady=$false;$triggerContract='';$taskMode='';$multipleInstancesPolicy='';$scheduledEntryObserved=$false;$directWatchdogLaunched=$false
 $flowCanonicalExit=$null;$flowCanonicalOk=$false;$flowCanonicalSelected='';$flowDirectExit=$null;$flowFallbackInvoked=$false;$flowReceiptFresh=$false;$flowReceiptOk=$false
 $Bootstrap=Join-Path $Root 'AgentBootstrap.ps1';$AutoResume=Join-Path $Root 'HomeDesignAutoResume.ps1';$Resume=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1';$Watchdog=Join-Path $Root 'HomeDesignLocalWatchdog.ps1'
 $AutoResumeInstaller=Join-Path $Root 'INSTALL_AUTO_RESUME_TASK.ps1';$AutoResumeReceipt=Join-Path $Root 'AUTO_RESUME_INSTALL_V3.json'
@@ -51,43 +51,60 @@ try{
     if($autoResumeInstallExit-ne0){$errors+=('AUTORESUME_INSTALL_EXIT_'+$autoResumeInstallExit)}
   }else{throw'AUTORESUME_INSTALLER_MISSING'}
 }catch{$errors+=('AUTORESUME_INSTALL_RUN:'+ $_.Exception.Message)}
+
 $autoResumeReceiptFresh=FreshReceipt $AutoResumeReceipt $startedAt
 if($autoResumeReceiptFresh){
   try{
     $ar=Get-Content -LiteralPath $AutoResumeReceipt -Raw -Encoding UTF8|ConvertFrom-Json
+    $autoResumeInstallerRevision=[string]$ar.installerRevision
     $taskCreated=[bool]$ar.scheduledTaskCreated
     $runKeySet=[bool]$ar.hkcuRunRegistered
     $persistenceReady=[bool]$ar.persistenceReady
+    $periodicTriggerReady=[bool]$ar.periodicTriggerReady
+    $fullTriggerContractReady=[bool]$ar.fullTriggerContractReady
+    $triggerContract=[string]$ar.triggerContract
+    $taskMode=[string]$ar.taskMode
+    $multipleInstancesPolicy=[string]$ar.multipleInstancesPolicy
+    $scheduledEntryObserved=[bool]$ar.scheduledEntryObserved
+    $directWatchdogLaunched=[bool]$ar.directWatchdogLaunched
     $autoResumeImmediateVerified=[bool]$ar.immediateExecutionVerified
     if($ar.directWatchdogExit-ne$null){$autoResumeDirectWatchdogExit=[int]$ar.directWatchdogExit}
+    if(-not$periodicTriggerReady){$errors+='AUTORESUME_V3_PERIODIC_TRIGGER_NOT_READY'}
+    if(-not$persistenceReady){$errors+='AUTORESUME_V3_PERSISTENCE_NOT_READY'}
     if(-not$autoResumeImmediateVerified){$errors+='AUTORESUME_V3_IMMEDIATE_NOT_VERIFIED'}
+    if($multipleInstancesPolicy-and$multipleInstancesPolicy-ne'IgnoreNew'){$errors+=('AUTORESUME_MULTIPLE_INSTANCES_POLICY_'+$multipleInstancesPolicy)}
   }catch{$errors+=('AUTORESUME_RECEIPT_READ:'+ $_.Exception.Message)}
 }else{$errors+='AUTORESUME_V3_RECEIPT_NOT_FRESH'}
 
-try{
-  foreach($p in @(BootstrapLoops)){try{Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction SilentlyContinue}catch{}}
-  Start-Sleep -Seconds 1
-  if(Test-Path -LiteralPath $Bootstrap){Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$Bootstrap`"",'-Loop') -WindowStyle Hidden|Out-Null;Start-Sleep -Seconds 3;$loopStarted=(@(BootstrapLoops).Count-gt0)}
-}catch{$errors+=('BOOTSTRAP_LOOP:'+ $_.Exception.Message)}
-
-try{
-  if(Test-Path -LiteralPath $Resume){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Resume;$resumeExit=$LASTEXITCODE}else{throw'RESUME_FILE_MISSING'}
-}catch{$errors+=('RESUME_RUN:'+ $_.Exception.Message)}
-
-try{
-  if(Test-Path -LiteralPath $FlowVerifier){
-    $central=FindCentral
-    $args=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$FlowVerifier)
-    if($central){$args+=@('-CentralRootOverride',$central)}
-    $out=& powershell.exe @args 2>&1;$flowCanonicalExit=$LASTEXITCODE
-    $last=($out|Select-Object -Last 1|Out-String).Trim();if($last){try{$j=$last|ConvertFrom-Json;$flowCanonicalOk=[bool]$j.ok;$flowCanonicalSelected=[string]$j.selectedPath}catch{}}
-    if($flowCanonicalExit-ne0-or-not$flowCanonicalOk){$errors+=('FLOW_CANONICAL_EXIT_'+$flowCanonicalExit)}
+# The canonical AutoResume installer has already driven Watchdog -> AutoResume -> Resume.
+# Do not run Resume a second time after that verified cycle. Only repair the bootstrap loop
+# if it is unexpectedly absent; otherwise preserve the single-executor path.
+$bootstrapLoopPresent=[bool](@(BootstrapLoops).Count-gt0)
+if($autoResumeInstallExit-eq0 -and $autoResumeReceiptFresh -and $periodicTriggerReady -and $persistenceReady -and $autoResumeImmediateVerified){
+  $resumeSkippedBecauseAutoResumeVerified=$true
+  if(-not$bootstrapLoopPresent){
+    try{if(Test-Path -LiteralPath $Bootstrap){Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$Bootstrap`"",'-Loop') -WindowStyle Hidden|Out-Null;Start-Sleep -Seconds 3;$loopStarted=(@(BootstrapLoops).Count-gt0);$bootstrapLoopPresent=[bool](@(BootstrapLoops).Count-gt0)}}catch{$errors+=('BOOTSTRAP_LOOP_REPAIR:'+ $_.Exception.Message)}
   }
-}catch{$errors+=('FLOW_CANONICAL:'+ $_.Exception.Message)}
+}else{
+  $errors+='AUTORESUME_GATE_BLOCKED_FLOW_RECOVERY'
+}
+
+if($autoResumeInstallExit-eq0 -and $periodicTriggerReady -and $persistenceReady -and $autoResumeImmediateVerified -and $bootstrapLoopPresent){
+  try{
+    if(Test-Path -LiteralPath $FlowVerifier){
+      $central=FindCentral
+      $args=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$FlowVerifier)
+      if($central){$args+=@('-CentralRootOverride',$central)}
+      $out=& powershell.exe @args 2>&1;$flowCanonicalExit=$LASTEXITCODE
+      $last=($out|Select-Object -Last 1|Out-String).Trim();if($last){try{$j=$last|ConvertFrom-Json;$flowCanonicalOk=[bool]$j.ok;$flowCanonicalSelected=[string]$j.selectedPath}catch{}}
+      if($flowCanonicalExit-ne0-or-not$flowCanonicalOk){$errors+=('FLOW_CANONICAL_EXIT_'+$flowCanonicalExit)}
+    }
+  }catch{$errors+=('FLOW_CANONICAL:'+ $_.Exception.Message)}
+}
 
 Start-Sleep -Seconds 8
 $flowReceiptFresh=FreshReceipt $FlowReceipt $startedAt
-if(-not$flowReceiptFresh -and $flowCanonicalOk -and $autoResumeImmediateVerified -and (Test-Path -LiteralPath $FlowAgent -PathType Leaf)){
+if(-not$flowReceiptFresh -and $autoResumeInstallExit-eq0 -and $periodicTriggerReady -and $persistenceReady -and $autoResumeImmediateVerified -and $bootstrapLoopPresent -and $flowCanonicalOk -and (Test-Path -LiteralPath $FlowAgent -PathType Leaf)){
   $flowFallbackInvoked=$true
   try{& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $FlowAgent;$flowDirectExit=$LASTEXITCODE;if($flowDirectExit-ne0){$errors+=('FLOW_DIRECT_EXIT_'+$flowDirectExit)}}catch{$errors+=('FLOW_DIRECT:'+ $_.Exception.Message)}
 }
@@ -97,5 +114,6 @@ if($flowReceiptFresh){try{$fr=Get-Content -LiteralPath $FlowReceipt -Raw -Encodi
 Start-Sleep -Seconds 3
 $state=$null;try{$sp=Join-Path $Root 'state.json';if(Test-Path $sp){$state=Get-Content $sp -Raw -Encoding UTF8|ConvertFrom-Json}}catch{}
 $bootstrapLoopPresent=[bool](@(BootstrapLoops).Count-gt0)
-$ok=[bool]($installed.bootstrap -and $installed.autoResume -and $installed.resume -and $installed.watchdog -and $installed.autoResumeInstaller -and $installed.flowCanonicalVerifier -and $installed.flowAgent169 -and $autoResumeReceiptFresh -and $persistenceReady -and $autoResumeImmediateVerified -and $bootstrapLoopPresent -and $flowCanonicalOk -and $flowReceiptFresh -and $flowReceiptOk)
-$rec=[ordered]@{ok=$ok;action='LOCAL_EXECUTOR_RECOVERY_V1';recoveryRevision='V1.3_AUTOREUME_V3_FLOW_CANONICAL_R10_GATE';startedAt=$started;completedAt=(Get-Date).ToString('o');installed=$installed;autoResumeInstallerVersion='V3';autoResumeInstallExit=$autoResumeInstallExit;autoResumeReceiptFresh=$autoResumeReceiptFresh;scheduledTaskCreated=$taskCreated;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;autoResumeImmediateExecutionVerified=$autoResumeImmediateVerified;autoResumeDirectWatchdogExit=$autoResumeDirectWatchdogExit;bootstrapLoopPresent=$bootstrapLoopPresent;bootstrapLoopStartedThisRun=$loopStarted;resumeExit=$resumeExit;hostHealthy=(HostHealthy);flowCanonicalExit=$flowCanonicalExit;flowCanonicalOk=$flowCanonicalOk;flowCanonicalSelectedPath=$flowCanonicalSelected;flowFallbackInvoked=$flowFallbackInvoked;flowDirectExit=$flowDirectExit;flowReceiptFresh=$flowReceiptFresh;flowReceiptOk=$flowReceiptOk;flowExecutionSequence='FLOW_PROJECT_LIST_NEW_PROJECT_V8_20260829';flowExtensionVersion='0.1.0';flowExtensionId='lgedgmpcikglaajhfclcihicgafimlna';alwaysOnBridgeSourceVersion='1.0.2';alwaysOnBridgeRuntimeState='LOCAL_RELOAD_PENDING';stateAgentVersion=$(if($state){[string]$state.agentVersion}else{''});stateStatus=$(if($state){[string]$state.status}else{''});normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;generateClicked=$false;creditSpend=$false;errors=$errors};Save $rec;$rec|ConvertTo-Json -Depth 50 -Compress;if($ok){exit 0}else{exit 2}
+$hostHealthy=HostHealthy
+$ok=[bool]($installed.bootstrap -and $installed.autoResume -and $installed.resume -and $installed.watchdog -and $installed.autoResumeInstaller -and $installed.flowCanonicalVerifier -and $installed.flowAgent169 -and ($autoResumeInstallExit-eq0) -and $autoResumeReceiptFresh -and $periodicTriggerReady -and $persistenceReady -and $autoResumeImmediateVerified -and $bootstrapLoopPresent -and $flowCanonicalOk -and $flowReceiptFresh -and $flowReceiptOk)
+$rec=[ordered]@{ok=$ok;action='LOCAL_EXECUTOR_RECOVERY_V1';recoveryRevision='V1.4_AUTORUN_V3_PERIODIC_SINGLE_EXECUTOR_FLOW_GATE';startedAt=$started;completedAt=(Get-Date).ToString('o');installed=$installed;autoResumeInstallerVersion='V3';autoResumeInstallerRevision=$autoResumeInstallerRevision;autoResumeInstallExit=$autoResumeInstallExit;autoResumeReceiptFresh=$autoResumeReceiptFresh;scheduledTaskCreated=$taskCreated;taskMode=$taskMode;triggerContract=$triggerContract;periodicTriggerReady=$periodicTriggerReady;fullTriggerContractReady=$fullTriggerContractReady;multipleInstancesPolicy=$multipleInstancesPolicy;scheduledEntryObserved=$scheduledEntryObserved;directWatchdogLaunched=$directWatchdogLaunched;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;autoResumeImmediateExecutionVerified=$autoResumeImmediateVerified;autoResumeDirectWatchdogExit=$autoResumeDirectWatchdogExit;resumeSkippedBecauseAutoResumeVerified=$resumeSkippedBecauseAutoResumeVerified;resumeExit=$resumeExit;bootstrapLoopPresent=$bootstrapLoopPresent;bootstrapLoopStartedThisRun=$loopStarted;hostHealthy=$hostHealthy;flowCanonicalExit=$flowCanonicalExit;flowCanonicalOk=$flowCanonicalOk;flowCanonicalSelectedPath=$flowCanonicalSelected;flowFallbackInvoked=$flowFallbackInvoked;flowDirectExit=$flowDirectExit;flowReceiptFresh=$flowReceiptFresh;flowReceiptOk=$flowReceiptOk;flowExecutionSequence='FLOW_PROJECT_LIST_NEW_PROJECT_V8_20260829';flowExtensionVersion='0.1.0';flowExtensionId='lgedgmpcikglaajhfclcihicgafimlna';alwaysOnBridgeSourceVersion='1.0.2';alwaysOnBridgeRuntimeState='LOCAL_RELOAD_PENDING';normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;generateClicked=$false;creditSpend=$false;errors=$errors};Save $rec;$rec|ConvertTo-Json -Depth 50 -Compress;if($ok){exit 0}else{exit 2}
