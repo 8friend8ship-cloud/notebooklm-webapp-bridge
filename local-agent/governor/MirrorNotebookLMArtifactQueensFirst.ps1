@@ -19,16 +19,22 @@ $invoke = @{
   TimeoutSeconds = $TimeoutSeconds
 }
 
-$raw = & $mirrorScript @invoke 2>&1
-$exitCode = $LASTEXITCODE
+# The base mirror is another PowerShell script, not an external executable.
+# $LASTEXITCODE is therefore not a reliable success signal here; parse its
+# explicit JSON contract and fail closed on missing/invalid/not-ok output.
+$raw = @()
+try {
+  $raw = @(& $mirrorScript @invoke 2>&1)
+} catch {
+  throw ('NOTEBOOKLM_BASE_MIRROR_EXCEPTION:' + $_.Exception.Message)
+}
 $text = @($raw | ForEach-Object { [string]$_ })
 $lastJson = @($text | Where-Object { $_ -match '^\s*\{' } | Select-Object -Last 1)
-if ($exitCode -ne 0 -or $lastJson.Count -lt 1) {
-  throw ('NOTEBOOKLM_BASE_MIRROR_FAILED:exit=' + $exitCode + ';output=' + ($text -join ' | '))
+if ($lastJson.Count -lt 1) {
+  throw ('NOTEBOOKLM_BASE_MIRROR_NO_JSON:output=' + ($text -join ' | '))
 }
-
-$mirror = $lastJson[0] | ConvertFrom-Json
-if (-not $mirror.ok) { throw 'NOTEBOOKLM_BASE_MIRROR_NOT_OK' }
+try { $mirror = $lastJson[0] | ConvertFrom-Json } catch { throw ('NOTEBOOKLM_BASE_MIRROR_BAD_JSON:' + $_.Exception.Message) }
+if (-not $mirror.ok) { throw ('NOTEBOOKLM_BASE_MIRROR_NOT_OK:' + ([string]$mirror.error)) }
 if (-not $mirror.destinationPath -or -not (Test-Path -LiteralPath ([string]$mirror.destinationPath) -PathType Leaf)) { throw 'QUEENS_NATIVE_ORIGINAL_NOT_FOUND' }
 $dest = Get-Item -LiteralPath ([string]$mirror.destinationPath)
 if ($dest.Length -le 0) { throw 'QUEENS_NATIVE_ORIGINAL_ZERO_BYTES' }
@@ -43,7 +49,7 @@ $assetId = 'NLM:' + $hash
 $sidecarPath = $dest.FullName + '.capture.json'
 
 $sidecar = [ordered]@{
-  schemaVersion = 'notebooklm-queens-first-v1'
+  schemaVersion = 'notebooklm-queens-first-v2'
   status = 'QUEENS_INBOX'
   taskId = $TaskId
   artifactType = $ArtifactType
@@ -65,7 +71,8 @@ $sidecar = [ordered]@{
   nativeOriginalVerified = $true
   hashDedupeReady = $true
   queensRegistrationReady = $true
-  seedDerivativeAllowed = $true
+  queensUrlVerified = $false
+  seedDerivativeAllowed = $false
   seedDerivativeVerified = $false
   johnsonDeliveryAllowed = $false
   nextGate = 'QUEENS_URL_VERIFIED'
@@ -88,9 +95,10 @@ if ($sidecarFile.Length -le 0) { throw 'QUEENS_SIDECAR_ZERO_BYTES' }
   nativeOriginalBytes = [int64]$dest.Length
   sha256 = $hash
   queensStatus = 'QUEENS_INBOX'
+  queensUrlVerified = $false
   queensSidecarPath = $sidecarFile.FullName
   queensSidecarBytes = [int64]$sidecarFile.Length
-  seedEligible = $true
+  seedEligible = $false
   seedVerified = $false
   johnsonEligible = $false
   nextGate = 'QUEENS_URL_VERIFIED'
