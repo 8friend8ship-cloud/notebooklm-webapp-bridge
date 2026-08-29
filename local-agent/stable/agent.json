@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.51",
-  "releasedAt": "2026-08-29T12:32:00+09:00",
-  "gitBlobSha1": "bb5ae000c04a679750dadaef00160a14a3cf76c0",
+  "version": "1.1.52",
+  "releasedAt": "2026-08-29T12:44:00+09:00",
+  "gitBlobSha1": "a268a843ab4c51b72b044a5fefdeb2433a9fefd5",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "P0 queue-integrity recovery without blind retry. Before invoking pinned Agent 1.1.50, checks LocalAgent/NOTEBOOKLM_QUEUE_INTEGRITY_SYNC_V2.json. A verified PASS is promoted to Runtime_Readback/AppsScript_QueueIntegrity/NOTEBOOKLM_QUEUE_INTEGRITY_SYNC.json only when version=0.2.10-queue-lock, sourceSha=e7c22534048062eca913e2d1b5d8b3c6e7ac8b28, ok=true and status=PUSH_PULL_READBACK_PASS. A terminal FAILED local receipt is mirrored to the canonical Drive path for diagnosis and remains HOLD. No new queue task, browser probe, OAuth, Apps Script project/deployment/trigger, paid Gemini call, public publish, or credit spend is added. Existing 1.1.50 power-continuity and 1.1.46 governance remain pinned. Completion still requires canonical Drive receipt readback and the existing single atomic concurrency smoke gate."
+  "notes": "Read-only P0 bound Script ID recovery after Agent 1.1.51 surfaced canonical FAILED/BINDING_VERIFY with NOTEBOOKLM_EXISTING_PROJECT_NOT_FOUND. This release does not create or run a queue task, launch a browser, login OAuth, create Apps Script projects/deployments/triggers, push remote code, publish, or spend credits. It decodes only the existing local clasp identity email when available, runs clasp list read-only, scans local/Drive/Chrome History and Session bytes with FileShare ReadWrite/Delete for the previously evidenced Script-ID prefix, and if exactly one 57-char candidate is recovered it uses clasp clone to a temp folder for read-only signature verification. A candidate is only marked readyForOnePush when clone succeeds and NotebookLM queue/bridge signatures score >=160. Existing Agent 1.1.51 governance remains pinned and runs afterward."
 }
