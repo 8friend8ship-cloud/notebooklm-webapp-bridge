@@ -29,13 +29,15 @@ jobs:
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$tokens,[ref]$errors)
             if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
           }
-      - name: Verify Flow V1.4 periodic persistence single-executor and launcher gates
+      - name: Verify Flow V1.5 periodic persistence auxiliary sync and launcher gates
         shell: powershell
         run: |
           $s=Get-Content 'local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1' -Raw
-          foreach($required in @('V1.4_AUTORUN_V3_PERIODIC_SINGLE_EXECUTOR_FLOW_GATE','INSTALL_AUTO_RESUME_TASK.ps1','AUTO_RESUME_INSTALL_V3.json','$autoResumeInstallExit-eq0','$periodicTriggerReady','$persistenceReady','$autoResumeImmediateVerified','resumeSkippedBecauseAutoResumeVerified','Test-FlowCanonicalExtension.ps1','FLOW_DIRECT_BOOTSTRAP_R10_1.1.69.json','FLOW_PROJECT_LIST_NEW_PROJECT_V8_20260829',"flowExtensionVersion='0.1.0'","flowExtensionId='lgedgmpcikglaajhfclcihicgafimlna'","PinnedFlowAgent169='9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'","alwaysOnBridgeSourceVersion='1.0.2'",'generateClicked=$false','creditSpend=$false','oauthChanged=$false')){if(-not$s.Contains($required)){throw "MISSING_RECOVERY_GUARD:$required"}}
+          foreach($required in @('V1.5_ALWAYS_ON_AUX_SYNC_FLOW_GATE','INSTALL_AUTO_RESUME_TASK.ps1','AUTO_RESUME_INSTALL_V3.json','$autoResumeInstallExit-eq0','$periodicTriggerReady','$persistenceReady','$autoResumeImmediateVerified','resumeSkippedBecauseAutoResumeVerified','Sync-GoogleAIAlwaysOnBridgeV102.ps1','GOOGLE_AI_ALWAYS_ON_BRIDGE_V102_SYNC.json','alwaysOnAuxiliaryOnly=$true','alwaysOnBridgeSourceVersion=','AUX_SYNC_','Test-FlowCanonicalExtension.ps1','FLOW_DIRECT_BOOTSTRAP_R10_1.1.69.json','FLOW_PROJECT_LIST_NEW_PROJECT_V8_20260829',"flowExtensionVersion='0.1.0'","flowExtensionId='lgedgmpcikglaajhfclcihicgafimlna'","PinnedFlowAgent169='9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'",'generateClicked=$false','creditSpend=$false','oauthChanged=$false')){if(-not$s.Contains($required)){throw "MISSING_RECOVERY_GUARD:$required"}}
           if($s.Contains('schtasks.exe /Create')){throw 'RECOVERY_MUST_NOT_REIMPLEMENT_SCHEDULED_TASK_CREATE'}
           if($s.Contains('& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Resume')){throw 'RECOVERY_MUST_NOT_RERUN_RESUME_AFTER_VERIFIED_AUTORUN'}
+          if(-not$s.Contains('$coreOk=[bool](')){throw 'CORE_OK_GATE_MISSING'}
+          if($s.Contains('$coreOk=[bool]($installed.alwaysOnUpdater')){throw 'ALWAYS_ON_MUST_REMAIN_AUXILIARY'}
           $i=Get-Content 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1' -Raw
           foreach($required in @('INSTALL_AUTO_RESUME_V3','V3.5_PERIODIC_REQUIRED_IGNORE_NEW_SINGLE_EXECUTOR','InstallVerified','SCHEDULED_TASK_FULL_CREATE','SCHEDULED_TASK_5MIN_FALLBACK','FALLBACK_5MIN','FULL_XML','periodicTriggerReady','fullTriggerContractReady','HKCU_LOGON+5MIN_FALLBACK','DIRECT_WATCHDOG_FALLBACK_ONLY','SCHEDULED_WATCHDOG_RECEIPT','WATCHDOG_ENTRY_LATEST.json','scheduledEntryObserved','directWatchdogLaunched','persistenceReady','immediateExecutionVerified','scheduledRunExit','directWatchdogExit','RunDirectWatchdog','$DirectWatchdogTimeoutSeconds=420','$ScheduledEntryWaitSeconds=15','$ScheduledExecutionLimitMinutes=10','LOGON+RESUME+5MIN','<LogonTrigger>','<EventTrigger>','<Interval>PT5M</Interval>','/SC MINUTE /MO 5','triggerIntervalMinutes=5','<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>',"multipleInstancesPolicy='IgnoreNew'")){if(-not$i.Contains($required)){throw "MISSING_INSTALLER_GUARD:$required"}}
           if($i.Contains('<MultipleInstancesPolicy>StopExisting</MultipleInstancesPolicy>')){throw 'FIVE_MIN_TRIGGER_MUST_NOT_KILL_ACTIVE_RECOVERY'}
@@ -51,11 +53,11 @@ jobs:
           if(360 -lt (120+180)){throw 'WATCHDOG_TIMEOUT_BELOW_RESUME_BOUNDED_WAIT'}
           if(420 -le 360){throw 'INSTALLER_DIRECT_TIMEOUT_MUST_EXCEED_WATCHDOG_TIMEOUT'}
           $cmd=Get-Content 'local-agent/bootstrap/RUN_FLOW_RECOVERY_NOW.cmd' -Raw
-          foreach($required in @('644761fd60c4bb2a1fd3c18c61bd50fc339c2753','fcf2cc5d4f03cd5ecb822f8d3245a0cef78041a9','RECOVERY_BLOB_PIN_MISMATCH','RUN_LOCAL_EXECUTOR_RECOVERY_V1.pinned.ps1')){if(-not$cmd.Contains($required)){throw "MISSING_LAUNCHER_PIN:$required"}}
+          foreach($required in @('aa90ef41f087e06470ec03a66f49546839ff73c5','043485590eb7404dda245adf158c7f156b0729ff','RECOVERY_BLOB_PIN_MISMATCH','RUN_LOCAL_EXECUTOR_RECOVERY_V1.pinned.ps1')){if(-not$cmd.Contains($required)){throw "MISSING_LAUNCHER_PIN:$required"}}
           $c=Get-Content 'config/flow-extension-canonical-v0.1.0.json' -Raw|ConvertFrom-Json
           if($c.version-ne'0.1.0'){throw 'FLOW_CANONICAL_VERSION_MISMATCH'}
           if($c.extensionId-ne'lgedgmpcikglaajhfclcihicgafimlna'){throw 'FLOW_CANONICAL_ID_MISMATCH'}
-          Write-Host 'FLOW_LOCAL_EXECUTOR_RECOVERY_V1_4_CONTRACT_PASS'
+          Write-Host 'FLOW_LOCAL_EXECUTOR_RECOVERY_V1_5_CONTRACT_PASS'
       - name: Verify Google AI Always-On 1.0.2 path-preserving contract
         shell: powershell
         run: |
