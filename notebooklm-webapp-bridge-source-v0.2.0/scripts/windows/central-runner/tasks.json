@@ -1,6 +1,6 @@
 {
   "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V2",
-  "version": "20260829.1",
+  "version": "20260829.2",
   "pollIntervalMinutes": 5,
   "tasks": [
     {
@@ -22,11 +22,11 @@
       "notes": "Reuse existing Git/clasp authorization and existing WEBAPP_TEMPLATE_05 only. Clone/snapshot live source, copy canonical Content OS modules, inject exactly one fail-open scheduler adapter into existing processTaskQueue, push same Script ID, clean reclone readback. No new OAuth/project/deployment/physical trigger."
     },
     {
-      "taskId": "TASK_20260829_CHROME_FLOW_HEALTH_RECOVERY_001",
+      "taskId": "TASK_20260829_CHROME_FLOW_HEALTH_RECOVERY_002",
       "action": "CHROME_FLOW_HEALTH",
       "enabled": true,
       "maxAttempts": 5,
-      "notes": "NotebookLM proven recovery template applied to Flow: preserve installed bridge/auth/session, safely restart bootstrap/dedicated Chrome only when missing, verify stable release + Apps Script/front health + extension PING, and write local chrome-flow-health.json. No reinstall, no new OAuth, no new Apps Script project. After health PASS, continue same-lineage Flow queue CLAIMED→STARTED→DONE then generation→Drive RESULT/ACK x2."
+      "notes": "Second same-lineage Flow health wake after X1 stale claim. Preserve installed bridge/auth/session. Re-run safe bootstrap/dedicated Chrome/stable release/front/Apps Script/extension PING health so the extension service worker reloads and clears stale active handoff, then consume existing X2 READY task. No reinstall, no new OAuth/project/deployment, no Generate, no credit spend. Completion still requires Flow deep-connect RESULT/ACK x2 before any generation gate."
     }
   ]
 }
