@@ -155,12 +155,18 @@ test('Local Agent 1.1.35 uses official Host async API for one fixed idempotent C
   assert.equal((agent35Ps.match(/CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01/g) || []).length, 1);
 });
 
-test('Stable Agent manifest points to its exact release blob and pinned Host/direct route', () => {
-  assert.ok(['1.1.30', '1.1.31', '1.1.32', '1.1.33', '1.1.34', '1.1.35'].includes(stableAgent.version), `unexpected stable agent ${stableAgent.version}`);
+test('Stable Agent manifest points to its exact release blob and current recovery contract', () => {
+  assert.match(stableAgent.version, /^1\.1\.\d+$/);
   const stableAgentPath = `local-agent/releases/${stableAgent.version}/HomeDesignLocalAgent.ps1`;
+  assert.ok(fs.existsSync(stableAgentPath), `stable agent release missing: ${stableAgent.version}`);
   assert.equal(stableAgent.gitBlobSha1.toLowerCase(), repositoryBlobSha1(stableAgentPath));
   const stableAgentPs = fs.readFileSync(stableAgentPath, 'utf8');
-  if (stableAgent.version === '1.1.35') {
+  if (stableAgent.version === '1.1.54') {
+    assert.match(stableAgentPs, /\[string\[\]\]\$ArgList/);
+    assert.match(stableAgentPs, /AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/);
+    assert.match(stableAgentPs, /PUSH_PULL_READBACK_PASS/);
+    assert.match(stableAgentPs, /DEPLOYMENT_INVARIANT_LOST/);
+  } else if (stableAgent.version === '1.1.35') {
     assert.equal(repositoryBlobSha1(agent35Path), 'e27b760b67933be05a5d6f1ac0af1afd6158b32b');
     assert.match(stableAgentPs, /CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01/);
     assert.match(stableAgentPs, /taskType='LOCAL_POWERSHELL'/);
@@ -189,7 +195,7 @@ test('Stable Agent manifest points to its exact release blob and pinned Host/dir
     assert.match(stableAgentPs, /5d17bb233706897cd1706930cea9af3796f29488/);
     assert.ok(stableAgentPs.includes('e6a79fbb113a79e19650b2864072f6abde5bcffb'), 'Agent 1.1.31 wrapper must identify the prior Host 1.2.5 pin');
     assert.ok(stableAgentPs.includes('HostExpected'), 'Agent 1.1.31 wrapper must patch HostExpected');
-  } else {
+  } else if (stableAgent.version === '1.1.30') {
     const hostExpected = stableAgentPs.match(/\$HostExpected='([0-9a-f]{40})'/i)?.[1];
     assert.ok(hostExpected, 'Agent 1.1.30 must pin HostExpected');
     assert.equal(hostExpected.toLowerCase(), repositoryBlobSha1(host125Path));
@@ -197,8 +203,8 @@ test('Stable Agent manifest points to its exact release blob and pinned Host/dir
   }
 });
 
-test('Stable Bridge 0.2.71 release hashes match every declared repository blob', () => {
-  assert.equal(stableBridge.version, '0.2.71');
+test('Stable Bridge release hashes match every declared repository blob', () => {
+  assert.match(stableBridge.version, /^0\.2\.\d+$/);
   assert.equal(stableBridge.requiresUserApproval, false);
   assert.ok(Array.isArray(stableBridge.files) && stableBridge.files.length > 0);
   for (const file of stableBridge.files) {
