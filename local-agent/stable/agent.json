@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.70",
-  "releasedAt": "2026-08-29T18:58:00+09:00",
-  "gitBlobSha1": "2dc7ccf22a30fe2748ed10faffc74790d6cb3e72",
+  "version": "1.1.71",
+  "releasedAt": "2026-08-29T19:07:00+09:00",
+  "gitBlobSha1": "49d4192a68e75c08598cc721c0d990bb573c97e0",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Preserves stable 1.1.69 no-credit Flow R10 direct bootstrap, then performs a direct no-generation ChatGPT Image Auto automation-contract probe using immutable pinned Inspect/Capture/Analyze scripts. This bypasses the stalled Sheet queue when the existing AgentBootstrap wakes. Writes CHATGPT_IMAGE_DIRECT_PROBE_1.1.70.json plus manifest/entrypoint/contract receipts to central Drive. Never clicks Generate, spends image credits, changes OAuth/scopes, mutates the extension, or touches normal Chrome."
+  "notes": "Preserves stable 1.1.70 ChatGPT Image direct contract probe and adds an immediate local/central ENTRY_HEARTBEAT before network/base work. This distinguishes bootstrap-not-running from probe failure. Writes CHATGPT_IMAGE_AGENT_ENTRY_1.1.71.json immediately, then CHATGPT_IMAGE_DIRECT_PROBE_1.1.71.json plus manifest/entrypoint/contract receipts. Never clicks Generate, spends image credits, changes OAuth/scopes, mutates the extension, or touches normal Chrome."
 }
