@@ -1,0 +1,44 @@
+name: Flow local executor recovery CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1'
+      - 'local-agent/governor/Test-FlowCanonicalExtension.ps1'
+      - 'config/flow-extension-canonical-v0.1.0.json'
+      - '.github/workflows/local-executor-flow-recovery-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse recovery and verifier
+        shell: powershell
+        run: |
+          foreach($p in @('local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1','local-agent/governor/Test-FlowCanonicalExtension.ps1')){
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$tokens,[ref]$errors)
+            if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
+          }
+      - name: Verify Flow safety and canonical gates
+        shell: powershell
+        run: |
+          $s=Get-Content 'local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1' -Raw
+          foreach($required in @(
+            "V1.2_FLOW_CANONICAL_R10_GATE",
+            "Test-FlowCanonicalExtension.ps1",
+            "FLOW_DIRECT_BOOTSTRAP_R10_1.1.69.json",
+            "FLOW_PROJECT_LIST_NEW_PROJECT_V8_20260829",
+            "flowExtensionVersion='0.1.0'",
+            "flowExtensionId='lgedgmpcikglaajhfclcihicgafimlna'",
+            "PinnedFlowAgent169='9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'",
+            'generateClicked=$false',
+            'creditSpend=$false',
+            'oauthChanged=$false'
+          )){if(-not$s.Contains($required)){throw "MISSING_RECOVERY_GUARD:$required"}}
+          $c=Get-Content 'config/flow-extension-canonical-v0.1.0.json' -Raw|ConvertFrom-Json
+          if($c.version-ne'0.1.0'){throw 'FLOW_CANONICAL_VERSION_MISMATCH'}
+          if($c.extensionId-ne'lgedgmpcikglaajhfclcihicgafimlna'){throw 'FLOW_CANONICAL_ID_MISMATCH'}
+          Write-Host 'FLOW_LOCAL_EXECUTOR_RECOVERY_CONTRACT_PASS'
