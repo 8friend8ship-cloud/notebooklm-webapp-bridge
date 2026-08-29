@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.67",
-  "releasedAt": "2026-08-29T17:38:00+09:00",
-  "gitBlobSha1": "0044c3633912147ef15d6ecfe551152b73fa63a4",
+  "version": "1.1.68",
+  "releasedAt": "2026-08-29T17:45:00+09:00",
+  "gitBlobSha1": "ec0bcb23ffab76c04ff8fd0691e6623d86b6b073",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Self-contained NotebookLM native runtime recovery. It no longer depends on the failing 1.1.62→1.1.65 base-agent chain. It installs pinned Host 1.3.0 directly, adds only the NotebookLM Queens/direct-CDP/video/view-capture allowlist entries, disables download prompts only in the dedicated HomeDesign CFT profile, pins Windows Downloads, and starts the dedicated NotebookLM CFT on CDP 9223. Normal Chrome, OAuth/scopes, Generate actions and credits are untouched."
+  "notes": "Preserves the verified 1.1.67 NotebookLM native runtime recovery, then recovers the existing WEBAPP_TEMPLATE_03 bound Apps Script ID read-only from dedicated Chrome, normal Chrome, or Edge History/Sessions. It requires the known project URL prefix, exact existing deployment ID, canonical clasp account, NotebookLM code signature, backup, one push at most, pull readback, and deployment invariant. No new Apps Script project/deployment, OAuth/scope, trigger, normal-Chrome mutation, paid API, or credits are allowed."
 }
