@@ -1,0 +1,30 @@
+name: ChatGPT Image adapter binding prep CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
+      - '.github/workflows/chatgpt-image-adapter-binding-prep-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: pwsh
+        run: |
+          $p='local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
+          $tokens=$null; $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count -gt 0){ $errors | Format-List | Out-String | Write-Host; exit 1 }
+      - name: Safety guards
+        shell: pwsh
+        run: |
+          $p='local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
+          $s=Get-Content -LiteralPath $p -Raw
+          $required=@('HOLD_MANIFEST_RECEIPT_MISSING','READY_FOR_ADAPTER_BINDING','NO_REINSTALL','NO_NEW_OAUTH','NO_PASSWORD_OR_COOKIE_READ','NO_GENERATE_UNTIL_INTERFACE_VERIFIED','normalChromeTouched = $false','extensionMutated = $false','generateClicked = $false','creditsSpent = $false')
+          foreach($x in $required){ if(-not $s.Contains($x)){ throw "missing guard: $x" } }
+          $forbidden=@('Cookies','Secure Preferences','password','chrome.exe --remote-debugging-port')
+          foreach($x in $forbidden){ if($s -match [regex]::Escape($x) -and $x -ne 'password'){ throw "forbidden token: $x" } }
