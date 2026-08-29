@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "purpose": "Canonical image-production route selection and evidence gate for Flow-first generation with ChatGPT Image Auto fallback.",
+  "generationPrinciple": "IMAGE_AND_ASSET_FIRST_THEN_VIDEO",
+  "routePriority": ["FLOW_AGENT_BRIDGE", "GOOGLE_AI_LOCAL_BRIDGE", "CHATGPT_IMAGE_AUTO_FALLBACK"],
+  "flowHealthyStates": ["READY", "CONNECTED", "STARTED", "RUNNING", "RESULT_READY"],
+  "fallbackReasons": [
+    "FLOW_RUNTIME_UNAVAILABLE",
+    "FLOW_GENERATION_FAILED",
+    "FLOW_UI_CHANGED",
+    "FLOW_LOGIN_SESSION_INVALID",
+    "FLOW_CREDIT_OR_QUOTA_BLOCKED",
+    "FLOW_RESULT_DOWNLOAD_FAILED"
+  ],
+  "chatgptFallback": {
+    "extensionId": "gedfnhdibkfgacmkbjgpfjihacalnlpn",
+    "version": "8.6.0",
+    "requiredAdapterState": "READY_FOR_ADAPTER_BINDING",
+    "queue": "Image_Task_Queue",
+    "parallelDuplicateGeneration": false,
+    "reuseExistingSessionOnly": true,
+    "newOauthForbidden": true,
+    "reinstallForbidden": true
+  },
+  "downloadGate": {
+    "acceptedExtensions": [".png", ".jpg", ".jpeg", ".webp"],
+    "minimumBytes": 1,
+    "reject": ["html_page", "text_placeholder", "link_only", "zero_byte_file", "thumbnail_only"],
+    "preserveOriginal": true,
+    "overwriteOriginal": false,
+    "exactSourcePathRequired": true
+  },
+  "driveAssetGate": {
+    "driveFileIdRequired": true,
+    "driveReadbackRequired": true,
+    "queensRawRegistrationRequired": true,
+    "assetMetadataRequired": ["DRIVE_FILE_ID", "DRIVE_PATH", "MIME_TYPE", "BYTES", "OWNER", "USAGE_SCOPE"],
+    "seedEligibleOnlyAfterQueensReadback": true
+  },
+  "verification": {
+    "requiredSameFixturePasses": 2,
+    "resultAckRequired": 2,
+    "installationEvidenceIsNotFunctionalPass": true,
+    "completionGate": "REAL_IMAGE_FILE + NONZERO_BYTES + DRIVE_READBACK + QUEENS_REGISTRATION + RESULT_ACK_X2"
+  },
+  "failurePolicy": {
+    "blindRetry": false,
+    "sameFailureWithoutChangedEvidence": "HOLD_DIAGNOSTIC",
+    "minimumFixOnly": true,
+    "recordRootCause": true,
+    "recordResumePoint": true
+  }
+}
