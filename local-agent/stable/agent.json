@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.64",
-  "releasedAt": "2026-08-29T16:24:00+09:00",
-  "gitBlobSha1": "68547a7382dfdb965fca056f5efae4115b02fdeb",
+  "version": "1.1.65",
+  "releasedAt": "2026-08-29T17:18:00+09:00",
+  "gitBlobSha1": "1153728d85e091ae5a914a4b67a5f494a14d675b",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Fixes the remaining 5-minute bootstrap churn: AgentBootstrap now skips re-running the one-shot stable Agent when the local Agent file SHA and state.agentVersion already match stable. Agent 1.1.64 applies pinned 1.1.63 once, installs the corrected bootstrap, then replaces the currently running old bootstrap loop after the apply completes. This prevents repeated Host/CFT restarts while preserving watchdog recovery for actual version/state/host failures. Normal Chrome, OAuth/scopes, Flow Generate and credits remain untouched."
+  "notes": "NotebookLM native artifact recovery. Applies stable 1.1.64, patches only the local command-host allowlist for the Queens/video/view-capture scripts, disables Ask where to save only in the dedicated HomeDesign CFT profile, pins its default download directory to Windows Downloads, and switches the dedicated CFT from held Flow work to the existing NotebookLM notebook on CDP 9223. Normal Chrome, OAuth/scopes, Generate actions and credits are untouched."
 }
