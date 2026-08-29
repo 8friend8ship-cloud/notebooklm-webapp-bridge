@@ -37,7 +37,8 @@ jobs:
         shell: powershell
         run: |
           $u=Get-Content 'local-agent/governor/Sync-GoogleAIAlwaysOnNotebookLMFallbackV1.ps1' -Raw
-          foreach($x in @('c6ead8195c8fc1a48aab20c96587622ca76a3c38','689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44','9d1337dbf2318cd3c22d451dd919dd5bb2ee01f1','8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c','CONFIG_MUTATION_DETECTED','configContentRead=$false','normalChromeTouched=$false','primaryNotebookBridgeChanged=$false','GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1.json','__GOOGLE_AI_ALWAYS_ON_BUILD__')){if(-not$u.Contains($x)){throw "UPDATER_CONTRACT_MISSING:$x"}}
+          foreach($x in @('c6ead8195c8fc1a48aab20c96587622ca76a3c38','689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44','9d1337dbf2318cd3c22d451dd919dd5bb2ee01f1','8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c','CONFIG_MUTATION_DETECTED','GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1.json','__GOOGLE_AI_ALWAYS_ON_BUILD__')){if(-not$u.Contains($x)){throw "UPDATER_CONTRACT_MISSING:$x"}}
+          foreach($pattern in @('configContentRead\s*=\s*\$false','normalChromeTouched\s*=\s*\$false','primaryNotebookBridgeChanged\s*=\s*\$false')){if($u -notmatch $pattern){throw "UPDATER_PROPERTY_CONTRACT_MISSING:$pattern"}}
           if($u.Contains('Stop-Process')){throw 'NLM_FALLBACK_UPDATER_MUST_NOT_STOP_CHROME'}
           if($u.Contains('Get-Content -LiteralPath $config')){throw 'NLM_FALLBACK_UPDATER_MUST_NOT_READ_CONFIG_CONTENT'}
           $swHash=(Get-FileHash 'extensions/google-ai-always-on-bridge/1.0.2/service-worker.js' -Algorithm SHA256).Hash.ToLowerInvariant()
