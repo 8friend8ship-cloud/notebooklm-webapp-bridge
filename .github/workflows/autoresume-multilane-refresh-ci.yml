@@ -1,0 +1,31 @@
+name: AutoResume multi-lane refresh CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/bootstrap/HomeDesignAutoResume.ps1'
+      - 'local-agent/bootstrap/AgentBootstrap.ps1'
+      - 'local-agent/stable/flow.json'
+      - '.github/workflows/autoresume-multilane-refresh-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: powershell
+        run: |
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'local-agent/bootstrap/HomeDesignAutoResume.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
+      - name: Verify refresh and safety contract
+        shell: powershell
+        run: |
+          $s=Get-Content 'local-agent/bootstrap/HomeDesignAutoResume.ps1' -Raw
+          foreach($required in @('AUTO_RESUME_START_CONTENTS_API_V4_MULTILANE_REFRESH','local-agent/bootstrap/AgentBootstrap.ps1','BOOTSTRAP_LOOP_DIRECT_START','RESUME_LOCAL_AGENT_ONCE.ps1','GitBlobSha1')){if(-not$s.Contains($required)){throw "MISSING_AUTRESUME_V4_GUARD:$required"}}
+          foreach($forbidden in @('chrome.exe','--remote-debugging-port','Generate','OAuth','clasp login')){if($s.Contains($forbidden)){throw "UNSAFE_AUTRESUME_V4_TOKEN:$forbidden"}}
+          $f=Get-Content 'local-agent/stable/flow.json' -Raw|ConvertFrom-Json
+          if(-not$f.enabled -or $f.version-ne'1.1.69'){throw 'FLOW_LANE_NOT_PINNED'}
+          Write-Host 'AUTORESUME_MULTILANE_REFRESH_PASS'
