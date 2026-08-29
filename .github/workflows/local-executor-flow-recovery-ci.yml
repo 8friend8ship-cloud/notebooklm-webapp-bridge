@@ -41,9 +41,9 @@ jobs:
             'oauthChanged=$false'
           )){if(-not$s.Contains($required)){throw "MISSING_RECOVERY_GUARD:$required"}}
           $i=Get-Content 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1' -Raw
-          foreach($required in @('INSTALL_AUTO_RESUME_V2','InstallVerified','SCHEDULED_TASK','HKCU_RUN','DIRECT_WATCHDOG_FALLBACK','persistenceReady')){if(-not$i.Contains($required)){throw "MISSING_INSTALLER_GUARD:$required"}}
-          if($i.IndexOf("catch{`$errors+=('SCHEDULED_TASK:") -lt 0){throw 'SCHEDULED_TASK_FAILURE_NOT_ISOLATED'}
-          if($i.IndexOf("`$runKey='HKCU:") -lt 0){throw 'HKCU_FALLBACK_MISSING'}
+          foreach($required in @('INSTALL_AUTO_RESUME_V3','InstallVerified','SCHEDULED_TASK_CREATE','HKCU_RUN','DIRECT_WATCHDOG_ALWAYS','persistenceReady','immediateExecutionVerified','scheduledRunExit','directWatchdogExit','RunDirectWatchdog')){if(-not$i.Contains($required)){throw "MISSING_INSTALLER_GUARD:$required"}}
+          if($i.IndexOf("$runKey='HKCU:") -lt 0){throw 'HKCU_FALLBACK_MISSING'}
+          if($i.IndexOf('$LASTEXITCODE') -lt 0){throw 'SCHEDULED_RUN_EXIT_NOT_CHECKED'}
           $cmd=Get-Content 'local-agent/bootstrap/RUN_FLOW_RECOVERY_NOW.cmd' -Raw
           foreach($required in @('594b7790e870c06751cdeacd8f2b564f77b0c3c9','db83fe88ede65ae1d4c73b75910b539d8d0ec257','RECOVERY_BLOB_PIN_MISMATCH','RUN_LOCAL_EXECUTOR_RECOVERY_V1.pinned.ps1')){if(-not$cmd.Contains($required)){throw "MISSING_LAUNCHER_PIN:$required"}}
           $c=Get-Content 'config/flow-extension-canonical-v0.1.0.json' -Raw|ConvertFrom-Json
