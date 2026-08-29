@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.56",
-  "releasedAt": "2026-08-29T15:02:00+09:00",
-  "gitBlobSha1": "b12290601fd4305d477b3bf3e9869981085830cb",
+  "version": "1.1.57",
+  "releasedAt": "2026-08-29T15:25:00+09:00",
+  "gitBlobSha1": "2c780c6e315b3c124b6ac73897d6d1ec19d49ad5",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "ChatGPT Image Auto runtime recovery using existing approved stable Agent/Bootstrap path. Agent 1.1.56 first executes pinned Agent 1.1.55 for Host 1.2.9 recovery, then performs read-only normal-Chrome extension inventory for ChatGPT Image Auto and writes CHATGPT_IMAGE_AUTO_LIVE_READBACK.json to local state and central Drive Runtime_Readback/CHROME. No reinstall, OAuth, new project/deployment/trigger, normal-Chrome mutation/restart, Flow work, Generate click, or credit spend. Runtime PASS requires current installed/enabled evidence; historical EXT-010 is not treated as live proof."
+  "notes": "Apply the current runtime/stable extension release through GitHub Contents API with per-file Git blob SHA verification, then cold-restart only the dedicated Chrome-for-Testing profile so MV3 reloads the stable extension. Current target is NotebookLM WebApp Bridge 0.2.73 legacy async active-lock recovery. Preserve normal Chrome, existing auth/session, OAuth, Apps Script project/deployment, settings, Generate and credits. Write STABLE_EXTENSION_RELEASE_APPLY_1.1.57.json to local and central Runtime_Readback when available."
 }
