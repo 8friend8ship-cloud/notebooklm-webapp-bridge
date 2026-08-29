@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "flow",
+  "enabled": true,
+  "version": "1.1.69",
+  "gitBlobSha1": "9dce2a7bb83d96a3d846a92e24f468b7a67cb38a",
+  "file": "HomeDesignLocalAgent.ps1",
+  "pollSeconds": 60,
+  "maxCycleSeconds": 300,
+  "purpose": "Flow Agent Bridge 0.1.0 no-credit R10 recovery/health lane independent from global NotebookLM one-shot stable channel",
+  "normalChromeTouched": false,
+  "generateClicked": false,
+  "creditSpend": false
+}
