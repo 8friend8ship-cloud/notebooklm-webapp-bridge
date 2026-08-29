@@ -29,23 +29,28 @@ jobs:
         run: |
           $s=Get-Content 'local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1' -Raw
           foreach($required in @(
-            "V1.2_FLOW_CANONICAL_R10_GATE",
+            "V1.3_AUTOREUME_V3_FLOW_CANONICAL_R10_GATE",
+            "INSTALL_AUTO_RESUME_TASK.ps1",
+            "AUTO_RESUME_INSTALL_V3.json",
+            "autoResumeImmediateExecutionVerified",
             "Test-FlowCanonicalExtension.ps1",
             "FLOW_DIRECT_BOOTSTRAP_R10_1.1.69.json",
             "FLOW_PROJECT_LIST_NEW_PROJECT_V8_20260829",
             "flowExtensionVersion='0.1.0'",
             "flowExtensionId='lgedgmpcikglaajhfclcihicgafimlna'",
             "PinnedFlowAgent169='9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'",
+            "alwaysOnBridgeSourceVersion='1.0.2'",
             'generateClicked=$false',
             'creditSpend=$false',
             'oauthChanged=$false'
           )){if(-not$s.Contains($required)){throw "MISSING_RECOVERY_GUARD:$required"}}
+          if($s.Contains('schtasks.exe /Create')){throw 'RECOVERY_MUST_NOT_REIMPLEMENT_SCHEDULED_TASK_CREATE'}
           $i=Get-Content 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1' -Raw
           foreach($required in @('INSTALL_AUTO_RESUME_V3','InstallVerified','SCHEDULED_TASK_CREATE','HKCU_RUN','DIRECT_WATCHDOG_ALWAYS','persistenceReady','immediateExecutionVerified','scheduledRunExit','directWatchdogExit','RunDirectWatchdog')){if(-not$i.Contains($required)){throw "MISSING_INSTALLER_GUARD:$required"}}
           if($i.IndexOf("$runKey='HKCU:") -lt 0){throw 'HKCU_FALLBACK_MISSING'}
           if($i.IndexOf('$LASTEXITCODE') -lt 0){throw 'SCHEDULED_RUN_EXIT_NOT_CHECKED'}
           $cmd=Get-Content 'local-agent/bootstrap/RUN_FLOW_RECOVERY_NOW.cmd' -Raw
-          foreach($required in @('594b7790e870c06751cdeacd8f2b564f77b0c3c9','db83fe88ede65ae1d4c73b75910b539d8d0ec257','RECOVERY_BLOB_PIN_MISMATCH','RUN_LOCAL_EXECUTOR_RECOVERY_V1.pinned.ps1')){if(-not$cmd.Contains($required)){throw "MISSING_LAUNCHER_PIN:$required"}}
+          foreach($required in @('a8ac6cbc75329dc6472500c169f3226a9a08540e','c3357a722fed085f2660efe951a3ff41418862fa','RECOVERY_BLOB_PIN_MISMATCH','RUN_LOCAL_EXECUTOR_RECOVERY_V1.pinned.ps1')){if(-not$cmd.Contains($required)){throw "MISSING_LAUNCHER_PIN:$required"}}
           $c=Get-Content 'config/flow-extension-canonical-v0.1.0.json' -Raw|ConvertFrom-Json
           if($c.version-ne'0.1.0'){throw 'FLOW_CANONICAL_VERSION_MISMATCH'}
           if($c.extensionId-ne'lgedgmpcikglaajhfclcihicgafimlna'){throw 'FLOW_CANONICAL_ID_MISMATCH'}
