@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "CENTRAL_SHOPPING_BRIDGE_CONTRACT_V1",
+  "bridgeId": "BRG_032",
+  "name": "Central Shopping Research & Affiliate Bridge",
+  "eligibleApps": {
+    "APP_KFOOD": {
+      "domain": "FOOD",
+      "research": ["reviews", "price", "delivery", "unit_cost", "local_availability"],
+      "seedTargets": ["ingredient_value", "recipe_reuse", "quality_risk", "delivery_fit"]
+    },
+    "APP_INTERIOR": {
+      "domain": "INTERIOR",
+      "research": ["reviews", "price", "delivery", "unit_cost", "local_availability"],
+      "seedTargets": ["material_value", "installation_feedback", "defect_risk", "lead_time"]
+    },
+    "APP_TRAVEL": {
+      "domain": "TRAVEL",
+      "research": ["reviews", "price", "delivery_or_booking", "local_availability"],
+      "seedTargets": ["local_product_value", "ticket_or_activity_value", "availability_risk", "visitor_fit"]
+    },
+    "APP_CONTENT_OS": {
+      "domain": "CONTENT_COMMERCE",
+      "research": ["reviews", "price", "delivery", "affiliate_fit"],
+      "seedTargets": ["recommendation_reason", "conversion_evidence", "audience_fit"]
+    }
+  },
+  "providers": ["COUPANG", "ALIEXPRESS", "AMAZON", "LOCAL_MAP"],
+  "queensRules": {
+    "publicVisibleOnly": true,
+    "noLoginAutomation": true,
+    "noCaptchaBypass": true,
+    "noReviewerIdentity": true,
+    "boundedScroll": true,
+    "singleReviewNeverFact": true,
+    "keepSourceUrlAndTimestamp": true
+  },
+  "seedPromotion": {
+    "deduplicate": true,
+    "removeAdAndNoise": true,
+    "requireRepeatedSignal": true,
+    "requireProductIdentityMatch": true,
+    "requireFreshness": true,
+    "safetyClaimsNeedOfficialCrossCheck": true
+  },
+  "recommendationGate": {
+    "livePriceRequired": true,
+    "deliveryOrBookingAvailabilityRequired": true,
+    "unitOrTotalCostComparable": true,
+    "unknownAvailabilityCannotWin": true,
+    "showReason": true,
+    "affiliateDisclosureRequired": true
+  },
+  "runtimeGate": {
+    "localExtensionX2": true,
+    "driveReadbackX2": true,
+    "queensIngestX2": true,
+    "providerOfferReadbackX2": true,
+    "frontReasonCardX2": true
+  }
+}
