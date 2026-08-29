@@ -54,14 +54,13 @@ function Resolve-ArtifactExtension([IO.FileInfo]$candidate, [string]$artifactTyp
   $generic = @('', '.dat', '.bin', '.blob', '.download')
   $resolved = $original
   $repaired = $false
+  $allowRepair = ($artifactType.ToUpperInvariant() -eq 'INFOGRAPHIC')
 
-  if ($generic -contains $original) {
-    if ($detected -and ($expected -contains $detected)) {
-      $resolved = $detected
-      $repaired = $true
-    }
-  } elseif ($expected -notcontains $original) {
-    if ($detected -and ($expected -contains $detected)) {
+  # Safety rule: extension repair is INFOGRAPHIC-only. Audio/video and all
+  # other artifact families must arrive with one of their expected native
+  # extensions; do not rename generic binary payloads into media files.
+  if ($expected -notcontains $original) {
+    if ($allowRepair -and $detected -and ($expected -contains $detected)) {
       $resolved = $detected
       $repaired = $true
     }
@@ -72,7 +71,13 @@ function Resolve-ArtifactExtension([IO.FileInfo]$candidate, [string]$artifactTyp
     DetectedExtension = $detected
     ResolvedExtension = $resolved
     Repaired = $repaired
+    RepairAllowed = $allowRepair
+    GenericSource = ($generic -contains $original)
   }
+}
+
+function Get-Sha256([string]$path) {
+  return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
 function Find-GoogleDriveMyDrive {
@@ -162,7 +167,7 @@ if ($SourcePath) {
     foreach ($dir in $sourceDirs) {
       try {
         $candidates += @(Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue | Where-Object {
-          $_.LastWriteTimeUtc -ge $startedUtc -and $_.Name -notlike '*.crdownload' -and $_.Name -notlike '*.tmp' -and $_.Length -gt 0 -and (($exts -contains $_.Extension.ToLowerInvariant()) -or ($genericExts -contains $_.Extension.ToLowerInvariant()))
+          $_.LastWriteTimeUtc -ge $startedUtc -and $_.Name -notlike '*.crdownload' -and $_.Name -notlike '*.tmp' -and $_.Length -gt 0 -and (($exts -contains $_.Extension.ToLowerInvariant()) -or ($ArtifactType.ToUpperInvariant() -eq 'INFOGRAPHIC' -and ($genericExts -contains $_.Extension.ToLowerInvariant())))
         })
       } catch {}
     }
@@ -178,6 +183,10 @@ if ($SourcePath) {
 
 if (-not $extensionInfo) { $extensionInfo = Resolve-ArtifactExtension $found $ArtifactType $exts }
 $resolvedExt = [string]$extensionInfo.ResolvedExtension
+$sourceBytesBefore = [int64]$found.Length
+$sourceHashBefore = Get-Sha256 $found.FullName
+if (-not $sourceHashBefore) { throw 'SOURCE_SHA256_NOT_AVAILABLE' }
+
 New-Item -ItemType Directory -Path $localCaptureDir -Force | Out-Null
 $localSafeTask = ($TaskId -replace '[^A-Za-z0-9_.-]','_')
 $sourceBase = [IO.Path]::GetFileNameWithoutExtension($found.Name)
@@ -186,6 +195,8 @@ $localCapturePath = Join-Path $localCaptureDir $localCaptureName
 if ([IO.Path]::GetFullPath($found.FullName) -ne [IO.Path]::GetFullPath($localCapturePath)) { Copy-Item -LiteralPath $found.FullName -Destination $localCapturePath -Force } else { $localCapturePath = $found.FullName }
 $localCaptured = Get-Item -LiteralPath $localCapturePath
 if ($localCaptured.Length -le 0) { throw 'LOCAL_CAPTURE_COPY_ZERO_BYTES' }
+$localHash = Get-Sha256 $localCaptured.FullName
+if ($localCaptured.Length -ne $sourceBytesBefore -or $localHash -ne $sourceHashBefore) { throw 'LOCAL_CAPTURE_BINARY_INTEGRITY_MISMATCH' }
 
 $myDrive = Find-GoogleDriveMyDrive
 $typeFolder = switch ($ArtifactType.ToUpperInvariant()) {
@@ -208,6 +219,13 @@ $destPath = Join-Path $destDir $destName
 Copy-Item -LiteralPath $localCaptured.FullName -Destination $destPath -Force
 $copied = Get-Item -LiteralPath $destPath
 if ($copied.Length -le 0) { throw 'DRIVE_SYNC_COPY_ZERO_BYTES' }
+$destinationHash = Get-Sha256 $copied.FullName
+if ($copied.Length -ne $sourceBytesBefore -or $destinationHash -ne $sourceHashBefore) { throw 'DRIVE_SYNC_BINARY_INTEGRITY_MISMATCH' }
+
+if (-not (Test-Path -LiteralPath $found.FullName -PathType Leaf)) { throw 'SOURCE_IMMUTABLE_VIOLATION' }
+$sourceAfter = Get-Item -LiteralPath $found.FullName
+$sourceHashAfter = Get-Sha256 $sourceAfter.FullName
+if ($sourceAfter.Length -ne $sourceBytesBefore -or $sourceHashAfter -ne $sourceHashBefore) { throw 'SOURCE_IMMUTABLE_HASH_MISMATCH' }
 
 [pscustomobject]@{
   ok = $true
@@ -218,19 +236,25 @@ if ($copied.Length -le 0) { throw 'DRIVE_SYNC_COPY_ZERO_BYTES' }
   searchedDirectories = $sourceDirs
   sourcePath = $found.FullName
   sourceName = $found.Name
-  sourceBytes = $found.Length
+  sourceBytes = $sourceBytesBefore
+  sourceSha256 = $sourceHashBefore
+  sourceImmutableVerified = $true
   originalExtension = $extensionInfo.OriginalExtension
   detectedExtension = $extensionInfo.DetectedExtension
   resolvedExtension = $extensionInfo.ResolvedExtension
   extensionRepaired = [bool]$extensionInfo.Repaired
+  extensionRepairAllowed = [bool]$extensionInfo.RepairAllowed
   canonicalLocalDirectory = $localCaptureDir
   localCapturePath = $localCaptured.FullName
   localCaptureName = $localCaptured.Name
   localCaptureBytes = $localCaptured.Length
+  localCaptureSha256 = $localHash
   googleDriveRoot = $myDrive
   destinationPath = $copied.FullName
   destinationName = $copied.Name
   destinationBytes = $copied.Length
+  destinationSha256 = $destinationHash
+  binaryIntegrityVerified = $true
   relativeDrivePath = "NotebookLM_Artifacts/$typeFolder/$($copied.Name)"
   copiedAt = (Get-Date).ToString('o')
 } | ConvertTo-Json -Depth 8 -Compress
