@@ -28,17 +28,26 @@ function Save($o){
 function BootstrapLoops{try{return @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -and $_.CommandLine -like '*HomeDesignAutomationV7*AgentBootstrap.ps1*' -and $_.CommandLine -match '(?i)(?:^|\s)-Loop(?:\s|$)'})}catch{return @()}}
 function HostHealthy{try{$h=Invoke-RestMethod 'http://127.0.0.1:8765/health' -TimeoutSec 3;return [bool]$h.ok}catch{return $false}}
 
-$started=(Get-Date).ToString('o');$errors=@();$installed=@{};$taskCreated=$false;$loopStarted=$false;$resumeExit=$null
+$started=(Get-Date).ToString('o');$errors=@();$installed=@{};$taskCreated=$false;$runKeySet=$false;$loopStarted=$false;$resumeExit=$null
 $Bootstrap=Join-Path $Root 'AgentBootstrap.ps1';$AutoResume=Join-Path $Root 'HomeDesignAutoResume.ps1';$Resume=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1';$Watchdog=Join-Path $Root 'HomeDesignLocalWatchdog.ps1'
 try{$installed.bootstrap=Install 'local-agent/bootstrap/AgentBootstrap.ps1' $Bootstrap}catch{$errors+=('BOOTSTRAP:'+ $_.Exception.Message)}
 try{$installed.autoResume=Install 'local-agent/bootstrap/HomeDesignAutoResume.ps1' $AutoResume}catch{$errors+=('AUTORESUME:'+ $_.Exception.Message)}
 try{$installed.resume=Install 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' $Resume}catch{$errors+=('RESUME:'+ $_.Exception.Message)}
 try{$installed.watchdog=Install 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$errors+=('WATCHDOG:'+ $_.Exception.Message)}
 
+$task='HomeDesignAutomation-AutoResume'
+$tr='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"'
 try{
-  $task='HomeDesignAutomation-AutoResume';$tr='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"';& schtasks.exe /Create /F /SC MINUTE /MO 5 /TN $task /TR $tr | Out-Null;if($LASTEXITCODE-ne0){throw('SCHTASKS_CREATE_'+$LASTEXITCODE)};$taskCreated=$true
-  $rk='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';New-Item -Path $rk -Force|Out-Null;Set-ItemProperty -Path $rk -Name 'HomeDesignAutomationAutoResume' -Value $tr -Type String
-}catch{$errors+=('PERSISTENCE:'+ $_.Exception.Message)}
+  & schtasks.exe /Create /F /SC MINUTE /MO 5 /TN $task /TR $tr | Out-Null
+  if($LASTEXITCODE-ne0){throw('SCHTASKS_CREATE_'+$LASTEXITCODE)}
+  $taskCreated=$true
+}catch{$errors+=('SCHEDULED_TASK:'+ $_.Exception.Message)}
+try{
+  $rk='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+  New-Item -Path $rk -Force|Out-Null
+  Set-ItemProperty -Path $rk -Name 'HomeDesignAutomationAutoResume' -Value $tr -Type String
+  $runKeySet=$true
+}catch{$errors+=('HKCU_RUN:'+ $_.Exception.Message)}
 
 try{
   foreach($p in @(BootstrapLoops)){try{Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction SilentlyContinue}catch{}}
@@ -50,8 +59,10 @@ try{
   if(Test-Path -LiteralPath $Resume){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Resume;$resumeExit=$LASTEXITCODE}else{throw'RESUME_FILE_MISSING'}
 }catch{$errors+=('RESUME_RUN:'+ $_.Exception.Message)}
 
-try{& schtasks.exe /Run /TN 'HomeDesignAutomation-AutoResume' | Out-Null}catch{}
+if($taskCreated){try{& schtasks.exe /Run /TN $task | Out-Null}catch{$errors+=('SCHEDULED_TASK_RUN:'+ $_.Exception.Message)}}
 Start-Sleep -Seconds 3
 $state=$null;try{$sp=Join-Path $Root 'state.json';if(Test-Path $sp){$state=Get-Content $sp -Raw -Encoding UTF8|ConvertFrom-Json}}catch{}
-$ok=[bool]($installed.bootstrap -and $installed.autoResume -and $installed.resume -and $installed.watchdog -and $taskCreated -and (@(BootstrapLoops).Count-gt0))
-$rec=[ordered]@{ok=$ok;action='LOCAL_EXECUTOR_RECOVERY_V1';startedAt=$started;completedAt=(Get-Date).ToString('o');installed=$installed;scheduledTaskCreated=$taskCreated;bootstrapLoopPresent=(@(BootstrapLoops).Count-gt0);bootstrapLoopStartedThisRun=$loopStarted;resumeExit=$resumeExit;hostHealthy=(HostHealthy);stateAgentVersion=$(if($state){[string]$state.agentVersion}else{''});stateStatus=$(if($state){[string]$state.status}else{''});normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;generateClicked=$false;creditSpend=$false;errors=$errors};Save $rec;$rec|ConvertTo-Json -Depth 40 -Compress;if($ok){exit 0}else{exit 2}
+$persistenceReady=[bool]($taskCreated -or $runKeySet)
+$bootstrapLoopPresent=[bool](@(BootstrapLoops).Count-gt0)
+$ok=[bool]($installed.bootstrap -and $installed.autoResume -and $installed.resume -and $installed.watchdog -and $persistenceReady -and $bootstrapLoopPresent)
+$rec=[ordered]@{ok=$ok;action='LOCAL_EXECUTOR_RECOVERY_V1';recoveryRevision='V1.1_HKCU_FALLBACK';startedAt=$started;completedAt=(Get-Date).ToString('o');installed=$installed;scheduledTaskCreated=$taskCreated;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;bootstrapLoopPresent=$bootstrapLoopPresent;bootstrapLoopStartedThisRun=$loopStarted;resumeExit=$resumeExit;hostHealthy=(HostHealthy);stateAgentVersion=$(if($state){[string]$state.agentVersion}else{''});stateStatus=$(if($state){[string]$state.status}else{''});normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;generateClicked=$false;creditSpend=$false;errors=$errors};Save $rec;$rec|ConvertTo-Json -Depth 40 -Compress;if($ok){exit 0}else{exit 2}
