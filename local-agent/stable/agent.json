@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.54",
-  "releasedAt": "2026-08-29T13:07:00+09:00",
-  "gitBlobSha1": "cf7a9a42275c427bf48cd777a5bde82eea0607ab",
+  "version": "1.1.55",
+  "releasedAt": "2026-08-29T14:08:00+09:00",
+  "gitBlobSha1": "90acc698096e3d94f2f6a695410b8344f79c60ab",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "NotebookLM queue-integrity recovery after Agent 1.1.52 proved the prior clasp wrapper was dropping command arguments and returning help text as exit 0. Agent 1.1.54 runs pinned 1.1.53 first, uses ArgList-safe clasp invocation, lists existing Apps Script projects, matches exactly one existing Script ID by the already-registered WEBAPP_TEMPLATE_03 deployment ID, clones and signature-checks that project, backs it up, and only then performs at most one exact-project push of the pinned 0.2.10-queue-lock Code.gs when needed. It pulls/readbacks the queue-lock contract and rechecks the deployment invariant; verified success replaces the canonical queue receipt. Any ambiguity or post-write mismatch is HOLD/rollback. No new Apps Script project, OAuth/scope, deployment, trigger, browser, queue task, paid API call, or credit spend is created."
+  "notes": "Flow bridge recovery: fresh device tasks proved the local command host was still executing a stale raw-main Setup wrapper after GitHub main had the corrected helper pin. Agent 1.1.55 uses the approved immutable Git blob API pattern to fetch the exact Host 1.2.9 installer, replaces only the existing localhost command-host process, verifies /health reports 1.2.9, writes central Runtime_Readback evidence, then starts pinned Agent 1.1.54 for the existing queue-integrity chain. No new OAuth, project, deployment, trigger, normal-Chrome change, Flow Generate click, or credit spend."
 }
