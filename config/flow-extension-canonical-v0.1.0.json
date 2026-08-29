@@ -32,5 +32,6 @@
     "generationRequiresCreditGate": true,
     "flowV8IsExecutionSequenceNotExtensionVersion": true
   },
-  "verifiedAt": "2026-08-29T19:15:00+09:00"
+  "verificationSource": "Central Drive reviewed source bytes + 2026-08-29 central registry/checklist cross-check",
+  "verifiedAt": "2026-08-29T19:17:00+09:00"
 }
