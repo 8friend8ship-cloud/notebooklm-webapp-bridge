@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.58",
-  "releasedAt": "2026-08-29T15:21:00+09:00",
-  "gitBlobSha1": "ec1d1f28d7a83c5563028c253db9acc6d8a886b4",
+  "version": "1.1.59",
+  "releasedAt": "2026-08-29T15:34:00+09:00",
+  "gitBlobSha1": "5351129b3b524bda5b7c5ad63c75f74fea1d32a3",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Replace HomeDesign Local Command Host 1.2.9 with Host 1.3.0, whose allowlisted script transport uses GitHub Contents API plus local Git blob SHA verification instead of raw.githubusercontent.com. Capture the current Flow X2 local CommandResults before handoff, restart only the local command host on 127.0.0.1:8765, and write central Runtime_Readback receipts. No Chrome restart, Generate, credit spend, OAuth, project, deployment, scope or settings changes."
+  "notes": "Changed-condition ChatGPT Image recovery chain. Agent 1.1.59 first fetches and executes pinned Agent 1.1.58 (Host 1.3.0 Contents API recovery), then performs read-only normal-Chrome inventory for ChatGPT Image Auto and writes CHATGPT_IMAGE_AUTO_LIVE_READBACK.json locally and to central Drive when mounted. No normal Chrome restart/mutation, reinstall, OAuth/scope/project/deployment/trigger changes, Flow generation, Generate click, or credit spend. PASS requires Agent 1.1.58 exit 0 plus current ChatGPT Image Auto installed+enabled evidence."
 }
