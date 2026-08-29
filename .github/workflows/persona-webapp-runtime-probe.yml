@@ -1,0 +1,63 @@
+name: Persona WEBAPP_TEMPLATE_05 Runtime Probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/persona-webapp-runtime-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      WEBAPP_URL: https://script.google.com/macros/s/AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo/exec
+    steps:
+      - name: Probe existing deployment read-only routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p probe
+          probe_get() {
+            local name="$1" url="$2"
+            curl -sS -L --max-time 45 \
+              -D "probe/${name}.headers" \
+              -o "probe/${name}.body" \
+              -w '%{http_code}' "$url" > "probe/${name}.status" || echo 'CURL_ERROR' > "probe/${name}.status"
+          }
+          probe_post() {
+            local name="$1" body="$2"
+            curl -sS -L --max-time 45 \
+              -H 'Content-Type: application/json' \
+              -D "probe/${name}.headers" \
+              -o "probe/${name}.body" \
+              -w '%{http_code}' \
+              -X POST --data "$body" "$WEBAPP_URL" > "probe/${name}.status" || echo 'CURL_ERROR' > "probe/${name}.status"
+          }
+          probe_get health "$WEBAPP_URL?action=contentos.intelligence.health.v3"
+          probe_get identity_get "$WEBAPP_URL?action=contentos.runtime.identity.v3"
+          probe_post identity_post '{"action":"contentos.runtime.identity.v3"}'
+          python3 - <<'PY'
+          import json, pathlib
+          out={}
+          for name in ('health','identity_get','identity_post'):
+              status=(pathlib.Path('probe')/f'{name}.status').read_text(errors='replace').strip()
+              body=(pathlib.Path('probe')/f'{name}.body').read_text(errors='replace') if (pathlib.Path('probe')/f'{name}.body').exists() else ''
+              headers=(pathlib.Path('probe')/f'{name}.headers').read_text(errors='replace') if (pathlib.Path('probe')/f'{name}.headers').exists() else ''
+              parsed=None
+              try: parsed=json.loads(body)
+              except Exception: pass
+              out[name]={'status':status,'json':parsed,'body_preview':body[:4000],'headers_preview':headers[:2000]}
+          pathlib.Path('probe/result.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(out,ensure_ascii=False))
+          PY
+      - name: Upload probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: persona-webapp-runtime-probe
+          path: probe/
+          if-no-files-found: error
