@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.53",
-  "releasedAt": "2026-08-29T13:00:18+09:00",
-  "gitBlobSha1": "f469f17e5d7d0101d5d0f21a521ee449abd747a9",
+  "version": "1.1.54",
+  "releasedAt": "2026-08-29T13:07:00+09:00",
+  "gitBlobSha1": "cf7a9a42275c427bf48cd777a5bde82eea0607ab",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Serial Persona recovery after verified Agent 1.1.52. Runs pinned 1.1.52 first, then only when the preserved WEBAPP_TEMPLATE_05 Persona V1 receipt has exact error TARGET_DEPLOYMENT_MATCH_COUNT:0 and no terminal V2 receipt exists, fetches pinned Bind-FrontPersonaOrchestrationAppsScriptV2.ps1 and executes it once. Binder uses existing clasp authorization only, calls list-scripts --json then list-deployments per existing Script ID, requires exactly one match for the existing deployment, clones/pulls baseline, verifies WEBAPP_TEMPLATE_05 signature, backs up, installs canonical personaOrchestrationGate + companion personaOrchestrator and one processTaskQueue due adapter, pushes existing project only, pulls/readbacks x2, and rechecks deployment invariant. Any ambiguity or terminal V2 failure is HOLD with no blind retry. No new Apps Script project, OAuth/scope, deployment, physical trigger, browser, paid Gemini API, or credit spend." 
+  "notes": "NotebookLM queue-integrity recovery after Agent 1.1.52 proved the prior clasp wrapper was dropping command arguments and returning help text as exit 0. Agent 1.1.54 runs pinned 1.1.53 first, uses ArgList-safe clasp invocation, lists existing Apps Script projects, matches exactly one existing Script ID by the already-registered WEBAPP_TEMPLATE_03 deployment ID, clones and signature-checks that project, backs it up, and only then performs at most one exact-project push of the pinned 0.2.10-queue-lock Code.gs when needed. It pulls/readbacks the queue-lock contract and rechecks the deployment invariant; verified success replaces the canonical queue receipt. Any ambiguity or post-write mismatch is HOLD/rollback. No new Apps Script project, OAuth/scope, deployment, trigger, browser, queue task, paid API call, or credit spend is created."
 }
