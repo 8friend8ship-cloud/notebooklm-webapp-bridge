@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "name": "Google AI Local Bridge v1",
+  "version": "1.0.2",
+  "extensionId": "kieodjjlhpefnakodgllmpckepjaggbd",
+  "source": {
+    "type": "GOOGLE_DRIVE_FOLDER",
+    "projectFolderId": "1P3ahSXu7UU96oG74glulCONX4sLyI-8c",
+    "extensionFolderId": "1L1muNkHs-CZhxzsi5za5lyL4E0WSpu_U",
+    "files": {
+      "manifest.json": {
+        "driveFileId": "1axgKUo7cwIBBBtKFEMIqWxHBUKoKU2K5",
+        "sha256": "22c1ad5470b355f05d8e53e07c66d068dc16366f7b677dd12fcd15ab2f36a553",
+        "gitBlobSha1": "bdcdb6b67c096eebc7f9c4322251ca02526264b1"
+      },
+      "service-worker.js": {
+        "driveFileId": "16hY2QPP_fxaCX8e726euQiJqGo_FxKaU",
+        "sha256": "bc522b5ccf93b754cdba2454b96e08ce0323b470414058b7dd8657623550a602",
+        "gitBlobSha1": "7a0509a4cff6b987a5c5b36fd22024ce88a87a5f"
+      },
+      "content/flow.js": {
+        "driveFileId": "1Fo-ZQj2R8-JZ4cws0TCTV9hAYfmIt3Is",
+        "sha256": "80b069153a101b61a37f66bc23890184bda0f0b8ca1bfafa804213afe6997b21",
+        "gitBlobSha1": "cf21e7cd741aa59e4aca9b87aca742e4642afecc"
+      }
+    }
+  },
+  "preserveFiles": [
+    "config.js",
+    "config.example.js",
+    "content/notebooklm.js"
+  ],
+  "policy": {
+    "preserveInstalledPath": true,
+    "preserveExtensionId": true,
+    "normalChromeRestartAllowed": false,
+    "dedicatedChromeReloadAllowed": true,
+    "permissionExpansionAllowed": false,
+    "generationRequiresExplicitApproval": true,
+    "connectivityProbeMaySpendCredits": false,
+    "duplicateInstallAllowed": false
+  }
+}
