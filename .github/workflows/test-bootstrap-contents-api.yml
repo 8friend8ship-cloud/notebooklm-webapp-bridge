@@ -1,0 +1,21 @@
+name: Test Bootstrap Contents API Recovery
+on:
+  push:
+    paths:
+      - 'local-agent/bootstrap/AgentBootstrap.ps1'
+      - 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
+      - 'local-agent/bootstrap/HomeDesignAutoResume.ps1'
+      - 'local-agent/releases/1.1.66/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - 'tests/bootstrap-contents-api.test.mjs'
+      - '.github/workflows/test-bootstrap-contents-api.yml'
+  workflow_dispatch:
+jobs:
+  static-recovery-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node tests/bootstrap-contents-api.test.mjs
