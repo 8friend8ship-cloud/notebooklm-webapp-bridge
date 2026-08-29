@@ -1,0 +1,29 @@
+--- WEBAPP_TEMPLATE_03_NotebookLM_Runner_v0.3.0.gs
++++ WEBAPP_TEMPLATE_03_NotebookLM_Runner_v0.3.1.gs
+@@
+-const VERSION = "0.3.0-runner";
++const VERSION = "0.3.1-runner-no-error-autoretry";
+@@ listTasks_
+-      return ["READY", "RETRY", "ERROR"].indexOf(
++      return ["READY", "RETRY"].indexOf(
+@@ claimTask_
+-  if (["READY", "RETRY", "ERROR"].indexOf(status) < 0) {
++  if (["READY", "RETRY"].indexOf(status) < 0) {
+@@ runnerClaimNext_
+-  const allowedStatuses = ["READY", "RETRY", "ERROR"];
++  // ERROR is fail-closed. Root cause must be recorded and the task explicitly moved to RETRY before another execution.
++  const allowedStatuses = ["READY", "RETRY"];
+
+RATIONALE
+- Current runnerClaimNext_ selects candidates[0] in physical sheet order.
+- Including ERROR causes the oldest same-day failed task to be auto-claimed repeatedly, starving later READY tasks.
+- On 2026-08-29 this blocked ChatGPT Image task LOCAL_CHATGPT_IMAGE_GOVERNOR_WAKE_20260829_1448_01 behind Flow ERROR rows 348/351/352.
+- Central policy already forbids blind retry of identical failures without changed evidence.
+- This patch preserves Flow error evidence; no Flow task row/status/content is mutated.
+- ERROR can run again only after an explicit reviewed transition to RETRY.
+
+DEPLOYMENT SAFETY
+- Existing WEBAPP_TEMPLATE_03 deployment ID is preserved.
+- Do not create a new Apps Script project or deployment.
+- Apply only to the existing bound Apps Script after exact Script ID/current source readback.
+- After apply: runnerHealth version must report 0.3.1-runner-no-error-autoretry; verify READY claim while ERROR rows remain preserved; then regression test runnerComplete/runnerFail.
