@@ -1,0 +1,57 @@
+name: Local Agent 1.1.54 CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/releases/1.1.54/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - '.github/workflows/local-agent-1-1-54-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/releases/1.1.54/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - '.github/workflows/local-agent-1-1-54-ci.yml'
+
+jobs:
+  validate-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell syntax
+        shell: powershell
+        run: |
+          $p='local-agent/releases/1.1.54/HomeDesignLocalAgent.ps1'
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p), [ref]$tokens, [ref]$errors)
+          if($errors.Count){
+            foreach($e in $errors){Write-Host ("line={0} col={1} id={2} message={3}" -f $e.Extent.StartLineNumber,$e.Extent.StartColumnNumber,$e.ErrorId,$e.Message)}
+            exit 1
+          }
+      - name: Recovery contract
+        shell: powershell
+        run: |
+          $p='local-agent/releases/1.1.54/HomeDesignLocalAgent.ps1'
+          $t=Get-Content $p -Raw
+          $required=@(
+            "AgentVersion='1.1.54'",
+            '[string[]]$ArgList',
+            "@('list-scripts','--json')",
+            'TARGET_DEPLOYMENT_MATCH_COUNT:',
+            'PUSH_PULL_READBACK_PASS',
+            'DEPLOYMENT_INVARIANT_LOST'
+          )
+          foreach($n in $required){if(-not $t.Contains($n)){throw "MISSING_CONTRACT:$n"}}
+          if($t.Contains('function InvokeSafe([string]$File,[string[]]$Args')){throw 'ARGS_COLLISION_REGRESSION'}
+          Write-Host 'Agent 1.1.54 contract PASS'
+      - name: Stable manifest integrity when promoted
+        shell: powershell
+        run: |
+          $m=Get-Content 'local-agent/stable/agent.json' -Raw | ConvertFrom-Json
+          if([string]$m.version -ne '1.1.54'){
+            Write-Host 'Stable manifest not yet promoted to 1.1.54'
+            exit 0
+          }
+          $p='local-agent/releases/1.1.54/HomeDesignLocalAgent.ps1'
+          $actual=(git rev-parse ("HEAD:"+$p)).Trim()
+          if($actual -ne [string]$m.gitBlobSha1){throw "STABLE_SHA_MISMATCH actual=$actual expected=$($m.gitBlobSha1)"}
+          Write-Host 'Stable manifest 1.1.54 SHA PASS'
