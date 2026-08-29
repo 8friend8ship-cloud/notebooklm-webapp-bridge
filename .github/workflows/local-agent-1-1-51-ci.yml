@@ -1,0 +1,64 @@
+name: Local Agent 1.1.51 CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/releases/1.1.51/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - '.github/workflows/local-agent-1-1-51-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/releases/1.1.51/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - '.github/workflows/local-agent-1-1-51-ci.yml'
+
+jobs:
+  validate-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell syntax
+        shell: powershell
+        run: |
+          $p='local-agent/releases/1.1.51/HomeDesignLocalAgent.ps1'
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p), [ref]$tokens, [ref]$errors)
+          if($errors.Count){
+            foreach($e in $errors){Write-Host ("line={0} col={1} id={2} message={3}" -f $e.Extent.StartLineNumber,$e.Extent.StartColumnNumber,$e.ErrorId,$e.Message)}
+            exit 1
+          }
+      - name: Queue receipt recovery contract
+        shell: powershell
+        run: |
+          $p='local-agent/releases/1.1.51/HomeDesignLocalAgent.ps1'
+          $t=Get-Content $p -Raw
+          $required=@(
+            "AgentVersion='1.1.51'",
+            "PreviousAgentSha='131bedf4dd2b2ff1d360b075edec3fad388a5b8c'",
+            "ExpectedQueueVersion='0.2.10-queue-lock'",
+            "ExpectedQueueSourceSha='e7c22534048062eca913e2d1b5d8b3c6e7ac8b28'",
+            'NOTEBOOKLM_QUEUE_INTEGRITY_SYNC_V2.json',
+            'NOTEBOOKLM_QUEUE_INTEGRITY_SYNC.json',
+            'LOCAL_VERIFIED_PASS_PROMOTED_TO_DRIVE',
+            'LOCAL_FAILURE_PROMOTED_TO_DRIVE_FOR_DIAGNOSIS',
+            'NO_BLIND_RETRY_LOCAL_RECEIPT_FIRST',
+            'newProjectCreated=$false','oauthChanged=$false','scopeChanged=$false','newDeployment=$false','newTrigger=$false','paidGeminiApiCalled=$false','generateClicked=$false','creditSpend=$false'
+          )
+          foreach($n in $required){if(-not $t.Contains($n)){throw "MISSING_CONTRACT:$n"}}
+          $forbidden=@('clasp login','create-script','create-deployment','ScriptApp.newTrigger','Start-Process chrome','GenerateContent')
+          foreach($n in $forbidden){if($t -match [regex]::Escape($n)){throw "FORBIDDEN_DIRECT_OPERATION:$n"}}
+          Write-Host 'Local Agent 1.1.51 queue receipt recovery contract PASS'
+      - name: Stable manifest integrity when promoted
+        shell: powershell
+        run: |
+          $m=Get-Content 'local-agent/stable/agent.json' -Raw | ConvertFrom-Json
+          if([string]$m.version -ne '1.1.51'){
+            Write-Host 'Stable manifest not yet promoted to 1.1.51; release-only validation PASS'
+            exit 0
+          }
+          $p='local-agent/releases/1.1.51/HomeDesignLocalAgent.ps1'
+          $actual=(git rev-parse ("HEAD:"+$p)).Trim()
+          if($LASTEXITCODE -ne 0 -or -not $actual){throw 'GIT_BLOB_LOOKUP_FAILED'}
+          if($actual -ne [string]$m.gitBlobSha1){throw "STABLE_SHA_MISMATCH actual=$actual expected=$($m.gitBlobSha1)"}
+          if([string]$m.file -ne 'HomeDesignLocalAgent.ps1'){throw 'STABLE_FILE_MISMATCH'}
+          Write-Host 'Stable manifest 1.1.51 Git blob SHA contract PASS'
