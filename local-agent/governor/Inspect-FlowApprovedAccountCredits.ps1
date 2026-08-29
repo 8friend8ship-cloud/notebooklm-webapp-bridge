@@ -2,15 +2,14 @@ param(
   [int]$DebugPort=9224,
   [switch]$NavigateWorkspace,
   [switch]$CurrentScreenOnly,
+  [switch]$InspectMediaOptions,
   [string]$DirectProjectUrl='',
   [int]$TimeoutSeconds=120,
   [string]$CentralRootOverride=''
 )
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
-$Version='FLOW_DIRECT_PROJECT_ROUTE_V6_20260829'
-$Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
-$FlowUrl='https://labs.google/fx/tools/flow'
+$Version='FLOW_MEDIA_OPTIONS_V7_20260829'
 function FindCentral {
   if($CentralRootOverride -and (Test-Path -LiteralPath $CentralRootOverride)){ return $CentralRootOverride }
   $name=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
@@ -36,11 +35,57 @@ const wsUrl=process.argv[2],mode=process.argv[3],arg=process.argv[4]||'';
 function connect(url){return new Promise((resolve,reject)=>{const ws=new WebSocket(url);let id=0,p=new Map();ws.onopen=()=>resolve({ws,send:(m,params={})=>new Promise((res,rej)=>{const n=++id;p.set(n,{res,rej});ws.send(JSON.stringify({id:n,method:m,params}));})});ws.onerror=reject;ws.onmessage=e=>{let x;try{x=JSON.parse(e.data)}catch{return};if(x.id&&p.has(x.id)){const q=p.get(x.id);p.delete(x.id);x.error?q.rej(new Error(JSON.stringify(x.error))):q.res(x.result)}}})}
 const c=await connect(wsUrl);
 try{
- if(mode==='navigate'){await c.send('Page.navigate',{url:arg});console.log(JSON.stringify({ok:true,navigatedTo:arg}));}
- else {
+ if(mode==='navigate'){
+   await c.send('Page.navigate',{url:arg});
+   console.log(JSON.stringify({ok:true,navigatedTo:arg}));
+ } else {
   const allowClick=mode==='scan-click';
-  const expr=`(()=>{const vis=e=>{const r=e.getBoundingClientRect();return !!(r.width&&r.height)&&!e.disabled};const controls=[...document.querySelectorAll('button,[role="button"],a,input[type="submit"]')].filter(vis);const inputs=[...document.querySelectorAll('textarea,input[type="text"],[contenteditable="true"],[role="textbox"]')].filter(vis);const items=controls.map((e,i)=>({i,text:String(e.innerText||e.textContent||e.value||e.getAttribute('aria-label')||'').trim().replace(/\\s+/g,' ').slice(0,180),tag:e.tagName,href:e.href||''}));const ins=inputs.map(e=>({tag:e.tagName,placeholder:e.getAttribute('placeholder')||'',aria:e.getAttribute('aria-label')||'',value:String(('value'in e)?e.value:(e.innerText||'')).slice(0,300)}));const url=location.href;let state='OTHER';const flowRoute=/labs\\.google\/fx\/(?:[a-z]{2}(?:-[A-Z]{2})?\/)?tools\/flow(?:\/|$)/i;if(/accounts\\.google\\.com/i.test(url))state='GOOGLE_LOGIN';else if(flowRoute.test(url))state=ins.length?'FLOW_WORKSPACE':'FLOW_LANDING';else if(/flow\\.google/i.test(url))state=ins.length?'FLOW_WORKSPACE':'FLOW_INTERMEDIATE';else if(/labs\\.google/i.test(url))state='LABS_INTERMEDIATE';let clicked=null,clickKind='';if(${allowClick?'true':'false'}&&state!=='FLOW_WORKSPACE'){const groups=[{kind:'COOKIE_CONSENT',rx:[/^agree$/i]},{kind:'FLOW_PRIMARY_CTA',rx:[/^create with google flow$/i,/^create with flow$/i,/^start creating$/i,/^enter flow$/i,/^try flow$/i,/^open flow$/i]},{kind:'SAFE_CONTINUE',rx:[/^continue$/i,/^allow$/i,/^get started$/i,/^confirm$/i,/resume/i,/recent/i,/open project/i,/new project/i,/create project/i]}];outer:for(const g of groups){for(const it of items){if(g.rx.some(r=>r.test(it.text))){try{controls[it.i].click();clicked=it;clickKind=g.kind;break outer}catch{}}}}}return {url,title:document.title,state,inputs:ins,buttons:items.slice(0,120),clicked,clickKind,passwordPrompt:!!document.querySelector('input[type="password"]'),emailPrompt:!!document.querySelector('input[type="email"]')};})()`;
-  const r=await c.send('Runtime.evaluate',{expression:expr,returnByValue:true,awaitPromise:true,userGesture:true});console.log(JSON.stringify(r.result?.value||{}));
+  const mediaScan=mode==='media-scan';
+  const expr=`(()=>{
+    const vis=e=>{const r=e.getBoundingClientRect();const s=getComputedStyle(e);return !!(r.width&&r.height)&&s.visibility!=='hidden'&&s.display!=='none'&&!e.disabled};
+    const txt=e=>String(e.innerText||e.textContent||e.value||e.getAttribute('aria-label')||'').trim().replace(/\\s+/g,' ').slice(0,220);
+    const controls=[...document.querySelectorAll('button,[role="button"],a,input[type="submit"],[role="tab"],[role="radio"]')].filter(vis);
+    const inputs=[...document.querySelectorAll('textarea,input[type="text"],[contenteditable="true"],[role="textbox"]')].filter(vis);
+    const items=controls.map((e,i)=>({i,text:txt(e),tag:e.tagName,role:e.getAttribute('role')||'',ariaLabel:e.getAttribute('aria-label')||'',ariaPressed:e.getAttribute('aria-pressed')||'',ariaSelected:e.getAttribute('aria-selected')||'',ariaChecked:e.getAttribute('aria-checked')||'',dataState:e.getAttribute('data-state')||'',href:e.href||'',cls:String(e.className||'').slice(0,180)}));
+    const ins=inputs.map(e=>({tag:e.tagName,placeholder:e.getAttribute('placeholder')||'',aria:e.getAttribute('aria-label')||'',value:String(('value'in e)?e.value:(e.innerText||'')).slice(0,300)}));
+    const url=location.href;
+    let state='OTHER';
+    const flowRoute=/labs\\.google\/fx\/(?:[a-z]{2}(?:-[A-Z]{2})?\/)?tools\/flow(?:\/|$)/i;
+    if(/accounts\\.google\\.com/i.test(url))state='GOOGLE_LOGIN';
+    else if(flowRoute.test(url))state=ins.length?'FLOW_WORKSPACE':'FLOW_LANDING';
+    else if(/flow\\.google/i.test(url))state=ins.length?'FLOW_WORKSPACE':'FLOW_INTERMEDIATE';
+    else if(/labs\\.google/i.test(url))state='LABS_INTERMEDIATE';
+    let clicked=null,clickKind='';
+    if(${allowClick?'true':'false'}&&state!=='FLOW_WORKSPACE'){
+      const groups=[
+        {kind:'COOKIE_CONSENT',rx:[/^agree$/i]},
+        {kind:'FLOW_PRIMARY_CTA',rx:[/^create with google flow$/i,/^create with flow$/i,/^start creating$/i,/^enter flow$/i,/^try flow$/i,/^open flow$/i]},
+        {kind:'SAFE_CONTINUE',rx:[/^continue$/i,/^allow$/i,/^get started$/i,/^confirm$/i,/resume/i,/recent/i,/open project/i,/new project/i,/create project/i]}
+      ];
+      outer:for(const g of groups){for(const it of items){if(g.rx.some(r=>r.test(it.text))){try{controls[it.i].click();clicked=it;clickKind=g.kind;break outer}catch{}}}}
+    }
+    let mediaOptions=null;
+    if(${mediaScan?'true':'false'}){
+      const selected=it=>it.ariaPressed==='true'||it.ariaSelected==='true'||it.ariaChecked==='true'||/checked|selected|active/i.test(it.dataState)||/(^|\\s)(selected|active)(\\s|$)/i.test(it.cls);
+      const mediaType=items.filter(it=>/^(image|video|이미지|동영상)$/i.test(it.text));
+      const aspectRatios=items.filter(it=>/^(16:9|4:3|1:1|3:4|9:16)$/i.test(it.text));
+      const counts=items.filter(it=>/^x[1-4]$/i.test(it.text));
+      const models=items.filter(it=>/(nano banana|veo|imagen|gemini|banana)/i.test(it.text));
+      const optionText=items.filter(it=>/(image|video|이미지|동영상|16:9|4:3|1:1|3:4|9:16|x1|x2|x3|x4|nano banana|veo|imagen)/i.test(it.text));
+      mediaOptions={
+        mediaType:mediaType.map(it=>({...it,selected:selected(it)})),
+        aspectRatios:aspectRatios.map(it=>({...it,selected:selected(it)})),
+        counts:counts.map(it=>({...it,selected:selected(it)})),
+        models:models.map(it=>({...it,selected:selected(it)})),
+        optionCandidates:optionText.map(it=>({...it,selected:selected(it)})),
+        promptInputs:ins,
+        promptReady:ins.length>0
+      };
+    }
+    return {url,title:document.title,state,inputs:ins,buttons:items.slice(0,160),clicked,clickKind,passwordPrompt:!!document.querySelector('input[type="password"]'),emailPrompt:!!document.querySelector('input[type="email"]'),mediaOptions};
+  })()`;
+  const r=await c.send('Runtime.evaluate',{expression:expr,returnByValue:true,awaitPromise:true,userGesture:true});
+  console.log(JSON.stringify(r.result?.value||{}));
  }
 } finally { try{c.ws.close()}catch{}; setTimeout(()=>process.exit(0),30) }
 '@
@@ -55,19 +100,33 @@ try{
   } finally { Remove-Item $js -Force -ErrorAction SilentlyContinue }
 }
 function Scan([string]$Ws,[bool]$Click){return InvokeNodeCdp $Ws $(if($Click){'scan-click'}else{'scan'})}
+function MediaScan([string]$Ws){return InvokeNodeCdp $Ws 'media-scan'}
 function Navigate([string]$Ws,[string]$Url){return InvokeNodeCdp $Ws 'navigate' $Url}
-function WriteReceipt($Object,[string]$Name){$central=FindCentral;if($central){$dir=Join-Path $central 'Runtime_Readback\Flow_Bridge_Direct';New-Item -ItemType Directory -Force -Path $dir|Out-Null;$Object|ConvertTo-Json -Depth 40|Set-Content -LiteralPath (Join-Path $dir $Name) -Encoding UTF8}}
+function WriteReceipt($Object,[string]$Name){$central=FindCentral;if($central){$dir=Join-Path $central 'Runtime_Readback\Flow_Bridge_Direct';New-Item -ItemType Directory -Force -Path $dir|Out-Null;$Object|ConvertTo-Json -Depth 50|Set-Content -LiteralPath (Join-Path $dir $Name) -Encoding UTF8}}
 function FlowPage { param($Pages) return ($Pages | Where-Object { ([string]$_.url) -match 'labs\.google|accounts\.google|flow\.google' } | Select-Object -First 1) }
+function ValidateProjectUrl([string]$Url){return [bool]($Url -match '^https://labs\.google/fx/(?:[a-z]{2}(?:-[A-Z]{2})?/)?tools/flow/project/[A-Za-z0-9-]+/?$')}
 $pages=@(Pages)
 if($CurrentScreenOnly){
   $page=FlowPage $pages;if(-not $page){throw 'CDP_FLOW_PAGE_NOT_FOUND_ON_CURRENT_SCREEN'}
   $scan=Scan ([string]$page.webSocketDebuggerUrl) $false;$allTargets=@(Targets);$extTargets=@($allTargets|Where-Object{([string]$_.url)-like'chrome-extension://*'}|ForEach-Object{[ordered]@{type=[string]$_.type;url=[string]$_.url;title=[string]$_.title}});$input=@($scan.inputs)|Select-Object -First 1
   $ok=[bool]([string]$scan.state-eq'FLOW_WORKSPACE'-and$input);$result=[ordered]@{ok=$ok;action='FLOW_CURRENT_SCREEN_CDP_READONLY';version=$Version;state=[string]$scan.state;pageUrl=[string]$scan.url;pageTitle=[string]$scan.title;inputFound=[bool]$input;input=$input;buttons=@($scan.buttons);extensionTargets=$extTargets;generateClicked=$false;creditSpend=$false;readOnly=$true;checkedAt=(Get-Date).ToString('o')};WriteReceipt $result 'FLOW_CURRENT_SCREEN_CDP_READONLY.json';$result|ConvertTo-Json -Depth 40 -Compress;if($ok){exit 0}else{exit 2}
 }
+if($InspectMediaOptions){
+  $directNav=$false
+  if($DirectProjectUrl){
+    if(-not(ValidateProjectUrl $DirectProjectUrl)){throw 'DIRECT_PROJECT_URL_REJECTED'}
+    $pages=@(Pages);$page=FlowPage $pages;if($page){[void](Navigate ([string]$page.webSocketDebuggerUrl) $DirectProjectUrl);$directNav=$true;Start-Sleep -Seconds 2}
+  }
+  $deadline=(Get-Date).AddSeconds($TimeoutSeconds);$scan=$null
+  while((Get-Date)-lt$deadline){$pages=@(Pages);$page=FlowPage $pages;if(-not$page){Start-Sleep -Milliseconds 500;continue};$scan=MediaScan ([string]$page.webSocketDebuggerUrl);if([string]$scan.state-eq'FLOW_WORKSPACE'-and$scan.mediaOptions-and[bool]$scan.mediaOptions.promptReady){break};Start-Sleep -Seconds 1}
+  $allTargets=@(Targets);$extTargets=@($allTargets|Where-Object{([string]$_.url)-like'chrome-extension://*'}|ForEach-Object{[ordered]@{type=[string]$_.type;url=[string]$_.url;title=[string]$_.title}})
+  $ok=[bool]($scan-and[string]$scan.state-eq'FLOW_WORKSPACE'-and$scan.mediaOptions-and[bool]$scan.mediaOptions.promptReady)
+  $result=[ordered]@{ok=$ok;action='FLOW_MEDIA_TYPE_AND_SIDE_OPTIONS_READBACK';version=$Version;directProjectUrl=$DirectProjectUrl;directNavigationAttempted=$directNav;state=$(if($scan){[string]$scan.state}else{'NO_PAGE'});pageUrl=$(if($scan){[string]$scan.url}else{''});pageTitle=$(if($scan){[string]$scan.title}else{''});mediaOptions=$(if($scan){$scan.mediaOptions}else{$null});extensionTargets=$extTargets;generateClicked=$false;creditSpend=$false;readOnly=$true;checkedAt=(Get-Date).ToString('o')};WriteReceipt $result 'FLOW_MEDIA_TYPE_AND_SIDE_OPTIONS_READBACK.json';$result|ConvertTo-Json -Depth 50 -Compress;if($ok){exit 0}else{exit 2}
+}
 if($NavigateWorkspace){
   $deadline=(Get-Date).AddSeconds($TimeoutSeconds);$history=@();$final=$null;$credential=$false;$directNav=$false
   if($DirectProjectUrl){
-    if($DirectProjectUrl -notmatch '^https://labs\.google/fx/(?:[a-z]{2}(?:-[A-Z]{2})?/)?tools/flow/project/[A-Za-z0-9-]+/?$'){throw 'DIRECT_PROJECT_URL_REJECTED'}
+    if(-not(ValidateProjectUrl $DirectProjectUrl)){throw 'DIRECT_PROJECT_URL_REJECTED'}
     $pages=@(Pages);$page=FlowPage $pages;if($page){[void](Navigate ([string]$page.webSocketDebuggerUrl) $DirectProjectUrl);$directNav=$true;Start-Sleep -Seconds 2}
   }
   while((Get-Date)-lt$deadline){$pages=@(Pages);$page=FlowPage $pages;if(-not$page){Start-Sleep -Milliseconds 600;continue};$scan=Scan ([string]$page.webSocketDebuggerUrl) $true;$history+=[ordered]@{at=(Get-Date).ToString('o');url=[string]$scan.url;title=[string]$scan.title;state=[string]$scan.state;inputCount=@($scan.inputs).Count;clickKind=[string]$scan.clickKind;clicked=$scan.clicked};$final=$scan;if([string]$scan.state-eq'FLOW_WORKSPACE'-and@($scan.inputs).Count){break};if([string]$scan.state-eq'GOOGLE_LOGIN'-and($scan.passwordPrompt-or$scan.emailPrompt)){$credential=$true;break};Start-Sleep -Seconds 2}
