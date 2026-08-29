@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.78",
-  "releasedAt": "2026-08-29T22:09:00+09:00",
-  "gitBlobSha1": "a0b74016d4711f294df39c0675fe4a0bb4941180",
+  "version": "1.1.79",
+  "releasedAt": "2026-08-29T22:51:23+09:00",
+  "gitBlobSha1": "9e79f86de57d9c77737d827139f330591ff3ded1",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 240,
-  "notes": "Minimal exactly-once fresh NotebookLM notebook + pasted-source direct agent. Does not rerun the base agent or alter Bridge 0.2.39. Uses named mutex + dispatch marker and writes central dispatch/result receipts. Dedicated Chrome/CDP only; rejects historical notebook ID; no OAuth/scope/project/public-publish changes."
+  "notes": "Bounded exactly-once fresh NotebookLM V3 isolation gate. Fetches SHA-pinned Test-NotebookLMFreshNotebookSourceCDPV3.ps1, stops only stale prior fresh-helper PowerShell processes, runs with a 180-second hard process timeout, writes dispatch/result readback, rejects historical notebook ID, and leaves Bridge 0.2.39 generation/download LAST_GOOD unchanged. No normal Chrome/OAuth/scope/project/public-publish changes."
 }
