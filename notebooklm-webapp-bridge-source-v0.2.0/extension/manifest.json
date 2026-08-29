@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.75",
-  "description": "Stable recovery build that preserves the 0.2.74 active-lock cleanup and synchronizes the verified native artifact extension-repair bridge source. No permission/OAuth/normal-Chrome/Generate/credit behavior change.",
+  "version": "0.2.77",
+  "description": "Fresh-notebook-first production validation build. Creates a new NotebookLM notebook before production tasks so old Studio artifacts cannot satisfy new-run evidence gates.",
   "permissions": [
     "alarms",
     "downloads",
@@ -42,6 +42,7 @@
         "https://notebook.google.com/*"
       ],
       "js": [
+        "content/fresh-notebook-create.js",
         "content/notebooklm-runner.js"
       ],
       "run_at": "document_idle"
