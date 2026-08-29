@@ -6,15 +6,16 @@ $ProgressPreference='SilentlyContinue'
 $runtimeDir=Join-Path $CentralRootOverride 'Runtime_Readback\CHROME'
 $out=Join-Path $runtimeDir 'CHATGPT_IMAGE_AUTOMATION_PROBE_V1.json'
 $repoRoot=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$manifestScript=Join-Path $repoRoot 'local-agent\governor\Inspect-ChatGPTImageAutoManifestV1.ps1'
+$postInspect=Join-Path $repoRoot 'local-agent\governor\Run-ChatGPTImagePostRecoveryInspect.ps1'
 $captureScript=Join-Path $repoRoot 'local-agent\governor\Capture-ChatGPTImageDeclaredEntrypointsV1.ps1'
 $analyzeScript=Join-Path $repoRoot 'local-agent\governor\Analyze-ChatGPTImageEntrypointContractV1.ps1'
 function Save([hashtable]$b){New-Item -ItemType Directory -Force -Path $runtimeDir|Out-Null;$b.at=(Get-Date).ToString('o');$b|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $out -Encoding UTF8;Write-Output ($b|ConvertTo-Json -Depth 30 -Compress)}
-$missing=@($manifestScript,$captureScript,$analyzeScript|Where-Object{-not(Test-Path -LiteralPath $_ -PathType Leaf)})
+$required=@($postInspect,$captureScript,$analyzeScript)
+$missing=@($required|Where-Object{-not(Test-Path -LiteralPath $_ -PathType Leaf)})
 if($missing.Count){Save @{ok=$false;status='HOLD_REQUIRED_SCRIPT_MISSING';missing=$missing;generateClicked=$false;creditsSpent=$false};exit 2}
 $steps=@()
-foreach($s in @($manifestScript,$captureScript,$analyzeScript)){
-  $text=& pwsh -NoProfile -ExecutionPolicy Bypass -File $s -CentralRootOverride $CentralRootOverride 2>&1 | Out-String
+foreach($s in $required){
+  $text=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $s -CentralRootOverride $CentralRootOverride 2>&1 | Out-String
   $rc=$LASTEXITCODE
   $steps += [pscustomobject]@{script=[IO.Path]::GetFileName($s);exitCode=$rc;output=$text.Trim()}
   if($rc -ne 0){Save @{ok=$false;status='HOLD_PROBE_STEP_FAILED';steps=$steps;failedScript=[IO.Path]::GetFileName($s);generateClicked=$false;creditsSpent=$false};exit $rc}
