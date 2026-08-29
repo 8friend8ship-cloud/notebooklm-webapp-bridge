@@ -23,41 +23,44 @@ jobs:
           f='local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1'
           python - <<'PY'
           from pathlib import Path
-          p=Path('local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1')
-          s=p.read_text(encoding='utf-8')
+          p = Path('local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1')
+          s = p.read_text(encoding='utf-8')
           if '[switch]$KickAgent1155HostRepair' not in s:
-              old='  [switch]$KickAgent1141HostRepair\n)'
-              new='  [switch]$KickAgent1141HostRepair,\n  [switch]$KickAgent1155HostRepair\n)'
+              old = '  [switch]$KickAgent1141HostRepair\n)'
+              new = '  [switch]$KickAgent1141HostRepair,\n  [switch]$KickAgent1155HostRepair\n)'
               if old not in s:
                   raise SystemExit('parameter anchor missing')
-              s=s.replace(old,new,1)
-              anchor='if($KickAgent1141HostRepair){'
-              block=r'''if($KickAgent1155HostRepair){
-  try{
-    New-Item -ItemType Directory -Force -Path $Root|Out-Null
-    $agent=Join-Path $Root 'HomeDesignLocalAgent-1.1.55-direct.ps1'
-    $expected='90acc698096e3d94f2f6a695410b8344f79c60ab'
-    $headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}
-    $resp=Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/git/blobs/'+$expected+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers $headers -Method Get -TimeoutSec 20
-    $tmp=$agent+'.download'
-    [IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$resp.content -replace '\s','')))
-    $actual=(GitBlobSha1 $tmp).ToLowerInvariant()
-    if($actual -ne $expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw ('AGENT1155_BLOB_MISMATCH actual='+$actual+' expected='+$expected)}
-    Move-Item -LiteralPath $tmp -Destination $agent -Force
-    $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$true;$psi.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$agent+'"';$proc=[Diagnostics.Process]::Start($psi)
-    [ordered]@{ok=$true;action='AGENT1155_IMMUTABLE_HOST_RECOVERY_DISPATCHED';taskId=$TaskId;agentSha=$actual;pid=[int]$proc.Id;expectedAgent='1.1.55';expectedHost='1.2.9';sourceFetchMode='IMMUTABLE_GIT_BLOB_API';normalChromeRestarted=$false;generateClicked=$false;creditSpend=$false;oauthChanged=$false;scopeChanged=$false;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress
-    exit 0
-  }catch{
-    [ordered]@{ok=$false;action='AGENT1155_IMMUTABLE_HOST_RECOVERY_DISPATCHED';taskId=$TaskId;error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress
-    exit 2
-  }
-}
-
-'''
+              s = s.replace(old, new, 1)
+              anchor = 'if($KickAgent1141HostRepair){'
+              lines = [
+                  'if($KickAgent1155HostRepair){',
+                  '  try{',
+                  "    New-Item -ItemType Directory -Force -Path $Root|Out-Null",
+                  "    $agent=Join-Path $Root 'HomeDesignLocalAgent-1.1.55-direct.ps1'",
+                  "    $expected='90acc698096e3d94f2f6a695410b8344f79c60ab'",
+                  "    $headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}",
+                  "    $resp=Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/git/blobs/'+$expected+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers $headers -Method Get -TimeoutSec 20",
+                  "    $tmp=$agent+'.download'",
+                  "    [IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$resp.content -replace '\\s','')))",
+                  "    $actual=(GitBlobSha1 $tmp).ToLowerInvariant()",
+                  "    if($actual -ne $expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw ('AGENT1155_BLOB_MISMATCH actual='+$actual+' expected='+$expected)}",
+                  "    Move-Item -LiteralPath $tmp -Destination $agent -Force",
+                  "    $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$true;$psi.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"'+$agent+'\"';$proc=[Diagnostics.Process]::Start($psi)",
+                  "    [ordered]@{ok=$true;action='AGENT1155_IMMUTABLE_HOST_RECOVERY_DISPATCHED';taskId=$TaskId;agentSha=$actual;pid=[int]$proc.Id;expectedAgent='1.1.55';expectedHost='1.2.9';sourceFetchMode='IMMUTABLE_GIT_BLOB_API';normalChromeRestarted=$false;generateClicked=$false;creditSpend=$false;oauthChanged=$false;scopeChanged=$false;at=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10 -Compress",
+                  '    exit 0',
+                  '  }catch{',
+                  "    [ordered]@{ok=$false;action='AGENT1155_IMMUTABLE_HOST_RECOVERY_DISPATCHED';taskId=$TaskId;error=$_.Exception.Message;at=(Get-Date).ToString('o')}|ConvertTo-Json -Compress",
+                  '    exit 2',
+                  '  }',
+                  '}',
+                  '',
+                  ''
+              ]
+              block = '\n'.join(lines)
               if anchor not in s:
                   raise SystemExit('dispatch anchor missing')
-              s=s.replace(anchor,block+anchor,1)
-              p.write_text(s,encoding='utf-8',newline='\n')
+              s = s.replace(anchor, block + anchor, 1)
+              p.write_text(s, encoding='utf-8', newline='\n')
           PY
           grep -Fq '[switch]$KickAgent1155HostRepair' "$f"
           grep -Fq 'AGENT1155_IMMUTABLE_HOST_RECOVERY_DISPATCHED' "$f"
