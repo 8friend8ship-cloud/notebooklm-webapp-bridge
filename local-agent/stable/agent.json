@@ -2,10 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.32",
-  "releasedAt": "2026-08-28T15:35:00+09:00",
-  "gitBlobSha1": "a38da31ff6aad74c43839a7b010909fec041342d",
+  "version": "1.1.77",
+  "releasedAt": "2026-08-29T22:03:00+09:00",
+  "gitBlobSha1": "abe4ac58a360389f7437b5e998968a246e572ce2",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Transport/runtime restored to proven healthy 1.1.32 immediately after one-shot Agent 1.1.77 dispatch, preventing duplicate fresh Notebook creation. NotebookLM generation remains pinned to Bridge 0.2.39 LAST_GOOD."
+  "maxCycleSeconds": 600,
+  "notes": "Hardened exactly-once fresh NotebookLM notebook + pasted-source bootstrap. Named mutex + dispatch marker prevent duplicate notebooks across overlapping Watchdog/AutoResume runs. Dedicated Chrome/CDP only; old notebook ID rejected; Bridge 0.2.39 remains generation LAST_GOOD. Terminal and dispatch receipts are written to central Runtime_Readback."
 }
