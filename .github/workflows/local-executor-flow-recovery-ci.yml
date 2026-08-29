@@ -26,7 +26,7 @@ jobs:
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$tokens,[ref]$errors)
             if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
           }
-      - name: Verify Flow safety canonical persistence trigger timeout and launcher gates
+      - name: Verify Flow safety canonical persistence trigger timeout single-executor and launcher gates
         shell: powershell
         run: |
           $s=Get-Content 'local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1' -Raw
@@ -49,14 +49,14 @@ jobs:
           if($s.Contains('schtasks.exe /Create')){throw 'RECOVERY_MUST_NOT_REIMPLEMENT_SCHEDULED_TASK_CREATE'}
 
           $i=Get-Content 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1' -Raw
-          foreach($required in @('INSTALL_AUTO_RESUME_V3','V3.2_TRIGGER_RESTORED_TIMEOUT_ALIGNED','InstallVerified','SCHEDULED_TASK_CREATE','HKCU_RUN','DIRECT_WATCHDOG_ALWAYS','persistenceReady','immediateExecutionVerified','scheduledRunExit','directWatchdogExit','RunDirectWatchdog','$DirectWatchdogTimeoutSeconds=420','$ScheduledExecutionLimitMinutes=10','LOGON+RESUME+5MIN','<LogonTrigger>','<EventTrigger>','<Interval>PT5M</Interval>','triggerIntervalMinutes=5')){if(-not$i.Contains($required)){throw "MISSING_INSTALLER_GUARD:$required"}}
+          foreach($required in @('INSTALL_AUTO_RESUME_V3','V3.3_SINGLE_EXECUTOR_TRIGGER_TIMEOUT_ALIGNED','InstallVerified','SCHEDULED_TASK_CREATE','HKCU_RUN','DIRECT_WATCHDOG_FALLBACK_ONLY','SCHEDULED_WATCHDOG_RECEIPT','WATCHDOG_ENTRY_LATEST.json','scheduledEntryObserved','directWatchdogLaunched','persistenceReady','immediateExecutionVerified','scheduledRunExit','directWatchdogExit','RunDirectWatchdog','$DirectWatchdogTimeoutSeconds=420','$ScheduledEntryWaitSeconds=15','$ScheduledExecutionLimitMinutes=10','LOGON+RESUME+5MIN','<LogonTrigger>','<EventTrigger>','<Interval>PT5M</Interval>','triggerIntervalMinutes=5')){if(-not$i.Contains($required)){throw "MISSING_INSTALLER_GUARD:$required"}}
+          if($i.Contains('DIRECT_WATCHDOG_ALWAYS')){throw 'DIRECT_WATCHDOG_MUST_NOT_ALWAYS_RUN'}
           if($i.IndexOf("$runKey='HKCU:") -lt 0){throw 'HKCU_FALLBACK_MISSING'}
           if($i.IndexOf('$LASTEXITCODE') -lt 0){throw 'SCHEDULED_RUN_EXIT_NOT_CHECKED'}
           if(($i|Select-String -Pattern "taskName='HomeDesignAutomation-AutoResume'" -AllMatches).Matches.Count -ne 1){throw 'CANONICAL_TASK_NAME_MUST_BE_SINGLE'}
 
           $w=Get-Content 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' -Raw
-          if(-not$w.Contains('$AutoResumeTimeoutSeconds=360')){throw 'WATCHDOG_TIMEOUT_NOT_ALIGNED'}
-          if(-not$w.Contains('WATCHDOG_TIMEOUT_ALIGNED_20260829')){throw 'WATCHDOG_REVISION_MISSING'}
+          foreach($required in @('$AutoResumeTimeoutSeconds=360','WATCHDOG_ENTRY_LATEST.json','WATCHDOG_ENTRY_V4','WATCHDOG_SINGLE_EXECUTOR_TIMEOUT_ALIGNED_20260829')){if(-not$w.Contains($required)){throw "MISSING_WATCHDOG_GUARD:$required"}}
           $r=Get-Content 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' -Raw
           if(-not($r.Contains('EnsureBootstrapLoop $Bootstrap 120') -and $r.Contains('$deadline=(Get-Date).AddSeconds(180)'))){throw 'RESUME_BOUNDED_CYCLE_CONTRACT_CHANGED'}
           if(360 -lt (120+180)){throw 'WATCHDOG_TIMEOUT_BELOW_RESUME_BOUNDED_WAIT'}
