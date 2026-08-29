@@ -1,0 +1,32 @@
+name: Agent bootstrap multi-lane CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/bootstrap/AgentBootstrap.ps1'
+      - 'local-agent/stable/flow.json'
+      - '.github/workflows/agent-bootstrap-multilane-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: powershell
+        run: |
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'local-agent/bootstrap/AgentBootstrap.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
+      - name: Verify independent Flow lane contract
+        shell: powershell
+        run: |
+          $s=Get-Content 'local-agent/bootstrap/AgentBootstrap.ps1' -Raw
+          foreach($required in @('ApplyIndependentLane','local-agent/stable/flow.json','state-flow.json','HomeDesignLocalAgent-flow.ps1','Lane FLOW')){if(-not$s.Contains($required)){throw "MISSING_MULTILANE_GUARD:$required"}}
+          $f=Get-Content 'local-agent/stable/flow.json' -Raw|ConvertFrom-Json
+          if(-not$f.enabled){throw 'FLOW_LANE_DISABLED'}
+          if($f.version-ne'1.1.69'){throw 'FLOW_LANE_VERSION_MISMATCH'}
+          if($f.gitBlobSha1-ne'9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'){throw 'FLOW_LANE_SHA_MISMATCH'}
+          if($f.generateClicked-ne$false -or $f.creditSpend-ne$false -or $f.normalChromeTouched-ne$false){throw 'FLOW_LANE_SAFETY_MISMATCH'}
+          Write-Host 'AGENT_BOOTSTRAP_MULTILANE_FLOW_PASS'
