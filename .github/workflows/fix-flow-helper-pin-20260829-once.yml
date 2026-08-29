@@ -1,0 +1,54 @@
+name: Fix Flow helper pin 20260829 once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-flow-helper-pin-20260829-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify current helper blob and update stale immutable pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          helper='local-agent/governor/RunFlowBridgeConnectSmoke.ps1'
+          wrapper='local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1'
+          expected_helper='43df9a311505abb0cb5e9b5a4aae2ce0bb881da0'
+          old_pin='d3d9cd856889c7b890302e2d9e57a3d5929c09c0'
+          actual_helper="$(git hash-object "$helper")"
+          test "$actual_helper" = "$expected_helper"
+          grep -Fq "$old_pin" "$wrapper"
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1')
+          s=p.read_text(encoding='utf-8')
+          old='d3d9cd856889c7b890302e2d9e57a3d5929c09c0'
+          new='43df9a311505abb0cb5e9b5a4aae2ce0bb881da0'
+          if s.count(old) != 1:
+              raise SystemExit(f'expected exactly one old pin, got {s.count(old)}')
+          p.write_text(s.replace(old,new),encoding='utf-8',newline='\n')
+          PY
+          grep -Fq "$expected_helper" "$wrapper"
+          git diff --check
+      - name: Commit pin repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1; then
+            echo 'No pin change needed'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1
+          git commit -m 'Pin Flow bridge helper to verified current blob'
+          git push origin HEAD:main
