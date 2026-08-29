@@ -80,12 +80,13 @@ foreach($rel in @($sideLocalScripts|Select-Object -Unique)){
     [void]$captured.Add([pscustomobject]@{relativePath=$resolvedRel;copiedPath=$dst;bytes=$item.Length;sha256=$sha;discoveredFrom='sidePanelScriptSrc'})
   }
 }
+$capturedArray=[object[]]$captured.ToArray()
 Write-Receipt @{
   ok=$true
   status='DECLARED_ENTRYPOINTS_CAPTURED'
   extensionId=[string]$m.extensionId
   version=[string]$m.extensionVersion
-  captured=@($captured)
+  captured=$capturedArray
   policy='READ_ONLY_DECLARED_EXTENSION_FILES_ONLY'
   prohibitions=@('NO_PREFERENCES','NO_SECURE_PREFERENCES','NO_COOKIES','NO_TOKENS','NO_HISTORY','NO_REINSTALL','NO_GENERATE')
   normalChromeTouched=$false
