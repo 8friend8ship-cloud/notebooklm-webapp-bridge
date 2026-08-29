@@ -1,0 +1,37 @@
+name: ChatGPT Image Post-Recovery Inspect CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/governor/Run-ChatGPTImagePostRecoveryInspect.ps1'
+      - 'local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1'
+      - '.github/workflows/chatgpt-image-post-recovery-inspect-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell files
+        shell: pwsh
+        run: |
+          $files = @(
+            'local-agent/governor/Run-ChatGPTImagePostRecoveryInspect.ps1',
+            'local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1'
+          )
+          foreach ($f in $files) {
+            $tokens = $null; $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { $errors | Format-List | Out-String | Write-Error; exit 1 }
+          }
+      - name: Enforce safety markers
+        shell: pwsh
+        run: |
+          $p = Get-Content 'local-agent/governor/Run-ChatGPTImagePostRecoveryInspect.ps1' -Raw
+          foreach ($needle in @('stable/agent.json','gitBlobSha1','Inspect-ChatGPTImageAutoManifest.ps1','CHATGPT_IMAGE_POST_RECOVERY_INSPECT.json')) {
+            if (-not $p.Contains($needle)) { throw "Missing marker: $needle" }
+          }
+          foreach ($forbidden in @('Secure Preferences','Cookies','password','Generate','creditSpend')) {
+            if ($p -match [regex]::Escape($forbidden)) { throw "Forbidden marker present: $forbidden" }
+          }
