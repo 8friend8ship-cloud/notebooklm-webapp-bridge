@@ -45,3 +45,5 @@ jobs:
           if($swHash-ne'689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44'){throw 'SERVICE_WORKER_SHA256_MISMATCH'}
           if($nHash-ne'8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c'){throw 'NOTEBOOKLM_SHA256_MISMATCH'}
           Write-Host 'ALWAYS_ON_NOTEBOOKLM_FALLBACK_CONTRACT_PASS'
+
+# trigger: 2026-08-29 fallback adapter validation
