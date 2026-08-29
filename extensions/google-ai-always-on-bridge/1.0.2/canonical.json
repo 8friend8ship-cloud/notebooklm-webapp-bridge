@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "Google AI Local Bridge v1",
   "version": "1.0.2",
   "extensionId": "kieodjjlhpefnakodgllmpckepjaggbd",
@@ -15,21 +15,35 @@
       },
       "service-worker.js": {
         "driveFileId": "16hY2QPP_fxaCX8e726euQiJqGo_FxKaU",
-        "sha256": "bc522b5ccf93b754cdba2454b96e08ce0323b470414058b7dd8657623550a602",
-        "gitBlobSha1": "7a0509a4cff6b987a5c5b36fd22024ce88a87a5f"
+        "sha256": "689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44",
+        "gitBlobSha1": "c6ead8195c8fc1a48aab20c96587622ca76a3c38",
+        "build": "NLM_FALLBACK_ROUTE_20260829"
       },
       "content/flow.js": {
         "driveFileId": "1Fo-ZQj2R8-JZ4cws0TCTV9hAYfmIt3Is",
         "sha256": "80b069153a101b61a37f66bc23890184bda0f0b8ca1bfafa804213afe6997b21",
         "gitBlobSha1": "cf21e7cd741aa59e4aca9b87aca742e4642afecc"
+      },
+      "content/notebooklm.js": {
+        "driveFileId": "1NSbrzlas5T5Bq9wAlsvPazKO-n_vpe1l",
+        "sha256": "8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c",
+        "gitBlobSha1": "9d1337dbf2318cd3c22d451dd919dd5bb2ee01f1",
+        "build": "NLM_FALLBACK_LAST_GOOD_ADAPTER_20260829"
       }
     }
   },
   "preserveFiles": [
     "config.js",
-    "config.example.js",
-    "content/notebooklm.js"
+    "config.example.js"
   ],
+  "fallbackCapabilities": {
+    "noCreditPreflight": true,
+    "freshNotebookCreate": true,
+    "chatRequiresExplicitApproval": true,
+    "chatReturnsSubmittedNotDone": true,
+    "studioArtifactsUsePrimaryNotebookBridge": true,
+    "primaryNotebookBridgeVersion": "0.2.71_LAST_GOOD"
+  },
   "policy": {
     "preserveInstalledPath": true,
     "preserveExtensionId": true,
@@ -38,6 +52,7 @@
     "permissionExpansionAllowed": false,
     "generationRequiresExplicitApproval": true,
     "connectivityProbeMaySpendCredits": false,
-    "duplicateInstallAllowed": false
+    "duplicateInstallAllowed": false,
+    "configContentMayBeReadByUpdater": false
   }
 }
