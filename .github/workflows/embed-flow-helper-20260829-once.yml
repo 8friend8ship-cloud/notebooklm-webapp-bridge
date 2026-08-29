@@ -1,0 +1,26 @@
+name: Embed Flow helper once
+on:
+  push:
+    paths:
+      - .github/workflows/embed-flow-helper-20260829-once.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python tools/embed_flow_bridge_helper.py
+      - run: |
+          git diff --check
+          grep -Fq 'FLOW_BRIDGE_CONNECT_PROBE_WRAPPER_EMBEDDED' local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1
+          grep -Fq 'secondaryNetworkFetch = $false' local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1
+      - run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add local-agent/capture/Setup-ChromeExtensionCaptureBridge.ps1
+          git commit -m 'Embed Flow bridge helper for offline recovery'
+          git push
