@@ -1,0 +1,60 @@
+name: Patch Agent 1.1.55 recovery to raw verified 20260829 once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-agent1155-raw-verified-recovery-20260829-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Replace Git blob API fetch with raw release fetch plus immutable hash verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1')
+          s=p.read_text(encoding='utf-8')
+          old="""    $headers=@{'User-Agent'='HomeDesign-Local-Agent';'Accept'='application/vnd.github+json'}
+    $resp=Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/git/blobs/'+$expected+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers $headers -Method Get -TimeoutSec 20
+    $tmp=$agent+'.download'
+    [IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$resp.content -replace '\\s','')))
+    $actual=(GitBlobSha1 $tmp).ToLowerInvariant()
+"""
+          new="""    $url='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/releases/1.1.55/HomeDesignLocalAgent.ps1?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $tmp=$agent+'.download'
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $tmp -TimeoutSec 20
+    $actual=(GitBlobSha1 $tmp).ToLowerInvariant()
+"""
+          if old not in s:
+              if "local-agent/releases/1.1.55/HomeDesignLocalAgent.ps1?hdcb=" in s:
+                  raise SystemExit(0)
+              raise SystemExit('AGENT1155_API_FETCH_BLOCK_NOT_FOUND')
+          s=s.replace(old,new,1)
+          s=s.replace("sourceFetchMode='IMMUTABLE_GIT_BLOB_API'","sourceFetchMode='RAW_MAIN_RELEASE_PLUS_IMMUTABLE_GIT_BLOB_SHA1'",1)
+          p.write_text(s,encoding='utf-8',newline='\n')
+          PY
+          grep -Fq "local-agent/releases/1.1.55/HomeDesignLocalAgent.ps1?hdcb=" local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1
+          grep -Fq "RAW_MAIN_RELEASE_PLUS_IMMUTABLE_GIT_BLOB_SHA1" local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1
+          git diff --check
+      - name: Commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add local-agent/diagnostics/Test-NotebookLMClaimStartBridge.ps1
+          git commit -m 'Use raw verified Agent 1.1.55 recovery fetch'
+          git push origin HEAD:main
