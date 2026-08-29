@@ -10,7 +10,7 @@ $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $UserData=Join-Path $Base 'ChromeUserData'
 $ExtensionRoot=Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
 $CftRoot=Join-Path $Base 'ChromeForTesting'
-$Home='https://notebook.google.com/'
+$NotebookHome='https://notebook.google.com/'
 $Started=Get-Date
 function Find-Chrome {
   if(Test-Path -LiteralPath $CftRoot){$x=Get-ChildItem -LiteralPath $CftRoot -Recurse -Filter chrome.exe -File -ErrorAction SilentlyContinue|Sort-Object FullName -Descending|Select-Object -First 1;if($x){return [string]$x.FullName}}
@@ -24,7 +24,7 @@ function Start-DebugChrome {
   foreach($p in @(Dedicated-Procs)){try{Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction SilentlyContinue}catch{}}
   Start-Sleep -Milliseconds 700
   $chrome=Find-Chrome
-  $args=@("--remote-debugging-port=$RemoteDebuggingPort",'--remote-allow-origins=*',"--user-data-dir=$UserData",'--profile-directory=Default',"--load-extension=$ExtensionRoot",'--new-window','--no-first-run','--no-default-browser-check','--disable-session-crashed-bubble',$Home)
+  $args=@("--remote-debugging-port=$RemoteDebuggingPort",'--remote-allow-origins=*',"--user-data-dir=$UserData",'--profile-directory=Default',"--load-extension=$ExtensionRoot",'--new-window','--no-first-run','--no-default-browser-check','--disable-session-crashed-bubble',$NotebookHome)
   Start-Process -FilePath $chrome -ArgumentList $args|Out-Null
   $deadline=(Get-Date).AddSeconds(15);do{Start-Sleep -Milliseconds 400;if(Debug-Ready){return}}while((Get-Date)-lt $deadline)
   throw 'CDP_PORT_NOT_READY'
