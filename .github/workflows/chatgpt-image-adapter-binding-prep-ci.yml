@@ -56,8 +56,8 @@ jobs:
         run: |
           $root=Join-Path $env:RUNNER_TEMP 'chatgpt-image-bind-missing'
           New-Item -ItemType Directory -Force -Path $root|Out-Null
-          & pwsh -NoProfile -File 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1' -CentralRootOverride $root
-          if($LASTEXITCODE -ne 2){ throw "expected exit 2, got $LASTEXITCODE" }
+          $proc=Start-Process -FilePath pwsh -ArgumentList @('-NoProfile','-File','local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1','-CentralRootOverride',$root) -Wait -PassThru -NoNewWindow
+          if($proc.ExitCode -ne 2){ throw "expected exit 2, got $($proc.ExitCode)" }
           $r=Get-Content -LiteralPath (Join-Path $root 'Runtime_Readback\CHROME\CHATGPT_IMAGE_ADAPTER_BINDING_PLAN_V1.json') -Raw|ConvertFrom-Json
           if($r.status -ne 'HOLD_MANIFEST_RECEIPT_MISSING' -or $r.ok){ throw 'missing-manifest fail-closed check failed' }
       - name: Fixture valid manifest becomes ready
@@ -81,8 +81,8 @@ jobs:
             )
           }
           $m|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_AUTO_MANIFEST_INSPECT.json') -Encoding UTF8
-          & pwsh -NoProfile -File 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1' -CentralRootOverride $root
-          if($LASTEXITCODE -ne 0){ throw "expected exit 0, got $LASTEXITCODE" }
+          $proc=Start-Process -FilePath pwsh -ArgumentList @('-NoProfile','-File','local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1','-CentralRootOverride',$root) -Wait -PassThru -NoNewWindow
+          if($proc.ExitCode -ne 0){ throw "expected exit 0, got $($proc.ExitCode)" }
           $r=Get-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_ADAPTER_BINDING_PLAN_V1.json') -Raw|ConvertFrom-Json
           if($r.status -ne 'READY_FOR_ADAPTER_BINDING' -or -not $r.ok){ throw 'valid-manifest readiness check failed' }
       - name: Fixture missing declared resource fails closed
@@ -103,7 +103,7 @@ jobs:
             referencedResources=@([ordered]@{relativePath='background.js';exists=$false;bytes=0})
           }
           $m|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_AUTO_MANIFEST_INSPECT.json') -Encoding UTF8
-          & pwsh -NoProfile -File 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1' -CentralRootOverride $root
-          if($LASTEXITCODE -ne 7){ throw "expected exit 7, got $LASTEXITCODE" }
+          $proc=Start-Process -FilePath pwsh -ArgumentList @('-NoProfile','-File','local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1','-CentralRootOverride',$root) -Wait -PassThru -NoNewWindow
+          if($proc.ExitCode -ne 7){ throw "expected exit 7, got $($proc.ExitCode)" }
           $r=Get-Content -LiteralPath (Join-Path $dir 'CHATGPT_IMAGE_ADAPTER_BINDING_PLAN_V1.json') -Raw|ConvertFrom-Json
           if($r.status -ne 'HOLD_DECLARED_RESOURCE_MISSING' -or $r.ok){ throw 'missing-resource fail-closed check failed' }
