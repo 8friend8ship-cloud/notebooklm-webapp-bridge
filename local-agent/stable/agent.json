@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.69",
-  "releasedAt": "2026-08-29T17:55:00+09:00",
-  "gitBlobSha1": "9dce2a7bb83d96a3d846a92e24f468b7a67cb38a",
+  "version": "1.1.70",
+  "releasedAt": "2026-08-29T18:58:00+09:00",
+  "gitBlobSha1": "2dc7ccf22a30fe2748ed10faffc74790d6cb3e72",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Preserves current 1.1.68 recovery, then performs the requested no-credit Flow R10 full-entry verification directly through CDP 9224 using pinned V8: landing/cookie if present -> Create with Google Flow -> project list -> + New Project -> actual /project/<id> workspace. This bypasses the stalled Sheet queue worker when AgentBootstrap is still alive. Writes FLOW_DIRECT_BOOTSTRAP_R10_1.1.69.json locally and to central Drive. Never clicks Generate, spends credits, enters credentials, changes OAuth/scopes, or touches normal Chrome."
+  "notes": "Preserves stable 1.1.69 no-credit Flow R10 direct bootstrap, then performs a direct no-generation ChatGPT Image Auto automation-contract probe using immutable pinned Inspect/Capture/Analyze scripts. This bypasses the stalled Sheet queue when the existing AgentBootstrap wakes. Writes CHATGPT_IMAGE_DIRECT_PROBE_1.1.70.json plus manifest/entrypoint/contract receipts to central Drive. Never clicks Generate, spends image credits, changes OAuth/scopes, mutates the extension, or touches normal Chrome."
 }
