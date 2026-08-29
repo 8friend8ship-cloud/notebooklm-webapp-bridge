@@ -7,7 +7,7 @@ on:
       - 'local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1'
       - 'local-agent/governor/Capture-ChatGPTImageDeclaredEntrypointsV1.ps1'
       - 'local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1'
-      - 'local-agent/releases/1.1.70/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.71/HomeDesignLocalAgent.ps1'
       - 'local-agent/stable/agent.json'
       - '.github/workflows/chatgpt-image-automation-probe-ci.yml'
   workflow_dispatch:
@@ -25,7 +25,7 @@ jobs:
             'local-agent/governor/Inspect-ChatGPTImageAutoManifest.ps1',
             'local-agent/governor/Capture-ChatGPTImageDeclaredEntrypointsV1.ps1',
             'local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1',
-            'local-agent/releases/1.1.70/HomeDesignLocalAgent.ps1'
+            'local-agent/releases/1.1.71/HomeDesignLocalAgent.ps1'
           )
           foreach($f in $files){
             $tokens=$null;$errors=$null
@@ -39,14 +39,14 @@ jobs:
           foreach($needle in @('Run-ChatGPTImagePostRecoveryInspect.ps1','Capture-ChatGPTImageDeclaredEntrypointsV1.ps1','Analyze-ChatGPTImageEntrypointContractV1.ps1','generateClicked=$false','creditsSpent=$false','CHATGPT_IMAGE_AUTOMATION_PROBE_V1.json')){
             if(-not $p.Contains($needle)){throw "missing queue contract: $needle"}
           }
-      - name: Validate stable 1.1.70 direct probe and pins
+      - name: Validate stable 1.1.71 direct probe and entry heartbeat
         shell: pwsh
         run: |
-          $a=Get-Content 'local-agent/releases/1.1.70/HomeDesignLocalAgent.ps1' -Raw
-          foreach($needle in @("`$AgentVersion='1.1.70'","`$PinnedBase='9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'","`$PinnedInspect='49d5fc958c1e6d683156380e5ca18a101af27cf9'","`$PinnedCapture='18d07e9b1796e154746df05fc35b110ced9148d7'","`$PinnedAnalyze='e0514cb6933ce02a0be5087e4deb6876f49ab34c'",'CHATGPT_IMAGE_DIRECT_PROBE_1.1.70.json','generateClicked=$false','creditSpend=$false','oauthChanged=$false','extensionMutated=$false')){
+          $a=Get-Content 'local-agent/releases/1.1.71/HomeDesignLocalAgent.ps1' -Raw
+          foreach($needle in @("`$AgentVersion='1.1.71'","`$PinnedBase='9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'","`$PinnedInspect='49d5fc958c1e6d683156380e5ca18a101af27cf9'","`$PinnedCapture='18d07e9b1796e154746df05fc35b110ced9148d7'","`$PinnedAnalyze='e0514cb6933ce02a0be5087e4deb6876f49ab34c'",'CHATGPT_IMAGE_AGENT_ENTRY_1.1.71.json','ENTRY_BEFORE_NETWORK_OR_BASE','CHATGPT_IMAGE_DIRECT_PROBE_1.1.71.json','generateClicked=$false','creditSpend=$false','oauthChanged=$false','extensionMutated=$false')){
             if(-not $a.Contains($needle)){throw "missing stable contract: $needle"}
           }
           $m=Get-Content 'local-agent/stable/agent.json' -Raw | ConvertFrom-Json
-          if($m.version -ne '1.1.70'){throw 'stable version mismatch'}
-          if($m.gitBlobSha1 -ne '2dc7ccf22a30fe2748ed10faffc74790d6cb3e72'){throw 'stable blob mismatch'}
-          Write-Host 'CHATGPT_IMAGE_DIRECT_STABLE_PROBE_STATIC_PASS'
+          if($m.version -ne '1.1.71'){throw 'stable version mismatch'}
+          if($m.gitBlobSha1 -ne '49d4192a68e75c08598cc721c0d990bb573c97e0'){throw 'stable blob mismatch'}
+          Write-Host 'CHATGPT_IMAGE_DIRECT_STABLE_1_1_71_STATIC_PASS'
