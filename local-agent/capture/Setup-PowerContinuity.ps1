@@ -15,7 +15,7 @@ $State=Join-Path $Root 'state.json'
 $TaskWatch='HomeDesign-PowerContinuity-Watchdog'
 $TaskNight='HomeDesign-Night-Display-Off'
 $UsbSubGroup='2a737441-1930-4402-8d77-b2bebba308a3'
-$UsbSelectiveSuspend='48e6b7a6-50f5-4782-a5d4-53be6a7c11e8'
+$UsbSelectiveSuspend='48e6b7a6-50f5-4782-a5d4-53bb8f07e226'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
 function TaskInfo([string]$Name){
