@@ -1,0 +1,37 @@
+name: Flow canonical extension contract CI
+
+on:
+  push:
+    paths:
+      - 'config/flow-extension-canonical-v0.1.0.json'
+      - 'local-agent/governor/Test-FlowCanonicalExtension.ps1'
+      - '.github/workflows/flow-canonical-extension-contract-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'local-agent/governor/Test-FlowCanonicalExtension.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){ $errors | Format-List | Out-String | Write-Error; exit 1 }
+      - name: Verify pinned contract
+        shell: pwsh
+        run: |
+          $c=Get-Content 'config/flow-extension-canonical-v0.1.0.json' -Raw | ConvertFrom-Json
+          if($c.version -ne '0.1.0'){ throw 'FLOW_VERSION_CONTRACT_MISMATCH' }
+          if($c.extensionId -ne 'lgedgmpcikglaajhfclcihicgafimlna'){ throw 'FLOW_EXTENSION_ID_CONTRACT_MISMATCH' }
+          if($c.architecture -ne 'content_script_plus_popup'){ throw 'FLOW_ARCHITECTURE_CONTRACT_MISMATCH' }
+          $src=Get-Content 'local-agent/governor/Test-FlowCanonicalExtension.ps1' -Raw
+          foreach($f in @('manifest.json','content.js','popup.js','popup.html')){
+            if(-not $src.Contains($f)){ throw "FLOW_REQUIRED_FILE_NOT_PINNED:$f" }
+            $sha=[string]$c.requiredFiles.$f.sha256
+            if(-not $src.Contains($sha)){ throw "FLOW_SHA_NOT_PINNED:$f" }
+          }
+          if(-not $src.Contains("ExpectedVersion='0.1.0'")){ throw 'FLOW_EXPECTED_VERSION_NOT_ENFORCED' }
+          if(-not $src.Contains("ExpectedExtensionId='lgedgmpcikglaajhfclcihicgafimlna'")){ throw 'FLOW_EXPECTED_ID_NOT_ENFORCED' }
