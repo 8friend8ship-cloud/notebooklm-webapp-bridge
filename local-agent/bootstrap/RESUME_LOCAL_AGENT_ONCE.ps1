@@ -10,8 +10,8 @@ $CftRoot = Join-Path $Base 'ChromeForTesting'
 $RemoteDebuggingPort = 9223
 $NotebookHomeUrl = 'https://notebook.google.com/'
 $HistoricalId = '69e055e5-c8d0-4e9c-8686-58cc6da35a51'
-$Marker = Join-Path $Root 'NLM_FRESH_RESUME_CDP_20260829_2040.attempted'
-$ResultPath = Join-Path $Root 'NLM_FRESH_RESUME_CDP_20260829_2040.json'
+$Marker = Join-Path $Root 'NLM_FRESH_RESUME_CDP_20260829_2045.attempted'
+$ResultPath = Join-Path $Root 'NLM_FRESH_RESUME_CDP_20260829_2045.json'
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 
 function FindCentralRoot {
@@ -39,7 +39,7 @@ function SaveReceipt($Object) {
     if ($central) {
         $dest = Join-Path $central 'Runtime_Readback\NotebookLM'
         New-Item -ItemType Directory -Force -Path $dest | Out-Null
-        $json | Set-Content -LiteralPath (Join-Path $dest 'NLM_FRESH_RESUME_CDP_20260829_2040.json') -Encoding UTF8
+        $json | Set-Content -LiteralPath (Join-Path $dest 'NLM_FRESH_RESUME_CDP_20260829_2045.json') -Encoding UTF8
     }
 }
 
@@ -113,6 +113,10 @@ function GetNotebookTab {
     } | Select-Object -First 1)[0]
 }
 
+function GetAnyPageTab {
+    return @(GetTabs | Where-Object { [string]$_.type -eq 'page' } | Select-Object -First 1)[0]
+}
+
 function ReceiveCdp([System.Net.WebSockets.ClientWebSocket]$Ws) {
     $buffer = New-Object byte[] 65536
     $stream = New-Object IO.MemoryStream
@@ -168,8 +172,10 @@ $result = [ordered]@{
     ok = $false
     action = 'NLM_FRESH_RESUME_CDP_DIRECT'
     startedAt = (Get-Date).ToString('o')
+    initialTabUrl = ''
     previousUrl = ''
     previousNotebookId = ''
+    navigatedToNotebookHome = $false
     clickedLabel = ''
     notebookUrl = ''
     notebookId = ''
@@ -181,25 +187,40 @@ $ws = $null
 
 try {
     StartDedicatedChrome
-    $deadline = (Get-Date).AddSeconds(20)
-    $tab = $null
-    do {
-        $tab = GetNotebookTab
-        if ($tab) { break }
-        Start-Sleep -Milliseconds 400
-    } while ((Get-Date) -lt $deadline)
-    if (-not $tab) { throw 'NOTEBOOKLM_TAB_NOT_FOUND' }
+    Start-Sleep -Milliseconds 800
+    $tab = GetNotebookTab
+    if (-not $tab) { $tab = GetAnyPageTab }
+    if (-not $tab) {
+        $encoded = [Uri]::EscapeDataString($NotebookHomeUrl)
+        $tab = Invoke-RestMethod -Uri ("http://127.0.0.1:$RemoteDebuggingPort/json/new?$encoded") -Method Put -TimeoutSec 5
+    }
+    if (-not $tab) { throw 'NO_CDP_PAGE_TARGET' }
 
-    $result.previousUrl = [string]$tab.url
-    if ($result.previousUrl -match '/notebook/([0-9a-fA-F-]+)') { $result.previousNotebookId = $Matches[1] }
-
+    $result.initialTabUrl = [string]$tab.url
     $uri = [Uri]([string]$tab.webSocketDebuggerUrl)
     $ws = New-Object System.Net.WebSockets.ClientWebSocket
     $ws.ConnectAsync($uri, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
     $sequence = 0
     [void](SendCdp $ws ([ref]$sequence) 'Runtime.enable' @{})
+    [void](SendCdp $ws ([ref]$sequence) 'Page.enable' @{})
     [void](SendCdp $ws ([ref]$sequence) 'Page.bringToFront' @{})
-    Start-Sleep -Milliseconds 700
+
+    $currentUrl = [string](EvalCdp $ws ([ref]$sequence) 'location.href')
+    if ($currentUrl -notlike 'https://notebook.google.com/*') {
+        [void](SendCdp $ws ([ref]$sequence) 'Page.navigate' @{url=$NotebookHomeUrl})
+        $deadline = (Get-Date).AddSeconds(30)
+        do {
+            Start-Sleep -Milliseconds 500
+            $currentUrl = [string](EvalCdp $ws ([ref]$sequence) 'location.href')
+            if ($currentUrl -like 'https://notebook.google.com/*') { break }
+        } while ((Get-Date) -lt $deadline)
+        if ($currentUrl -notlike 'https://notebook.google.com/*') { throw 'NOTEBOOK_HOME_NAVIGATION_FAILED' }
+        $result.navigatedToNotebookHome = $true
+        Start-Sleep -Seconds 2
+    }
+
+    $result.previousUrl = $currentUrl
+    if ($currentUrl -match '/notebook/([0-9a-fA-F-]+)') { $result.previousNotebookId = $Matches[1] }
 
     $clickExpression = @"
 (() => {
@@ -220,8 +241,7 @@ try {
   for (const wanted of preferred) {
     const hit = items.find(e => {
       const raw = String([e.innerText,e.textContent,e.getAttribute('aria-label'),e.getAttribute('title')].join(' ')).trim();
-      const lower = raw.toLowerCase();
-      return lower.includes(wanted.toLowerCase());
+      return raw.toLowerCase().includes(wanted.toLowerCase());
     });
     if (hit) {
       const label = String([hit.innerText,hit.textContent,hit.getAttribute('aria-label'),hit.getAttribute('title')].join(' ')).trim().slice(0,200);
