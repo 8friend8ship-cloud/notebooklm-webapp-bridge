@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.81",
-  "releasedAt": "2026-08-30T08:07:00+09:00",
-  "gitBlobSha1": "5c9dff56ac07df6bb5c1c313530f080f8aec35d9",
+  "version": "1.1.82",
+  "releasedAt": "2026-08-30T08:17:00+09:00",
+  "gitBlobSha1": "ece251e62f76f84e9a5de1fcb9e2f4d7bdd81a15",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Minimal recovery wake for the existing canonical NotebookLM fresh task row450. Delegates to proven Agent 1.1.32 exactly, then wakes only the dedicated automation Chrome/control-center with a new one-shot marker. Bridge 0.2.39 generation/download LAST_GOOD is unchanged; normal Chrome, OAuth, scopes and permissions are unchanged. No duplicate fresh task is created."
+  "notes": "Exactly-once out-of-band execution of the existing verified Test-NotebookLMFreshNotebookSourceCDPV3 helper for canonical row450. Row450 is held to prevent duplicate creation while this runs. Bridge 0.2.39 generation/download LAST_GOOD remains unchanged. No normal Chrome, OAuth, scope, permission, public-publish or paid API changes. PASS requires a unique non-historical notebook URL plus sourceAdded/sourceVerified."
 }
