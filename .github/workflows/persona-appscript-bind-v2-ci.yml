@@ -1,0 +1,62 @@
+name: Persona Apps Script Bind V2 CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV2.ps1'
+      - '.github/workflows/persona-appscript-bind-v2-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV2.ps1'
+      - '.github/workflows/persona-appscript-bind-v2-ci.yml'
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Windows PowerShell 5.1 parse
+        shell: powershell
+        run: |
+          $path='local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV2.ps1'
+          $null=[scriptblock]::Create((Get-Content -LiteralPath $path -Raw -Encoding UTF8))
+          Write-Host 'WinPS5.1 parse PASS'
+      - name: Existing-project-only contract
+        shell: powershell
+        run: |
+          $p='local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV2.ps1'
+          $s=Get-Content -LiteralPath $p -Raw -Encoding UTF8
+          $required=@(
+            "@('list-scripts','--json')",
+            "@('list-deployments', `$ScriptId)",
+            'TARGET_DEPLOYMENT_MATCH_COUNT_V2',
+            "@('clone-script',`$targetScriptId)",
+            "@('push','--force')",
+            "@('pull')",
+            'READBACK_X1',
+            'READBACK_X2',
+            'EXISTING_DEPLOYMENT_INVARIANT_FAILED',
+            'PERSONA_FACTORY_DUE_ADAPTER_V2',
+            'PersonaOrchestrationGate.gs',
+            'PersonaOrchestrator.gs',
+            '948c056e6d175b5b709b53955abdd3b83869b9c3',
+            'a3e8ebb0400ffb19bb8cc83e88ab2950be4e7320',
+            'duplicateClockCreated = `$false',
+            'newProjectCreated = `$false',
+            'newDeployment = `$false',
+            'newTrigger = `$false',
+            'paidGeminiApiCalled = `$false'
+          )
+          foreach($n in $required){if(-not $s.Contains($n)){throw "MISSING_CONTRACT:$n"}}
+          $forbidden=@('create-script','create-deployment','update-deployment','redeploy','ScriptApp.newTrigger','clasp login','enable-api')
+          foreach($n in $forbidden){if($s -match [regex]::Escape($n)){throw "FORBIDDEN_OPERATION:$n"}}
+          Write-Host 'Existing-project-only contract PASS'
+      - name: Fail-closed target and rollback contract
+        shell: powershell
+        run: |
+          $s=Get-Content -LiteralPath 'local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV2.ps1' -Raw -Encoding UTF8
+          foreach($n in @('if ($matches.Count -ne 1)','TARGET_SPREADSHEET_SIGNATURE_NOT_FOUND','BACKUP','Restore-Snapshot','FAILED_ROLLED_BACK','deploymentMatch = $hit','listedScriptCount')){
+            if(-not $s.Contains($n)){throw "MISSING_FAIL_CLOSED:$n"}
+          }
+          Write-Host 'Fail-closed + rollback contract PASS'
