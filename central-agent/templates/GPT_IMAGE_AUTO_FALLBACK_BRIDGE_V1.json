@@ -1,0 +1,55 @@
+{
+  "templateId": "GPT_IMAGE_AUTO_FALLBACK_BRIDGE_V1",
+  "version": "1.0.0",
+  "role": "image_generation_fallback_bridge",
+  "priority": {
+    "primary": "Flow Agent Bridge",
+    "secondary": "Google AI Local Bridge v1",
+    "fallback": "ChatGPT Image Auto CANONICAL v8.6.0"
+  },
+  "activation": {
+    "normal": "DO_NOT_CALL_GPT_IMAGE_AUTO",
+    "allowedWhen": [
+      "FLOW_RUNTIME_UNAVAILABLE",
+      "FLOW_GENERATION_FAILED",
+      "FLOW_UI_CHANGED",
+      "FLOW_LOGIN_SESSION_INVALID",
+      "FLOW_CREDIT_OR_QUOTA_BLOCKED",
+      "FLOW_RESULT_DOWNLOAD_FAILED"
+    ],
+    "requiresChangedEvidenceBeforeRetry": true,
+    "parallelDuplicateGeneration": false
+  },
+  "queueContract": {
+    "queue": "Image_Task_Queue",
+    "states": ["READY", "CLAIMED", "STARTED", "GENERATED", "DOWNLOADED", "DRIVE_REGISTERED", "RESULT_ACK", "DONE"],
+    "requiredTaskFields": ["taskId", "prompt", "sourceWorkflow", "fallbackReason", "createdAt"],
+    "optionalTaskFields": ["referenceImageAssetIds", "aspectRatio", "outputHint"]
+  },
+  "downloadContract": {
+    "acceptedExtensions": [".png", ".jpg", ".jpeg", ".webp"],
+    "reject": ["html_page", "text_placeholder", "link_only", "zero_byte_file", "thumbnail_only"],
+    "preserveOriginal": true,
+    "overwriteOriginal": false,
+    "localInbox": "C:/HomeDesignAutomationV7/CaptureBridge/INBOX/ChatGPTImage",
+    "centralInbox": "00_중앙에이전트/CaptureBridge/INBOX/ChatGPTImage",
+    "requiredEvidence": ["sourcePath", "bytes", "mimeType", "sha256_if_available", "taskId", "timestamp"]
+  },
+  "driveAssetContract": {
+    "registerBeforeReuse": true,
+    "requiredFields": ["SOURCE_URL_OR_SOURCE_CONTEXT", "DRIVE_FILE_ID", "DRIVE_PATH", "MIME_TYPE", "BYTES", "CONTENT_HASH_IF_AVAILABLE", "OWNER", "USAGE_SCOPE", "SOURCE_ASSET_ID_IF_DERIVED"],
+    "derivedEditsBecomeNewAssets": true
+  },
+  "lineage": ["Image_Task_Queue", "local_download", "Drive_asset", "Queens_raw", "Seed_candidate", "RESULT_ACK"],
+  "verification": {
+    "installationEvidenceIsNotFunctionalPass": true,
+    "requiredFunctionalRuns": 2,
+    "sameFixture": true,
+    "completionGate": "image_generated + real_image_file_downloaded + nonzero_bytes + Drive_file_id + asset_metadata + RESULT_ACK x2"
+  },
+  "errorPolicy": {
+    "blindRetry": false,
+    "minimumFixOnly": true,
+    "requiredFields": ["FAILED_STAGE", "EXPECTED", "ACTUAL", "ROOT_CAUSE", "MINIMUM_FIX", "SAME_FIXTURE_RETEST", "DO_NOT_REPEAT", "RESUME_POINT"]
+  }
+}
