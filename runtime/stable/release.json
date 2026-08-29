@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.73_LEGACY_ACTIVE_LOCK_RECOVERY_20260829",
-  "version": "0.2.73",
-  "releasedAt": "2026-08-29T15:20:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.74_ACTIVE_LOCK_CLEANUP_20260829",
+  "version": "0.2.74",
+  "releasedAt": "2026-08-29T15:24:00+09:00",
   "requiresUserApproval": false,
-  "description": "Reconciles legacy nlmLocalPowerShellAsyncActiveV2 state against the live Apps Script queue and local Host before finalizing. Orphan/non-live persisted locks are cleared, and legacy active records without stable timestamps receive one stable anchor instead of resetting timeout age on every poll. Prevents permanent READY starvation. No new permission, OAuth, download-path, normal-Chrome, Generate, or credit behavior.",
+  "description": "Removes duplicate active-lock helper declarations from the 0.2.73 emergency recovery while preserving queue/Host reconciliation and stable timestamp anchoring. No permissions, OAuth, normal Chrome, Generate or credit changes.",
   "sourceCommit": "PENDING_THIS_COMMIT",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
@@ -15,7 +15,7 @@
   "files": [
     {
       "path": "manifest.json",
-      "gitBlobSha1": "930f9a0ad19e1cf705af0b4031025151aa76b890"
+      "gitBlobSha1": "8f4149caec817f790070af8a1db7013979390256"
     },
     {
       "path": "worker.js",
@@ -47,7 +47,7 @@
     },
     {
       "path": "local-powershell-runner.js",
-      "gitBlobSha1": "abbb9c939d0e67c754f3a392d10aebc1b5e4d517"
+      "gitBlobSha1": "89b8265ed93783fb2e502042e877414c1e9ceb89"
     },
     {
       "path": "flow-script-id-direct-recovery.js",
