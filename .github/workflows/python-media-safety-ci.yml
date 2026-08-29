@@ -1,0 +1,27 @@
+name: Python media safety CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'local-agent/python/notebooklm_raw_download_capture.py'
+      - 'local-agent/python/test_notebooklm_raw_download_capture.py'
+      - '.github/workflows/python-media-safety-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  media-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run binary preservation and fail-closed tests
+        run: python local-agent/python/test_notebooklm_raw_download_capture.py
+      - name: Run module self-test
+        run: python local-agent/python/notebooklm_raw_download_capture.py --self-test
