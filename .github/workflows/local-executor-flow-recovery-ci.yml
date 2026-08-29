@@ -9,6 +9,9 @@ on:
       - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
       - 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
       - 'local-agent/governor/Test-FlowCanonicalExtension.ps1'
+      - 'local-agent/governor/Sync-GoogleAIAlwaysOnBridgeV102.ps1'
+      - 'local-agent/governor/policy.json'
+      - 'extensions/google-ai-always-on-bridge/1.0.2/**'
       - 'config/flow-extension-canonical-v0.1.0.json'
       - '.github/workflows/local-executor-flow-recovery-ci.yml'
   workflow_dispatch:
@@ -18,10 +21,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Parse recovery verifier installer and watchdog
+      - name: Parse recovery verifier installer watchdog and Always-On updater
         shell: powershell
         run: |
-          foreach($p in @('local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1','local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1','local-agent/bootstrap/HomeDesignLocalWatchdog.ps1','local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1','local-agent/governor/Test-FlowCanonicalExtension.ps1')){
+          foreach($p in @('local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1','local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1','local-agent/bootstrap/HomeDesignLocalWatchdog.ps1','local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1','local-agent/governor/Test-FlowCanonicalExtension.ps1','local-agent/governor/Sync-GoogleAIAlwaysOnBridgeV102.ps1')){
             $tokens=$null;$errors=$null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$tokens,[ref]$errors)
             if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
@@ -107,3 +110,60 @@ jobs:
           if($c.version-ne'0.1.0'){throw 'FLOW_CANONICAL_VERSION_MISMATCH'}
           if($c.extensionId-ne'lgedgmpcikglaajhfclcihicgafimlna'){throw 'FLOW_CANONICAL_ID_MISMATCH'}
           Write-Host 'FLOW_LOCAL_EXECUTOR_RECOVERY_V1_4_CONTRACT_PASS'
+
+      - name: Verify Google AI Always-On 1.0.2 path-preserving contract
+        shell: powershell
+        run: |
+          $u=Get-Content 'local-agent/governor/Sync-GoogleAIAlwaysOnBridgeV102.ps1' -Raw
+          foreach($required in @(
+            "ExtensionId='kieodjjlhpefnakodgllmpckepjaggbd'",
+            "ExpectedVersion='1.0.2'",
+            "CanonicalRoot='extensions/google-ai-always-on-bridge/1.0.2'",
+            'GOOGLE_AI_ALWAYS_ON_BRIDGE_V102_SYNC.json',
+            'V1_PATH_PRESERVE_SECRET_SAFE',
+            'CONFIG_MUTATION_DETECTED',
+            'NOTEBOOKLM_MUTATION_DETECTED',
+            'configContentRead=$false',
+            'configPreserved=$true',
+            'notebooklmPreserved=$true',
+            'normalChromeTouched=$false',
+            'duplicateInstallCreated=$false',
+            'generateClicked=$false',
+            'creditSpend=$false',
+            'oauthChanged=$false',
+            'scopeChanged=$false',
+            'AllowDedicatedRestart',
+            'DedicatedUserData',
+            'chrome.runtime.reload()',
+            'chrome.runtime.getManifest().version',
+            '22c1ad5470b355f05d8e53e07c66d068dc16366f7b677dd12fcd15ab2f36a553',
+            'bc522b5ccf93b754cdba2454b96e08ce0323b470414058b7dd8657623550a602',
+            '80b069153a101b61a37f66bc23890184bda0f0b8ca1bfafa804213afe6997b21'
+          )){if(-not$u.Contains($required)){throw "MISSING_ALWAYS_ON_GUARD:$required"}}
+          if($u.Contains("Get-Content -LiteralPath $config")){throw 'UPDATER_MUST_NOT_READ_CONFIG_CONTENT'}
+          if($u.Contains('Stop-Process') -and -not$u.Contains('Contains($DedicatedUserData)')){throw 'CHROME_STOP_MUST_BE_DEDICATED_SCOPED'}
+
+          $canon=Get-Content 'extensions/google-ai-always-on-bridge/1.0.2/canonical.json' -Raw|ConvertFrom-Json
+          if($canon.version-ne'1.0.2'){throw 'ALWAYS_ON_CANONICAL_VERSION_MISMATCH'}
+          if($canon.extensionId-ne'kieodjjlhpefnakodgllmpckepjaggbd'){throw 'ALWAYS_ON_CANONICAL_ID_MISMATCH'}
+          if($canon.source.projectFolderId-ne'1P3ahSXu7UU96oG74glulCONX4sLyI-8c'){throw 'ALWAYS_ON_DRIVE_SOURCE_MISMATCH'}
+          if(-not($canon.preserveFiles -contains 'config.js')){throw 'CONFIG_PRESERVE_CONTRACT_MISSING'}
+          if(-not($canon.preserveFiles -contains 'content/notebooklm.js')){throw 'NOTEBOOKLM_PRESERVE_CONTRACT_MISSING'}
+          if($canon.policy.normalChromeRestartAllowed){throw 'NORMAL_CHROME_RESTART_MUST_BE_FALSE'}
+          if(-not$canon.policy.generationRequiresExplicitApproval){throw 'GENERATION_APPROVAL_GATE_MISSING'}
+          if($canon.policy.connectivityProbeMaySpendCredits){throw 'CONNECTIVITY_PROBE_MUST_NOT_SPEND_CREDITS'}
+
+          $policy=Get-Content 'local-agent/governor/policy.json' -Raw|ConvertFrom-Json
+          $rule=@($policy.managedExtensions|Where-Object{$_.name-eq'Google AI Local Bridge v1'})|Select-Object -First 1
+          if(-not$rule){throw 'ALWAYS_ON_POLICY_RULE_MISSING'}
+          if($rule.canonicalVersion-ne'1.0.2'){throw 'ALWAYS_ON_POLICY_VERSION_MISMATCH'}
+          if($rule.mode-ne'DRIVE_SOURCE_BOUND_VERIFY_THEN_UPDATE'){throw 'ALWAYS_ON_POLICY_MODE_MISMATCH'}
+          if($rule.sourceId-ne'1P3ahSXu7UU96oG74glulCONX4sLyI-8c'){throw 'ALWAYS_ON_POLICY_SOURCE_MISMATCH'}
+
+          node --check 'extensions/google-ai-always-on-bridge/1.0.2/service-worker.js'
+          if($LASTEXITCODE-ne0){throw 'SERVICE_WORKER_JS_PARSE_FAILED'}
+          node --check 'extensions/google-ai-always-on-bridge/1.0.2/content/flow.js'
+          if($LASTEXITCODE-ne0){throw 'FLOW_JS_PARSE_FAILED'}
+          $m=Get-Content 'extensions/google-ai-always-on-bridge/1.0.2/manifest.json' -Raw|ConvertFrom-Json
+          if($m.version-ne'1.0.2'){throw 'MIRRORED_MANIFEST_VERSION_MISMATCH'}
+          Write-Host 'GOOGLE_AI_ALWAYS_ON_BRIDGE_V102_PATH_PRESERVE_CONTRACT_PASS'
