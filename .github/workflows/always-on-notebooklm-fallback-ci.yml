@@ -41,7 +41,6 @@ jobs:
           foreach($pattern in @('configContentRead\s*=\s*\$false','normalChromeTouched\s*=\s*\$false','primaryNotebookBridgeChanged\s*=\s*\$false')){if($u -notmatch $pattern){throw "UPDATER_PROPERTY_CONTRACT_MISSING:$pattern"}}
           if($u.Contains('Stop-Process')){throw 'NLM_FALLBACK_UPDATER_MUST_NOT_STOP_CHROME'}
           if($u.Contains('Get-Content -LiteralPath $config')){throw 'NLM_FALLBACK_UPDATER_MUST_NOT_READ_CONFIG_CONTENT'}
-
           $swBlob=(git rev-parse 'HEAD:extensions/google-ai-always-on-bridge/1.0.2/service-worker.js').Trim()
           $nBlob=(git rev-parse 'HEAD:extensions/google-ai-always-on-bridge/1.0.2/content/notebooklm.js').Trim()
           if($swBlob-ne'c6ead8195c8fc1a48aab20c96587622ca76a3c38'){throw "SERVICE_WORKER_BLOB_MISMATCH:$swBlob"}
@@ -57,5 +56,19 @@ jobs:
           if($swHash-ne'689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44'){throw "SERVICE_WORKER_SHA256_MISMATCH:$swHash"}
           if($nHash-ne'8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c'){throw "NOTEBOOKLM_SHA256_MISMATCH:$nHash"}
           Write-Host 'ALWAYS_ON_NOTEBOOKLM_FALLBACK_CONTRACT_PASS'
-
-# trigger: 2026-08-29 fallback adapter validation
+      - name: Stage exact verified source bytes
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path verified-source/content | Out-Null
+          $swBlob=(git rev-parse 'HEAD:extensions/google-ai-always-on-bridge/1.0.2/service-worker.js').Trim()
+          $nBlob=(git rev-parse 'HEAD:extensions/google-ai-always-on-bridge/1.0.2/content/notebooklm.js').Trim()
+          cmd.exe /d /c "git cat-file blob $swBlob > verified-source\service-worker.js"
+          if($LASTEXITCODE-ne0){throw 'STAGE_SERVICE_WORKER_FAILED'}
+          cmd.exe /d /c "git cat-file blob $nBlob > verified-source\content\notebooklm.js"
+          if($LASTEXITCODE-ne0){throw 'STAGE_NOTEBOOKLM_FAILED'}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: always-on-notebooklm-fallback-verified-source
+          path: verified-source
+          if-no-files-found: error
+          retention-days: 3
