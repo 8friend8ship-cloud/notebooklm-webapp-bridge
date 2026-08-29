@@ -6,6 +6,8 @@ $Repo = '8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $AgentFile = Join-Path $Root 'HomeDesignLocalAgent.ps1'
 $StateFile = Join-Path $Root 'state.json'
+$FlowAgentFile = Join-Path $Root 'HomeDesignLocalAgent-flow.ps1'
+$FlowLaneStateFile = Join-Path $Root 'state-flow.json'
 $BootstrapLog = Join-Path $Root 'bootstrap.log'
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 
@@ -32,6 +34,13 @@ function CurrentStateVersion {
   if(-not(Test-Path -LiteralPath $StateFile)){ return '' }
   try { return [string]((Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json).agentVersion) } catch { return '' }
 }
+function CurrentLaneVersion([string]$Path){
+  if(-not(Test-Path -LiteralPath $Path)){ return '' }
+  try { return [string]((Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json).appliedVersion) } catch { return '' }
+}
+function SaveLaneState([string]$Path,[string]$Lane,[string]$Version,[int]$ExitCode){
+  try{[ordered]@{lane=$Lane;appliedVersion=$Version;exitCode=$ExitCode;updatedAt=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $Path -Encoding UTF8}catch{}
+}
 function StopStaleAgentProcesses([int]$MaxAgeSeconds=1800){
   $killed=@();$now=Get-Date
   try{
@@ -56,6 +65,20 @@ function RunAgentBounded([string]$Path,[int]$TimeoutSeconds=900){
     return 124
   }
   try{return [int]$proc.ExitCode}catch{return 1}
+}
+function ApplyIndependentLane([string]$MetaPath,[string]$LaneName,[string]$Dest,[string]$LaneStatePath){
+  try{
+    $mResp=ApiContent $MetaPath;$m=(DecodeText $mResp)|ConvertFrom-Json
+    if(-not$m.enabled){BLog "Lane $LaneName disabled.";return}
+    $expected=([string]$m.gitBlobSha1).ToLowerInvariant();$version=[string]$m.version
+    $releasePath='local-agent/releases/'+$version+'/HomeDesignLocalAgent.ps1';$r=ApiContent $releasePath
+    if(([string]$r.sha).ToLowerInvariant()-ne$expected){throw "Lane $LaneName API blob mismatch"}
+    $needsFile= -not(Test-Path -LiteralPath $Dest);if(-not$needsFile){$needsFile=((GitBlobSha1 $Dest)-ne$expected)}
+    if($needsFile){$tmp=$Dest+'.download';WriteApiFile $r $tmp;$actual=GitBlobSha1 $tmp;if($actual-ne$expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw "Lane $LaneName local SHA mismatch"};Move-Item $tmp $Dest -Force;BLog "Lane $LaneName updated to $version sha=$expected."}
+    $laneVersion=CurrentLaneVersion $LaneStatePath
+    if($needsFile -or $laneVersion-ne$version){$timeout=300;if($m.maxCycleSeconds){$timeout=[Math]::Max(180,[Math]::Min(1800,[int]$m.maxCycleSeconds))};$rc=RunAgentBounded $Dest $timeout;SaveLaneState $LaneStatePath $LaneName $version $rc;if($rc-ne0){BLog "Lane $LaneName exit=$rc version=$version."}else{BLog "Lane $LaneName apply complete version=$version."}}
+    else{BLog "Lane $LaneName unchanged; skip reapply version=$version."}
+  }catch{BLog("Lane $LaneName error: "+$_.Exception.Message)}
 }
 
 $mutex = New-Object System.Threading.Mutex($false,'HomeDesignLocalAgentBootstrapV1')
@@ -101,6 +124,10 @@ try {
         }
       } else { BLog 'Agent stable channel is disabled.' }
     } catch { BLog ("Bootstrap cycle error: " + $_.Exception.Message) }
+
+    # Independent Flow lane prevents task-specific NotebookLM stable releases from starving Flow.
+    # It has its own state marker and never changes normal Chrome/OAuth/Generate policy.
+    ApplyIndependentLane 'local-agent/stable/flow.json' 'FLOW' $FlowAgentFile $FlowLaneStateFile
 
     if ($Loop) { Start-Sleep -Seconds $pollSeconds }
   } while ($Loop)
