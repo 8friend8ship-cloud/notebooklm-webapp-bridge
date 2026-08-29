@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.72",
-  "releasedAt": "2026-08-29T19:55:00+09:00",
-  "gitBlobSha1": "7b106f90fe63de89553270274a775d7d3e0b2452",
+  "version": "1.1.73",
+  "releasedAt": "2026-08-29T20:06:00+09:00",
+  "gitBlobSha1": "8c58413418717bcb402fe95f0e502799fce93e5c",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 60,
   "maxCycleSeconds": 300,
-  "notes": "One-shot fail-closed NotebookLM recovery. Restores the exact 0.2.75 extension files from commit 10b464ac4022a73e4728bf5012a7ce33c91025b2, preserves the existing generation/download runner, then creates exactly one fresh NotebookLM notebook via dedicated CDP 9223. Does not use Flow as a prerequisite and does not touch normal Chrome, OAuth, scopes, paid APIs, or generation credits. Attempt marker blocks duplicate fresh notebooks."
+  "notes": "Minimal fix to one-shot NotebookLM recovery: replace invalid PowerShell regex path conversion with literal string Replace only. All other behavior remains the same: restore exact 0.2.75 files, preserve successful generation/download runner, create exactly one fresh notebook through dedicated CDP 9223, no Flow prerequisite, no normal Chrome/OAuth/scope/paid changes. Separate 1.1.73 attempt marker prevents duplicate fresh notebooks."
 }
