@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "channel": "stable",
-  "updatedAt": "2026-08-24T17:44:00+09:00",
+  "updatedAt": "2026-08-29T20:09:00+09:00",
   "pollSeconds": 900,
   "rules": {
     "noDelete": true,
@@ -52,10 +52,14 @@
     },
     {
       "name": "Google AI Local Bridge v1",
-      "canonicalVersion": "1.0.1",
-      "mode": "VERIFY_ONLY_UNTIL_SOURCE_BOUND",
-      "profile": "actual profile",
-      "notes": "P0 legacy visible-error lineage. Do not replace NotebookLM canonical path."
+      "canonicalVersion": "1.0.2",
+      "mode": "DRIVE_SOURCE_BOUND_VERIFY_THEN_UPDATE",
+      "profile": "actual installed profile",
+      "sourceType": "GOOGLE_DRIVE_FOLDER",
+      "sourceId": "1P3ahSXu7UU96oG74glulCONX4sLyI-8c",
+      "sourceName": "Google_AI_Always_On_Bridge_v1.0.2_flow_fixed",
+      "extensionId": "kieodjjlhpefnakodgllmpckepjaggbd",
+      "notes": "Source-bound 2026-08-29 after Flow TODO repair. Canonical 1.0.2 retains existing permissions and 1-minute heartbeat/claim, adds safe Flow workspace entry and prompt probe, and keeps Generate behind explicit approval. Do not widen permissions, create duplicate installs, restart normal Chrome blindly, or spend Flow credits during connectivity recovery. Runtime promotion requires installed-path refresh/reload evidence plus heartbeat->claim->CONNECTED readback."
     },
     {
       "name": "AI Studio Bridge",
@@ -73,5 +77,5 @@
     }
   ],
   "securityHoldNames": ["Save to Google Drive"],
-  "observeOnlyNames": ["UniConverter 다운로드 확장 프로그램","ChatGPT"]
+  "observeOnlyNames": ["UniConverter 다운로드 확장 프로그램", "ChatGPT"]
 }
