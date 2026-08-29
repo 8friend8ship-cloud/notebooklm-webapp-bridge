@@ -8,6 +8,8 @@ on:
       - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
       - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
       - 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
+      - 'local-agent/bootstrap/AgentBootstrap.ps1'
+      - 'local-agent/stable/flow.json'
       - 'local-agent/governor/Test-FlowCanonicalExtension.ps1'
       - 'local-agent/governor/Sync-GoogleAIAlwaysOnBridgeV102.ps1'
       - 'local-agent/governor/policy.json'
@@ -21,23 +23,63 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Parse recovery verifier installer watchdog and Always-On updater
+      - name: Parse recovery bootstrap verifier installer watchdog and Always-On updater
         shell: powershell
         run: |
-          foreach($p in @('local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1','local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1','local-agent/bootstrap/HomeDesignLocalWatchdog.ps1','local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1','local-agent/governor/Test-FlowCanonicalExtension.ps1','local-agent/governor/Sync-GoogleAIAlwaysOnBridgeV102.ps1')){
+          foreach($p in @('local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1','local-agent/bootstrap/AgentBootstrap.ps1','local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1','local-agent/bootstrap/HomeDesignLocalWatchdog.ps1','local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1','local-agent/governor/Test-FlowCanonicalExtension.ps1','local-agent/governor/Sync-GoogleAIAlwaysOnBridgeV102.ps1')){
             $tokens=$null;$errors=$null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$tokens,[ref]$errors)
             if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
           }
-      - name: Verify Flow V1.5 periodic persistence auxiliary sync and launcher gates
+      - name: Verify Flow V1.6 independent lane auxiliary sync and launcher gates
         shell: powershell
         run: |
           $s=Get-Content 'local-agent/bootstrap/RUN_LOCAL_EXECUTOR_RECOVERY_V1.ps1' -Raw
-          foreach($required in @('V1.5_ALWAYS_ON_AUX_SYNC_FLOW_GATE','INSTALL_AUTO_RESUME_TASK.ps1','AUTO_RESUME_INSTALL_V3.json','$autoResumeInstallExit-eq0','$periodicTriggerReady','$persistenceReady','$autoResumeImmediateVerified','resumeSkippedBecauseAutoResumeVerified','Sync-GoogleAIAlwaysOnBridgeV102.ps1','GOOGLE_AI_ALWAYS_ON_BRIDGE_V102_SYNC.json','alwaysOnAuxiliaryOnly=$true','alwaysOnBridgeSourceVersion=','AUX_SYNC_','Test-FlowCanonicalExtension.ps1','FLOW_DIRECT_BOOTSTRAP_R10_1.1.69.json','FLOW_PROJECT_LIST_NEW_PROJECT_V8_20260829',"flowExtensionVersion='0.1.0'","flowExtensionId='lgedgmpcikglaajhfclcihicgafimlna'","PinnedFlowAgent169='9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'",'generateClicked=$false','creditSpend=$false','oauthChanged=$false')){if(-not$s.Contains($required)){throw "MISSING_RECOVERY_GUARD:$required"}}
+          foreach($required in @(
+            'V1.6_FLOW_INDEPENDENT_LANE_ALWAYS_ON_AUX',
+            'state-flow.json',
+            'ReadFlowLane',
+            'WaitFlowLane',
+            'flowIndependentLaneApplied',
+            'flowIndependentLaneAppliedVersion',
+            '$flowLaneApplied',
+            "appliedVersion-eq'1.1.69'",
+            'INSTALL_AUTO_RESUME_TASK.ps1',
+            'AUTO_RESUME_INSTALL_V3.json',
+            '$autoResumeInstallExit-eq0',
+            '$periodicTriggerReady',
+            '$persistenceReady',
+            '$autoResumeImmediateVerified',
+            'resumeSkippedBecauseAutoResumeVerified',
+            'Sync-GoogleAIAlwaysOnBridgeV102.ps1',
+            'GOOGLE_AI_ALWAYS_ON_BRIDGE_V102_SYNC.json',
+            'alwaysOnAuxiliaryOnly=$true',
+            'AUX_SYNC_',
+            'Test-FlowCanonicalExtension.ps1',
+            'FLOW_DIRECT_BOOTSTRAP_R10_1.1.69.json',
+            'FLOW_PROJECT_LIST_NEW_PROJECT_V8_20260829',
+            "flowExtensionVersion='0.1.0'",
+            "flowExtensionId='lgedgmpcikglaajhfclcihicgafimlna'",
+            "PinnedFlowAgent169='9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'",
+            'generateClicked=$false',
+            'creditSpend=$false',
+            'oauthChanged=$false'
+          )){if(-not$s.Contains($required)){throw "MISSING_RECOVERY_GUARD:$required"}}
           if($s.Contains('schtasks.exe /Create')){throw 'RECOVERY_MUST_NOT_REIMPLEMENT_SCHEDULED_TASK_CREATE'}
           if($s.Contains('& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Resume')){throw 'RECOVERY_MUST_NOT_RERUN_RESUME_AFTER_VERIFIED_AUTORUN'}
           if(-not$s.Contains('$coreOk=[bool](')){throw 'CORE_OK_GATE_MISSING'}
+          if(-not$s.Contains('-and $flowLaneApplied -and $flowCanonicalOk')){throw 'CORE_OK_MUST_REQUIRE_FLOW_INDEPENDENT_LANE'}
           if($s.Contains('$coreOk=[bool]($installed.alwaysOnUpdater')){throw 'ALWAYS_ON_MUST_REMAIN_AUXILIARY'}
+
+          $bootstrap=Get-Content 'local-agent/bootstrap/AgentBootstrap.ps1' -Raw
+          foreach($required in @('ApplyIndependentLane','local-agent/stable/flow.json',"'FLOW'",'HomeDesignLocalAgent-flow.ps1','state-flow.json')){if(-not$bootstrap.Contains($required)){throw "MISSING_BOOTSTRAP_FLOW_LANE:$required"}}
+          $flowMeta=Get-Content 'local-agent/stable/flow.json' -Raw|ConvertFrom-Json
+          if(-not$flowMeta.enabled){throw 'FLOW_LANE_DISABLED'}
+          if($flowMeta.version-ne'1.1.69'){throw 'FLOW_LANE_VERSION_MISMATCH'}
+          if($flowMeta.gitBlobSha1-ne'9dce2a7bb83d96a3d846a92e24f468b7a67cb38a'){throw 'FLOW_LANE_SHA_MISMATCH'}
+          if($flowMeta.creditSpend){throw 'FLOW_LANE_MUST_NOT_SPEND_CREDITS'}
+          if($flowMeta.generateClicked){throw 'FLOW_LANE_MUST_NOT_GENERATE'}
+
           $i=Get-Content 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1' -Raw
           foreach($required in @('INSTALL_AUTO_RESUME_V3','V3.5_PERIODIC_REQUIRED_IGNORE_NEW_SINGLE_EXECUTOR','InstallVerified','SCHEDULED_TASK_FULL_CREATE','SCHEDULED_TASK_5MIN_FALLBACK','FALLBACK_5MIN','FULL_XML','periodicTriggerReady','fullTriggerContractReady','HKCU_LOGON+5MIN_FALLBACK','DIRECT_WATCHDOG_FALLBACK_ONLY','SCHEDULED_WATCHDOG_RECEIPT','WATCHDOG_ENTRY_LATEST.json','scheduledEntryObserved','directWatchdogLaunched','persistenceReady','immediateExecutionVerified','scheduledRunExit','directWatchdogExit','RunDirectWatchdog','$DirectWatchdogTimeoutSeconds=420','$ScheduledEntryWaitSeconds=15','$ScheduledExecutionLimitMinutes=10','LOGON+RESUME+5MIN','<LogonTrigger>','<EventTrigger>','<Interval>PT5M</Interval>','/SC MINUTE /MO 5','triggerIntervalMinutes=5','<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>',"multipleInstancesPolicy='IgnoreNew'")){if(-not$i.Contains($required)){throw "MISSING_INSTALLER_GUARD:$required"}}
           if($i.Contains('<MultipleInstancesPolicy>StopExisting</MultipleInstancesPolicy>')){throw 'FIVE_MIN_TRIGGER_MUST_NOT_KILL_ACTIVE_RECOVERY'}
@@ -46,18 +88,21 @@ jobs:
           if($i.IndexOf('$LASTEXITCODE') -lt 0){throw 'SCHEDULED_RUN_EXIT_NOT_CHECKED'}
           if(($i|Select-String -Pattern "taskName='HomeDesignAutomation-AutoResume'" -AllMatches).Matches.Count -ne 1){throw 'CANONICAL_TASK_NAME_MUST_BE_SINGLE'}
           if(-not$i.Contains('$ok=[bool]($runnerSha-and$watchdogSha-and$periodicTriggerReady-and$persistenceReady-and$immediateStarted-and$immediateVerified)')){throw 'INSTALLER_FINAL_OK_MUST_REQUIRE_PERIODIC_TRIGGER'}
+
           $w=Get-Content 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' -Raw
           foreach($required in @('$AutoResumeTimeoutSeconds=360','WATCHDOG_ENTRY_LATEST.json','WATCHDOG_ENTRY_V4','WATCHDOG_SINGLE_EXECUTOR_TIMEOUT_ALIGNED_20260829')){if(-not$w.Contains($required)){throw "MISSING_WATCHDOG_GUARD:$required"}}
           $r=Get-Content 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' -Raw
           if(-not($r.Contains('EnsureBootstrapLoop $Bootstrap 120') -and $r.Contains('$deadline=(Get-Date).AddSeconds(180)'))){throw 'RESUME_BOUNDED_CYCLE_CONTRACT_CHANGED'}
           if(360 -lt (120+180)){throw 'WATCHDOG_TIMEOUT_BELOW_RESUME_BOUNDED_WAIT'}
           if(420 -le 360){throw 'INSTALLER_DIRECT_TIMEOUT_MUST_EXCEED_WATCHDOG_TIMEOUT'}
+
           $cmd=Get-Content 'local-agent/bootstrap/RUN_FLOW_RECOVERY_NOW.cmd' -Raw
-          foreach($required in @('aa90ef41f087e06470ec03a66f49546839ff73c5','043485590eb7404dda245adf158c7f156b0729ff','RECOVERY_BLOB_PIN_MISMATCH','RUN_LOCAL_EXECUTOR_RECOVERY_V1.pinned.ps1')){if(-not$cmd.Contains($required)){throw "MISSING_LAUNCHER_PIN:$required"}}
+          foreach($required in @('7af31b9f0e390430cc895751153f1f5db4339cd1','5aa0d630ca865ca43244f7bd325a255ad83beda0','RECOVERY_BLOB_PIN_MISMATCH','RUN_LOCAL_EXECUTOR_RECOVERY_V1.pinned.ps1')){if(-not$cmd.Contains($required)){throw "MISSING_LAUNCHER_PIN:$required"}}
           $c=Get-Content 'config/flow-extension-canonical-v0.1.0.json' -Raw|ConvertFrom-Json
           if($c.version-ne'0.1.0'){throw 'FLOW_CANONICAL_VERSION_MISMATCH'}
           if($c.extensionId-ne'lgedgmpcikglaajhfclcihicgafimlna'){throw 'FLOW_CANONICAL_ID_MISMATCH'}
-          Write-Host 'FLOW_LOCAL_EXECUTOR_RECOVERY_V1_5_CONTRACT_PASS'
+          Write-Host 'FLOW_LOCAL_EXECUTOR_RECOVERY_V1_6_CONTRACT_PASS'
+
       - name: Verify Google AI Always-On 1.0.2 path-preserving contract
         shell: powershell
         run: |
