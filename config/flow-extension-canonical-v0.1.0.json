@@ -32,6 +32,7 @@
     "generationRequiresCreditGate": true,
     "flowV8IsExecutionSequenceNotExtensionVersion": true
   },
+  "recoveryContract": "V1.2_FLOW_CANONICAL_R10_GATE",
   "verificationSource": "Central Drive reviewed source bytes + 2026-08-29 central registry/checklist cross-check",
-  "verifiedAt": "2026-08-29T19:17:00+09:00"
+  "verifiedAt": "2026-08-29T19:22:00+09:00"
 }
