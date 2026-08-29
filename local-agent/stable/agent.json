@@ -2,11 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.77",
-  "releasedAt": "2026-08-29T21:52:00+09:00",
-  "gitBlobSha1": "b583b1e3a084eeb0500581dcbbb6ab27ba060c97",
+  "version": "1.1.32",
+  "releasedAt": "2026-08-28T15:35:00+09:00",
+  "gitBlobSha1": "a38da31ff6aad74c43839a7b010909fec041342d",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "maxCycleSeconds": 600,
-  "notes": "Exactly-once fresh NotebookLM notebook + pasted-source bootstrap requested by user. Runs on dedicated Chrome/CDP only, rejects historical notebook 69e055e5-c8d0-4e9c-8686-58cc6da35a51, preserves Bridge 0.2.39 generation LAST_GOOD, and writes Runtime_Readback/AGENT_1.1.77_FRESH_NOTEBOOK_DIRECT_ONESHOT.json. No OAuth/scope/project/public-publish changes. Restore stable Agent 1.1.32 after terminal readback."
+  "notes": "Transport/runtime restored to proven healthy 1.1.32 immediately after one-shot Agent 1.1.77 dispatch, preventing duplicate fresh Notebook creation. NotebookLM generation remains pinned to Bridge 0.2.39 LAST_GOOD."
 }
