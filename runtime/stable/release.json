@@ -3,12 +3,12 @@
   "channel": "stable",
   "enabled": true,
   "action": "apply",
-  "actionId": "APPLY_NOTEBOOKLM_0.2.75_NATIVE_ARTIFACT_REPAIR_20260829",
-  "version": "0.2.75",
-  "releasedAt": "2026-08-29T16:06:00+09:00",
+  "actionId": "APPLY_NOTEBOOKLM_0.2.76_QUEENS_FIRST_INFOGRAPHIC_20260829",
+  "version": "0.2.76",
+  "releasedAt": "2026-08-29T16:25:00+09:00",
   "requiresUserApproval": false,
-  "description": "Preserves the 0.2.74 active-lock cleanup and synchronizes the verified native artifact extension-repair source. No permission, OAuth, normal Chrome, Generate, or credit changes.",
-  "sourceCommit": "a5df22f1763fbdbf1e53094a50a365e4d39f70a1",
+  "description": "Preserves the existing audio/video native download path, limits generic extension repair to INFOGRAPHIC, and routes mirrored artifacts through Queens-first native-original registration before Seed/Johnson. No OAuth, permission, normal Chrome, Generate, or credit changes.",
+  "sourceCommit": "fd49edea12218ed4f49f5869c0210ba8b7bfd4a9",
   "baseUrl": "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/notebooklm-webapp-bridge-source-v0.2.0/extension",
   "healthUrl": "https://script.google.com/macros/s/AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P/exec",
   "frontUrl": "https://notebooklm-webapp-bridge.vercel.app",
@@ -26,6 +26,6 @@
     {"path":"front-main.js","gitBlobSha1":"a246bcfe6a199ae7d171d1cf21b19a20d39db42f"},
     {"path":"front-extension.js","gitBlobSha1":"01590edbfd9eb9d1f0b1271ea7755a49a4a81871"},
     {"path":"content/notebooklm-runner.js","gitBlobSha1":"98bd13179b56ab231579d5818372fe8203a55d1f"},
-    {"path":"artifact-drive-mirror.js","gitBlobSha1":"073f3dae5f10997acde7bb08773815e0bd225af9"}
+    {"path":"artifact-drive-mirror.js","gitBlobSha1":"5d313c4390159f04781ad1949f87723776f795da"}
   ]
 }
