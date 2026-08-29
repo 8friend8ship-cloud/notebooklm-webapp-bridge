@@ -1,0 +1,37 @@
+name: ChatGPT Image automation probe CI
+on:
+  push:
+    paths:
+      - 'local-agent/jobs/Run-ChatGPTImageAutomationProbeV1.ps1'
+      - 'local-agent/governor/Run-ChatGPTImagePostRecoveryInspect.ps1'
+      - 'local-agent/governor/Capture-ChatGPTImageDeclaredEntrypointsV1.ps1'
+      - 'local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1'
+      - '.github/workflows/chatgpt-image-automation-probe-ci.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell files
+        shell: pwsh
+        run: |
+          $files=@(
+            'local-agent/jobs/Run-ChatGPTImageAutomationProbeV1.ps1',
+            'local-agent/governor/Run-ChatGPTImagePostRecoveryInspect.ps1',
+            'local-agent/governor/Capture-ChatGPTImageDeclaredEntrypointsV1.ps1',
+            'local-agent/governor/Analyze-ChatGPTImageEntrypointContractV1.ps1'
+          )
+          foreach($f in $files){
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+            if($errors.Count){$errors|Format-List|Out-String|Write-Error;exit 1}
+          }
+      - name: Validate probe safety and exact chain
+        shell: pwsh
+        run: |
+          $p=Get-Content 'local-agent/jobs/Run-ChatGPTImageAutomationProbeV1.ps1' -Raw
+          foreach($needle in @('Run-ChatGPTImagePostRecoveryInspect.ps1','Capture-ChatGPTImageDeclaredEntrypointsV1.ps1','Analyze-ChatGPTImageEntrypointContractV1.ps1','generateClicked=$false','creditsSpent=$false','CHATGPT_IMAGE_AUTOMATION_PROBE_V1.json')){
+            if(-not $p.Contains($needle)){throw "missing contract: $needle"}
+          }
+          Write-Host 'CHATGPT_IMAGE_AUTOMATION_PROBE_STATIC_PASS'
