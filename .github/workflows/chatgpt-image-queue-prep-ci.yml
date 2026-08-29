@@ -1,0 +1,29 @@
+name: ChatGPT Image queue prep CI
+on:
+  push:
+    paths:
+      - 'central-agent/templates/GPT_IMAGE_AUTO_FALLBACK_BRIDGE_V1.json'
+      - 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1'
+      - 'tests/chatgpt-image-queue-prep.test.ps1'
+      - '.github/workflows/chatgpt-image-queue-prep-ci.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse policy and PowerShell
+        shell: pwsh
+        run: |
+          $p=Get-Content 'central-agent/templates/GPT_IMAGE_AUTO_FALLBACK_BRIDGE_V1.json' -Raw|ConvertFrom-Json
+          if($p.version -ne '1.2.0'){throw 'POLICY_VERSION_FAIL'}
+          if($p.currentAutomationStatus -ne 'MANUAL_FUNCTION_PASS_AUTOMATION_PENDING'){throw 'AUTOMATION_STATUS_FAIL'}
+          if(-not $p.quotaPolicy.bothProvidersAreFinite){throw 'QUOTA_POLICY_FAIL'}
+          foreach($f in @('local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1','tests/chatgpt-image-queue-prep.test.ps1')){
+            $tokens=$null;$errors=$null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)|Out-Null
+            if($errors.Count){$errors|%{Write-Error $_.Message};throw "parse failed: $f"}
+          }
+      - name: Run queue prep fixtures
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/chatgpt-image-queue-prep.test.ps1
