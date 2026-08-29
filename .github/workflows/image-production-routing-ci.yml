@@ -1,0 +1,49 @@
+name: Image production routing CI
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'config/image-production-routing-policy-v1.json'
+      - 'central-agent/templates/GPT_IMAGE_AUTO_FALLBACK_BRIDGE_V1.json'
+      - 'local-agent/governor/Resolve-ImageGenerationRouteV1.ps1'
+      - 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
+      - 'tests/image-production-routing.test.ps1'
+      - '.github/workflows/image-production-routing-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse policy and PowerShell
+        shell: pwsh
+        run: |
+          $policy=Get-Content 'config/image-production-routing-policy-v1.json' -Raw|ConvertFrom-Json
+          if($policy.generationPrinciple -ne 'IMAGE_AND_ASSET_FIRST_THEN_VIDEO'){throw 'IMAGE_FIRST_POLICY_MISSING'}
+          if($policy.routePriority[0] -ne 'FLOW_AGENT_BRIDGE'){throw 'FLOW_NOT_PRIMARY'}
+          if($policy.routePriority[-1] -ne 'CHATGPT_IMAGE_AUTO_FALLBACK'){throw 'GPT_NOT_FALLBACK'}
+          if($policy.verification.requiredSameFixturePasses -ne 2){throw 'X2_GATE_MISSING'}
+          foreach($f in @('local-agent/governor/Resolve-ImageGenerationRouteV1.ps1','tests/image-production-routing.test.ps1')){
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+            if($errors.Count){$errors|%{Write-Error $_.Message};throw "POWERSHELL_PARSE_FAIL:$f"}
+          }
+      - name: Validate fallback binding contract
+        shell: pwsh
+        run: |
+          $fallback=Get-Content 'central-agent/templates/GPT_IMAGE_AUTO_FALLBACK_BRIDGE_V1.json' -Raw|ConvertFrom-Json
+          if($fallback.priority.primary -ne 'Flow Agent Bridge'){throw 'FALLBACK_TEMPLATE_PRIMARY_MISMATCH'}
+          if($fallback.priority.fallback -notmatch 'ChatGPT Image Auto'){throw 'FALLBACK_TEMPLATE_ROUTE_MISSING'}
+          if($fallback.verification.requiredFunctionalRuns -ne 2){throw 'FALLBACK_X2_MISSING'}
+          $prep=Get-Content 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1' -Raw
+          foreach($token in @('READY_FOR_ADAPTER_BINDING','NONZERO_IMAGE','EXACT_DOWNLOAD_PATH','DRIVE_ASSET_READBACK','RESULT_ACK_X2','NO_FLOW_SUBSTITUTION')){
+            if(-not $prep.Contains($token)){throw "ADAPTER_CONTRACT_TOKEN_MISSING:$token"}
+          }
+      - name: Run image production route fixtures
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/image-production-routing.test.ps1
