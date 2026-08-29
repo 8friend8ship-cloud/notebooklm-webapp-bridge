@@ -14,16 +14,12 @@
       "seedTargets": ["material_value", "installation_feedback", "defect_risk", "lead_time"]
     },
     "APP_TRAVEL": {
-      "domain": "TRAVEL",
-      "research": ["reviews", "price", "delivery_or_booking", "local_availability"],
-      "seedTargets": ["local_product_value", "ticket_or_activity_value", "availability_risk", "visitor_fit"]
-    },
-    "APP_CONTENT_OS": {
-      "domain": "CONTENT_COMMERCE",
-      "research": ["reviews", "price", "delivery", "affiliate_fit"],
-      "seedTargets": ["recommendation_reason", "conversion_evidence", "audience_fit"]
+      "domain": "TRAVEL_GOODS_ONLY",
+      "research": ["reviews", "price", "delivery_or_pickup", "local_availability"],
+      "seedTargets": ["local_product_value", "travel_goods_value", "availability_risk", "visitor_fit"]
     }
   },
+  "futureAppRule": "NO_IMPLICIT_ADOPTION. Add another app only after its canonical APP_ID is verified in 56_FRONTAPP_WORKFLOW_MAP and a commerce-specific domain contract is registered.",
   "providers": ["COUPANG", "ALIEXPRESS", "AMAZON", "LOCAL_MAP"],
   "queensRules": {
     "publicVisibleOnly": true,
