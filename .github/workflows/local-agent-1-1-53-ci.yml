@@ -1,0 +1,59 @@
+name: Local Agent 1.1.53 CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'local-agent/releases/1.1.53/HomeDesignLocalAgent.ps1'
+      - 'local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV2.ps1'
+      - '.github/workflows/local-agent-1-1-53-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/releases/1.1.53/HomeDesignLocalAgent.ps1'
+      - 'local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV2.ps1'
+      - '.github/workflows/local-agent-1-1-53-ci.yml'
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: WinPS 5.1 parse agent and binder
+        shell: powershell
+        run: |
+          foreach($p in @('local-agent/releases/1.1.53/HomeDesignLocalAgent.ps1','local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV2.ps1')){
+            $null=[scriptblock]::Create((Get-Content -LiteralPath $p -Raw -Encoding UTF8))
+            Write-Host "parse PASS $p"
+          }
+      - name: Agent serializes after 1.1.52 and runs V2 once
+        shell: powershell
+        run: |
+          $p='local-agent/releases/1.1.53/HomeDesignLocalAgent.ps1'
+          $s=Get-Content -LiteralPath $p -Raw -Encoding UTF8
+          foreach($n in @(
+            "`$AgentVersion='1.1.53'",
+            "`$PreviousAgentSha='a268a843ab4c51b72b044a5fefdeb2433a9fefd5'",
+            "`$BinderSha='10882d60d84106a9554c04bee019a7d77cf96121'",
+            'TARGET_DEPLOYMENT_MATCH_COUNT:0',
+            'IsTerminalPersonaV2',
+            'PERSONA_V2_ALREADY_PASS',
+            'PERSONA_V2_TERMINAL_FAILURE_HOLD',
+            'PERSONA_V2_BIND_PASS',
+            'blindRetry=$false',
+            'newProjectCreated=$false',
+            'newDeployment=$false',
+            'newTrigger=$false',
+            'paidGeminiApiCalled=$false'
+          )){if(-not $s.Contains($n)){throw "MISSING_AGENT_CONTRACT:$n"}}
+          foreach($n in @('create-script','create-deployment','update-deployment','redeploy','clasp login','enable-api','ScriptApp.newTrigger(')){
+            if($s -match [regex]::Escape($n)){throw "FORBIDDEN_AGENT_OPERATION:$n"}
+          }
+          Write-Host 'Agent serial one-shot contract PASS'
+      - name: Binder is pinned and exact-deployment fail-closed
+        shell: powershell
+        run: |
+          $s=Get-Content -LiteralPath 'local-agent/governor/Bind-FrontPersonaOrchestrationAppsScriptV2.ps1' -Raw -Encoding UTF8
+          foreach($n in @("@('list-scripts','--json')",'if ($matches.Count -ne 1)','PUSH_PULL_READBACK_X2_PASS','Restore-Snapshot','EXISTING_DEPLOYMENT_INVARIANT_FAILED','PERSONA_FACTORY_DUE_ADAPTER_V2')){
+            if(-not $s.Contains($n)){throw "MISSING_BINDER_CONTRACT:$n"}
+          }
+          Write-Host 'Binder exact-deployment contract PASS'
