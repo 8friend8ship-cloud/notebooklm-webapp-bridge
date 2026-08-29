@@ -16,12 +16,10 @@ rawcap = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 spec.loader.exec_module(rawcap)
 
-
 def check(cond: bool, name: str):
     if not cond:
         raise AssertionError(name)
     print(f"PASS {name}")
-
 
 def main():
     fixtures = {
@@ -32,6 +30,7 @@ def main():
         "mp3": ("sample.mp3", b"ID3" + b"\x04\x00\x00" + b"\x00"*80, "audio/mpeg"),
         "wav": ("sample.wav", b"RIFF" + (32).to_bytes(4,"little") + b"WAVE" + b"\x00"*40, "audio/wav"),
         "mp4": ("sample.mp4", b"\x00\x00\x00\x18ftypisom" + b"\x00"*64, "video/mp4"),
+        "m4a": ("sample.m4a", b"\x00\x00\x00\x18ftypdash" + b"\x00"*24 + b"hdlr" + b"\x00"*8 + b"soun" + b"\x00"*64, "audio/mp4"),
         "unknown": ("sample.bin", b"\x01\x02\x03\x04" + b"\x99"*80, "application/octet-stream"),
     }
     with tempfile.TemporaryDirectory() as td:
@@ -94,7 +93,6 @@ def main():
 
     print("ALL_TESTS_PASS")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
