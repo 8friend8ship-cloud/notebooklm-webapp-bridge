@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "service": "Google Flow",
+  "canonicalName": "Flow Agent Bridge",
+  "registryAlias": "Google AI Local Bridge - Flow",
+  "version": "0.1.0",
+  "extensionId": "lgedgmpcikglaajhfclcihicgafimlna",
+  "driveFolderId": "14BcD6HVwI082uTY5ecy_L1ZOGHuVgYvb",
+  "architecture": "content_script_plus_popup",
+  "requiredFiles": {
+    "manifest.json": {
+      "bytes": 868,
+      "sha256": "41d7d4acd844329ae328373d8d56798f508848a17f5892841c7930d2451c8169"
+    },
+    "content.js": {
+      "bytes": 8334,
+      "sha256": "fa4d98f8962c6c8b799908a3e876d19e57babfecbe62781312a28a34549f3050"
+    },
+    "popup.js": {
+      "bytes": 8747,
+      "sha256": "297e40dfe1609f840b58d76d0ec531f6e594f15ba793710e6806892501419040"
+    },
+    "popup.html": {
+      "bytes": 2307,
+      "sha256": "ba79b1decc5e135433123bd9764d796035c2e8b39315553870873a4465dec0f2"
+    }
+  },
+  "policy": {
+    "rejectSameVersionDifferentCoreFiles": true,
+    "noAutomaticPermissionExpansion": true,
+    "noDuplicateInstall": true,
+    "generationRequiresCreditGate": true,
+    "flowV8IsExecutionSequenceNotExtensionVersion": true
+  },
+  "verifiedAt": "2026-08-29T19:15:00+09:00"
+}
