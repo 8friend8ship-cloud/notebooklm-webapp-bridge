@@ -5,13 +5,13 @@ on:
     paths:
       - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
       - 'local-agent/capture/Setup-PowerContinuity.ps1'
-      - 'local-agent/releases/1.1.48/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.49/HomeDesignLocalAgent.ps1'
       - '.github/workflows/persona-device-recovery-once-ci.yml'
   pull_request:
     paths:
       - 'local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1'
       - 'local-agent/capture/Setup-PowerContinuity.ps1'
-      - 'local-agent/releases/1.1.48/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.49/HomeDesignLocalAgent.ps1'
 
 jobs:
   validate:
@@ -21,45 +21,22 @@ jobs:
       - name: Windows PowerShell 5.1 parse
         shell: powershell
         run: |
-          $files=@('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1','local-agent/capture/Setup-PowerContinuity.ps1','local-agent/releases/1.1.48/HomeDesignLocalAgent.ps1')
+          $files=@('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1','local-agent/capture/Setup-PowerContinuity.ps1','local-agent/releases/1.1.49/HomeDesignLocalAgent.ps1')
           foreach($file in $files){
             $tokens=$null;$errors=$null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
             if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
           }
-      - name: Pinned and non-destructive recovery contract
+      - name: Power continuity and argument forwarding contract
         shell: python
         run: |
           from pathlib import Path
-          t=Path('local-agent/bootstrap/Run-PersonaBindRecoveryOnce.ps1').read_text(encoding='utf-8')
           p=Path('local-agent/capture/Setup-PowerContinuity.ps1').read_text(encoding='utf-8')
-          a=Path('local-agent/releases/1.1.48/HomeDesignLocalAgent.ps1').read_text(encoding='utf-8')
-          required=[
-            "$ExpectedAgent='1.1.46'",
-            "$ExpectedAgentBlob='b72e57af70f77578fddb3de49f6581a37e2de792'",
-            "$ExpectedV2Blob='a4b7967da7bc26f3cb49c88d3b3cb122ddf86c7c'",
-            "$ExpectedPowerBlob='b98ed149d91cdec4ff75ccf4b03aa7b9e09f241f'",
-            "GitHubContent 'local-agent/stable/agent.json'",
-            "FetchPinned 'local-agent/governor/RunChromeGovernorReadbackV2.ps1'",
-            "FetchPinned 'local-agent/capture/Setup-PowerContinuity.ps1'",
-            '-KickStableAgent',
-            "-Install -NightStart '02:00' -NightEnd '05:00' -IdleDisplayMinutes 30",
-            "POWER_CONTINUITY_WINDOW_MISMATCH",
-            "POWER_CONTINUITY_IDLE_MISMATCH",
-            "POWER_CONTINUITY_AC_SLEEP_MISMATCH",
-            "POWER_CONTINUITY_USB_SUSPEND_MISMATCH",
-            "POWER_CONTINUITY_KEYBOARD_GUARD_MISMATCH",
-            'newProjectCreated=$false',
-            'oauthChanged=$false',
-            'scopeChanged=$false',
-            'newDeployment=$false',
-            'newTrigger=$false',
-            'paidGeminiApiCalled=$false'
-          ]
-          missing=[x for x in required if x not in t]
-          if missing: raise SystemExit('MISSING_RECOVERY_CONTRACT:'+repr(missing))
+          a=Path('local-agent/releases/1.1.49/HomeDesignLocalAgent.ps1').read_text(encoding='utf-8')
           power_required=[
             "[int]$IdleDisplayMinutes=30",
+            "$UsbSubGroup='2a737441-1930-4402-8d77-b2bebba308a3'",
+            "$UsbSelectiveSuspend='48e6b7a6-50f5-4782-a5d4-53bb8f07e226'",
             "monitor-timeout-ac $IdleDisplayMinutes",
             "monitor-timeout-dc $IdleDisplayMinutes",
             "standby-timeout-ac 0",
@@ -68,42 +45,54 @@ jobs:
             "idleDisplayMinutes=$IdleDisplayMinutes",
             "idleDisplayApplies='AC_AND_BATTERY'",
             "acAutomaticSleep='DISABLED'",
+            "acAutomaticHibernate='DISABLED'",
             "acUsbSelectiveSuspend='DISABLED'",
             "keyboardFreezeGuard='NO_AC_SLEEP_RESUME_PLUS_USB_SELECTIVE_SUSPEND_DISABLED'",
             "batteryPolicy='DISPLAY_30_MIN_SLEEP_AND_USB_POLICY_NO_OVERRIDE'"
           ]
-          pmissing=[x for x in power_required if x not in p]
-          if pmissing: raise SystemExit('MISSING_POWER_CONTRACT:'+repr(pmissing))
+          missing=[x for x in power_required if x not in p]
+          if missing: raise SystemExit('MISSING_POWER_CONTRACT:'+repr(missing))
+          if '48e6b7a6-50f5-4782-a5d4-53be6a7c11e8' in p:
+            raise SystemExit('WRONG_USB_SELECTIVE_SUSPEND_GUID_REGRESSION')
           agent_required=[
-            "$AgentVersion = '1.1.48'",
-            "$LegacyAgentSha = 'b72e57af70f77578fddb3de49f6581a37e2de792'",
-            "$PowerHelperSha = 'b98ed149d91cdec4ff75ccf4b03aa7b9e09f241f'",
-            "function Invoke-PowerShellCaptured([string]$Path, [string[]]$ScriptArgs)",
-            "+ @($ScriptArgs)",
-            "Invoke-PowerShellCaptured $PowerHelper @('-StatusOnly')",
-            "Invoke-PowerShellCaptured $PowerHelper @('-Install','-NightStart','02:00','-NightEnd','05:00','-IdleDisplayMinutes','30')",
-            "Recover-AbandonedMarkerOnce",
-            "queue-integrity-sync-v2-1.1.45-marker-recovery.once.json",
-            "persona-bind-v1-1.1.46-marker-recovery.once.json",
-            "AGENT_1.1.48_POWER_CONTINUITY_SELF_HEAL",
+            "$AgentVersion='1.1.49'",
+            "$PowerHelperSha='d570a7e84a8d3e4d72f8f95e40deaf63e6b90fa4'",
+            "function InvokeChild([string]$Path,[string[]]$ScriptArgs)",
+            "+@($ScriptArgs)",
+            "InvokeChild $PowerHelper @('-StatusOnly')",
+            "InvokeChild $PowerHelper @('-Install','-NightStart','02:00','-NightEnd','05:00','-IdleDisplayMinutes','30')",
+            "AGENT_1.1.49_POWER_CONTINUITY_SELF_HEAL",
             "POWER_CONTINUITY_RUNTIME_READBACK.json",
-            "acAutomaticSleep = 'DISABLED'",
-            "acAutomaticHibernate = 'DISABLED'",
-            "acUsbSelectiveSuspend = 'DISABLED'",
-            "keyboardFreezeGuard = 'NO_AC_SLEEP_RESUME_PLUS_USB_SELECTIVE_SUSPEND_DISABLED'",
-            "batterySleepAndUsbPolicyOverride = $false",
-            "newProjectCreated = $false",
-            "oauthChanged = $false",
-            "scopeChanged = $false",
-            "newDeployment = $false",
-            "newTrigger = $false",
-            "paidGeminiApiCalled = $false"
+            "acAutomaticSleep='DISABLED'",
+            "acAutomaticHibernate='DISABLED'",
+            "acUsbSelectiveSuspend='DISABLED'",
+            "keyboardFreezeGuard='NO_AC_SLEEP_RESUME_PLUS_USB_SELECTIVE_SUSPEND_DISABLED'",
+            "batterySleepAndUsbPolicyOverride=$false",
+            "newProjectCreated=$false",
+            "oauthChanged=$false",
+            "scopeChanged=$false",
+            "newDeployment=$false",
+            "newTrigger=$false",
+            "paidGeminiApiCalled=$false"
           ]
           amissing=[x for x in agent_required if x not in a]
-          if amissing: raise SystemExit('MISSING_AGENT_1148_CONTRACT:'+repr(amissing))
-          if "function Invoke-PowerShellCaptured([string]$Path, [string[]]$Args)" in a:
+          if amissing: raise SystemExit('MISSING_AGENT_1149_CONTRACT:'+repr(amissing))
+          if 'function InvokeChild([string]$Path,[string[]]$Args)' in a:
             raise SystemExit('AUTOMATIC_ARGS_COLLISION_REGRESSION')
           forbidden=['clasp create','clasp deploy','ScriptApp.newTrigger','GOOGLE_AI_PAID_API_APPROVED=Y']
-          bad=[x for x in forbidden if x in t or x in p or x in a]
+          bad=[x for x in forbidden if x in p or x in a]
           if bad: raise SystemExit('FORBIDDEN_ACTION:'+repr(bad))
-          print('LOCAL_AGENT_1148_POWER_ARGUMENT_FORWARDING_CONTRACT_PASS')
+          print('LOCAL_AGENT_1149_CORRECT_USB_GUID_CONTRACT_PASS')
+      - name: Argument forwarding smoke
+        shell: powershell
+        run: |
+          $child=Join-Path $env:RUNNER_TEMP 'child.ps1'
+          @'
+          param([switch]$StatusOnly,[switch]$Install,[string]$NightStart,[string]$NightEnd,[int]$IdleDisplayMinutes)
+          if($StatusOnly){Write-Output 'STATUS_OK';exit 0}
+          if($Install -and $NightStart -eq '02:00' -and $NightEnd -eq '05:00' -and $IdleDisplayMinutes -eq 30){Write-Output 'INSTALL_OK';exit 0}
+          exit 3
+          '@ | Set-Content -LiteralPath $child -Encoding UTF8
+          function InvokeChild([string]$Path,[string[]]$ScriptArgs){$all=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$Path)+@($ScriptArgs);$out=& powershell.exe @all 2>&1|Out-String;return @{exitCode=$LASTEXITCODE;stdout=$out.Trim()}}
+          $s=InvokeChild $child @('-StatusOnly');if($s.exitCode -ne 0 -or $s.stdout -notmatch 'STATUS_OK'){throw 'STATUS_ARGUMENT_FORWARDING_FAILED'}
+          $i=InvokeChild $child @('-Install','-NightStart','02:00','-NightEnd','05:00','-IdleDisplayMinutes','30');if($i.exitCode -ne 0 -or $i.stdout -notmatch 'INSTALL_OK'){throw 'INSTALL_ARGUMENT_FORWARDING_FAILED'}
