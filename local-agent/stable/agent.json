@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.49",
-  "releasedAt": "2026-08-29T09:22:00+09:00",
-  "gitBlobSha1": "405a94b4bf5552f5392b79c19bd34c16e044b311",
+  "version": "1.1.50",
+  "releasedAt": "2026-08-29T09:29:00+09:00",
+  "gitBlobSha1": "131bedf4dd2b2ff1d360b075edec3fad388a5b8c",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Corrects the USB selective suspend setting GUID to Windows power-setting GUID 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 and pins Setup-PowerContinuity blob d570a7e84a8d3e4d72f8f95e40deaf63e6b90fa4. Preserves fixed ScriptArgs child argument forwarding and the stable-agent self-heal route. Required policy: 30-minute idle display-only off on AC/DC; AC automatic sleep and hibernate disabled; AC USB selective suspend disabled; daily 02:00 display-off; no forced 05:00 display-on; keyboard/mouse wakes display without system resume; battery sleep/USB policy not overridden. Completion still requires laptop Runtime_Readback. No new Apps Script project, OAuth/scope, deployment, trigger, paid Gemini API, browser Generate, credit action, or manual PowerShell approval is created."
+  "notes": "Uses user-level HKCU Run plus a hidden resident PowerShell watcher instead of creating new scheduled tasks, because laptop runtime returned WATCHDOG_TASK_CREATE_FAILED access denied under the existing non-elevated automation token. Pins Setup-PowerContinuity blob 7d6e2578fbbc78c12687dd0f701778517d204f51 with corrected USB selective suspend GUID 48e6b7a6-50f5-4782-a5d4-53bb8f07e226. Required policy remains 30-minute idle display-only off on AC/DC, AC automatic sleep/hibernate disabled, AC USB selective suspend disabled, daily display-off once inside 02:00-05:00, no forced display-on at 05:00, native keyboard/mouse display wake, battery sleep/USB policy unchanged. No new OAuth, Apps Script project/deployment/trigger, UAC approval, paid Gemini API, or manual PowerShell rerun is required. Completion requires laptop Runtime_Readback."
 }
