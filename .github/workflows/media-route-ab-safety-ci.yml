@@ -1,0 +1,112 @@
+name: Media route A-B safety CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
+      - 'local-agent/governor/MirrorNotebookLMArtifactQueensFirst.ps1'
+      - 'local-agent/python/notebooklm_raw_download_capture.py'
+      - 'local-agent/python/test_notebooklm_raw_download_capture.py'
+      - '.github/workflows/media-route-ab-safety-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare-routes:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compare legacy PowerShell and Python media routes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'notebooklm-media-ab'
+          $downloads = Join-Path $root 'Downloads'
+          $drive = Join-Path $root 'Drive'
+          $central = Join-Path $drive '00_중앙에이전트'
+          New-Item -ItemType Directory -Force -Path $downloads,$drive,$central | Out-Null
+          $env:HDCENTRAL = $central
+
+          function Bytes([string]$prefix,[string]$handler,[int]$pad=256) {
+            $list = New-Object System.Collections.Generic.List[byte]
+            $list.AddRange([byte[]](0,0,0,24))
+            $list.AddRange([Text.Encoding]::ASCII.GetBytes($prefix))
+            $list.AddRange([byte[]](0,0,0,0,0,0,0,0))
+            $list.AddRange([Text.Encoding]::ASCII.GetBytes('hdlr'))
+            $list.AddRange([byte[]](0,0,0,0,0,0,0,0))
+            $list.AddRange([Text.Encoding]::ASCII.GetBytes($handler))
+            $list.AddRange((New-Object byte[] $pad))
+            return $list.ToArray()
+          }
+          $audio = Join-Path $downloads 'notebook-audio.m4a'
+          $video = Join-Path $downloads 'notebook-video.mp4'
+          [IO.File]::WriteAllBytes($audio,(Bytes 'ftypdash' 'soun'))
+          [IO.File]::WriteAllBytes($video,(Bytes 'ftypisom' 'vide'))
+          $audioSha = (Get-FileHash $audio -Algorithm SHA256).Hash.ToLowerInvariant()
+          $videoSha = (Get-FileHash $video -Algorithm SHA256).Hash.ToLowerInvariant()
+
+          $mirror = 'local-agent/governor/MirrorNotebookLMArtifactToDrive.ps1'
+          $queens = 'local-agent/governor/MirrorNotebookLMArtifactQueensFirst.ps1'
+          $py = 'local-agent/python/notebooklm_raw_download_capture.py'
+
+          $la = (& $mirror -TaskId 'CI_LEGACY_AUDIO' -ArtifactType AUDIO_OVERVIEW -SourcePath $audio | Select-Object -Last 1) | ConvertFrom-Json
+          if (-not $la.ok -or -not $la.binaryIntegrityVerified -or -not $la.sourceImmutableVerified) { throw 'LEGACY_AUDIO_INTEGRITY_FAIL' }
+          if ($la.sourceSha256 -ne $audioSha -or $la.destinationSha256 -ne $audioSha) { throw 'LEGACY_AUDIO_SHA_FAIL' }
+          if ($la.resolvedExtension -ne '.m4a' -or $la.extensionRepaired) { throw 'LEGACY_AUDIO_EXTENSION_FAIL' }
+          Write-Host 'PASS legacy-audio exact-bytes/source-immutable/native-extension'
+
+          $lv = (& $mirror -TaskId 'CI_LEGACY_VIDEO' -ArtifactType VIDEO_OVERVIEW -SourcePath $video | Select-Object -Last 1) | ConvertFrom-Json
+          if (-not $lv.ok -or -not $lv.binaryIntegrityVerified -or -not $lv.sourceImmutableVerified) { throw 'LEGACY_VIDEO_INTEGRITY_FAIL' }
+          if ($lv.sourceSha256 -ne $videoSha -or $lv.destinationSha256 -ne $videoSha) { throw 'LEGACY_VIDEO_SHA_FAIL' }
+          if ($lv.resolvedExtension -ne '.mp4' -or $lv.extensionRepaired) { throw 'LEGACY_VIDEO_EXTENSION_FAIL' }
+          Write-Host 'PASS legacy-video exact-bytes/source-immutable/native-extension'
+
+          $qa = (& $queens -TaskId 'CI_QUEENS_AUDIO' -ArtifactType AUDIO_OVERVIEW -SourcePath $audio | Select-Object -Last 1) | ConvertFrom-Json
+          if (-not $qa.ok -or $qa.seedEligible -or $qa.seedVerified -or $qa.johnsonEligible -or $qa.nextGate -ne 'QUEENS_URL_VERIFIED') { throw 'QUEENS_AUDIO_GATE_FAIL' }
+          $qv = (& $queens -TaskId 'CI_QUEENS_VIDEO' -ArtifactType VIDEO_OVERVIEW -SourcePath $video | Select-Object -Last 1) | ConvertFrom-Json
+          if (-not $qv.ok -or $qv.seedEligible -or $qv.seedVerified -or $qv.johnsonEligible -or $qv.nextGate -ne 'QUEENS_URL_VERIFIED') { throw 'QUEENS_VIDEO_GATE_FAIL' }
+          Write-Host 'PASS Queens audio/video strict Seed gate'
+
+          $paDir = Join-Path $root 'PythonAudio'
+          $pvDir = Join-Path $root 'PythonVideo'
+          $pa = (& python $py --source-file $audio --drive-dir $paDir --expected-media audio | Out-String) | ConvertFrom-Json
+          $pv = (& python $py --source-file $video --drive-dir $pvDir --expected-media video | Out-String) | ConvertFrom-Json
+          if (-not $pa.ok -or $pa.sha256 -ne $audioSha -or -not $pa.sourceImmutableVerified -or $pa.detected.mime -ne 'audio/mp4') { throw 'PYTHON_AUDIO_FAIL' }
+          if (-not $pv.ok -or $pv.sha256 -ne $videoSha -or -not $pv.sourceImmutableVerified -or $pv.detected.mime -ne 'video/mp4') { throw 'PYTHON_VIDEO_FAIL' }
+          Write-Host 'PASS python-audio/video exact-bytes/source-immutable/media-family'
+
+          $legacyAudioDestSha = (Get-FileHash ([string]$la.destinationPath) -Algorithm SHA256).Hash.ToLowerInvariant()
+          $legacyVideoDestSha = (Get-FileHash ([string]$lv.destinationPath) -Algorithm SHA256).Hash.ToLowerInvariant()
+          $pythonAudioDestSha = (Get-FileHash ([string]$pa.destinationPath) -Algorithm SHA256).Hash.ToLowerInvariant()
+          $pythonVideoDestSha = (Get-FileHash ([string]$pv.destinationPath) -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($legacyAudioDestSha -ne $pythonAudioDestSha -or $legacyAudioDestSha -ne $audioSha) { throw 'A_B_AUDIO_HASH_MISMATCH' }
+          if ($legacyVideoDestSha -ne $pythonVideoDestSha -or $legacyVideoDestSha -ne $videoSha) { throw 'A_B_VIDEO_HASH_MISMATCH' }
+          Write-Host 'PASS A/B audio/video identical SHA-256'
+
+          $genericAudio = Join-Path $downloads 'generic-audio.bin'
+          [IO.File]::WriteAllBytes($genericAudio,(Bytes 'ftypdash' 'soun'))
+          $failed = $false
+          try { & $mirror -TaskId 'CI_GENERIC_AUDIO' -ArtifactType AUDIO_OVERVIEW -SourcePath $genericAudio | Out-Null } catch { $failed = $true }
+          if (-not $failed) { throw 'LEGACY_GENERIC_AUDIO_REPAIR_MUST_FAIL' }
+
+          $genericVideo = Join-Path $downloads 'generic-video.dat'
+          [IO.File]::WriteAllBytes($genericVideo,(Bytes 'ftypisom' 'vide'))
+          $failed = $false
+          try { & $mirror -TaskId 'CI_GENERIC_VIDEO' -ArtifactType VIDEO_OVERVIEW -SourcePath $genericVideo | Out-Null } catch { $failed = $true }
+          if (-not $failed) { throw 'LEGACY_GENERIC_VIDEO_REPAIR_MUST_FAIL' }
+          Write-Host 'PASS legacy generic audio/video fail-closed'
+
+          $genericImage = Join-Path $downloads 'generic-image.dat'
+          [IO.File]::WriteAllBytes($genericImage,([byte[]](0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a) + (New-Object byte[] 128)))
+          $li = (& $mirror -TaskId 'CI_GENERIC_IMAGE' -ArtifactType INFOGRAPHIC -SourcePath $genericImage | Select-Object -Last 1) | ConvertFrom-Json
+          if (-not $li.ok -or -not $li.extensionRepaired -or $li.resolvedExtension -ne '.png') { throw 'LEGACY_IMAGE_REPAIR_FAIL' }
+          Write-Host 'PASS generic extension repair remains image-only'
+
+          Write-Host 'ALL_MEDIA_ROUTE_AB_SAFETY_TESTS_PASS'
