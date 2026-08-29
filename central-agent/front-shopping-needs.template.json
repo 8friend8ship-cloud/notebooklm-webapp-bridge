@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "FRONT_SHOPPING_NEEDS_V1",
+  "purpose": "Every front request performs a Queens-stage commerce/procurement need check. NONE is valid and stops commerce routing; OPTIONAL/REQUIRED creates app-specific research tasks.",
+  "requiredFields": [
+    "appId",
+    "taskId",
+    "checkedAt",
+    "status",
+    "requirements",
+    "seedReuse",
+    "routing"
+  ],
+  "statusEnum": ["NONE", "OPTIONAL", "REQUIRED", "UNKNOWN"],
+  "requirementShape": {
+    "needType": "APP_PROFILE_CATEGORY",
+    "query": "normalized product/ticket/material/service need",
+    "quantity": "optional number/text",
+    "budget": "optional amount/range",
+    "locationScope": "country/city/precise-location-only-if-already-granted-or-user-requests",
+    "timeWindow": "optional delivery/visit/use deadline",
+    "mustHave": ["explicit constraints"],
+    "reason": "why this item is needed for this front task"
+  },
+  "queensPlan": {
+    "searchSeedFirst": true,
+    "reuseFreshQualifiedSeed": true,
+    "refreshWhenStaleOrMissing": true,
+    "commentsReviews": "BRG_032 only for physical goods/product evidence",
+    "officialSpecs": "required for safety, nutrition, structural, legal, ticket/booking terms or other high-stakes facts",
+    "providerOffers": "server-side provider adapters; live offer verification required before recommendation",
+    "localMap": "local availability discovery only; map result alone is not verified price/delivery"
+  },
+  "routingRules": {
+    "NONE": "continue normal app Queens→Seed→T1/T2 without shopping provider calls",
+    "PHYSICAL_GOOD": "BRG_032→Drive Queens→qualified Seed→domain template→live provider/local comparison→front reason card",
+    "TICKET_RESERVATION": "domain live/official booking provider lane→Queens/Seed; BRG_032 is not used for venue booking reviews",
+    "DIGITAL_TOOL_SERVICE": "connector/tool/service evaluation lane; do not force physical shopping bridge",
+    "UNKNOWN": "hold recommendation and request/derive missing requirement context; do not rank an offer"
+  },
+  "appProfiles": {
+    "APP_INTERIOR": ["MATERIAL", "FURNITURE", "DECOR", "APPLIANCE", "LIFESTYLE_GOOD", "TOOL", "INSTALLATION_PART"],
+    "APP_KFOOD": ["INGREDIENT", "PACKAGED_FOOD", "KITCHEN_TOOL", "STORAGE", "SERVING_ITEM"],
+    "APP_TRAVEL": ["TICKET", "PASS", "RESERVATION", "TRAVEL_GEAR", "LOCAL_GOOD", "SIM_CONNECTIVITY", "TRANSPORT_ITEM"],
+    "APP_BOTS": ["CLOTHING", "COSTUME", "ACCESSORY", "PROP", "MAKEUP", "CHARACTER_ITEM", "VOICE_STREAM_GEAR"],
+    "APP_BOTS_FRONTEND": ["CLOTHING", "COSTUME", "ACCESSORY", "PROP", "MAKEUP", "CHARACTER_ITEM", "VOICE_STREAM_GEAR"],
+    "APP_VTUBE": ["COSTUME", "PROP", "CAMERA_LIGHTING", "AUDIO_GEAR", "BACKDROP", "STREAM_ACCESSORY"],
+    "APP_SHORTS": ["COSTUME", "PROP", "SET_DECOR", "LIGHTING", "CAMERA_AUDIO_ACCESSORY"],
+    "APP_DRYWRITE": ["REFERENCE_BOOK", "PHYSICAL_REFERENCE", "PROP", "SET_ITEM"],
+    "APP_BIBLE": ["BOOK", "STUDY_MATERIAL", "PRINT_GIFT", "TEACHING_PROP"],
+    "APP_LECTURE": ["BOOK", "COURSE_MATERIAL", "TEACHING_PROP", "PRESENTATION_EQUIPMENT"],
+    "APP_ANALYZER": ["TARGET_PHYSICAL_PRODUCT"],
+    "APP_ARSENAL": ["DIGITAL_TOOL", "SERVICE_SUBSCRIPTION", "PHYSICAL_TOOL_IF_EXPLICIT"],
+    "APP_NBLAB": ["DIGITAL_RESEARCH_RESOURCE", "REFERENCE_BOOK", "LAB_TOOL_IF_EXPLICIT"],
+    "APP_DRYSEED": [],
+    "APP_QUEENS": [],
+    "APP_SEED": [],
+    "APP_NEW": ["DOMAIN_CLASSIFICATION_REQUIRED_BEFORE_CATEGORY"]
+  },
+  "learningRules": {
+    "preserveAppDomain": true,
+    "noCrossDomainContamination": true,
+    "successfulRequirementsBecomeTemplateCandidates": true,
+    "failedOrRejectedCandidatesBecomeNegativeSeed": true,
+    "frontClickUseOutcomeMayAdjustRankingOnlyAfterVerifiedWriteback": true,
+    "doNotLearnFromAffiliateClickAlone": true
+  },
+  "output": {
+    "recommendationReason": "app-style-specific reason using verified unit/total cost, availability/delivery/booking, repeated qualified signals and task fit",
+    "alternatives": 2,
+    "sourceTimestampRequired": true,
+    "affiliateDisclosureRequiredWhenApplicable": true,
+    "unknownAvailabilityCannotWin": true
+  }
+}
