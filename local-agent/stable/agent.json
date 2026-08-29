@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.79",
-  "releasedAt": "2026-08-29T22:51:23+09:00",
-  "gitBlobSha1": "9e79f86de57d9c77737d827139f330591ff3ded1",
+  "version": "1.1.80",
+  "releasedAt": "2026-08-29T23:00:31+09:00",
+  "gitBlobSha1": "6fd1b71977ea4fdbaf9a6afc2333181968c2043e",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 240,
-  "notes": "Bounded exactly-once fresh NotebookLM V3 isolation gate. Fetches SHA-pinned Test-NotebookLMFreshNotebookSourceCDPV3.ps1, stops only stale prior fresh-helper PowerShell processes, runs with a 180-second hard process timeout, writes dispatch/result readback, rejects historical notebook ID, and leaves Bridge 0.2.39 generation/download LAST_GOOD unchanged. No normal Chrome/OAuth/scope/project/public-publish changes."
+  "notes": "Read-only diagnostic after 1.1.79 fresh NotebookLM V3 attempt. Copies local 1.1.79 result/dispatch/stdout/stderr/helper SHA and current dedicated-CDP NotebookLM tab URLs to central Runtime_Readback, without clicking, creating notebooks, generating artifacts, changing Bridge 0.2.39, normal Chrome, OAuth, scope, project, or publishing state."
 }
