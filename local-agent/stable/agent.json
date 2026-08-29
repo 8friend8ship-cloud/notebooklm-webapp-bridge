@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.32",
-  "releasedAt": "2026-08-28T15:35:00+09:00",
-  "gitBlobSha1": "a38da31ff6aad74c43839a7b010909fec041342d",
+  "version": "1.1.22",
+  "releasedAt": "2026-08-26T11:47:00+09:00",
+  "gitBlobSha1": "8eb558717939ea6ecb95725dfbaa2656692d8e58",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Changed-condition D82 recovery after fresh Agent1.1.31/Host1.2.6/Bridge0.2.71 SELF_HEAL_PASS still left the existing auto-submit D82 row READY across multiple 1-minute poll windows. Agent 1.1.32 preserves Host1.2.6 and Bridge0.2.71, then opens the existing NotebookLM control center exactly once in the dedicated Chrome user-data profile using a version marker. This refreshes the existing front-session-to-extension storage handoff so the existing worker alarms can resume polling. It does not read/store token contents, restart or modify normal Chrome, add OAuth/scopes, change the download path, move files, generate new NotebookLM content, publish publicly, or incur paid API/credit use. The one-shot wake writes AGENT_1.1.32_CONTROL_CENTER_WAKE.json to Runtime_Readback for evidence; same-version repeats are blocked by the local marker."
+  "notes": "Autonomous recovery with bounded retry and explicit final state/readback promotion to agentVersion 1.1.22. Reuses proven 1.1.21/1.1.19 self-heal path, verifies Host/Dedicated Chrome/Governor/Drive sync, repairs Governor/Bridge once if needed, and writes central Runtime_Readback directly. Manual V3-V6 installer loop retired."
 }
