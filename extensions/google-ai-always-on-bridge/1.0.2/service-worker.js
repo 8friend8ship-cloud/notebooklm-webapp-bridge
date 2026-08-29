@@ -1,6 +1,7 @@
 import { CONFIG } from './config.js';
 const VERSION='1.0.2';
 const BUILD='NLM_FALLBACK_ROUTE_20260829';
+globalThis.__GOOGLE_AI_ALWAYS_ON_BUILD__=BUILD;
 chrome.runtime.onInstalled.addListener(()=>chrome.alarms.create('bridgeTick',{periodInMinutes:1}));
 chrome.runtime.onStartup.addListener(()=>chrome.alarms.create('bridgeTick',{periodInMinutes:1}));
 chrome.alarms.onAlarm.addListener(a=>{ if(a.name==='bridgeTick') tick(); });
