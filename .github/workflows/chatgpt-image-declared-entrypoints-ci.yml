@@ -1,0 +1,47 @@
+name: ChatGPT Image declared entrypoints CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/governor/Capture-ChatGPTImageDeclaredEntrypointsV1.ps1'
+      - '.github/workflows/chatgpt-image-declared-entrypoints-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: pwsh
+        run: |
+          $p='local-agent/governor/Capture-ChatGPTImageDeclaredEntrypointsV1.ps1'
+          $tokens=$null; $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Host;exit 1}
+      - name: Safety guards
+        shell: pwsh
+        run: |
+          $s=Get-Content -LiteralPath 'local-agent/governor/Capture-ChatGPTImageDeclaredEntrypointsV1.ps1' -Raw
+          $required=@('READ_ONLY_DECLARED_EXTENSION_FILES_ONLY','NO_PREFERENCES','NO_SECURE_PREFERENCES','NO_COOKIES','NO_TOKENS','NO_HISTORY','NO_REINSTALL','NO_GENERATE','DECLARED_ENTRYPOINTS_CAPTURED')
+          foreach($x in $required){if(-not $s.Contains($x)){throw "missing guard: $x"}}
+      - name: Fixture declared files captured
+        shell: pwsh
+        run: |
+          $root=Join-Path $env:RUNNER_TEMP 'chatgpt-image-entry-fixture'
+          $ext=Join-Path $root 'ext'
+          $runtime=Join-Path $root 'Runtime_Readback\CHROME'
+          New-Item -ItemType Directory -Force -Path $ext,$runtime|Out-Null
+          Set-Content -LiteralPath (Join-Path $ext 'background.js') -Value 'chrome.runtime.onMessage.addListener(()=>{});' -Encoding UTF8
+          Set-Content -LiteralPath (Join-Path $ext 'content.js') -Value 'console.log("content");' -Encoding UTF8
+          Set-Content -LiteralPath (Join-Path $ext 'panel.js') -Value 'console.log("panel");' -Encoding UTF8
+          Set-Content -LiteralPath (Join-Path $ext 'sidepanel.html') -Value '<html><script src="panel.js"></script></html>' -Encoding UTF8
+          $m=[ordered]@{ok=$true;extensionId='gedfnhdibkfgacmkbjgpfjihacalnlpn';extensionVersion='8.6.0';extensionPath=$ext;sidePanelDefaultPath='sidepanel.html';serviceWorker='background.js';contentScripts=@([ordered]@{js=@('content.js')})}
+          $m|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $runtime 'CHATGPT_IMAGE_AUTO_MANIFEST_INSPECT.json') -Encoding UTF8
+          $proc=Start-Process -FilePath pwsh -ArgumentList @('-NoProfile','-File','local-agent/governor/Capture-ChatGPTImageDeclaredEntrypointsV1.ps1','-CentralRootOverride',$root) -Wait -PassThru -NoNewWindow
+          if($proc.ExitCode -ne 0){throw "expected exit 0, got $($proc.ExitCode)"}
+          $r=Get-Content -LiteralPath (Join-Path $runtime 'CHATGPT_IMAGE_DECLARED_ENTRYPOINTS_V1.json') -Raw|ConvertFrom-Json
+          if(-not $r.ok -or $r.status -ne 'DECLARED_ENTRYPOINTS_CAPTURED'){throw 'capture receipt not ready'}
+          $names=@($r.captured.relativePath)
+          foreach($n in @('background.js','content.js','sidepanel.html','panel.js')){if($names -notcontains $n){throw "missing captured entrypoint $n"}}
+          if(@($r.captured|Where-Object{$_.bytes -le 0}).Count -gt 0){throw 'zero-byte capture'}
