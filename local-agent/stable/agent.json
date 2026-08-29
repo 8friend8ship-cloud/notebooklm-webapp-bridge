@@ -2,11 +2,11 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.46",
-  "releasedAt": "2026-08-28T22:27:46+09:00",
-  "gitBlobSha1": "b72e57af70f77578fddb3de49f6581a37e2de792",
+  "version": "1.1.47",
+  "releasedAt": "2026-08-29T09:08:00+09:00",
+  "gitBlobSha1": "da1ed80c4bee3496b551765815ce8399e2a6856f",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Preserves Agent 1.1.45 Queue Integrity V2 and adds Persona Apps Script binding governor. Persona governor is pinned to blob 186e987af8cb61e7a11242a6a2c69251ec0e1c73 and canonical Persona source commit 0ad86472116e73728d99c0c49d940e0a884d4739. It scans only existing local .clasp.json bindings, targets WEBAPP_TEMPLATE_05 by existing deployment AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo, backs up before push, injects Persona maintenance into the existing processTaskQueue wake, performs pull readback X2, preserves the deployment, and rolls back on post-push failure. No new Apps Script project, OAuth/scope, deployment, trigger, paid Gemini API, browser Generate, or credit action is created."
+  "notes": "Preserves Agent 1.1.46 Queue Integrity V2 + Persona binding behavior through a pinned legacy child, adds exactly-once recovery for abandoned dispatch markers when no result exists, and makes power continuity a stable-agent self-heal responsibility. Every cycle SHA-verifies Setup-PowerContinuity.ps1 blob b98ed149d91cdec4ff75ccf4b03aa7b9e09f241f, checks status first, and installs only when required. Required policy: 30-minute idle display-off on AC/DC, AC automatic sleep/hibernate disabled, AC USB selective suspend disabled, daily 02:00 display-off with 05:00 no forced display-on, keyboard/mouse native display wake without system resume, battery sleep/USB policy not overridden. Writes AGENT_1.1.47_POWER_CONTINUITY_SELF_HEAL.json and POWER_CONTINUITY_RUNTIME_READBACK.json to central Runtime_Readback. No new Apps Script project, OAuth/scope, deployment, trigger, paid Gemini API, browser Generate, credit action, or manual PowerShell approval is created."
 }
