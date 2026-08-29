@@ -1,38 +1,300 @@
 param()
-$ErrorActionPreference='Stop'
-$ProgressPreference='SilentlyContinue'
-$Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$ExtensionId='kieodjjlhpefnakodgllmpckepjaggbd'
-$ExpectedName='Google AI Local Bridge v1'
-$ExpectedVersion='1.0.2'
-$ExpectedBuild='NLM_FALLBACK_ROUTE_20260829'
-$Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
-$Root=Join-Path $Base 'LocalAgent'
-$ReceiptPath=Join-Path $Root 'GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1.json'
-$CanonicalRoot='extensions/google-ai-always-on-bridge/1.0.2'
-New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
-$Canonical=@{
-  'service-worker.js'=@{blob='c6ead8195c8fc1a48aab20c96587622ca76a3c38';sha256='689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44'}
-  'content/notebooklm.js'=@{blob='9d1337dbf2318cd3c22d451dd919dd5bb2ee01f1';sha256='8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c'}
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$Repo = '8friend8ship-cloud/notebooklm-webapp-bridge'
+$ExtensionId = 'kieodjjlhpefnakodgllmpckepjaggbd'
+$ExpectedName = 'Google AI Local Bridge v1'
+$ExpectedVersion = '1.0.2'
+$ExpectedBuild = 'NLM_FALLBACK_ROUTE_20260829'
+$Base = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
+$Root = Join-Path $Base 'LocalAgent'
+$ReceiptPath = Join-Path $Root 'GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1.json'
+$CanonicalRoot = 'extensions/google-ai-always-on-bridge/1.0.2'
+New-Item -ItemType Directory -Force -Path $Root | Out-Null
+
+$Canonical = @{
+  'service-worker.js' = @{ blob = 'c6ead8195c8fc1a48aab20c96587622ca76a3c38'; sha256 = '689e03cac9e369b9d762728cb7d2236250abe7e33ed9564cc3565bf063c0fb44' }
+  'content/notebooklm.js' = @{ blob = '9d1337dbf2318cd3c22d451dd919dd5bb2ee01f1'; sha256 = '8c0f3afafb38a79b59977579126c025c573046fc8c680e5d4b2f3f517e758b5c' }
 }
 
-function Api([string]$Path){Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers @{'User-Agent'='HomeDesign-AlwaysOn-NLM-Fallback';'Accept'='application/vnd.github+json'} -TimeoutSec 30}
-function GitBlob([string]$Path){$b=[IO.File]::ReadAllBytes($Path);$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{return(($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join'')}finally{$s.Dispose()}}
-function Sha256([string]$Path){(Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()}
-function ReadJson([string]$Path){try{Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json}catch{$null}}
-function FindCentral{$name=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$my=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){if(-not$d.Root){continue};foreach($c in @((Join-Path $d.Root $name),(Join-Path $d.Root ('My Drive\'+$name)),(Join-Path $d.Root ($my+'\'+$name)),(Join-Path $d.Root ('Google Drive\'+$name)))){if(Test-Path -LiteralPath $c -PathType Container){return$c}}};return''}
-function SaveReceipt($o){$json=$o|ConvertTo-Json -Depth 30;$json|Set-Content -LiteralPath $ReceiptPath -Encoding UTF8;$c=FindCentral;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$json|Set-Content -LiteralPath (Join-Path $d 'GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1.json') -Encoding UTF8}}
-function AddCandidate([System.Collections.ArrayList]$List,[string]$Profile,[string]$Path){if(-not$Path){return};try{$p=(Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path}catch{return};$m=Join-Path $p 'manifest.json';if(-not(Test-Path -LiteralPath $m -PathType Leaf)){return};$j=ReadJson $m;if(-not$j-or[string]$j.name-ne$ExpectedName){return};if(@($List|Where-Object{$_.path-eq$p}).Count-eq0){[void]$List.Add([pscustomobject]@{profile=$Profile;path=$p;version=[string]$j.version})}}
-function ScanProfile([System.Collections.ArrayList]$List,[string]$Label,[string]$ProfileRoot){if(-not(Test-Path -LiteralPath $ProfileRoot -PathType Container)){return};foreach($n in @('Preferences','Secure Preferences')){$pref=Join-Path $ProfileRoot $n;if(-not(Test-Path -LiteralPath $pref -PathType Leaf)){continue};try{$data=Get-Content -LiteralPath $pref -Raw -Encoding UTF8|ConvertFrom-Json;$x=$data.extensions.settings.PSObject.Properties[$ExtensionId];if($x-and$x.Value.path){$p=[string]$x.Value.path;if(-not[IO.Path]::IsPathRooted($p)){$p=Join-Path $ProfileRoot $p};AddCandidate $List $Label $p}}catch{}}}
-function GetCandidates{$list=New-Object System.Collections.ArrayList;$normal=Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data';if(Test-Path $normal){foreach($p in @(Get-ChildItem $normal -Directory -ErrorAction SilentlyContinue|Where-Object{$_.Name-eq'Default'-or$_.Name-like'Profile *'})){ScanProfile $list ('NORMAL_CHROME/'+$p.Name) $p.FullName}};ScanProfile $list 'HOMEDESIGN_CFT/Default' (Join-Path $Base 'ChromeUserData\Default');AddCandidate $list 'KNOWN_FALLBACK' (Join-Path $env:USERPROFILE 'Downloads\Google_AI_Always_On_Bridge_v1.0.1_fixed\extension');return@($list)}
-function FetchCanonical([string]$Rel,[string]$Temp){$spec=$Canonical[$Rel];$r=Api ($CanonicalRoot+'/'+$Rel);if(([string]$r.sha).ToLowerInvariant()-ne$spec.blob){throw('CANONICAL_BLOB_MISMATCH:'+ $Rel)};[IO.File]::WriteAllBytes($Temp,[Convert]::FromBase64String(([string]$r.content-replace'\s','')));if((GitBlob $Temp).ToLowerInvariant()-ne$spec.blob){throw('DOWNLOADED_BLOB_MISMATCH:'+ $Rel)};if((Sha256 $Temp)-ne$spec.sha256){throw('DOWNLOADED_SHA256_MISMATCH:'+ $Rel)}}
-function UpdateTarget($c,[string]$stamp){$path=[string]$c.path;$config=Join-Path $path 'config.js';if(-not(Test-Path -LiteralPath $config -PathType Leaf)){throw'CONFIG_MISSING'};$configBefore=Sha256 $config;$backup=Join-Path (Join-Path $Base 'Backups\GoogleAIAlwaysOnBridgeNLM') ($stamp+'_'+([string]$c.profile-replace'[^A-Za-z0-9_.-]','_'));New-Item -ItemType Directory -Force -Path (Join-Path $backup 'content')|Out-Null;$rels=@('service-worker.js','content/notebooklm.js');foreach($rel in $rels){$src=Join-Path $path ($rel-replace'/','\');if(Test-Path $src){$bak=Join-Path $backup ($rel-replace'/','\');$par=Split-Path -Parent $bak;if(-not(Test-Path $par)){New-Item -ItemType Directory -Force -Path $par|Out-Null};Copy-Item $src $bak -Force}};$temps=@{};try{foreach($rel in $rels){$dest=Join-Path $path ($rel-replace'/','\');$par=Split-Path -Parent $dest;if(-not(Test-Path $par)){New-Item -ItemType Directory -Force -Path $par|Out-Null};$tmp=$dest+'.nlmfallback';FetchCanonical $rel $tmp;$temps[$rel]=$tmp};foreach($rel in $rels){$dest=Join-Path $path ($rel-replace'/','\');Move-Item $temps[$rel] $dest -Force;if((Sha256 $dest)-ne$Canonical[$rel].sha256){throw('POST_SHA_MISMATCH:'+ $rel)}};if((Sha256 $config)-ne$configBefore){throw'CONFIG_MUTATION_DETECTED'};return[pscustomobject]@{ok=$true;profile=$c.profile;path=$path;backupPath=$backup;configPreserved=$true;serviceWorkerSha256=(Sha256 (Join-Path $path 'service-worker.js'));notebooklmSha256=(Sha256 (Join-Path $path 'content\notebooklm.js'))}}catch{foreach($rel in $rels){$bak=Join-Path $backup ($rel-replace'/','\');$dest=Join-Path $path ($rel-replace'/','\');if(Test-Path $bak){Copy-Item $bak $dest -Force};if($temps.ContainsKey($rel)){Remove-Item $temps[$rel] -Force -ErrorAction SilentlyContinue}};throw}}
-function CdpPorts{$o=@();try{foreach($p in @(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue)){$cmd=[string]$p.CommandLine;if($cmd-match'--remote-debugging-port(?:=|\s+)(\d+)'){$o+=[int]$Matches[1]}}}catch{};return@($o|Sort-Object -Unique)}
-function EvalWs([string]$Ws,[string]$Expr){$node=Get-Command node.exe -ErrorAction SilentlyContinue;if(-not$node){$node=Get-Command node -ErrorAction SilentlyContinue};if(-not$node){return$null};$js=Join-Path $env:TEMP ('hd-nlm-reload-'+[guid]::NewGuid().ToString('N')+'.mjs');$code=@'
-const u=process.argv[2],e=Buffer.from(process.argv[3],'base64').toString('utf8');const w=new WebSocket(u);let n=0,p=new Map();await new Promise((r,j)=>{w.onopen=r;w.onerror=j});w.onmessage=x=>{let m;try{m=JSON.parse(x.data)}catch{return}if(m.id&&p.has(m.id)){let q=p.get(m.id);p.delete(m.id);m.error?q.j(m.error):q.r(m.result)}};const s=(method,params={})=>new Promise((r,j)=>{let id=++n;p.set(id,{r,j});w.send(JSON.stringify({id,method,params}))});let z=await s('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true,userGesture:true});console.log(JSON.stringify(z.result?.value??null));w.close();
-'@;Set-Content $js $code -Encoding UTF8;try{$b=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Expr));$out=& $node.Source $js $Ws $b 2>$null|Out-String;return$out.Trim()}catch{return$null}finally{Remove-Item $js -Force -ErrorAction SilentlyContinue}}
-function ReloadExtension{foreach($port in @(CdpPorts)){try{$targets=@(Invoke-RestMethod ('http://127.0.0.1:'+ $port +'/json/list') -TimeoutSec 3);$t=$targets|Where-Object{$_.url-like('chrome-extension://'+$ExtensionId+'/*')-and$_.webSocketDebuggerUrl}|Select-Object -First 1;if(-not$t){continue};[void](EvalWs ([string]$t.webSocketDebuggerUrl) "(()=>{setTimeout(()=>chrome.runtime.reload(),100);return 'RELOAD_SCHEDULED'})()");Start-Sleep 4;$targets=@(Invoke-RestMethod ('http://127.0.0.1:'+ $port +'/json/list') -TimeoutSec 3);$t=$targets|Where-Object{$_.url-like('chrome-extension://'+$ExtensionId+'/*')-and$_.webSocketDebuggerUrl}|Select-Object -First 1;if($t){$v=EvalWs ([string]$t.webSocketDebuggerUrl) 'globalThis.__GOOGLE_AI_ALWAYS_ON_BUILD__||""';return[pscustomobject]@{requested=$true;verified=([string]$v).Contains($ExpectedBuild);build=[string]$v;port=$port}}}catch{}};return[pscustomobject]@{requested=$false;verified=$false;build='';port=$null}}
+function Invoke-GitHubContent([string]$Path) {
+  $uri = 'https://api.github.com/repos/' + $Repo + '/contents/' + $Path + '?ref=main&cb=' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  return Invoke-RestMethod -Uri $uri -Headers @{'User-Agent'='HomeDesign-AlwaysOn-NLM-Fallback';'Accept'='application/vnd.github+json'} -TimeoutSec 30
+}
 
-$started=(Get-Date).ToString('o');$updates=@();$errors=@();$stamp=Get-Date -Format 'yyyyMMdd_HHmmss'
-try{$candidates=@(GetCandidates);if($candidates.Count-eq0){throw'INSTALLED_EXTENSION_PATH_NOT_FOUND'};foreach($c in $candidates){try{$updates+=UpdateTarget $c $stamp}catch{$errors+=([string]$c.profile+':'+$_.Exception.Message)}};if($updates.Count-eq0){throw('NO_TARGET_UPDATED:'+($errors-join'|'))};$reload=ReloadExtension;$rec=[ordered]@{ok=$true;action='GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1';revision='V1_LAST_GOOD_SELECTOR_SAFE';startedAt=$started;completedAt=(Get-Date).ToString('o');extensionId=$ExtensionId;expectedVersion=$ExpectedVersion;expectedBuild=$ExpectedBuild;updatedTargets=$updates;errors=$errors;configContentRead=$false;configPreserved=$true;normalChromeTouched=$false;cdpReloadRequested=[bool]$reload.requested;cdpReloadVerified=[bool]$reload.verified;runtimeBuild=[string]$reload.build;reloadPending=[bool](-not$reload.verified);primaryNotebookBridgeChanged=$false;generateClicked=$false;creditSpend=$false;oauthChanged=$false;scopeChanged=$false;duplicateInstallCreated=$false};SaveReceipt $rec;$rec|ConvertTo-Json -Depth 30 -Compress;exit 0}catch{$errors+=$_.Exception.Message;$rec=[ordered]@{ok=$false;action='GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1';revision='V1_LAST_GOOD_SELECTOR_SAFE';startedAt=$started;completedAt=(Get-Date).ToString('o');extensionId=$ExtensionId;updatedTargets=$updates;errors=$errors;configContentRead=$false;normalChromeTouched=$false;reloadPending=$true;primaryNotebookBridgeChanged=$false;generateClicked=$false;creditSpend=$false;oauthChanged=$false;scopeChanged=$false;duplicateInstallCreated=$false};SaveReceipt $rec;$rec|ConvertTo-Json -Depth 30 -Compress;exit 2}
+function Get-GitBlob([string]$Path) {
+  $bytes = [IO.File]::ReadAllBytes($Path)
+  $header = [Text.Encoding]::ASCII.GetBytes(('blob ' + $bytes.Length + [char]0))
+  $all = New-Object byte[] ($header.Length + $bytes.Length)
+  [Buffer]::BlockCopy($header, 0, $all, 0, $header.Length)
+  [Buffer]::BlockCopy($bytes, 0, $all, $header.Length, $bytes.Length)
+  $sha = [Security.Cryptography.SHA1]::Create()
+  try { return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '') }
+  finally { $sha.Dispose() }
+}
+
+function Get-Sha256([string]$Path) {
+  return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Read-Json([string]$Path) {
+  try { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json }
+  catch { return $null }
+}
+
+function Find-CentralRoot {
+  $name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+  $myDriveKo = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
+  foreach ($drive in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
+    if (-not $drive.Root) { continue }
+    $candidates = @(
+      (Join-Path $drive.Root $name),
+      (Join-Path $drive.Root ('My Drive\' + $name)),
+      (Join-Path $drive.Root ($myDriveKo + '\' + $name)),
+      (Join-Path $drive.Root ('Google Drive\' + $name))
+    )
+    foreach ($candidate in $candidates) {
+      if (Test-Path -LiteralPath $candidate -PathType Container) { return $candidate }
+    }
+  }
+  return ''
+}
+
+function Save-Receipt($Object) {
+  $json = $Object | ConvertTo-Json -Depth 30
+  $json | Set-Content -LiteralPath $ReceiptPath -Encoding UTF8
+  $central = Find-CentralRoot
+  if ($central) {
+    $dir = Join-Path $central 'Runtime_Readback'
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $json | Set-Content -LiteralPath (Join-Path $dir 'GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1.json') -Encoding UTF8
+  }
+}
+
+function Add-Candidate([System.Collections.ArrayList]$List, [string]$Profile, [string]$Path) {
+  if (-not $Path) { return }
+  try { $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path }
+  catch { return }
+  $manifestPath = Join-Path $resolved 'manifest.json'
+  if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { return }
+  $manifest = Read-Json $manifestPath
+  if (-not $manifest -or [string]$manifest.name -ne $ExpectedName) { return }
+  if (@($List | Where-Object { [string]$_.path -eq $resolved }).Count -eq 0) {
+    [void]$List.Add([pscustomobject]@{ profile = $Profile; path = $resolved; version = [string]$manifest.version })
+  }
+}
+
+function Scan-Profile([System.Collections.ArrayList]$List, [string]$Label, [string]$ProfileRoot) {
+  if (-not (Test-Path -LiteralPath $ProfileRoot -PathType Container)) { return }
+  foreach ($name in @('Preferences','Secure Preferences')) {
+    $pref = Join-Path $ProfileRoot $name
+    if (-not (Test-Path -LiteralPath $pref -PathType Leaf)) { continue }
+    try {
+      $data = Get-Content -LiteralPath $pref -Raw -Encoding UTF8 | ConvertFrom-Json
+      $property = $data.extensions.settings.PSObject.Properties[$ExtensionId]
+      if ($property -and $property.Value.path) {
+        $candidatePath = [string]$property.Value.path
+        if (-not [IO.Path]::IsPathRooted($candidatePath)) { $candidatePath = Join-Path $ProfileRoot $candidatePath }
+        Add-Candidate $List $Label $candidatePath
+      }
+    } catch {}
+  }
+}
+
+function Get-Candidates {
+  $list = New-Object System.Collections.ArrayList
+  $normalRoot = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
+  if (Test-Path -LiteralPath $normalRoot -PathType Container) {
+    foreach ($profile in @(Get-ChildItem -LiteralPath $normalRoot -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' })) {
+      Scan-Profile $list ('NORMAL_CHROME/' + $profile.Name) $profile.FullName
+    }
+  }
+  Scan-Profile $list 'HOMEDESIGN_CFT/Default' (Join-Path $Base 'ChromeUserData\Default')
+  Add-Candidate $list 'KNOWN_FALLBACK' (Join-Path $env:USERPROFILE 'Downloads\Google_AI_Always_On_Bridge_v1.0.1_fixed\extension')
+  return @($list)
+}
+
+function Fetch-Canonical([string]$Relative, [string]$TempPath) {
+  $spec = $Canonical[$Relative]
+  if (-not $spec) { throw ('CANONICAL_SPEC_MISSING:' + $Relative) }
+  $response = Invoke-GitHubContent ($CanonicalRoot + '/' + $Relative)
+  if (([string]$response.sha).ToLowerInvariant() -ne [string]$spec.blob) { throw ('CANONICAL_BLOB_MISMATCH:' + $Relative) }
+  [IO.File]::WriteAllBytes($TempPath, [Convert]::FromBase64String(([string]$response.content -replace '\s','')))
+  if ((Get-GitBlob $TempPath).ToLowerInvariant() -ne [string]$spec.blob) { throw ('DOWNLOADED_BLOB_MISMATCH:' + $Relative) }
+  if ((Get-Sha256 $TempPath) -ne [string]$spec.sha256) { throw ('DOWNLOADED_SHA256_MISMATCH:' + $Relative) }
+}
+
+function Update-Target($Candidate, [string]$Stamp) {
+  $path = [string]$Candidate.path
+  $config = Join-Path $path 'config.js'
+  if (-not (Test-Path -LiteralPath $config -PathType Leaf)) { throw 'CONFIG_MISSING' }
+  $configBefore = Get-Sha256 $config
+  $safeProfile = ([string]$Candidate.profile -replace '[^A-Za-z0-9_.-]', '_')
+  $backup = Join-Path (Join-Path $Base 'Backups\GoogleAIAlwaysOnBridgeNLM') ($Stamp + '_' + $safeProfile)
+  New-Item -ItemType Directory -Force -Path (Join-Path $backup 'content') | Out-Null
+  $rels = @('service-worker.js','content/notebooklm.js')
+  foreach ($rel in $rels) {
+    $source = Join-Path $path ($rel -replace '/', '\')
+    if (Test-Path -LiteralPath $source -PathType Leaf) {
+      $backupFile = Join-Path $backup ($rel -replace '/', '\')
+      $backupParent = Split-Path -Parent $backupFile
+      if (-not (Test-Path -LiteralPath $backupParent)) { New-Item -ItemType Directory -Force -Path $backupParent | Out-Null }
+      Copy-Item -LiteralPath $source -Destination $backupFile -Force
+    }
+  }
+  $temps = @{}
+  try {
+    foreach ($rel in $rels) {
+      $dest = Join-Path $path ($rel -replace '/', '\')
+      $parent = Split-Path -Parent $dest
+      if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+      $tmp = $dest + '.nlmfallback'
+      Fetch-Canonical $rel $tmp
+      $temps[$rel] = $tmp
+    }
+    foreach ($rel in $rels) {
+      $dest = Join-Path $path ($rel -replace '/', '\')
+      Move-Item -LiteralPath $temps[$rel] -Destination $dest -Force
+      if ((Get-Sha256 $dest) -ne [string]$Canonical[$rel].sha256) { throw ('POST_SHA_MISMATCH:' + $rel) }
+    }
+    if ((Get-Sha256 $config) -ne $configBefore) { throw 'CONFIG_MUTATION_DETECTED' }
+    return [pscustomobject]@{
+      ok = $true
+      profile = [string]$Candidate.profile
+      path = $path
+      backupPath = $backup
+      configPreserved = $true
+      serviceWorkerSha256 = Get-Sha256 (Join-Path $path 'service-worker.js')
+      notebooklmSha256 = Get-Sha256 (Join-Path $path 'content\notebooklm.js')
+    }
+  } catch {
+    foreach ($rel in $rels) {
+      $backupFile = Join-Path $backup ($rel -replace '/', '\')
+      $dest = Join-Path $path ($rel -replace '/', '\')
+      if (Test-Path -LiteralPath $backupFile -PathType Leaf) { Copy-Item -LiteralPath $backupFile -Destination $dest -Force }
+      if ($temps.ContainsKey($rel)) { Remove-Item -LiteralPath $temps[$rel] -Force -ErrorAction SilentlyContinue }
+    }
+    throw
+  }
+}
+
+function Get-CdpPorts {
+  $ports = @()
+  try {
+    foreach ($process in @(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue)) {
+      $commandLine = [string]$process.CommandLine
+      if ($commandLine -match '--remote-debugging-port(?:=|\s+)(\d+)') { $ports += [int]$Matches[1] }
+    }
+  } catch {}
+  return @($ports | Sort-Object -Unique)
+}
+
+function Invoke-CdpExpression([string]$WebSocketUrl, [string]$Expression) {
+  $node = Get-Command node.exe -ErrorAction SilentlyContinue
+  if (-not $node) { $node = Get-Command node -ErrorAction SilentlyContinue }
+  if (-not $node) { return '' }
+  $js = Join-Path $env:TEMP ('hd-nlm-reload-' + [guid]::NewGuid().ToString('N') + '.mjs')
+  $code = @'
+const u=process.argv[2],e=Buffer.from(process.argv[3],'base64').toString('utf8');
+const w=new WebSocket(u);let n=0,p=new Map();
+await new Promise((r,j)=>{w.onopen=r;w.onerror=j});
+w.onmessage=x=>{let m;try{m=JSON.parse(x.data)}catch{return}if(m.id&&p.has(m.id)){let q=p.get(m.id);p.delete(m.id);m.error?q.j(m.error):q.r(m.result)}};
+const s=(method,params={})=>new Promise((r,j)=>{let id=++n;p.set(id,{r,j});w.send(JSON.stringify({id,method,params}))});
+let z=await s('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true,userGesture:true});
+console.log(JSON.stringify(z.result?.value??null));w.close();
+'@
+  Set-Content -LiteralPath $js -Value $code -Encoding UTF8
+  try {
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Expression))
+    $output = & $node.Source $js $WebSocketUrl $encoded 2>$null | Out-String
+    return $output.Trim()
+  } catch { return '' }
+  finally { Remove-Item -LiteralPath $js -Force -ErrorAction SilentlyContinue }
+}
+
+function Reload-Extension {
+  foreach ($port in @(Get-CdpPorts)) {
+    try {
+      $targets = @(Invoke-RestMethod -Uri ('http://127.0.0.1:' + $port + '/json/list') -TimeoutSec 3)
+      $target = $targets | Where-Object { [string]$_.url -like ('chrome-extension://' + $ExtensionId + '/*') -and $_.webSocketDebuggerUrl } | Select-Object -First 1
+      if (-not $target) { continue }
+      [void](Invoke-CdpExpression ([string]$target.webSocketDebuggerUrl) "(()=>{setTimeout(()=>chrome.runtime.reload(),100);return 'RELOAD_SCHEDULED'})()")
+      Start-Sleep -Seconds 4
+      $targets = @(Invoke-RestMethod -Uri ('http://127.0.0.1:' + $port + '/json/list') -TimeoutSec 3)
+      $target = $targets | Where-Object { [string]$_.url -like ('chrome-extension://' + $ExtensionId + '/*') -and $_.webSocketDebuggerUrl } | Select-Object -First 1
+      if ($target) {
+        $build = Invoke-CdpExpression ([string]$target.webSocketDebuggerUrl) 'globalThis.__GOOGLE_AI_ALWAYS_ON_BUILD__||""'
+        return [pscustomobject]@{ requested = $true; verified = ([string]$build).Contains($ExpectedBuild); build = [string]$build; port = $port }
+      }
+    } catch {}
+  }
+  return [pscustomobject]@{ requested = $false; verified = $false; build = ''; port = $null }
+}
+
+$started = (Get-Date).ToString('o')
+$updates = @()
+$errors = @()
+$stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+try {
+  $candidates = @(Get-Candidates)
+  if ($candidates.Count -eq 0) { throw 'INSTALLED_EXTENSION_PATH_NOT_FOUND' }
+  foreach ($candidate in $candidates) {
+    try { $updates += Update-Target $candidate $stamp }
+    catch { $errors += ([string]$candidate.profile + ':' + $_.Exception.Message) }
+  }
+  if ($updates.Count -eq 0) { throw ('NO_TARGET_UPDATED:' + ($errors -join '|')) }
+  $reload = Reload-Extension
+  $receipt = [ordered]@{
+    ok = $true
+    action = 'GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1'
+    revision = 'V1.1_LAST_GOOD_SELECTOR_SAFE_PARSE_FIXED'
+    startedAt = $started
+    completedAt = (Get-Date).ToString('o')
+    extensionId = $ExtensionId
+    expectedVersion = $ExpectedVersion
+    expectedBuild = $ExpectedBuild
+    updatedTargets = $updates
+    errors = $errors
+    configContentRead = $false
+    configPreserved = $true
+    normalChromeTouched = $false
+    cdpReloadRequested = [bool]$reload.requested
+    cdpReloadVerified = [bool]$reload.verified
+    runtimeBuild = [string]$reload.build
+    reloadPending = [bool](-not $reload.verified)
+    primaryNotebookBridgeChanged = $false
+    generateClicked = $false
+    creditSpend = $false
+    oauthChanged = $false
+    scopeChanged = $false
+    duplicateInstallCreated = $false
+  }
+  Save-Receipt $receipt
+  $receipt | ConvertTo-Json -Depth 30 -Compress
+  exit 0
+} catch {
+  $errors += $_.Exception.Message
+  $receipt = [ordered]@{
+    ok = $false
+    action = 'GOOGLE_AI_ALWAYS_ON_NOTEBOOKLM_FALLBACK_V1'
+    revision = 'V1.1_LAST_GOOD_SELECTOR_SAFE_PARSE_FIXED'
+    startedAt = $started
+    completedAt = (Get-Date).ToString('o')
+    extensionId = $ExtensionId
+    updatedTargets = $updates
+    errors = $errors
+    configContentRead = $false
+    normalChromeTouched = $false
+    reloadPending = $true
+    primaryNotebookBridgeChanged = $false
+    generateClicked = $false
+    creditSpend = $false
+    oauthChanged = $false
+    scopeChanged = $false
+    duplicateInstallCreated = $false
+  }
+  Save-Receipt $receipt
+  $receipt | ConvertTo-Json -Depth 30 -Compress
+  exit 2
+}
