@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NotebookLM WebApp Bridge",
-  "version": "0.2.72",
-  "description": "Async host-handoff lease recovery: unstarted LOCAL_POWERSHELL_ASYNC claims expire after a short handoff window and initial Host start failures release the claim immediately. D92 exact-download handoff remains unchanged.",
+  "version": "0.2.73",
+  "description": "Legacy async active-lock recovery: reconcile persisted LOCAL_POWERSHELL_ASYNC active state with the live queue/Host and clear orphan or non-live locks so READY tasks cannot starve forever. No new permissions, OAuth, normal-Chrome, Generate, or credit behavior.",
   "permissions": [
     "alarms",
     "downloads",

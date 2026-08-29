@@ -105,11 +105,49 @@ async function adoptRecentClaimed(cfg,token,tasks,profileEmail){
   return finalize(cfg,token,await getActive());
 }
 
+function activeStableTime(active){
+  const direct=Number(active?.startedAtMs||active?.claimedAtMs||0);
+  if(Number.isFinite(direct)&&direct>0)return direct;
+  const derived=taskTime(active?.task||{});
+  return Number.isFinite(derived)&&derived>0?derived:0;
+}
+function queueTaskLiveForActive(t){
+  const s=taskStatus(t);
+  return ["CLAIMED","STARTED","RUNNING","NOTEBOOK_OPENED"].includes(s);
+}
+async function reconcileActive(cfg,token,active,listedTasks){
+  const id=String(active?.taskId||"");
+  if(!id){await setActive(null);return {cleared:true,reason:"LEGACY_ACTIVE_NO_TASK_ID"};}
+  const queued=(listedTasks||[]).find(t=>taskId(t)===id)||null;
+  if(queued&&!queueTaskLiveForActive(queued)){
+    await setActive(null);
+    return {cleared:true,reason:`ACTIVE_QUEUE_NOT_LIVE_${taskStatus(queued)}`,taskId:id};
+  }
+  if(!queued){
+    let host=null;try{host=await hostResult(id);}catch{}
+    const hs=String(host?.state||"").toUpperCase();
+    if(!["RUNNING","STARTED"].includes(hs)){
+      await setActive(null);
+      return {cleared:true,reason:`ACTIVE_ORPHAN_QUEUE_MISSING_HOST_${hs||"UNKNOWN"}`,taskId:id};
+    }
+  }
+  const stable=activeStableTime(active);
+  if(!stable){
+    const next={...active,claimedAtMs:Date.now(),legacyTimestampRecovered:true,legacyRecoveredAt:new Date().toISOString()};
+    await setActive(next);
+    return {cleared:false,active:next,reason:"LEGACY_ACTIVE_TIMESTAMP_ANCHORED"};
+  }
+  return {cleared:false,active,reason:"ACTIVE_RECONCILED"};
+}
 async function pollCore(reason="alarm"){
   const cfg=await config();const token=await sessionToken();if(!token){await wakeControlCenter(cfg,"NO_SESSION");return {ok:true,skipped:"no_session",authRefreshRequested:true};}
-  const active=await getActive();if(active)return {ok:true,reason,active:await finalize(cfg,token,active)};
   let listed;try{listed=await api(cfg.appsScriptUrl,{action:"listTasks",sessionToken:token,includeClaimed:true});}catch(error){if(isSessionError(error)){await clearExpiredSessionAndWake(cfg,error);return {ok:true,reason,skipped:"session_refresh_requested"};}throw error;}
   const listedTasks=Array.isArray(listed.tasks)?listed.tasks:[];
+  const active=await getActive();
+  if(active){
+    const reconciled=await reconcileActive(cfg,token,active,listedTasks);
+    if(!reconciled.cleared)return {ok:true,reason,active:await finalize(cfg,token,reconciled.active)};
+  }
   await recoverStale(cfg,token,listedTasks);
   const profile=await chrome.identity.getProfileUserInfo({accountStatus:"ANY"}).catch(()=>({email:""}));
   const adopted=await adoptRecentClaimed(cfg,token,listedTasks,profile.email||"");
