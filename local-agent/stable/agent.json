@@ -3,10 +3,10 @@
   "channel": "stable",
   "enabled": true,
   "version": "1.1.68",
-  "releasedAt": "2026-08-29T17:45:00+09:00",
-  "gitBlobSha1": "ec0bcb23ffab76c04ff8fd0691e6623d86b6b073",
+  "releasedAt": "2026-08-29T17:49:00+09:00",
+  "gitBlobSha1": "49cf6a07cd7f39bb76a6f26526b89b21dbdf4c25",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 900,
-  "notes": "Preserves the verified 1.1.67 NotebookLM native runtime recovery, then recovers the existing WEBAPP_TEMPLATE_03 bound Apps Script ID read-only from dedicated Chrome, normal Chrome, or Edge History/Sessions. It requires the known project URL prefix, exact existing deployment ID, canonical clasp account, NotebookLM code signature, backup, one push at most, pull readback, and deployment invariant. No new Apps Script project/deployment, OAuth/scope, trigger, normal-Chrome mutation, paid API, or credits are allowed."
+  "notes": "Preserves the verified 1.1.67 NotebookLM native runtime recovery, then recovers the existing WEBAPP_TEMPLATE_03 bound Apps Script ID read-only from dedicated Chrome, normal Chrome, or Edge History/Sessions. It requires the known project URL prefix, exact existing deployment ID, canonical clasp account, NotebookLM code signature, backup, one push at most, pull readback, and deployment invariant. Safe HOLD_NO_WRITE is terminal for this cycle to prevent blind retries. No new Apps Script project/deployment, OAuth/scope, trigger, normal-Chrome mutation, paid API, or credits are allowed."
 }
