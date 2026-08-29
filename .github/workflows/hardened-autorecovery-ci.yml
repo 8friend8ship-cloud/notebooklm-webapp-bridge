@@ -1,0 +1,23 @@
+name: Hardened AutoRecovery CI
+on:
+  push:
+    paths:
+      - 'local-agent/bootstrap/RUN_HARDENED_AUTORECOVERY_NOW.ps1'
+      - 'local-agent/bootstrap/RUN_HARDENED_AUTORECOVERY_NOW.cmd'
+      - '.github/workflows/hardened-autorecovery-ci.yml'
+  workflow_dispatch:
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: powershell
+        run: |
+          $p='local-agent/bootstrap/RUN_HARDENED_AUTORECOVERY_NOW.ps1'
+          $tokens=$null; $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$tokens,[ref]$errors) | Out-Null
+          if($errors.Count -gt 0){ $errors | Format-List | Out-String | Write-Error; exit 1 }
+          $s=Get-Content $p -Raw
+          foreach($required in @('INSTALL_AUTO_RESUME_TASK.ps1','local-agent/stable/agent.json','gitBlobSha1','STABLE_AGENT_SHA_MISMATCH','WATCHDOG_LAST.json')){ if($s -notmatch [regex]::Escape($required)){ throw "missing guard: $required" } }
+          Write-Host 'HARDENED_AUTORECOVERY_PARSE_PASS'
