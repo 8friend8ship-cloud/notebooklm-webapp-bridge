@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.22",
-  "releasedAt": "2026-08-26T11:47:00+09:00",
-  "gitBlobSha1": "8eb558717939ea6ecb95725dfbaa2656692d8e58",
+  "version": "1.1.32",
+  "releasedAt": "2026-08-28T15:35:00+09:00",
+  "gitBlobSha1": "a38da31ff6aad74c43839a7b010909fec041342d",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Autonomous recovery with bounded retry and explicit final state/readback promotion to agentVersion 1.1.22. Reuses proven 1.1.21/1.1.19 self-heal path, verifies Host/Dedicated Chrome/Governor/Drive sync, repairs Governor/Bridge once if needed, and writes central Runtime_Readback directly. Manual V3-V6 installer loop retired."
+  "notes": "Transport/runtime kept on the proven healthy 1.1.32 lane while NotebookLM generation logic is pinned separately to Bridge 0.2.39 LAST_GOOD. This prevents watchdog version-churn and does not alter NotebookLM Studio generation state machines."
 }
