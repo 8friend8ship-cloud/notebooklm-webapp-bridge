@@ -23,7 +23,7 @@ jobs:
         shell: powershell
         run: |
           $s=Get-Content 'local-agent/bootstrap/AgentBootstrap.ps1' -Raw
-          foreach($required in @('ApplyIndependentLane','local-agent/stable/flow.json','state-flow.json','HomeDesignLocalAgent-flow.ps1','Lane FLOW')){if(-not$s.Contains($required)){throw "MISSING_MULTILANE_GUARD:$required"}}
+          foreach($required in @('ApplyIndependentLane','local-agent/stable/flow.json','state-flow.json','HomeDesignLocalAgent-flow.ps1',"'FLOW'")){if(-not$s.Contains($required)){throw "MISSING_MULTILANE_GUARD:$required"}}
           $f=Get-Content 'local-agent/stable/flow.json' -Raw|ConvertFrom-Json
           if(-not$f.enabled){throw 'FLOW_LANE_DISABLED'}
           if($f.version-ne'1.1.69'){throw 'FLOW_LANE_VERSION_MISMATCH'}
