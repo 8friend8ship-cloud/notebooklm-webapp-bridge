@@ -32,7 +32,7 @@ function FindCentralRoot{
 }
 function WriteResumeHeartbeat([string]$Stage){
   try{
-    $hb=[ordered]@{ok=$true;action='AUTO_RESUME_ENTRY_HEARTBEAT';version='RESUME_TELEMETRY_V1_20260828';stage=$Stage;pid=$PID;hostHealthy=(TestHostHealth);newOAuth=$false;newScope=$false;newProjectCreated=$false;newDeployment=$false;newTrigger=$false;normalChromeRestarted=$false;at=(Get-Date).ToString('o')}
+    $hb=[ordered]@{ok=$true;action='AUTO_RESUME_ENTRY_HEARTBEAT';version='RESUME_TELEMETRY_V2_20260829';stage=$Stage;pid=$PID;hostHealthy=(TestHostHealth);newOAuth=$false;newScope=$false;newProjectCreated=$false;newDeployment=$false;newTrigger=$false;normalChromeRestarted=$false;at=(Get-Date).ToString('o')}
     $json=$hb|ConvertTo-Json -Depth 20
     $local=Join-Path $Root 'AUTO_RESUME_ENTRY_1.1.46.json'
     $json|Set-Content -LiteralPath $local -Encoding UTF8
@@ -42,6 +42,49 @@ function WriteResumeHeartbeat([string]$Stage){
       $json|Set-Content -LiteralPath (Join-Path $dest 'AUTO_RESUME_ENTRY_1.1.46.json') -Encoding UTF8
     }
   }catch{}
+}
+function BootstrapLoopProcesses{
+  try{return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{
+    $_.Name -match 'powershell|pwsh' -and $_.CommandLine -and
+    $_.CommandLine -like '*AgentBootstrap.ps1*' -and $_.CommandLine -match '(?i)(?:^|\s)-Loop(?:\s|$)'
+  })}catch{return @()}
+}
+function EnsureBootstrapLoop([string]$BootstrapPath,[int]$TimeoutSeconds=120){
+  $deadline=(Get-Date).AddSeconds($TimeoutSeconds)
+  $attempts=0
+  while((Get-Date)-lt $deadline){
+    $loops=@(BootstrapLoopProcesses)
+    if($loops.Count -gt 0){
+      Start-Sleep -Milliseconds 900
+      $loops2=@(BootstrapLoopProcesses)
+      if($loops2.Count -gt 0){return [ordered]@{ok=$true;state='EXISTING_LOOP_VERIFIED';attempts=$attempts;pids=@($loops2|ForEach-Object{[int]$_.ProcessId})}}
+    }
+
+    # AgentBootstrap uses this mutex. If a one-shot bootstrap currently owns it,
+    # starting a new -Loop process immediately would exit. Wait until it is free,
+    # release our test acquisition, then start exactly one loop and verify it lives.
+    $m=$null;$free=$false
+    try{
+      $m=New-Object System.Threading.Mutex($false,'HomeDesignLocalAgentBootstrapV1')
+      $free=$m.WaitOne(0,$false)
+      if($free){try{$m.ReleaseMutex()}catch{}}
+    }catch{$free=$false}
+    finally{if($m){$m.Dispose()}}
+
+    if($free){
+      $attempts++
+      Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$BootstrapPath`"",'-Loop') -WindowStyle Hidden
+      Start-Sleep -Seconds 2
+      $started=@(BootstrapLoopProcesses)
+      if($started.Count -gt 0){
+        Start-Sleep -Seconds 2
+        $stable=@(BootstrapLoopProcesses)
+        if($stable.Count -gt 0){return [ordered]@{ok=$true;state='NEW_LOOP_STARTED_VERIFIED';attempts=$attempts;pids=@($stable|ForEach-Object{[int]$_.ProcessId})}}
+      }
+    }
+    Start-Sleep -Seconds 3
+  }
+  return [ordered]@{ok=$false;state='BOOTSTRAP_LOOP_VERIFY_TIMEOUT';attempts=$attempts;pids=@()}
 }
 
 Write-Host 'HomeDesign Local Agent - SAFE DIRECT RESUME'
@@ -140,8 +183,11 @@ if(-not(Test-Path -LiteralPath $verifyMarker)){
   Write-Host ('CDP versioned retest already attempted for '+$verifyKey+'; same-condition retry blocked.')
 }
 
-Write-Host '[5/5] Ensuring future bootstrap loop...'
-Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$Bootstrap`"",'-Loop') -WindowStyle Hidden
+Write-Host '[5/5] Ensuring future bootstrap loop (mutex-safe)...'
+$loopState=EnsureBootstrapLoop $Bootstrap 120
+Write-Host ('bootstrapLoop='+($loopState|ConvertTo-Json -Compress))
+if(-not $loopState.ok){throw ('BOOTSTRAP_LOOP_NOT_VERIFIED:'+($loopState|ConvertTo-Json -Compress))}
+WriteResumeHeartbeat ('BOOTSTRAP_LOOP_'+[string]$loopState.state)
 
 $deadline=(Get-Date).AddSeconds(180)
 while((Get-Date)-lt $deadline){
@@ -169,5 +215,5 @@ while((Get-Date)-lt $deadline){
   }
 }
 Write-Host 'RESUME RESULT: STARTED, RUNTIME READBACK STILL PENDING'
-Write-Host 'Do not reinstall or reauthorize. Bootstrap remains enabled.'
+Write-Host 'Do not reinstall or reauthorize. Bootstrap loop was verified and remains enabled.'
 exit 2
