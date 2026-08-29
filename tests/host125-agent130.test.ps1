@@ -64,12 +64,24 @@ if($agent35 -match 'LOCAL_POWERSHELL_ASYNC'){throw 'AGENT135_QUEUE_TASKTYPE_FORB
 if($agent35 -match 'Stop-Process.+chrome' -or $agent35 -match 'taskkill.+chrome'){throw 'AGENT135_CHROME_KILL_FORBIDDEN'}
 if(([regex]::Matches($agent35,'CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01')).Count -ne 1){throw 'AGENT135_FIXED_TASK_ID_NOT_SINGLE_DECLARATION'}
 
-if(@('1.1.32','1.1.33','1.1.34','1.1.35') -notcontains [string]$stable.version){throw "BAD_STABLE_VERSION:$($stable.version)"}
-$stableAgentPath=$(if([string]$stable.version -eq '1.1.35'){$agent35Path}elseif([string]$stable.version -eq '1.1.34'){$agent34Path}elseif([string]$stable.version -eq '1.1.33'){$agent33Path}else{$agent32Path})
+# Current stable may advance beyond historical D115 agents. Preserve historical assertions above,
+# then verify the active stable release generically by version path + exact repository blob SHA.
+$stableVersion=[string]$stable.version
+if($stableVersion -notmatch '^1\.1\.\d+$'){throw "BAD_STABLE_VERSION:$stableVersion"}
+$stableAgentPath=Join-Path $root ('local-agent/releases/'+$stableVersion+'/HomeDesignLocalAgent.ps1')
+if(-not(Test-Path -LiteralPath $stableAgentPath -PathType Leaf)){throw "STABLE_AGENT_RELEASE_MISSING:$stableVersion"}
+$tokens=$null;$errors=$null
+[void][System.Management.Automation.Language.Parser]::ParseFile($stableAgentPath,[ref]$tokens,[ref]$errors)
+if($errors.Count -gt 0){throw ("STABLE_AGENT_PARSE_FAIL:{0}" -f ($errors.Message -join '|'))}
 $stableSha=(& git hash-object -- $stableAgentPath).Trim();if($LASTEXITCODE -ne 0){throw 'STABLE_AGENT_HASH_FAILED'}
 if($stableSha -ne [string]$stable.gitBlobSha1){throw ("AGENT_STABLE_SHA_MISMATCH:{0}:{1}" -f $stableSha,[string]$stable.gitBlobSha1)}
-if([string]$stable.version -eq '1.1.35'){
+$stableText=Get-Content -LiteralPath $stableAgentPath -Raw -Encoding UTF8
+if($stableVersion -eq '1.1.54'){
+  foreach($needle in @('[string[]]$ArgList','AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P','PUSH_PULL_READBACK_PASS','DEPLOYMENT_INVARIANT_LOST','newProjectCreated=$false','oauthChanged=$false','newDeployment=$false','newTrigger=$false','browserLaunched=$false','queueTaskCreated=$false','creditSpend=$false')){
+    if(-not $stableText.Contains($needle)){throw "STABLE_AGENT154_MISSING:$needle"}
+  }
+}elseif($stableVersion -eq '1.1.35'){
   if($stableSha -ne 'e27b760b67933be05a5d6f1ac0af1afd6158b32b'){throw 'STABLE_AGENT135_SHA_MISMATCH'}
   foreach($needle in @('CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01','taskType=''LOCAL_POWERSHELL''','/run','/result?taskId=')){if(-not $agent35.Contains($needle)){throw "STABLE_AGENT135_MISSING:$needle"}}
-}elseif([string]$stable.version -eq '1.1.34' -and -not $agent34.Contains('ac4aae953fae2219d393de2307ef655b0988c9f4')){throw 'STABLE_AGENT134_HOST127_PIN_MISSING'}
-Write-Host ('HOST_RECOVERY_LINEAGE_AND_CONTENTOS_D115_AGENT135_PASS stable='+[string]$stable.version)
+}elseif($stableVersion -eq '1.1.34' -and -not $agent34.Contains('ac4aae953fae2219d393de2307ef655b0988c9f4')){throw 'STABLE_AGENT134_HOST127_PIN_MISSING'}
+Write-Host ('HOST_RECOVERY_LINEAGE_AND_CURRENT_STABLE_PASS stable='+$stableVersion)
