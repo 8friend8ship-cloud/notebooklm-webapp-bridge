@@ -20,7 +20,7 @@ function SaveReceipt($o){$json=$o|ConvertTo-Json -Depth 30;$json|Set-Content -Li
 function FreshReceipt([string]$Path,[datetime]$Since){try{return ((Test-Path -LiteralPath $Path -PathType Leaf) -and ((Get-Item -LiteralPath $Path).LastWriteTime -ge $Since.AddSeconds(-2)))}catch{return $false}}
 function RunDirectWatchdog([int]$TimeoutSeconds=$DirectWatchdogTimeoutSeconds){$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Watchdog+'"';$p=New-Object Diagnostics.Process;$p.StartInfo=$psi;[void]$p.Start();if(-not $p.WaitForExit($TimeoutSeconds*1000)){try{& taskkill.exe /PID $p.Id /T /F 2>$null|Out-Null}catch{};return 124};return [int]$p.ExitCode}
 
-$startedAt=Get-Date;$started=$startedAt.ToString('o');$errors=@();$runnerSha='';$watchdogSha='';$taskCreated=$false;$runKeySet=$false;$scheduledRunExit=$null;$immediateExit=$null;$immediateMode='';$triggerContract='LOGON+RESUME+5MIN';$scheduledEntryObserved=$false;$directWatchdogLaunched=$false;$multipleInstancesPolicy='IgnoreNew'
+$startedAt=Get-Date;$started=$startedAt.ToString('o');$errors=@();$runnerSha='';$watchdogSha='';$taskCreated=$false;$runKeySet=$false;$scheduledRunExit=$null;$immediateExit=$null;$immediateMode='';$triggerContract='NONE';$scheduledEntryObserved=$false;$directWatchdogLaunched=$false;$multipleInstancesPolicy='IgnoreNew';$taskMode='NONE';$periodicTriggerReady=$false;$fullTriggerContractReady=$false
 try{$runnerSha=InstallVerified 'local-agent/bootstrap/HomeDesignAutoResume.ps1' $Runner}catch{$errors+=('RUNNER_INSTALL:'+ $_.Exception.Message)}
 try{$watchdogSha=InstallVerified 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$errors+=('WATCHDOG_INSTALL:'+ $_.Exception.Message)}
 
@@ -45,36 +45,38 @@ $xml=@"
 </Task>
 "@
 $tmpXml=Join-Path $env:TEMP 'HomeDesignAutomation-AutoResume-v3.xml'
-try{$xml|Set-Content -LiteralPath $tmpXml -Encoding Unicode;& schtasks.exe /Create /TN $taskName /XML $tmpXml /F | Out-Null;if($LASTEXITCODE-ne0){throw('SCHTASKS_CREATE_'+$LASTEXITCODE)};$taskCreated=$true}catch{$errors+=('SCHEDULED_TASK_CREATE:'+ $_.Exception.Message)}finally{Remove-Item $tmpXml -Force -ErrorAction SilentlyContinue}
+try{$xml|Set-Content -LiteralPath $tmpXml -Encoding Unicode;& schtasks.exe /Create /TN $taskName /XML $tmpXml /F | Out-Null;if($LASTEXITCODE-ne0){throw('SCHTASKS_CREATE_'+$LASTEXITCODE)};$taskCreated=$true;$taskMode='FULL_XML';$periodicTriggerReady=$true;$fullTriggerContractReady=$true;$triggerContract='LOGON+RESUME+5MIN'}catch{$errors+=('SCHEDULED_TASK_FULL_CREATE:'+ $_.Exception.Message)}finally{Remove-Item $tmpXml -Force -ErrorAction SilentlyContinue}
+
+# If the EventTrigger XML is blocked by local policy, preserve the same task name and
+# fall back to a 5-minute task. HKCU already provides logon recovery; StartWhenAvailable
+# is approximated by the next <=5 minute periodic run after resume. Do not claim full contract.
+if(-not$taskCreated){
+  try{
+    $tr='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"'
+    & schtasks.exe /Create /F /SC MINUTE /MO 5 /TN $taskName /TR $tr | Out-Null
+    if($LASTEXITCODE-ne0){throw('SCHTASKS_FALLBACK_CREATE_'+$LASTEXITCODE)}
+    $taskCreated=$true;$taskMode='FALLBACK_5MIN';$periodicTriggerReady=$true;$fullTriggerContractReady=$false;$triggerContract='HKCU_LOGON+5MIN_FALLBACK'
+  }catch{$errors+=('SCHEDULED_TASK_5MIN_FALLBACK:'+ $_.Exception.Message)}
+}
 
 $immediateAttemptStart=Get-Date
 if($taskCreated){try{& schtasks.exe /Run /TN $taskName | Out-Null;$scheduledRunExit=$LASTEXITCODE;if($scheduledRunExit-ne0){throw('SCHTASKS_RUN_'+$scheduledRunExit)}}catch{$errors+=('SCHEDULED_TASK_RUN:'+ $_.Exception.Message)}}
 
-if($taskCreated -and $scheduledRunExit-eq0){
-  $entryDeadline=(Get-Date).AddSeconds($ScheduledEntryWaitSeconds)
-  while((Get-Date)-lt$entryDeadline){if(FreshReceipt $WatchdogEntry $immediateAttemptStart){$scheduledEntryObserved=$true;break};Start-Sleep -Seconds 1}
-}
+if($taskCreated -and $scheduledRunExit-eq0){$entryDeadline=(Get-Date).AddSeconds($ScheduledEntryWaitSeconds);while((Get-Date)-lt$entryDeadline){if(FreshReceipt $WatchdogEntry $immediateAttemptStart){$scheduledEntryObserved=$true;break};Start-Sleep -Seconds 1}}
 
 if($scheduledEntryObserved){
-  $immediateMode='SCHEDULED_WATCHDOG_RECEIPT'
-  $doneDeadline=(Get-Date).AddSeconds($DirectWatchdogTimeoutSeconds)
-  while((Get-Date)-lt$doneDeadline){
-    if(FreshReceipt $WatchdogReceipt $immediateAttemptStart){
-      try{$wr=Get-Content -LiteralPath $WatchdogReceipt -Raw -Encoding UTF8|ConvertFrom-Json;$immediateExit=[int]$wr.exitCode;if(-not[bool]$wr.ok -or $immediateExit-ne0){$errors+=('SCHEDULED_WATCHDOG_RECEIPT_EXIT_'+$immediateExit)};break}catch{$errors+=('SCHEDULED_WATCHDOG_RECEIPT_READ:'+ $_.Exception.Message);break}
-    }
-    Start-Sleep -Seconds 2
-  }
+  $immediateMode='SCHEDULED_WATCHDOG_RECEIPT';$doneDeadline=(Get-Date).AddSeconds($DirectWatchdogTimeoutSeconds)
+  while((Get-Date)-lt$doneDeadline){if(FreshReceipt $WatchdogReceipt $immediateAttemptStart){try{$wr=Get-Content -LiteralPath $WatchdogReceipt -Raw -Encoding UTF8|ConvertFrom-Json;$immediateExit=[int]$wr.exitCode;if(-not[bool]$wr.ok-or$immediateExit-ne0){$errors+=('SCHEDULED_WATCHDOG_RECEIPT_EXIT_'+$immediateExit)};break}catch{$errors+=('SCHEDULED_WATCHDOG_RECEIPT_READ:'+ $_.Exception.Message);break}};Start-Sleep -Seconds 2}
   if($immediateExit-eq$null){$immediateExit=124;$errors+='SCHEDULED_WATCHDOG_RECEIPT_TIMEOUT'}
 }elseif(Test-Path -LiteralPath $Watchdog -PathType Leaf){
-  $directWatchdogLaunched=$true;$immediateMode='DIRECT_WATCHDOG_FALLBACK_ONLY'
-  try{$immediateExit=RunDirectWatchdog $DirectWatchdogTimeoutSeconds;if($immediateExit-ne0){$errors+=('DIRECT_WATCHDOG_EXIT_'+$immediateExit)}}catch{$errors+=('DIRECT_WATCHDOG:'+ $_.Exception.Message);$immediateExit=3}
+  $directWatchdogLaunched=$true;$immediateMode='DIRECT_WATCHDOG_FALLBACK_ONLY';try{$immediateExit=RunDirectWatchdog $DirectWatchdogTimeoutSeconds;if($immediateExit-ne0){$errors+=('DIRECT_WATCHDOG_EXIT_'+$immediateExit)}}catch{$errors+=('DIRECT_WATCHDOG:'+ $_.Exception.Message);$immediateExit=3}
 }else{$errors+='WATCHDOG_FILE_MISSING_AFTER_INSTALL'}
 
-$persistenceReady=[bool]($taskCreated-or$runKeySet)
+$persistenceReady=[bool]($periodicTriggerReady -and ($taskCreated-or$runKeySet))
 $immediateStarted=[bool]($immediateExit-ne$null)
 $immediateVerified=[bool]($immediateExit-eq0)
-$ok=[bool]($runnerSha-and$watchdogSha-and$persistenceReady-and$immediateStarted-and$immediateVerified)
-$rec=[ordered]@{ok=$ok;action='INSTALL_AUTO_RESUME_V3';installerRevision='V3.4_IGNORE_NEW_SINGLE_EXECUTOR_TRIGGER_TIMEOUT_ALIGNED';startedAt=$started;completedAt=(Get-Date).ToString('o');runnerSha=$runnerSha;watchdogSha=$watchdogSha;scheduledTaskCreated=$taskCreated;scheduledRunExit=$scheduledRunExit;scheduledEntryObserved=$scheduledEntryObserved;scheduledEntryWaitSeconds=$ScheduledEntryWaitSeconds;scheduledExecutionLimitMinutes=$ScheduledExecutionLimitMinutes;multipleInstancesPolicy=$multipleInstancesPolicy;triggerContract=$triggerContract;triggerLogon=$true;triggerResume=$true;triggerIntervalMinutes=5;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;immediateMode=$immediateMode;directWatchdogLaunched=$directWatchdogLaunched;directWatchdogTimeoutSeconds=$DirectWatchdogTimeoutSeconds;directWatchdogExit=$immediateExit;immediateExecutionVerified=$immediateVerified;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;errors=$errors}
+$ok=[bool]($runnerSha-and$watchdogSha-and$periodicTriggerReady-and$persistenceReady-and$immediateStarted-and$immediateVerified)
+$rec=[ordered]@{ok=$ok;action='INSTALL_AUTO_RESUME_V3';installerRevision='V3.5_PERIODIC_REQUIRED_IGNORE_NEW_SINGLE_EXECUTOR';startedAt=$started;completedAt=(Get-Date).ToString('o');runnerSha=$runnerSha;watchdogSha=$watchdogSha;scheduledTaskCreated=$taskCreated;taskMode=$taskMode;scheduledRunExit=$scheduledRunExit;scheduledEntryObserved=$scheduledEntryObserved;scheduledEntryWaitSeconds=$ScheduledEntryWaitSeconds;scheduledExecutionLimitMinutes=$ScheduledExecutionLimitMinutes;multipleInstancesPolicy=$multipleInstancesPolicy;triggerContract=$triggerContract;fullTriggerContractReady=$fullTriggerContractReady;periodicTriggerReady=$periodicTriggerReady;triggerIntervalMinutes=5;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;immediateMode=$immediateMode;directWatchdogLaunched=$directWatchdogLaunched;directWatchdogTimeoutSeconds=$DirectWatchdogTimeoutSeconds;directWatchdogExit=$immediateExit;immediateExecutionVerified=$immediateVerified;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;errors=$errors}
 SaveReceipt $rec
 $rec|ConvertTo-Json -Depth 30 -Compress
 if($ok){exit 0}else{exit 2}
