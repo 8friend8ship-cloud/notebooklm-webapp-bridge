@@ -2,11 +2,10 @@ param([switch]$Loop)
 
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
+$Repo = '8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root = Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $AgentFile = Join-Path $Root 'HomeDesignLocalAgent.ps1'
 $StateFile = Join-Path $Root 'state.json'
-$AgentMetaUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/stable/agent.json'
-$AgentBaseUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/releases'
 $BootstrapLog = Join-Path $Root 'bootstrap.log'
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 
@@ -16,7 +15,19 @@ function GitBlobSha1([string]$Path) {
   [Buffer]::BlockCopy($header,0,$all,0,$header.Length); [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
   $sha = [Security.Cryptography.SHA1]::Create(); try { return (($sha.ComputeHash($all) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() }
 }
-function Bust([string]$Url,[string]$Tag){$sep=if($Url.Contains('?')){'&'}else{'?'};return $Url+$sep+'hdcb='+[Uri]::EscapeDataString($Tag)}
+function ApiContent([string]$Path){
+  $headers=@{'User-Agent'='HomeDesign-Local-Agent-Bootstrap';'Accept'='application/vnd.github+json'}
+  $url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  return Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec 30
+}
+function DecodeText($Response){
+  $raw=([string]$Response.content -replace '\s','')
+  return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($raw))
+}
+function WriteApiFile($Response,[string]$Path){
+  $bytes=[Convert]::FromBase64String(([string]$Response.content -replace '\s',''))
+  [IO.File]::WriteAllBytes($Path,$bytes)
+}
 function CurrentStateVersion {
   if(-not(Test-Path -LiteralPath $StateFile)){ return '' }
   try { return [string]((Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json).agentVersion) } catch { return '' }
@@ -55,22 +66,27 @@ try {
     $pollSeconds = 300
     $maxCycleSeconds = 900
     try {
-      $nonce=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString()
-      $meta = Invoke-RestMethod -Uri (Bust $AgentMetaUrl $nonce) -Method Get -TimeoutSec 30
+      $metaResp=ApiContent 'local-agent/stable/agent.json'
+      $meta=(DecodeText $metaResp)|ConvertFrom-Json
       if ($meta.pollSeconds) { $pollSeconds = [Math]::Max(60,[int]$meta.pollSeconds) }
       if ($meta.maxCycleSeconds) { $maxCycleSeconds = [Math]::Max(180,[Math]::Min(1800,[int]$meta.maxCycleSeconds)) }
 
       if ($meta.enabled) {
         $expected=([string]$meta.gitBlobSha1).ToLowerInvariant()
+        $releasePath='local-agent/releases/'+[string]$meta.version+'/HomeDesignLocalAgent.ps1'
+        $releaseResp=ApiContent $releasePath
+        $apiSha=([string]$releaseResp.sha).ToLowerInvariant()
+        if($apiSha -ne $expected){throw "Agent API blob mismatch: api=$apiSha expected=$expected"}
+
         $needsFile = -not (Test-Path -LiteralPath $AgentFile)
         if (-not $needsFile) { $needsFile = (GitBlobSha1 $AgentFile) -ne $expected }
         if ($needsFile) {
           $tmp = $AgentFile + '.download'
-          $url = Bust ("$AgentBaseUrl/$($meta.version)/HomeDesignLocalAgent.ps1") $expected
-          Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing -TimeoutSec 60
-          if ((GitBlobSha1 $tmp) -ne $expected) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue; throw 'Agent Git blob SHA1 mismatch.' }
+          WriteApiFile $releaseResp $tmp
+          $actual=GitBlobSha1 $tmp
+          if ($actual -ne $expected) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue; throw "Agent local Git blob SHA1 mismatch: actual=$actual expected=$expected" }
           Move-Item -LiteralPath $tmp -Destination $AgentFile -Force
-          BLog "Agent updated to $($meta.version) sha=$expected."
+          BLog "Agent updated via Contents API to $($meta.version) sha=$expected."
         }
 
         $stateVersion=CurrentStateVersion
