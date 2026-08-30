@@ -7,6 +7,8 @@ on:
       - 'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.1.92/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.1.93/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.94/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.95/HomeDesignLocalAgent.ps1'
       - 'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
 jobs:
   parse:
@@ -22,6 +24,8 @@ jobs:
             'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.1.92/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.1.93/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.1.94/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.1.95/HomeDesignLocalAgent.ps1',
             'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
           )
           $bad=$false
@@ -34,8 +38,8 @@ jobs:
               foreach($e in $errors){ Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message) }
             } else { Write-Host "PARSE_PASS $f" }
           }
-          $agent=Get-Content 'local-agent/releases/1.1.93/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
-          foreach($needle in @("includes('sources')","includes('chat')","includes('studio')","Replace('return`$z.result','return `$z.result')")){
-            if(-not $agent.Contains($needle)){ Write-Host ('MISSING_CONTRACT '+$needle); $bad=$true }
+          $diag=Get-Content 'local-agent/releases/1.1.95/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          foreach($needle in @('AGENT_1.1.95_NOTEBOOKLM_SOURCE_PANEL_READONLY','sourceLikeElements','checkboxCount','possibleSourceCountTokens','normalChromeTouched=$false','bridgeChanged=$false')){
+            if(-not $diag.Contains($needle)){ Write-Host ('MISSING_DIAG_CONTRACT '+$needle); $bad=$true }
           }
           if($bad){ exit 1 }
