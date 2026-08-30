@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.89",
-  "releasedAt": "2026-08-30T10:00:00+09:00",
-  "gitBlobSha1": "c9fe191f955fd4ebd533617c2e6b369aad965f64",
+  "version": "1.1.90",
+  "releasedAt": "2026-08-30T10:08:00+09:00",
+  "gitBlobSha1": "a1325df9487447d157e0f6bb21ae43e9965a880f",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Research-first NotebookLM workflow for the existing fresh notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Source panel Web/Drive research first (Fast Research default; Deep Research when complex), review/select/import relevant sources, require source count > 0, then fill the analyzed task prompt in Chat and submit, then Studio -> AI Audio Overview. Optional PDF/image/Drive/YouTube enrichment is part of the central template; web URLs are text-oriented and YouTube URLs contribute transcript context. No duplicate notebook, no Bridge0.2.39 change, no normal Chrome/OAuth/scope change."
+  "notes": "Exact ordered NotebookLM research workflow on existing fresh notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c: TITLE_SET -> SOURCE_TAB direct web Fast Research field (do not open Add Source first) -> import relevant sources and require source count > 0 -> CHAT prompt fill -> send arrow -> STUDIO -> AI Audio Overview -> artifact-specific instruction/settings when available -> generate arrow -> artifact ready. Add Source remains optional only for user-provided PDF/image/video/Drive/YouTube material. No duplicate notebook, no Bridge0.2.39 change, no normal Chrome/OAuth/scope change."
 }
