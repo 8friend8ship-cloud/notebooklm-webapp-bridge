@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.102",
-  "releasedAt": "2026-08-30T13:54:40+09:00",
-  "gitBlobSha1": "6c72fdde2c9c2a8e68734e2c9da32930d8456330",
+  "version": "1.1.103",
+  "releasedAt": "2026-08-30T14:21:23+09:00",
+  "gitBlobSha1": "d20ae3386c17b7d1e4ed2484e649207e802d68ea",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.102_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE_RESULT.json",
-  "notes": "Minimal retry of 1.1.101. Only fix is a single-quoted SOURCE_SKIP regex so PowerShell does not interpolate $result before regex matching. Same exact fresh notebook, existing 7 sources, same proven exact-order helper, same DirectCDPDownloadSyncedV3, same Drive output gate. Final ok=true only after real nonzero audio file download and Drive synced project copy with exact size+SHA256 match. Bridge0.2.39 unchanged; no new notebook or duplicate queue task."
+  "resultReceipt": "AGENT_1.1.103_EXACT_TAB_THEN_AUDIO_DRIVE_RESULT.json",
+  "notes": "Minimal recovery for 1.1.102 NO_NOTEBOOKLM_PAGE. Before delegating the unchanged 1.1.102 audio-to-Drive one-shot, restore only the dedicated CDP 9223 exact notebook page using the proven V5 pattern: exact page if present, otherwise Page.navigate on an existing dedicated page, Target.createTarget if no page exists, and dedicated Chrome start only if CDP itself is down. Delegate 1.1.102 is raw fetched and Git-blob SHA verified. Bridge0.2.39, notebook ID, 7 imported sources, normal Chrome, OAuth and scopes remain unchanged. Download policy remains legacy DirectCDPDownloadSyncedV3 primary; CaptureBridge/raw-byte mirror and Python raw watcher remain verification/fallback only. Final PASS still requires fresh real audio binary, stable nonzero bytes, Drive project copy, exact size/SHA256 and Drive API file ID/MIME/size/readback."
 }
