@@ -12,6 +12,7 @@ on:
       - 'local-agent/releases/1.1.95/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.1.96/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.1.97/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.98/HomeDesignLocalAgent.ps1'
       - 'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
 jobs:
   parse:
@@ -32,6 +33,7 @@ jobs:
             'local-agent/releases/1.1.95/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.1.96/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.1.97/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.1.98/HomeDesignLocalAgent.ps1',
             'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
           )
           $bad=$false
@@ -48,4 +50,6 @@ jobs:
           foreach($needle in @('AGENT_1.1.96_FAST_RESEARCH_RESULTS_READONLY_BEFORE_IMPORT','8d1eda83-cfe3-4487-b2bc-266a5be3465c','Fast Research','importClicked=$false','chatSubmitted=$false','studioSelected=$false','generateClicked=$false','normalChromeTouched=$false','bridgeChanged=$false')){if(-not $diag96.Contains($needle)){Write-Host ('MISSING_DIAG96_CONTRACT '+$needle);$bad=$true}}
           $diag97=Get-Content 'local-agent/releases/1.1.97/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
           foreach($needle in @('AGENT_1.1.97_FAST_RESEARCH_EDITOR_READONLY','editorControls','searchButtons','researchFilled=$false','researchSubmitted=$false','importClicked=$false','chatSubmitted=$false','studioSelected=$false','generateClicked=$false','normalChromeTouched=$false','bridgeChanged=$false')){if(-not $diag97.Contains($needle)){Write-Host ('MISSING_DIAG97_CONTRACT '+$needle);$bad=$true}}
+          $diag98=Get-Content 'local-agent/releases/1.1.98/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          foreach($needle in @('AGENT_1.1.98_FAST_RESEARCH_IMPORT_ONLY','8d1eda83-cfe3-4487-b2bc-266a5be3465c','FAST_RESEARCH_NOT_COMPLETE','IMPORT_BUTTON_NOT_UNIQUE','SOURCE_COUNT_ZERO_AFTER_IMPORT','sourceVerified','chatSubmitted=$false','studioSelected=$false','generateClicked=$false','normalChromeTouched=$false','bridgeChanged=$false')){if(-not $diag98.Contains($needle)){Write-Host ('MISSING_DIAG98_CONTRACT '+$needle);$bad=$true}}
           if($bad){exit 1}
