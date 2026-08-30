@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.111",
-  "releasedAt": "2026-08-30T18:39:10+09:00",
-  "gitBlobSha1": "9e9909f9457349b79e794543a65a134300b7a44b",
+  "version": "1.1.112",
+  "releasedAt": "2026-08-30T18:45:00+09:00",
+  "gitBlobSha1": "f6d67bf39b2491c86cc283bece8163e310446db5",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.111_IMPORT_CURRENT_SELECTED_RESEARCH_SOURCES_RESULT.json",
-  "notes": "Existing exact notebook and current selection view only. Click the currently enabled Import button exactly once for already selected Fast Research sources, then verify actual saved NotebookLM sources become >0. No new notebook/query/selection expansion, no Chat/Studio/generation/download, no normal Chrome, OAuth, scope, or Bridge changes."
+  "resultReceipt": "AGENT_1.1.112_CHAT_PROMPT_SUBMIT_ONCE_RESULT.json",
+  "notes": "Exact notebook only after actual saved sources were imported. Click Chat tab, fill the approved research-to-audio prompt in 질문하거나 창작하세요, click the send arrow once, and verify marker appears. Local success receipt prevents duplicate chat submission. No Studio/generation/download yet; no normal Chrome, OAuth, scope, or Bridge changes."
 }
