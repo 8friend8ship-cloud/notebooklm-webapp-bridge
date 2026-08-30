@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.86",
-  "releasedAt": "2026-08-30T09:12:00+09:00",
-  "gitBlobSha1": "597c75ad4c9182bf0b5f2c34a7ef8d847f67c50f",
+  "version": "1.1.87",
+  "releasedAt": "2026-08-30T09:17:00+09:00",
+  "gitBlobSha1": "fa47942e46ee797643c5dc56e83c8868aa2ab47a",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Exact source-only bind to the physically verified fresh NotebookLM ID 8d1eda83-cfe3-4487-b2bc-266a5be3465c found by read-only CDP inventory and matching the user's screenshot. It navigates CDP 9223 to that exact existing notebook, adds the canonical full SOURCE_TEXT through Sources > Add source > Paste text, verifies source >0, fills the Audio Overview instruction in Chat, and selects Studio. It never creates a notebook and does not change Bridge0.2.39, normal Chrome, OAuth or scopes."
+  "notes": "Minimal runtime fix for Agent1.1.86 PAGE_CONNECT failure. Keeps exact fresh notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c and V5 source-binding logic unchanged; only suppresses PowerShell method output and returns one typed ClientWebSocket instead of System.Object[]. No notebook creation, Bridge0.2.39 change, normal Chrome change, OAuth or scope change."
 }
