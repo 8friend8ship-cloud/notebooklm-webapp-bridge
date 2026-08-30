@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.107",
-  "releasedAt": "2026-08-30T14:56:10+09:00",
-  "gitBlobSha1": "6dbe528343293bb13e791baba8995210df23bea4",
+  "version": "1.1.109",
+  "releasedAt": "2026-08-30T18:29:00+09:00",
+  "gitBlobSha1": "872e2a09b3c13a54d3fe39d1a5491b6ffbf7ebf9",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.107_FAST_RESEARCH_VIEW_SELECTION_READONLY_RESULT.json",
-  "notes": "Read-only continuation after 1.1.106 clicked Import but actual saved sources stayed zero. Existing exact notebook only. Open Sources and Fast Research View, inspect checkbox/option selection state and Import enabled/disabled state. No source selection, no Import, no Chat, Studio, generation, download, new notebook, normal Chrome, OAuth, scope, or Bridge changes."
+  "resultReceipt": "AGENT_1.1.109_FAST_RESEARCH_SELECT_IMPORT_VERIFY_RESULT.json",
+  "notes": "Existing exact notebook only. Wait until Fast Research completed UI is visible, open View, select visible research source controls if needed, click Import once, and verify actual saved NotebookLM source count becomes >0. No new notebook, no new research query, no Chat/Studio/generation/download, no normal Chrome, OAuth, scope, or Bridge changes."
 }
