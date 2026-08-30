@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.116",
-  "releasedAt": "2026-08-30T23:26:44+09:00",
-  "gitBlobSha1": "284dcedfe43cc757fba46c9e7a34fe7f275521aa",
+  "version": "1.1.118",
+  "releasedAt": "2026-08-30T23:54:00+09:00",
+  "gitBlobSha1": "304eca09b08719cd562b8ea3211e12000ea7b22c",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.116_DOM_CHAT_STUDIO_AUDIO_START_RESULT.json",
-  "notes": "Exact existing notebook only. Reuse 1.1.112 native DOM value setter plus InputEvent/change to activate exact aria=submit, but verify with new unique Chat marker CHAT_AUDIO_RUN_20260830_2322 plus editor clear. Then Studio > Audio Overview > optional Customize instruction > exact Generate and stop after generation start. No new notebook/source, no Bridge/OAuth/scope/normal Chrome changes. Download remains separate: legacy/CDP primary; Python raw verifier/fallback."
+  "resultReceipt": "AGENT_1.1.118_TRUSTED_CHAT_SUBMIT_RESULT.json",
+  "notes": "Exact existing notebook only. Do not add sources or create notebook. Clear chat editor, fill target prompt, pulse trusted CDP key events and fallback trusted char fill to activate exact aria=submit, click only when enabled, and verify unique marker in chat. No Studio or download in this step. Bridge0.2.39/OAuth/scope/normal Chrome unchanged."
 }
