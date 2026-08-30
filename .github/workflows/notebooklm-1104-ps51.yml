@@ -1,0 +1,22 @@
+name: NotebookLM 1.1.104 PS51 Parse
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1104-ps51.yml'
+      - 'local-agent/releases/1.1.104/HomeDesignLocalAgent.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and readonly contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.104/HomeDesignLocalAgent.ps1'
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+          if($errors.Count){foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)};exit 1}
+          $s=Get-Content $f -Raw -Encoding UTF8
+          foreach($n in @('AGENT_1.1.104_CHAT_STUDIO_DOM_READONLY','matchedControls','editors','clicked=$false','submitted=$false','generated=$false','normalChromeTouched=$false','bridgeChanged=$false','8d1eda83-cfe3-4487-b2bc-266a5be3465c')){if(-not $s.Contains($n)){Write-Host ('MISSING '+$n);exit 1}}
+          Write-Host 'READONLY_PARSE_CONTRACT_PASS_1.1.104'
