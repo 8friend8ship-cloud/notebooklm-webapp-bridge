@@ -1,0 +1,22 @@
+name: NotebookLM 1.1.106 PS51 Parse
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1106-ps51.yml'
+      - 'local-agent/releases/1.1.106/HomeDesignLocalAgent.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.106/HomeDesignLocalAgent.ps1'
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+          if($errors.Count){foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)};exit 1}
+          $s=Get-Content $f -Raw -Encoding UTF8
+          foreach($n in @('AGENT_1.1.106_FAST_RESEARCH_IMPORT_VISIBLE_ELEMENT','closest(''button,[role=button],nb-button,a'')','actualSourceVerified','ACTUAL_SAVED_SOURCE_ZERO_AFTER_VISIBLE_IMPORT','normalChromeTouched=$false','chatSubmitted=$false','downloadClicked=$false')){if(-not $s.Contains($n)){Write-Host ('MISSING '+$n);exit 1}}
+          Write-Host 'PARSE_AND_CONTRACT_PASS_1.1.106'
