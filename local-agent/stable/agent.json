@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.109",
-  "releasedAt": "2026-08-30T18:29:00+09:00",
-  "gitBlobSha1": "872e2a09b3c13a54d3fe39d1a5491b6ffbf7ebf9",
+  "version": "1.1.110",
+  "releasedAt": "2026-08-30T18:33:20+09:00",
+  "gitBlobSha1": "8fe290d9b6ce908f53b576024779f93861f247ff",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.109_FAST_RESEARCH_SELECT_IMPORT_VERIFY_RESULT.json",
-  "notes": "Existing exact notebook only. Wait until Fast Research completed UI is visible, open View, select visible research source controls if needed, click Import once, and verify actual saved NotebookLM source count becomes >0. No new notebook, no new research query, no Chat/Studio/generation/download, no normal Chrome, OAuth, scope, or Bridge changes."
+  "resultReceipt": "AGENT_1.1.110_SOURCE_RESEARCH_STATE_READONLY_RESULT.json",
+  "notes": "Read-only exact notebook source/research UI snapshot after 1.1.109 found prior Fast Research result state no longer ready. Captures source tab body, controls, editors, saved-source signals, Fast Research/import/view visibility only. No source mutation, no query, no Chat/Studio/generation/download, no normal Chrome, OAuth, scope, or Bridge changes."
 }
