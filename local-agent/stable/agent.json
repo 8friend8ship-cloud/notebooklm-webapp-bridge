@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.118",
-  "releasedAt": "2026-08-30T23:54:00+09:00",
-  "gitBlobSha1": "304eca09b08719cd562b8ea3211e12000ea7b22c",
+  "version": "1.1.119",
+  "releasedAt": "2026-08-30T23:59:20+09:00",
+  "gitBlobSha1": "8486e857cae833d230dce46d3e1b1c7fb8dca1ff",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.118_TRUSTED_CHAT_SUBMIT_RESULT.json",
-  "notes": "Exact existing notebook only. Do not add sources or create notebook. Clear chat editor, fill target prompt, pulse trusted CDP key events and fallback trusted char fill to activate exact aria=submit, click only when enabled, and verify unique marker in chat. No Studio or download in this step. Bridge0.2.39/OAuth/scope/normal Chrome unchanged."
+  "resultReceipt": "AGENT_1.1.119_TRUSTED_CHAT_SUBMIT_RESULT.json",
+  "notes": "Minimal repair of 1.1.118 only: restore over-escaped NotebookLM Korean unicode selectors to the same form proven in 1.1.116, then execute the same trusted chat-submit test. Exact existing notebook only; no new notebook/source/Studio/download; Bridge0.2.39/OAuth/scope/normal Chrome unchanged."
 }
