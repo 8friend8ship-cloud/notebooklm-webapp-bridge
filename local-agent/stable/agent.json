@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.113",
-  "releasedAt": "2026-08-30T21:22:40+09:00",
-  "gitBlobSha1": "3d245e007d22fec02c59c1517e04a766f30faa65",
+  "version": "1.1.114",
+  "releasedAt": "2026-08-30T21:27:00+09:00",
+  "gitBlobSha1": "d304d6d86a2c86e93e9c2739f78dd5d4ae4fa231",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.113_CHAT_PROMPT_BASE64_FIX_WRAPPER_RESULT.json",
-  "notes": "Same minimal 1.1.113 chat-submit lane, corrected stable blob pointer to the CI-passed prompt payload containing marker NLM_FRESH_ALL_20260829_1915. Reuse exact notebook and imported research sources. No new notebook/source import, Studio/generation/download, normal Chrome, OAuth, scope, or Bridge changes."
+  "resultReceipt": "AGENT_1.1.114_CHAT_SEND_CONTROL_CHROME_READONLY_RESULT.json",
+  "notes": "Read-only exact notebook diagnostic after 1.1.113 filled the Chat editor but clicked a wrong close control. Capture the editor-adjacent button aria/title/icon/coordinates plus dedicated Chrome executable/version and CDP browser/protocol. No clicks, no prompt edits, no Studio/generation/download, no normal Chrome/OAuth/scope/Bridge changes."
 }
