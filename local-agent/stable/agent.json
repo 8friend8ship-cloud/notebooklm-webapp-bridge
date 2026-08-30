@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.101",
-  "releasedAt": "2026-08-30T13:57:00+09:00",
-  "gitBlobSha1": "e9b1242991ec061f3a537c45513d480e888d8749",
+  "version": "1.1.102",
+  "releasedAt": "2026-08-30T13:54:40+09:00",
+  "gitBlobSha1": "6c72fdde2c9c2a8e68734e2c9da32930d8456330",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.101_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE_RESULT.json",
-  "notes": "Exact fresh notebook only. Reuse the proven exact-order NotebookLM helper with the already-verified 7 sources, skip re-research/import, execute Chat -> Studio -> Audio Overview -> Generate, require artifact readiness, then reuse DirectCDPDownloadSyncedV3 with exact notebook URL and copy the real nonzero downloaded file into the Google Drive Desktop synced NOTEBOOKLM_FACTORY/03_OUTPUT_AUDIO_VIDEO_SLIDES/project folder. Final ok=true only after destination size and SHA256 equal the downloaded original. Bridge0.2.39 unchanged; no new notebook, no duplicate queue task, no normal Chrome/OAuth/scope change."
+  "resultReceipt": "AGENT_1.1.102_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE_RESULT.json",
+  "notes": "Minimal retry of 1.1.101. Only fix is a single-quoted SOURCE_SKIP regex so PowerShell does not interpolate $result before regex matching. Same exact fresh notebook, existing 7 sources, same proven exact-order helper, same DirectCDPDownloadSyncedV3, same Drive output gate. Final ok=true only after real nonzero audio file download and Drive synced project copy with exact size+SHA256 match. Bridge0.2.39 unchanged; no new notebook or duplicate queue task."
 }
