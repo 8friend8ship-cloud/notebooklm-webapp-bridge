@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.99",
-  "releasedAt": "2026-08-30T12:37:00+09:00",
-  "gitBlobSha1": "cc5884de3083d3d73810a4740fa08dc5bc996fcf",
+  "version": "1.1.100",
+  "releasedAt": "2026-08-30T12:43:00+09:00",
+  "gitBlobSha1": "f86750e4a03cb2e57e1a9ca09c58dcf0849f6db5",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.99_WAKE_EXISTING_NOTEBOOKLM_AUTO_POLL_ONCE_RESULT.json",
-  "notes": "Wake-only minimal delta after exact fresh notebook source import reached 7 stored sources. Connect to the already running dedicated Bridge0.2.39 service worker on CDP 9223 and dispatch its existing RUN_AUTO_POLL message once. Do not create/modify queue tasks, do not change runner/generation/download code, do not touch normal Chrome/OAuth/scope. Canonical row430 AUDIO_OVERVIEW remains the sole READY artifact task; background.js performs existing listTasks→claimTask→RUN_NOTEBOOK_TASK path."
+  "resultReceipt": "AGENT_1.1.100_RUN_EXISTING_AUTO_POLL_DIAGNOSTIC_ONCE_RESULT.json",
+  "notes": "Minimal recovery after 1.1.99 proved the dedicated Bridge0.2.39 service worker was asleep/not listed. Execute the already-existing hash-pinned DiagnoseNotebookLMAutoPoll.ps1 exactly once. That script restarts only the dedicated HomeDesignAutomationV7 Chrome with the existing extension and inspects the worker; worker-load invokes the existing background auto poll. A local sentinel prevents repeated restarts. No queue duplication, no generator/download code changes, no normal Chrome/OAuth/scope changes. Canonical row430 AUDIO_OVERVIEW remains the sole READY artifact task."
 }
