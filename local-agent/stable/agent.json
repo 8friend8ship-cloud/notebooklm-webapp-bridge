@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.106",
-  "releasedAt": "2026-08-30T14:46:20+09:00",
-  "gitBlobSha1": "0d714f85cbd7bfffed851a06c070c5f01a82feae",
+  "version": "1.1.107",
+  "releasedAt": "2026-08-30T14:56:10+09:00",
+  "gitBlobSha1": "6dbe528343293bb13e791baba8995210df23bea4",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.106_FAST_RESEARCH_IMPORT_VISIBLE_ELEMENT_RESULT.json",
-  "notes": "Minimal continuation from 1.1.105. Existing exact notebook only. Fast Research is already complete but actual saved sources are zero. Find visible import text on any element, click only its nearest clickable ancestor, then require actual saved-source evidence >0. No Chat, Studio, generation, download, new notebook, normal Chrome, OAuth, scope, or Bridge changes."
+  "resultReceipt": "AGENT_1.1.107_FAST_RESEARCH_VIEW_SELECTION_READONLY_RESULT.json",
+  "notes": "Read-only continuation after 1.1.106 clicked Import but actual saved sources stayed zero. Existing exact notebook only. Open Sources and Fast Research View, inspect checkbox/option selection state and Import enabled/disabled state. No source selection, no Import, no Chat, Studio, generation, download, new notebook, normal Chrome, OAuth, scope, or Bridge changes."
 }
