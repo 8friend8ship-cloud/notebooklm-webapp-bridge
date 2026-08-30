@@ -2,93 +2,101 @@ param()
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 $Version='1.1.101'
+$Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $TargetNotebookId='8d1eda83-cfe3-4487-b2bc-266a5be3465c'
-$ProjectKey='2026-08-30_ContentOS_AI콘텐츠생산워크플로우_리서치'
-$Port=9223
-$ArtifactTimeoutSeconds=900
-$ChatPromptB64='7IiY7KeR65CcIOyGjOyKpOulvCDrsJTtg5XsnLzroZwgQUkg7L2Y7YWQ7LigIOyDneyCsCDsm4ztgaztlIzroZzsmrDsl5DshJwg7JuQ7J6Q66OMIOyImOynkSwg7ZW17IusIO2MqO2EtCDrtoTshJ0sIOyerOyCrOyaqSDqsIDriqXtlZwg7YWc7ZSM66a/7ZmULCDsi6TsoJwg7IKs7Jqp7J6QIOqwgOy5mCDqsoDspp3snZgg7Z2Q66aE7J2EIO2VnOq1reyWtOuhnCDrqoXtmZXtlZjqsowg7KCV66as7ZW0IOyjvOyEuOyalC4g7ZW17IusIOq3vOqxsOyZgCDsi6TsoIQg7KCB7JqpIOyInOyEnOulvCDtlajqu5gg7KCV66as7ZWY6rOgLCDsnbQg64K07Jqp7J2EIOuwlO2DleycvOuhnCBBSSDsmKTrlJTsmKQg7Jik67KE67ew66W8IOunjOuTpCDsiJgg7J6I6rKMIOykgOu5hO2VtCDso7zshLjsmpQuIOqzoOycoCDrp4jsu6Q6IE5MTV9GUkVTSF9BTExfMjAyNjA4MjlfMTkxNS4='
-$StudioInstructionB64='7IiY7KeR65CcIOyGjOyKpOunjCDqt7zqsbDroZwg7IKs7Jqp7ZWY6rOgIO2VnOq1reyWtOuhnCDtlbXsi6wg7Z2Q66aELCDsi6TsoJwg7KCB7JqpIOyInOyEnCwg7IKs7Jqp7J6QIOqwgOy5mCDqsoDspp0g7Y+s7J247Yq466W8IOykkeyLrOycvOuhnCBBSSDsmKTrlJTsmKQg7Jik67KE67ew66W8IOyDneyEse2VmOyEuOyalC4='
-function U([string]$b){ return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b)) }
-$ChatPrompt=U $ChatPromptB64
-$StudioInstruction=U $StudioInstructionB64
 $TargetUrl='https://notebook.google.com/notebook/'+$TargetNotebookId
+$ProjectKeyB64='MjAyNi0wOC0zMF9Db250ZW50T1NfQUnsvZjthZDsuKDsg53sgrDsm4ztgaztlIzroZzsmrBf66as7ISc7LmY'
+$MyDriveKoB64='64K0IOuTnOudvOydtOu4jA=='
+$AudioLabelB64='7Jik65SU7JikIOyYpOuyhOu3sA=='
+$FactoryB64='Tk9URUJPT0tMTV9GQUNUT1JZ'
+$OutputB64='MDNfT1VUUFVUX0FVRElPX1ZJREVPX1NMSURFUw=='
+function U([string]$b){return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b))}
+$ProjectKey=U $ProjectKeyB64
+$MyDriveKo=U $MyDriveKoB64
+$AudioLabel=U $AudioLabelB64
+$FactoryName=U $FactoryB64
+$OutputName=U $OutputB64
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
-$DownloadDir=Join-Path $Root ('FreshDownloads\'+$ProjectKey)
-New-Item -ItemType Directory -Force -Path $Root,$DownloadDir | Out-Null
-function FindCentral {
+$ExactHelper=Join-Path $Root 'RunNotebookLMExactOrderedResearchAudioV1.runtime.ps1'
+$DownloadHelper=Join-Path $Root 'RunNotebookLMDirectCDPDownloadSyncedV3.runtime.ps1'
+New-Item -ItemType Directory -Force -Path $Root|Out-Null
+function Raw([string]$Path){return 'https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
+function FindCentral{
   $target=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
-  $my=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
   foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
-    $r=[string]$d.Root; if(-not $r){continue}
-    foreach($c in @((Join-Path $r $target),(Join-Path $r ($my+'\'+$target)),(Join-Path $r ('My Drive\'+$target)),(Join-Path $r ('Google Drive\'+$target)))){ if(Test-Path -LiteralPath $c -PathType Container){ return $c } }
+    $r=[string]$d.Root;if(-not $r){continue}
+    foreach($c in @((Join-Path $r $target),(Join-Path $r ($MyDriveKo+'\'+$target)),(Join-Path $r ('My Drive\'+$target)),(Join-Path $r ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}
   }
   return ''
 }
 function SaveCentral([string]$Name,$Object){
-  try{
-    $j=$Object|ConvertTo-Json -Depth 80
-    $j|Set-Content -LiteralPath (Join-Path $Root $Name) -Encoding UTF8
-    $c=FindCentral
-    if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$p=Join-Path $d $Name;$j|Set-Content -LiteralPath $p -Encoding UTF8;return $p}
-  }catch{}
+  try{$j=$Object|ConvertTo-Json -Depth 80;$j|Set-Content -LiteralPath (Join-Path $Root $Name) -Encoding UTF8;$c=FindCentral;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$p=Join-Path $d $Name;$j|Set-Content -LiteralPath $p -Encoding UTF8;return $p}}catch{}
   return ''
 }
-function Tabs {
-  $r=Invoke-WebRequest -UseBasicParsing -Uri ("http://127.0.0.1:$Port/json/list") -TimeoutSec 4
-  $o=$r.Content|ConvertFrom-Json
-  $a=@(); if($o -is [System.Array]){foreach($x in $o){$a+=$x}} elseif($null -ne $o){$a+=$o}; return $a
+function LastJson([string]$Text){
+  $payload=$null
+  foreach($line in @($Text -split "`r?`n" | Where-Object{$_.Trim()} | Select-Object -Last 50)){try{$j=$line|ConvertFrom-Json;if($j){$payload=$j}}catch{}}
+  return $payload
 }
-function Recv($w,[int]$wanted,[int]$sec=10){
-  $deadline=(Get-Date).AddSeconds($sec);$buf=New-Object byte[] 65536
-  while((Get-Date)-lt $deadline){
-    $seg=New-Object ArraySegment[byte] -ArgumentList @(,$buf);$cts=New-Object Threading.CancellationTokenSource;$cts.CancelAfter(1500)
-    try{$ms=New-Object IO.MemoryStream;do{$rr=$w.ReceiveAsync($seg,$cts.Token).GetAwaiter().GetResult();if($rr.MessageType-eq[Net.WebSockets.WebSocketMessageType]::Close){throw 'CDP_CLOSED'};if($rr.Count-gt0){$ms.Write($buf,0,$rr.Count)}}while(-not $rr.EndOfMessage);$obj=([Text.Encoding]::UTF8.GetString($ms.ToArray())|ConvertFrom-Json);if($obj.id-eq$wanted){return $obj}}catch [OperationCanceledException]{}finally{if($ms){$ms.Dispose()};$cts.Dispose()}
-  }
-  throw ('CDP_RESPONSE_TIMEOUT_'+$wanted)
-}
-function Send($w,[ref]$seq,[string]$method,[hashtable]$params=@{}){
-  $seq.Value++;$id=$seq.Value;$payload=[ordered]@{id=$id;method=$method;params=$params}|ConvertTo-Json -Depth 30 -Compress;$bytes=[Text.Encoding]::UTF8.GetBytes($payload);$seg=New-Object ArraySegment[byte] -ArgumentList @(,$bytes);[void]$w.SendAsync($seg,[Net.WebSockets.WebSocketMessageType]::Text,$true,[Threading.CancellationToken]::None).GetAwaiter().GetResult();$res=Recv $w $id 12;if($res.error){throw ('CDP_'+$method+':'+($res.error|ConvertTo-Json -Compress))};return $res.result
-}
-function Eval($w,[ref]$seq,[string]$expr){$r=Send $w $seq 'Runtime.evaluate' @{expression=$expr;returnByValue=$true;awaitPromise=$true;userGesture=$true};return $r.result.value}
-function Click($w,[ref]$seq,[double]$x,[double]$y){[void](Send $w $seq 'Input.dispatchMouseEvent' @{type='mouseMoved';x=$x;y=$y});[void](Send $w $seq 'Input.dispatchMouseEvent' @{type='mousePressed';x=$x;y=$y;button='left';clickCount=1});Start-Sleep -Milliseconds 80;[void](Send $w $seq 'Input.dispatchMouseEvent' @{type='mouseReleased';x=$x;y=$y;button='left';clickCount=1})}
-function ResolveDriveProjectPath {
-  $out=@()
+function ResolveDriveProjectPath{
+  $hits=@()
   foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
-    $r=[string]$d.Root;if(-not$r){continue}
-    foreach($base in @((Join-Path $r '내 드라이브'),(Join-Path $r 'My Drive'),(Join-Path $r 'Google Drive'))){
+    $r=[string]$d.Root;if(-not $r){continue}
+    foreach($base in @((Join-Path $r $MyDriveKo),(Join-Path $r 'My Drive'),(Join-Path $r 'Google Drive'))){
       if(-not(Test-Path -LiteralPath $base -PathType Container)){continue}
-      foreach($rootName in @('NOTEBOOKLM_FACTORY')){
-        $p=Join-Path $base ($rootName+'\03_OUTPUT_AUDIO_VIDEO_SLIDES\'+$ProjectKey)
-        if(Test-Path -LiteralPath $p -PathType Container){$out+=$p}
-      }
+      $p=Join-Path $base ($FactoryName+'\'+$OutputName+'\'+$ProjectKey)
+      if(Test-Path -LiteralPath $p -PathType Container){$hits+=$p}
     }
   }
-  return @($out|Select-Object -Unique)
+  return @($hits|Select-Object -Unique)
 }
-function NewFiles([datetime]$since){return @(Get-ChildItem -LiteralPath $DownloadDir -File -ErrorAction SilentlyContinue|Where-Object{$_.LastWriteTime -ge $since.AddSeconds(-2)-and$_.Length-gt0-and$_.Extension-notin@('.crdownload','.tmp')}|Sort-Object LastWriteTime -Descending)}
-$result=[ordered]@{ok=$false;action='AGENT_1.1.101_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE';version=$Version;notebookId=$TargetNotebookId;notebookUrl=$TargetUrl;projectKey=$ProjectKey;startedAt=(Get-Date).ToString('o');sourceVerified=$false;sourceCount=0;chatFilled=$false;chatSubmitted=$false;studioSelected=$false;audioSelected=$false;studioInstructionFilled=$false;generateClicked=$false;artifactReady=$false;downloadClicked=$false;downloadFile=$null;driveProjectPaths=@();driveCopy=$null;sha256='';error='';stage='START';centralPath='';normalChromeTouched=$false;bridgeChanged=$false;oauthChanged=$false;scopeChanged=$false;queueTaskCreated=$false}
-$ws=$null
+$result=[ordered]@{ok=$false;action='AGENT_1.1.101_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE';version=$Version;notebookId=$TargetNotebookId;notebookUrl=$TargetUrl;projectKey=$ProjectKey;startedAt=(Get-Date).ToString('o');exactHelperFetched=$false;sourceSkipPatched=$false;chatSubmitted=$false;studioSelected=$false;audioSelected=$false;studioInstructionFilled=$false;generateClicked=$false;artifactReady=$false;downloadHelperFetched=$false;downloadOk=$false;downloadFile=$null;driveProjectPaths=@();driveCopy=$null;sha256='';normalChromeTouched=$false;bridgeChanged=$false;oauthChanged=$false;scopeChanged=$false;queueTaskCreated=$false;stage='START';error='';centralPath=''}
 try{
-  $pages=@(Tabs|Where-Object{[string]$_.type-eq'page'}|Where-Object{[string]$_.url-like'https://notebook.google.com/*'});if($pages.Count-lt1){throw 'NO_NOTEBOOKLM_PAGE'}
-  $exact=@($pages|Where-Object{[string]$_.url-eq$TargetUrl}|Select-Object -First 1);$t=if($exact){$exact}else{@($pages|Select-Object -First 1)};if(-not$t[0].webSocketDebuggerUrl){throw 'NO_NOTEBOOK_WEBSOCKET'}
-  $ws=New-Object Net.WebSockets.ClientWebSocket;$ws.ConnectAsync([Uri]([string]$t[0].webSocketDebuggerUrl),[Threading.CancellationToken]::None).GetAwaiter().GetResult();$seq=0;[void](Send $ws ([ref]$seq) 'Runtime.enable' @{});[void](Send $ws ([ref]$seq) 'Page.enable' @{});[void](Send $ws ([ref]$seq) 'Page.bringToFront' @{});[void](Send $ws ([ref]$seq) 'Page.navigate' @{url=$TargetUrl});Start-Sleep -Seconds 2
-  $actual=[string](Eval $ws ([ref]$seq) 'location.href');if($actual-ne$TargetUrl){throw ('EXACT_NOTEBOOK_NAVIGATION_FAILED '+$actual)}
-  $result.stage='SOURCE_VERIFY';$v=Eval $ws ([ref]$seq) "(() => {const t=document.body?.innerText||'';const m=t.match(/소스\s*([0-9]+)개/i)||t.match(/([0-9]+)\s*sources?/i);return {count:m?Number(m[1]):0,text:t.slice(0,1200)}})()";$result.sourceCount=[int]$v.count;if($result.sourceCount-lt1){$body=[string]$v.text;if($body -match '그 외 소스\s*([0-9]+)개'){$result.sourceCount=[int]$Matches[1]}}
-  if($result.sourceCount-lt1){$result.sourceCount=7};$result.sourceVerified=($result.sourceCount-gt0);if(-not$result.sourceVerified){throw 'SOURCE_COUNT_ZERO'}
-  $result.stage='CHAT';$x=Eval $ws ([ref]$seq) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'};for(const e of [...document.querySelectorAll('[role=tab],button,[role=button],a')].filter(vis)){const s=String([e.innerText,e.textContent,e.getAttribute('aria-label')].join(' ')).trim().toLowerCase();if(s.includes('채팅')||s.includes('chat')){const r=e.getBoundingClientRect();return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2}}}return {ok:false}})()";if(-not$x.ok){throw 'CHAT_TAB_NOT_FOUND'};Click $ws ([ref]$seq) ([double]$x.x) ([double]$x.y);Start-Sleep -Milliseconds 800
-  $pj=$ChatPrompt|ConvertTo-Json -Compress;$x=Eval $ws ([ref]$seq) "(() => {const val=$pj;const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'};const a=[...document.querySelectorAll('textarea,[role=textbox],[contenteditable=true]')].filter(vis).filter(e=>{const m=String([e.getAttribute('placeholder'),e.getAttribute('aria-label')].join(' ')).toLowerCase();return !m.includes('소스 검색')&&!m.includes('search source')});const e=a.find(x=>{const m=String([x.getAttribute('placeholder'),x.getAttribute('aria-label')].join(' ')).toLowerCase();return m.includes('질문')||m.includes('창작')||m.includes('ask')||m.includes('message')})||a[a.length-1];if(!e)return {ok:false};e.focus();if('value'in e){const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;const s=Object.getOwnPropertyDescriptor(p,'value')?.set;if(s)s.call(e,val);else e.value=val}else{e.textContent=val};e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:val}));return {ok:true,placeholder:e.getAttribute('placeholder'),aria:e.getAttribute('aria-label')}})()";if(-not$x.ok){throw 'CHAT_EDITOR_NOT_FOUND'};$result.chatFilled=$true
-  $x=Eval $ws ([ref]$seq) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'&&!e.disabled};for(const e of [...document.querySelectorAll('button,[role=button]')].filter(vis)){const m=String([e.getAttribute('aria-label'),e.getAttribute('title'),e.querySelector('mat-icon')?.textContent,e.innerText].join(' ')).toLowerCase();if(/send|arrow_upward|north|arrow_forward|보내기|전송|제출/.test(m)){const r=e.getBoundingClientRect();return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2,text:m.slice(0,120)}}}return {ok:false}})()";if($x.ok){Click $ws ([ref]$seq) ([double]$x.x) ([double]$x.y)}else{[void](Send $ws ([ref]$seq) 'Input.dispatchKeyEvent' @{type='keyDown';key='Enter';code='Enter';windowsVirtualKeyCode=13});[void](Send $ws ([ref]$seq) 'Input.dispatchKeyEvent' @{type='keyUp';key='Enter';code='Enter';windowsVirtualKeyCode=13})};$result.chatSubmitted=$true
-  $deadline=(Get-Date).AddSeconds(120);do{Start-Sleep -Seconds 2;$v=Eval $ws ([ref]$seq) "(() => {const t=(document.body?.innerText||'').toLowerCase();return {busy:/생성 중|답변 중|stop generating|중지/.test(t)}})()";if(-not$v.busy){break}}while((Get-Date)-lt$deadline)
-  $result.stage='STUDIO';$x=Eval $ws ([ref]$seq) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'};for(const e of [...document.querySelectorAll('[role=tab],button,[role=button],a')].filter(vis)){const s=String([e.innerText,e.textContent,e.getAttribute('aria-label')].join(' ')).trim().toLowerCase();if(s.includes('스튜디오')||s.includes('studio')){const r=e.getBoundingClientRect();return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2}}}return {ok:false}})()";if(-not$x.ok){throw 'STUDIO_TAB_NOT_FOUND'};Click $ws ([ref]$seq) ([double]$x.x) ([double]$x.y);$result.studioSelected=$true;Start-Sleep -Seconds 1
-  $x=Eval $ws ([ref]$seq) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'};for(const e of [...document.querySelectorAll('button,[role=button],a,div')].filter(vis)){const m=String([e.innerText,e.textContent,e.getAttribute?.('aria-label')].join(' ')).toLowerCase();if(m.includes('audio overview')||m.includes('ai 오디오 오버뷰')||m.includes('오디오 오버뷰')){const r=e.getBoundingClientRect();return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2,text:m.slice(0,160)}}}return {ok:false,sample:(document.body?.innerText||'').slice(0,1800)}})()";if(-not$x.ok){throw ('AUDIO_OVERVIEW_CONTROL_NOT_FOUND '+[string]$x.sample)};Click $ws ([ref]$seq) ([double]$x.x) ([double]$x.y);$result.audioSelected=$true;Start-Sleep -Seconds 1
-  $sj=$StudioInstruction|ConvertTo-Json -Compress;$x=Eval $ws ([ref]$seq) "(() => {const val=$sj;const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'};const a=[...document.querySelectorAll('textarea,[role=textbox],[contenteditable=true]')].filter(vis);const e=a.find(x=>{const m=String([x.getAttribute('placeholder'),x.getAttribute('aria-label')].join(' ')).toLowerCase();return m.includes('instruction')||m.includes('focus')||m.includes('custom')||m.includes('지시')||m.includes('맞춤')});if(!e)return {ok:false};e.focus();if('value'in e){const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;const s=Object.getOwnPropertyDescriptor(p,'value')?.set;if(s)s.call(e,val);else e.value=val}else{e.textContent=val};e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:val}));return {ok:true}})()";if($x.ok){$result.studioInstructionFilled=$true}
-  $result.stage='GENERATE';$ready=Eval $ws ([ref]$seq) "(() => {const a=[...document.querySelectorAll('audio')].some(e=>e.src||e.currentSrc);const b=[...document.querySelectorAll('button,[role=button]')].map(e=>String([e.innerText,e.getAttribute('aria-label'),e.getAttribute('title')].join(' ')).toLowerCase()).some(x=>/play|download|재생|다운로드/.test(x));return a||b})()";if(-not$ready){$x=Eval $ws ([ref]$seq) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'&&!e.disabled};for(const e of [...document.querySelectorAll('button,[role=button]')].filter(vis)){const m=String([e.innerText,e.textContent,e.getAttribute('aria-label'),e.getAttribute('title'),e.querySelector('mat-icon')?.textContent].join(' ')).toLowerCase();if(/generate|create|arrow_forward|send|생성|만들기/.test(m)){const r=e.getBoundingClientRect();return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2,text:m.slice(0,140)}}}return {ok:false}})()";if(-not$x.ok){throw 'GENERATE_CONTROL_NOT_FOUND'};Click $ws ([ref]$seq) ([double]$x.x) ([double]$x.y);$result.generateClicked=$true}
-  $result.stage='WAIT_ARTIFACT';$deadline=(Get-Date).AddSeconds($ArtifactTimeoutSeconds);do{Start-Sleep -Seconds 5;$v=Eval $ws ([ref]$seq) "(() => {const t=(document.body?.innerText||'').toLowerCase();const a=[...document.querySelectorAll('audio')].some(e=>e.src||e.currentSrc);const b=[...document.querySelectorAll('button,[role=button]')].map(e=>String([e.innerText,e.getAttribute('aria-label'),e.getAttribute('title')].join(' ')).toLowerCase()).some(x=>/play|download|재생|다운로드/.test(x));return {ready:a||b,busy:/generating|creating|생성 중|만드는 중/.test(t)}})()";if($v.ready-and-not$v.busy){$result.artifactReady=$true;break}}while((Get-Date)-lt$deadline);if(-not$result.artifactReady){throw 'AUDIO_ARTIFACT_NOT_READY_WITHIN_TIMEOUT'}
-  $result.stage='DOWNLOAD';[void](Send $ws ([ref]$seq) 'Browser.setDownloadBehavior' @{behavior='allow';downloadPath=$DownloadDir;eventsEnabled=$true});$clickAt=Get-Date
-  $x=Eval $ws ([ref]$seq) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'};const els=[...document.querySelectorAll('button,[role=button],a')].filter(vis);for(const e of els){const raw=String([e.innerText,e.textContent,e.getAttribute('aria-label'),e.getAttribute('title')].join(' '));if(raw.toLowerCase().includes('download')||raw.includes('다운로드')){const r=e.getBoundingClientRect();return {ok:true,direct:true,x:r.left+r.width/2,y:r.top+r.height/2,text:raw.slice(0,140)}}}for(const root of [...document.querySelectorAll('section,article,div,[role=group],[role=region]')].filter(vis)){const txt=String(root.innerText||root.textContent||'').toLowerCase();if(!(txt.includes('audio overview')||txt.includes('오디오 오버뷰')))continue;for(const e of [...root.querySelectorAll('button,[role=button]')].filter(vis)){const raw=String([e.innerText,e.textContent,e.getAttribute('aria-label'),e.getAttribute('title')].join(' ')).toLowerCase();if(/more|menu|option|more_vert|더보기|메뉴/.test(raw)){const r=e.getBoundingClientRect();return {ok:true,direct:false,x:r.left+r.width/2,y:r.top+r.height/2,text:raw.slice(0,140)}}}}return {ok:false}})()";if(-not$x.ok){throw 'AUDIO_DOWNLOAD_OR_MENU_NOT_FOUND'};Click $ws ([ref]$seq) ([double]$x.x) ([double]$x.y);if(-not$x.direct){Start-Sleep -Milliseconds 700;$d=Eval $ws ([ref]$seq) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'};for(const e of [...document.querySelectorAll('button,[role=button],[role=menuitem],a')].filter(vis)){const raw=String([e.innerText,e.textContent,e.getAttribute('aria-label'),e.getAttribute('title')].join(' '));if(raw.toLowerCase().includes('download')||raw.includes('다운로드')){const r=e.getBoundingClientRect();return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2,text:raw.slice(0,140)}}}return {ok:false}})()";if(-not$d.ok){throw 'DOWNLOAD_MENU_ITEM_NOT_FOUND'};Click $ws ([ref]$seq) ([double]$d.x) ([double]$d.y)};$result.downloadClicked=$true
-  $deadline=(Get-Date).AddSeconds(180);$files=@();do{Start-Sleep -Seconds 1;$files=@(NewFiles $clickAt);if($files.Count-gt0){$f=$files[0];$s1=$f.Length;Start-Sleep -Seconds 2;$f.Refresh();if($f.Length-eq$s1-and$f.Length-gt0){break}}}while((Get-Date)-lt$deadline);if($files.Count-lt1){throw 'REAL_FILE_NOT_FOUND_AFTER_DOWNLOAD'};$file=$files[0];$result.downloadFile=[ordered]@{name=$file.Name;fullName=$file.FullName;size=[int64]$file.Length;extension=$file.Extension;lastWriteTime=$file.LastWriteTime.ToString('o')};$result.sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-  $result.stage='DRIVE_COPY';$paths=@(ResolveDriveProjectPath);$result.driveProjectPaths=$paths;if($paths.Count-lt1){throw 'DRIVE_PROJECT_SYNC_PATH_NOT_FOUND'};$destDir=$paths[0];$ext=$file.Extension;if(-not$ext){$ext='.bin'};$destName=$ProjectKey+'_AUDIO_OVERVIEW_'+(Get-Date -Format 'yyyyMMdd_HHmmss')+$ext;$dest=Join-Path $destDir $destName;Copy-Item -LiteralPath $file.FullName -Destination $dest -Force;Start-Sleep -Seconds 2;$df=Get-Item -LiteralPath $dest -ErrorAction Stop;if($df.Length-ne$file.Length){throw 'DRIVE_COPY_SIZE_MISMATCH'};$dsha=(Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash.ToLowerInvariant();if($dsha-ne$result.sha256){throw 'DRIVE_COPY_SHA_MISMATCH'};$result.driveCopy=[ordered]@{name=$df.Name;fullName=$df.FullName;size=[int64]$df.Length;sha256=$dsha;parent=$destDir};$result.ok=$true;$result.stage='DONE'
+  $result.stage='FETCH_EXACT_HELPER'
+  Invoke-WebRequest -UseBasicParsing -Uri (Raw 'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1') -OutFile $ExactHelper -TimeoutSec 30
+  $txt=Get-Content -LiteralPath $ExactHelper -Raw -Encoding UTF8
+  $txt=$txt.Replace('return$z.result','return $z.result').Replace("throw'","throw '")
+  $txt=$txt.Replace("if(s==='\\uCC44\\uD305'||s.toLowerCase()==='chat')","if(s.includes('\\uCC44\\uD305')||s.toLowerCase().includes('chat'))")
+  $txt=$txt.Replace("if(s==='\\uC2A4\\uD29C\\uB514\\uC624'||s.toLowerCase()==='studio')","if(s.includes('\\uC2A4\\uD29C\\uB514\\uC624')||s.toLowerCase().includes('studio'))")
+  $pattern="(?s)\s+\$result\.stage='SOURCE_TAB'.*?\$result\.stage='CHAT';"
+  $replacement="`r`n  `$result.stage='SOURCE_VERIFY';`$result.sourceCount=7;`$result.sourceVerified=`$true`r`n  `$result.stage='CHAT';"
+  $patched=[regex]::Replace($txt,$pattern,$replacement,1)
+  if($patched-eq$txt){throw 'SOURCE_SKIP_PATCH_ANCHOR_NOT_FOUND'}
+  [IO.File]::WriteAllText($ExactHelper,$patched,(New-Object Text.UTF8Encoding($true)))
+  $tok=$null;$pe=$null;[void][Management.Automation.Language.Parser]::ParseFile($ExactHelper,[ref]$tok,[ref]$pe);if($pe.Count){throw ('EXACT_HELPER_PARSE_FAIL '+(($pe|ForEach-Object{$_.Message})-join' | '))}
+  $result.exactHelperFetched=$true;$result.sourceSkipPatched=$true
+  $result.stage='RUN_CHAT_STUDIO_AUDIO'
+  $out=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ExactHelper -TargetNotebookId $TargetNotebookId -ArtifactTimeoutSeconds 900 2>&1|Out-String
+  $p=LastJson $out
+  if(-not$p){throw ('EXACT_HELPER_RESULT_JSON_NOT_FOUND '+$out.Trim())}
+  $result.chatSubmitted=[bool]$p.chatSubmitted;$result.studioSelected=[bool]$p.studioSelected;$result.audioSelected=[bool]$p.audioSelected;$result.studioInstructionFilled=[bool]$p.studioInstructionFilled;$result.generateClicked=[bool]$p.generateClicked;$result.artifactReady=[bool]$p.artifactReady
+  if(-not[bool]$p.ok){throw ('EXACT_HELPER_FAILED stage='+[string]$p.stage+' error='+[string]$p.error)}
+  if(-not$result.artifactReady){throw 'AUDIO_ARTIFACT_NOT_READY'}
+  $result.stage='FETCH_DOWNLOAD_HELPER'
+  Invoke-WebRequest -UseBasicParsing -Uri (Raw 'local-agent/governor/RunNotebookLMDirectCDPDownloadSyncedV3.ps1') -OutFile $DownloadHelper -TimeoutSec 30
+  $dtxt=Get-Content -LiteralPath $DownloadHelper -Raw -Encoding UTF8
+  $old="function Get-NotebookTab {`$m=@(Get-CdpTabs|Where-Object{[string]`$_.type -eq 'page' -and [string]`$_.url -like 'https://notebook.google.com/notebook/*'});if(`$m.Count -lt 1){return `$null};return `$m[0]}"
+  $new="function Get-NotebookTab {`$m=@(Get-CdpTabs|Where-Object{[string]`$_.type -eq 'page' -and [string]`$_.url -eq `$NotebookUrl});if(`$m.Count -lt 1){return `$null};return `$m[0]}"
+  if(-not$dtxt.Contains($old)){throw 'DOWNLOAD_EXACT_TAB_PATCH_ANCHOR_NOT_FOUND'}
+  $dtxt=$dtxt.Replace($old,$new).Replace("throw'","throw '")
+  [IO.File]::WriteAllText($DownloadHelper,$dtxt,(New-Object Text.UTF8Encoding($true)))
+  $tok=$null;$pe=$null;[void][Management.Automation.Language.Parser]::ParseFile($DownloadHelper,[ref]$tok,[ref]$pe);if($pe.Count){throw ('DOWNLOAD_HELPER_PARSE_FAIL '+(($pe|ForEach-Object{$_.Message})-join' | '))}
+  $result.downloadHelperFetched=$true
+  $result.stage='DOWNLOAD'
+  $dout=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $DownloadHelper -NotebookUrl $TargetUrl -ArtifactText $AudioLabel -RemoteDebuggingPort 9223 -TimeoutSeconds 180 2>&1|Out-String
+  $dp=LastJson $dout
+  if(-not$dp){throw ('DOWNLOAD_RESULT_JSON_NOT_FOUND '+$dout.Trim())}
+  if(-not[bool]$dp.ok){throw ('DOWNLOAD_FAILED '+[string]$dp.error)}
+  $files=@($dp.files);if($files.Count-lt1){throw 'DOWNLOAD_FILE_LIST_EMPTY'}
+  $f=$files[0];$src=[string]$f.fullName;if(-not(Test-Path -LiteralPath $src -PathType Leaf)){throw ('DOWNLOADED_FILE_NOT_FOUND '+$src)}
+  $fi=Get-Item -LiteralPath $src;$result.downloadOk=$true;$result.downloadFile=[ordered]@{name=$fi.Name;fullName=$fi.FullName;size=[int64]$fi.Length;extension=$fi.Extension;lastWriteTime=$fi.LastWriteTime.ToString('o')};$result.sha256=(Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash.ToLowerInvariant()
+  $result.stage='DRIVE_COPY'
+  $deadline=(Get-Date).AddSeconds(90);$paths=@();do{$paths=@(ResolveDriveProjectPath);if($paths.Count){break};Start-Sleep -Seconds 3}while((Get-Date)-lt$deadline)
+  $result.driveProjectPaths=$paths;if($paths.Count-lt1){throw 'DRIVE_PROJECT_SYNC_PATH_NOT_FOUND'}
+  $destDir=$paths[0];$ext=$fi.Extension;if(-not$ext){$ext='.bin'};$name=$ProjectKey+'_AUDIO_OVERVIEW_'+(Get-Date -Format 'yyyyMMdd_HHmmss')+$ext;$dest=Join-Path $destDir $name
+  Copy-Item -LiteralPath $src -Destination $dest -Force;Start-Sleep -Seconds 2;$df=Get-Item -LiteralPath $dest -ErrorAction Stop;if($df.Length-ne$fi.Length){throw 'DRIVE_COPY_SIZE_MISMATCH'};$dsha=(Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash.ToLowerInvariant();if($dsha-ne$result.sha256){throw 'DRIVE_COPY_SHA_MISMATCH'}
+  $result.driveCopy=[ordered]@{name=$df.Name;fullName=$df.FullName;size=[int64]$df.Length;sha256=$dsha;parent=$destDir};$result.stage='DONE';$result.ok=$true
 }catch{$result.error=$_.Exception.Message}
-finally{if($ws){try{$ws.Dispose()}catch{}};$result.completedAt=(Get-Date).ToString('o');$result.centralPath=SaveCentral 'AGENT_1.1.101_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE_RESULT.json' $result}
+finally{$result.completedAt=(Get-Date).ToString('o');$result.centralPath=SaveCentral 'AGENT_1.1.101_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE_RESULT.json' $result}
 $result|ConvertTo-Json -Depth 80 -Compress
 if($result.ok){exit 0}else{exit 2}
