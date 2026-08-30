@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.100",
-  "releasedAt": "2026-08-30T12:43:00+09:00",
-  "gitBlobSha1": "f86750e4a03cb2e57e1a9ca09c58dcf0849f6db5",
+  "version": "1.1.101",
+  "releasedAt": "2026-08-30T13:57:00+09:00",
+  "gitBlobSha1": "e9b1242991ec061f3a537c45513d480e888d8749",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.100_RUN_EXISTING_AUTO_POLL_DIAGNOSTIC_ONCE_RESULT.json",
-  "notes": "Minimal recovery after 1.1.99 proved the dedicated Bridge0.2.39 service worker was asleep/not listed. Execute the already-existing hash-pinned DiagnoseNotebookLMAutoPoll.ps1 exactly once. That script restarts only the dedicated HomeDesignAutomationV7 Chrome with the existing extension and inspects the worker; worker-load invokes the existing background auto poll. A local sentinel prevents repeated restarts. No queue duplication, no generator/download code changes, no normal Chrome/OAuth/scope changes. Canonical row430 AUDIO_OVERVIEW remains the sole READY artifact task."
+  "resultReceipt": "AGENT_1.1.101_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE_RESULT.json",
+  "notes": "Exact fresh notebook only. Reuse the proven exact-order NotebookLM helper with the already-verified 7 sources, skip re-research/import, execute Chat -> Studio -> Audio Overview -> Generate, require artifact readiness, then reuse DirectCDPDownloadSyncedV3 with exact notebook URL and copy the real nonzero downloaded file into the Google Drive Desktop synced NOTEBOOKLM_FACTORY/03_OUTPUT_AUDIO_VIDEO_SLIDES/project folder. Final ok=true only after destination size and SHA256 equal the downloaded original. Bridge0.2.39 unchanged; no new notebook, no duplicate queue task, no normal Chrome/OAuth/scope change."
 }
