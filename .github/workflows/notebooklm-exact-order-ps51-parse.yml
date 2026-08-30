@@ -5,6 +5,7 @@ on:
       - '.github/workflows/notebooklm-exact-order-ps51-parse.yml'
       - 'local-agent/releases/1.1.90/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.92/HomeDesignLocalAgent.ps1'
       - 'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
 jobs:
   parse:
@@ -18,6 +19,7 @@ jobs:
           $files=@(
             'local-agent/releases/1.1.90/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.1.92/HomeDesignLocalAgent.ps1',
             'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
           )
           $bad=$false
@@ -30,7 +32,7 @@ jobs:
               foreach($e in $errors){ Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message) }
             } else { Write-Host "PARSE_PASS $f" }
           }
-          $agent=Get-Content 'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
-          if($agent -notlike "*`$old='return`$z.result'*"){ Write-Host 'MISSING_RETURN_PATCH_ANCHOR'; $bad=$true }
-          if($agent -notlike "*`$new='return `$z.result'*"){ Write-Host 'MISSING_RETURN_PATCH_REPLACEMENT'; $bad=$true }
+          $agent=Get-Content 'local-agent/releases/1.1.92/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          if($agent -notlike "*Replace('return`$z.result','return `$z.result')*"){ Write-Host 'MISSING_RETURN_RUNTIME_FIX'; $bad=$true }
+          if($agent -notlike '*Replace("throw''","throw ''")*'){ Write-Host 'MISSING_THROW_RUNTIME_FIX'; $bad=$true }
           if($bad){ exit 1 }
