@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.95",
-  "releasedAt": "2026-08-30T10:52:00+09:00",
-  "gitBlobSha1": "1a8e0151273a94083e9c52b1aa635729b17177aa",
+  "version": "1.1.96",
+  "releasedAt": "2026-08-30T12:05:00+09:00",
+  "gitBlobSha1": "2373c5b2dbc01e84fc36d07d9d9bb86dac7587bc",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.95_NOTEBOOKLM_SOURCE_PANEL_READONLY_RESULT.json",
-  "notes": "Read-only diagnostic on existing exact NotebookLM notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c after 1.1.94 reached SOURCE_VERIFY with SOURCE_COUNT_ZERO. Navigate exact notebook, open Sources tab only, capture visible source/research/import elements, checkbox state and body text. No new notebook, no research submit, no import click, no Chat/Studio/Generate, no Bridge0.2.39 change, no normal Chrome/OAuth/scope change."
+  "resultReceipt": "AGENT_1.1.96_FAST_RESEARCH_RESULTS_READONLY_RESULT.json",
+  "notes": "Minimal source-only diagnostic on existing exact NotebookLM notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Reuse the known research query, open Sources/Add source/Fast Research, submit search, and capture the exact post-search checkbox/import controls before any import click. Do not create a notebook. importClicked=false, Chat/Studio/Generate=false, Bridge0.2.39 unchanged, normal Chrome/OAuth/scope unchanged."
 }
