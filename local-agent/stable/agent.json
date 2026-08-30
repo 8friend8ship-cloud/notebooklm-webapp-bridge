@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.84",
-  "releasedAt": "2026-08-30T08:35:00+09:00",
-  "gitBlobSha1": "a7e95c650caea2ec0dc6cf996578b896c930599a",
+  "version": "1.1.85",
+  "releasedAt": "2026-08-30T09:08:00+09:00",
+  "gitBlobSha1": "7bef0dc07b88af913c761fc5255b9898c63ce6d1",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Source-only recovery for the already-created fresh NotebookLM tab. It never creates another notebook. It selects the existing non-historical notebook, opens Sources, Add source, Paste text, verifies source count/marker, optionally fills the Chat prompt, then selects Studio. The previously overwritten LAST_GOOD claim/start diagnostic was restored in commit c4bb0799c62308cb125db226ab5d2ec0387cbb4b. Bridge 0.2.39 generation/download, normal Chrome, OAuth and scopes remain unchanged."
+  "notes": "Read-only diagnostic after Agent1.1.84 proved CDP 9223 had no nonhistorical fresh notebook while the user's visible Test Chrome showed fresh notebooks. Inventory ports 9222-9230 and remote-debugging Chrome process command lines only; do not click, create, navigate, change Bridge0.2.39, OAuth, scopes, or normal Chrome."
 }
