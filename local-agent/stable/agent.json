@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "version": "1.1.113",
-  "releasedAt": "2026-08-30T21:18:00+09:00",
-  "gitBlobSha1": "a3796176dffffdbdf8739525b7fd2f1c5b54b38b",
+  "releasedAt": "2026-08-30T21:22:40+09:00",
+  "gitBlobSha1": "3d245e007d22fec02c59c1517e04a766f30faa65",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
   "resultReceipt": "AGENT_1.1.113_CHAT_PROMPT_BASE64_FIX_WRAPPER_RESULT.json",
-  "notes": "Minimal retry of the exact 1.1.112 chat-submit lane. Reuse the same notebook and imported research sources; only replace the corrupted PromptB64 with a CI-validated UTF-8 Base64 string, then run the existing 1.1.112 logic. No new notebook/source import, Studio/generation/download, normal Chrome, OAuth, scope, or Bridge changes."
+  "notes": "Same minimal 1.1.113 chat-submit lane, corrected stable blob pointer to the CI-passed prompt payload containing marker NLM_FRESH_ALL_20260829_1915. Reuse exact notebook and imported research sources. No new notebook/source import, Studio/generation/download, normal Chrome, OAuth, scope, or Bridge changes."
 }
