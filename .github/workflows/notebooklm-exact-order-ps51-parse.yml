@@ -4,6 +4,7 @@ on:
     paths:
       - '.github/workflows/notebooklm-exact-order-ps51-parse.yml'
       - 'local-agent/releases/1.1.90/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1'
       - 'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
 jobs:
   parse:
@@ -16,6 +17,7 @@ jobs:
           $ErrorActionPreference='Stop'
           $files=@(
             'local-agent/releases/1.1.90/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1',
             'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
           )
           $bad=$false
@@ -28,4 +30,7 @@ jobs:
               foreach($e in $errors){ Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message) }
             } else { Write-Host "PARSE_PASS $f" }
           }
+          $agent=Get-Content 'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          if($agent -notlike "*`$old='return`$z.result'*"){ Write-Host 'MISSING_RETURN_PATCH_ANCHOR'; $bad=$true }
+          if($agent -notlike "*`$new='return `$z.result'*"){ Write-Host 'MISSING_RETURN_PATCH_REPLACEMENT'; $bad=$true }
           if($bad){ exit 1 }
