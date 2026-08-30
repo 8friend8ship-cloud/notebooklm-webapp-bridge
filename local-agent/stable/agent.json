@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.115",
-  "releasedAt": "2026-08-30T23:18:01+09:00",
-  "gitBlobSha1": "883886e99c33b9abbc34986a8e5db34cefab125a",
+  "version": "1.1.116",
+  "releasedAt": "2026-08-30T23:26:44+09:00",
+  "gitBlobSha1": "284dcedfe43cc757fba46c9e7a34fe7f275521aa",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.115_NATIVE_CHAT_STUDIO_AUDIO_START_RESULT.json",
-  "notes": "Exact existing notebook only. Native CDP Input.insertText with unique Chat marker and exact aria=submit; verify marker plus editor clear; then Studio > Audio Overview > optional Customize instruction > exact Generate. Stops after generation start to avoid 330s one-shot timeout. No new notebook/source, no Bridge/OAuth/scope/normal Chrome changes. Download remains separate: proven legacy/CDP primary, Python raw verifier/fallback."
+  "resultReceipt": "AGENT_1.1.116_DOM_CHAT_STUDIO_AUDIO_START_RESULT.json",
+  "notes": "Exact existing notebook only. Reuse 1.1.112 native DOM value setter plus InputEvent/change to activate exact aria=submit, but verify with new unique Chat marker CHAT_AUDIO_RUN_20260830_2322 plus editor clear. Then Studio > Audio Overview > optional Customize instruction > exact Generate and stop after generation start. No new notebook/source, no Bridge/OAuth/scope/normal Chrome changes. Download remains separate: legacy/CDP primary; Python raw verifier/fallback."
 }
