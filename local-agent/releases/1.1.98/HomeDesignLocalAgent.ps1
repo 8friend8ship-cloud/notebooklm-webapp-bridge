@@ -123,16 +123,16 @@ try{
   Start-Sleep -Seconds 2
   $result.notebookUrl=[string](Eval $w ([ref]$q) 'location.href')
   if($result.notebookUrl -ne $TargetUrl){throw 'EXACT_NOTEBOOK_NAVIGATION_FAILED'}
-  $x=Eval $w ([ref]$q) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'};const txt=e=>String([e.innerText,e.textContent,e.getAttribute?.('aria-label')].join(' ')).replace(/\s+/g,' ').trim();const a=[...document.querySelectorAll('*')].filter(vis).filter(e=>{const s=txt(e).toLowerCase();return s==='\\uCD9C\\uCC98'||s==='sources'||s.includes('\\uCD9C\\uCC98')||s.includes('sources')}).sort((p,n)=>{const a=p.getBoundingClientRect(),b=n.getBoundingClientRect();return a.width*a.height-b.width*b.height});if(!a.length)return{ok:false};let e=a[0].closest('button,[role=button],[role=tab],a,nb-button,nb-tab')||a[0];const r=e.getBoundingClientRect();return{ok:true,x:r.left+r.width/2,y:r.top+r.height/2}})()"
+  $x=Eval $w ([ref]$q) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'};const txt=e=>String([e.innerText,e.textContent,e.getAttribute?.('aria-label')].join(' ')).replace(/\s+/g,' ').trim();const a=[...document.querySelectorAll('*')].filter(vis).filter(e=>{const s=txt(e).toLowerCase();return s==='\uCD9C\uCC98'||s==='sources'||s.includes('\uCD9C\uCC98')||s.includes('sources')}).sort((p,n)=>{const a=p.getBoundingClientRect(),b=n.getBoundingClientRect();return a.width*a.height-b.width*b.height});if(!a.length)return{ok:false};let e=a[0].closest('button,[role=button],[role=tab],a,nb-button,nb-tab')||a[0];const r=e.getBoundingClientRect();return{ok:true,x:r.left+r.width/2,y:r.top+r.height/2}})()"
   if(-not $x.ok){throw 'SOURCE_TAB_NOT_FOUND'}
   Click $w ([ref]$q) ([double]$x.x) ([double]$x.y)
   $result.sourceTabClicked=$true
   Start-Sleep -Seconds 1
-  $v=Eval $w ([ref]$q) "(() => {const t=document.body?.innerText||'';const m=t.match(/\\uC18C\\uC2A4\\s*([0-9]+)\\uAC1C/i)||t.match(/([0-9]+)\\s*sources?/i);return{body:t.slice(0,12000),count:m?Number(m[1]):0,complete:/Fast Research\\s*\\uC644\\uB8CC/i.test(t)}})()"
+  $v=Eval $w ([ref]$q) "(() => {const t=document.body?.innerText||'';const m=t.match(/\uC18C\uC2A4\s*([0-9]+)\uAC1C/i)||t.match(/([0-9]+)\s*sources?/i);return{body:t.slice(0,12000),count:m?Number(m[1]):0,complete:/Fast Research\s*\uC644\uB8CC/i.test(t)}})()"
   $result.sourceCountBefore=[int]$v.count
   $result.fastResearchComplete=[bool]$v.complete
   if(-not $result.fastResearchComplete){throw 'FAST_RESEARCH_NOT_COMPLETE'}
-  $x=Eval $w ([ref]$q) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'&&!e.disabled};const txt=e=>String([e.innerText,e.textContent,e.getAttribute?.('aria-label'),e.getAttribute?.('title')].join(' ')).replace(/\\s+/g,' ').trim();const a=[...document.querySelectorAll('button,[role=button],nb-button')].filter(vis).filter(e=>{const s=txt(e);return s==='\\uAC00\\uC838\\uC624\\uAE30'||s.includes('\\uAC00\\uC838\\uC624\\uAE30')||/^import$/i.test(s)});if(a.length!==1)return{ok:false,count:a.length,sample:a.map(e=>txt(e).slice(0,160)).slice(0,10)};const e=a[0];const r=e.getBoundingClientRect();return{ok:true,x:r.left+r.width/2,y:r.top+r.height/2,text:txt(e).slice(0,160)}})()"
+  $x=Eval $w ([ref]$q) "(() => {const vis=e=>{if(!(e instanceof HTMLElement))return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>2&&r.height>2&&s.display!=='none'&&s.visibility!=='hidden'&&!e.disabled};const txt=e=>String([e.innerText,e.textContent,e.getAttribute?.('aria-label'),e.getAttribute?.('title')].join(' ')).replace(/\s+/g,' ').trim();const a=[...document.querySelectorAll('button,[role=button],nb-button')].filter(vis).filter(e=>{const s=txt(e);return s==='\uAC00\uC838\uC624\uAE30'||s.includes('\uAC00\uC838\uC624\uAE30')||/^import$/i.test(s)});if(a.length!==1)return{ok:false,count:a.length,sample:a.map(e=>txt(e).slice(0,160)).slice(0,10)};const e=a[0];const r=e.getBoundingClientRect();return{ok:true,x:r.left+r.width/2,y:r.top+r.height/2,text:txt(e).slice(0,160)}})()"
   if(-not $x.ok){throw ('IMPORT_BUTTON_NOT_UNIQUE count='+[string]$x.count)}
   $result.importButtonFound=$true
   Click $w ([ref]$q) ([double]$x.x) ([double]$x.y)
@@ -140,7 +140,7 @@ try{
   $deadline=(Get-Date).AddSeconds(90)
   do{
     Start-Sleep -Seconds 2
-    $v=Eval $w ([ref]$q) "(() => {const t=document.body?.innerText||'';const m=t.match(/\\uC18C\\uC2A4\\s*([0-9]+)\\uAC1C/i)||t.match(/([0-9]+)\\s*sources?/i);return{count:m?Number(m[1]):0,body:t.slice(0,8000)}})()"
+    $v=Eval $w ([ref]$q) "(() => {const t=document.body?.innerText||'';const m=t.match(/\uC18C\uC2A4\s*([0-9]+)\uAC1C/i)||t.match(/([0-9]+)\s*sources?/i);return{count:m?Number(m[1]):0,body:t.slice(0,8000)}})()"
     $result.sourceCountAfter=[int]$v.count
     if($result.sourceCountAfter -gt 0){$result.sourceVerified=$true;break}
   }while((Get-Date) -lt $deadline)
