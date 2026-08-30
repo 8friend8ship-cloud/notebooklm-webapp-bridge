@@ -1,0 +1,22 @@
+name: NotebookLM 1.1.118 PS51
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1118-ps51.yml'
+      - 'local-agent/releases/1.1.118/HomeDesignLocalAgent.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.118/HomeDesignLocalAgent.ps1'
+          $t=$null;$e=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$t,[ref]$e)
+          if($e.Count){$e|ForEach-Object{Write-Host ($_.Extent.StartLineNumber.ToString()+':'+$_.Message)};exit 1}
+          $s=Get-Content $f -Raw -Encoding UTF8
+          foreach($n in @('AGENT_1.1.118_TRUSTED_CHAT_SUBMIT','Input.dispatchKeyEvent','TRUSTED_INPUT_DID_NOT_ENABLE_SUBMIT','CHAT_MARKER_NOT_VERIFIED','8d1eda83-cfe3-4487-b2bc-266a5be3465c')){if(-not$s.Contains($n)){throw ('MISSING '+$n)}}
+          Write-Host 'PASS_1.1.118'
