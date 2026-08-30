@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.91",
-  "releasedAt": "2026-08-30T10:27:00+09:00",
-  "gitBlobSha1": "dd0833cb29bc7d08fce73a236f55c7eed876f072",
+  "version": "1.1.92",
+  "releasedAt": "2026-08-30T10:32:00+09:00",
+  "gitBlobSha1": "4944b10c05c45331e6f0c4dc0ae0a2272be41cf8",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.91_EXACT_ORDER_RETURNFIX_RESULT.json",
-  "notes": "Minimal retry of the exact ordered NotebookLM research workflow on existing fresh notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Preserves helper V1 blob and Bridge0.2.39; patches only PowerShell runtime token return$z.result to return $z.result before execution. Exact order remains TITLE_SET -> SOURCE_TAB direct Web/Fast Research -> import sources -> source count >0 -> CHAT send -> STUDIO -> AI Audio Overview settings -> GENERATE -> artifact ready. No duplicate notebook, normal Chrome, OAuth or scope change."
+  "resultReceipt": "AGENT_1.1.92_EXACT_ORDER_KEYWORDFIX_RESULT.json",
+  "notes": "Minimal retry on existing exact notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Preserves helper V1 blob and Bridge0.2.39. Runtime-patches only PowerShell keyword spacing: return$z.result -> return $z.result and throw' -> throw '. Physical 1.1.91 already proved titleVerified=true. Next pass must advance beyond SOURCE_TAB into direct Web/Fast Research. No duplicate notebook, normal Chrome, OAuth or scope changes."
 }
