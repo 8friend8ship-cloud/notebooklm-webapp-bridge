@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.94",
-  "releasedAt": "2026-08-30T10:41:00+09:00",
-  "gitBlobSha1": "66d8be6cce3d39cc7d79e26114451b7db7cad436",
+  "version": "1.1.95",
+  "releasedAt": "2026-08-30T10:52:00+09:00",
+  "gitBlobSha1": "1a8e0151273a94083e9c52b1aa635729b17177aa",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.94_EXACT_ORDER_TABFIX_B64_RESULT.json",
-  "notes": "Exact notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Same Bridge0.2.39 and helper V1. Fixes tab selector patch transport only by decoding exact old/new Source Chat Studio comparison strings from base64, while retaining return/throw keyword spacing fixes. Title already physically verified. No duplicate notebook, normal Chrome, OAuth or scope changes."
+  "resultReceipt": "AGENT_1.1.95_NOTEBOOKLM_SOURCE_PANEL_READONLY_RESULT.json",
+  "notes": "Read-only diagnostic on existing exact NotebookLM notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c after 1.1.94 reached SOURCE_VERIFY with SOURCE_COUNT_ZERO. Navigate exact notebook, open Sources tab only, capture visible source/research/import elements, checkbox state and body text. No new notebook, no research submit, no import click, no Chat/Studio/Generate, no Bridge0.2.39 change, no normal Chrome/OAuth/scope change."
 }
