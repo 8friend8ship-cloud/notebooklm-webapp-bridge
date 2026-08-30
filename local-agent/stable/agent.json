@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.119",
-  "releasedAt": "2026-08-30T23:59:20+09:00",
-  "gitBlobSha1": "8486e857cae833d230dce46d3e1b1c7fb8dca1ff",
+  "version": "1.1.120",
+  "releasedAt": "2026-08-31T00:02:45+09:00",
+  "gitBlobSha1": "42c153e9fabfc774e2e52daf7ee66707e810ec0b",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.119_TRUSTED_CHAT_SUBMIT_RESULT.json",
-  "notes": "Minimal repair of 1.1.118 only: restore over-escaped NotebookLM Korean unicode selectors to the same form proven in 1.1.116, then execute the same trusted chat-submit test. Exact existing notebook only; no new notebook/source/Studio/download; Bridge0.2.39/OAuth/scope/normal Chrome unchanged."
+  "resultReceipt": "AGENT_1.1.120_SOURCE_RESEARCH_STATE_READONLY_RESULT.json",
+  "notes": "Read-only rerun of proven 1.1.110 source-state diagnostic against exact existing notebook. Inspect current source tab, saved-source signals, Fast Research/import/view state only. No source add/import click, no Chat/Studio/download, no normal Chrome/Bridge/OAuth/scope changes."
 }
