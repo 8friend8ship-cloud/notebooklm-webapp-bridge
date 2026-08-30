@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.104",
-  "releasedAt": "2026-08-30T14:28:20+09:00",
-  "gitBlobSha1": "e7d70929949c4e5c2f5dbc1dd2c8cd25ff095f49",
+  "version": "1.1.105",
+  "releasedAt": "2026-08-30T14:34:15+09:00",
+  "gitBlobSha1": "056fe6abf196cc1e5f68db80453fdb1fad3c6f49",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.104_CHAT_STUDIO_DOM_READONLY_RESULT.json",
-  "notes": "Read-only changed-condition diagnostic after 1.1.103 physically proved exactTabVerified=true but child failed CHAT_TAB_NOT_FOUND. Inspect only the exact fresh notebook DOM for visible Chat/Studio headings, buttons and editors. No clicks, no submit, no generation, no download, no source changes, no normal Chrome/OAuth/scope/Bridge changes. Use evidence to patch only the exact Chat selector, then return to the existing 1.1.103 + immutable 1.1.102 audio-to-Drive chain."
+  "resultReceipt": "AGENT_1.1.105_FAST_RESEARCH_IMPORT_ACTUAL_SOURCE_VERIFY_RESULT.json",
+  "notes": "Correct false positive from 1.1.98: '그 외 소스 7개' was Fast Research result count, not saved notebook sources. Current exact notebook read-only 1.1.104 proves source 0. This one-shot opens only the existing exact notebook Sources tab, reuses completed Fast Research results, clicks the unique Import/가져오기 once, and waits up to 120s for actual saved-source evidence: an exact '^소스 N개$' count >0 or real source-item DOM with the saved-source empty state gone. No Chat, Studio, generation, download, new notebook, normal Chrome, OAuth, scope, or Bridge changes."
 }
