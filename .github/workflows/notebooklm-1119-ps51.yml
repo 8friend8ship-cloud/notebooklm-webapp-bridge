@@ -1,0 +1,29 @@
+name: NotebookLM 1.1.119 PS51
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1119-ps51.yml'
+      - 'local-agent/releases/1.1.119/HomeDesignLocalAgent.ps1'
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse wrapper and simulate runtime repair
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.119/HomeDesignLocalAgent.ps1'
+          $t=$null;$e=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$t,[ref]$e)
+          if($e.Count){$e|ForEach-Object{Write-Host ($_.Extent.StartLineNumber.ToString()+':'+$_.Message)};exit 1}
+          $src=Get-Content 'local-agent/releases/1.1.118/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          $fixed=$src.Replace('1.1.118','1.1.119').Replace('\\u','\u')
+          if($fixed -eq $src){throw 'UNICODE_REPAIR_DID_NOT_CHANGE_SOURCE'}
+          foreach($want in @("s.includes('\uCC44\uD305')","==='\uC81C\uCD9C'")){if(-not $fixed.Contains($want)){throw ('MISSING_REPAIRED_SELECTOR '+$want)}}
+          $tmp=Join-Path $env:RUNNER_TEMP 'agent119.runtime.ps1'
+          [IO.File]::WriteAllText($tmp,$fixed,(New-Object Text.UTF8Encoding($true)))
+          $t2=$null;$e2=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile($tmp,[ref]$t2,[ref]$e2)
+          if($e2.Count){$e2|ForEach-Object{Write-Host ($_.Extent.StartLineNumber.ToString()+':'+$_.Message)};exit 1}
+          Write-Host 'PASS_1.1.119_SELECTOR_REPAIR'
