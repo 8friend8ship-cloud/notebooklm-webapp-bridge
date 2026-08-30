@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.114",
-  "releasedAt": "2026-08-30T21:27:00+09:00",
-  "gitBlobSha1": "d304d6d86a2c86e93e9c2739f78dd5d4ae4fa231",
+  "version": "1.1.115",
+  "releasedAt": "2026-08-30T23:18:01+09:00",
+  "gitBlobSha1": "883886e99c33b9abbc34986a8e5db34cefab125a",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.114_CHAT_SEND_CONTROL_CHROME_READONLY_RESULT.json",
-  "notes": "Read-only exact notebook diagnostic after 1.1.113 filled the Chat editor but clicked a wrong close control. Capture the editor-adjacent button aria/title/icon/coordinates plus dedicated Chrome executable/version and CDP browser/protocol. No clicks, no prompt edits, no Studio/generation/download, no normal Chrome/OAuth/scope/Bridge changes."
+  "resultReceipt": "AGENT_1.1.115_NATIVE_CHAT_STUDIO_AUDIO_START_RESULT.json",
+  "notes": "Exact existing notebook only. Native CDP Input.insertText with unique Chat marker and exact aria=submit; verify marker plus editor clear; then Studio > Audio Overview > optional Customize instruction > exact Generate. Stops after generation start to avoid 330s one-shot timeout. No new notebook/source, no Bridge/OAuth/scope/normal Chrome changes. Download remains separate: proven legacy/CDP primary, Python raw verifier/fallback."
 }
