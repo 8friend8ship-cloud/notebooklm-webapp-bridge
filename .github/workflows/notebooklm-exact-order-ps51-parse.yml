@@ -1,0 +1,31 @@
+name: NotebookLM Exact Order PS51 Parse
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-exact-order-ps51-parse.yml'
+      - 'local-agent/releases/1.1.90/HomeDesignLocalAgent.ps1'
+      - 'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $files=@(
+            'local-agent/releases/1.1.90/HomeDesignLocalAgent.ps1',
+            'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
+          )
+          $bad=$false
+          foreach($f in $files){
+            $tokens=$null; $errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+            if($errors.Count){
+              $bad=$true
+              Write-Host "PARSE_FAIL $f"
+              foreach($e in $errors){ Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message) }
+            } else { Write-Host "PARSE_PASS $f" }
+          }
+          if($bad){ exit 1 }
