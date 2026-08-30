@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.105",
-  "releasedAt": "2026-08-30T14:34:15+09:00",
-  "gitBlobSha1": "056fe6abf196cc1e5f68db80453fdb1fad3c6f49",
+  "version": "1.1.106",
+  "releasedAt": "2026-08-30T14:46:20+09:00",
+  "gitBlobSha1": "0d714f85cbd7bfffed851a06c070c5f01a82feae",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.105_FAST_RESEARCH_IMPORT_ACTUAL_SOURCE_VERIFY_RESULT.json",
-  "notes": "Correct false positive from 1.1.98: '그 외 소스 7개' was Fast Research result count, not saved notebook sources. Current exact notebook read-only 1.1.104 proves source 0. This one-shot opens only the existing exact notebook Sources tab, reuses completed Fast Research results, clicks the unique Import/가져오기 once, and waits up to 120s for actual saved-source evidence: an exact '^소스 N개$' count >0 or real source-item DOM with the saved-source empty state gone. No Chat, Studio, generation, download, new notebook, normal Chrome, OAuth, scope, or Bridge changes."
+  "resultReceipt": "AGENT_1.1.106_FAST_RESEARCH_IMPORT_VISIBLE_ELEMENT_RESULT.json",
+  "notes": "Minimal continuation from 1.1.105. Existing exact notebook only. Fast Research is already complete but actual saved sources are zero. Find visible import text on any element, click only its nearest clickable ancestor, then require actual saved-source evidence >0. No Chat, Studio, generation, download, new notebook, normal Chrome, OAuth, scope, or Bridge changes."
 }
