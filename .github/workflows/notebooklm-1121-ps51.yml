@@ -16,7 +16,16 @@ jobs:
           $f='local-agent/releases/1.1.121/HomeDesignLocalAgent.ps1'
           $t=$null;$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$t,[ref]$e);if($e.Count){exit 1}
           $src=Get-Content 'local-agent/releases/1.1.117/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          $src=$src.Replace('1.1.117','1.1.121')
           $anchor="[void](Send `$w ([ref]`$q) 'Runtime.enable' @{});[void](Send `$w ([ref]`$q) 'Page.bringToFront' @{})"
           if(-not$src.Contains($anchor)){throw 'MISSING_STUDIO_ANCHOR'}
-          foreach($want in @('RunNotebookLMDirectCDPDownloadSyncedV3.ps1','notebooklm_raw_download_capture.py','PYTHON_INDEPENDENT_VERIFY','DRIVE_COPY_PRIMARY','Get-FileHash','expected-media audio')){if(-not$src.Contains($want)){throw ('MISSING '+$want)}}
-          Write-Host 'PASS_1.1.121_DOWNLOAD_CHAIN'
+          $insert=@'
+;[void](Eval $w ([ref]$q) "(() => {for(const e of [...document.querySelectorAll('[role=tab]')]){const s=String(e.innerText||e.textContent||'').trim().toLowerCase();if(s==='studio'||s.includes('\uC2A4\uD29C\uB514\uC624')){e.click();return true}}return false})()")
+  Start-Sleep -Milliseconds 1000
+'@
+          $fixed=$src.Replace($anchor,$anchor+$insert)
+          if($fixed-eq$src){throw 'STUDIO_PATCH_DID_NOT_APPLY'}
+          foreach($want in @('RunNotebookLMDirectCDPDownloadSyncedV3.ps1','notebooklm_raw_download_capture.py','PYTHON_INDEPENDENT_VERIFY','DRIVE_COPY_PRIMARY','Get-FileHash','expected-media audio')){if(-not$fixed.Contains($want)){throw ('MISSING '+$want)}}
+          $tmp=Join-Path $env:RUNNER_TEMP 'agent121.runtime.ps1';[IO.File]::WriteAllText($tmp,$fixed,(New-Object Text.UTF8Encoding($true)))
+          $t2=$null;$e2=$null;[void][System.Management.Automation.Language.Parser]::ParseFile($tmp,[ref]$t2,[ref]$e2);if($e2.Count){$e2|ForEach-Object{Write-Host ($_.Extent.StartLineNumber.ToString()+':'+$_.Message)};exit 1}
+          Write-Host 'PASS_1.1.121_FULL_RUNTIME_PARSE'
