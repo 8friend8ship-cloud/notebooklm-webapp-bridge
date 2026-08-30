@@ -7,5 +7,7 @@
   "gitBlobSha1": "a1325df9487447d157e0f6bb21ae43e9965a880f",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Exact ordered NotebookLM research workflow on existing fresh notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c: TITLE_SET -> SOURCE_TAB direct web Fast Research field (do not open Add Source first) -> import relevant sources and require source count > 0 -> CHAT prompt fill -> send arrow -> STUDIO -> AI Audio Overview -> artifact-specific instruction/settings when available -> generate arrow -> artifact ready. Add Source remains optional only for user-provided PDF/image/video/Drive/YouTube material. No duplicate notebook, no Bridge0.2.39 change, no normal Chrome/OAuth/scope change."
+  "executionMode": "one_shot",
+  "resultReceipt": "AGENT_1.1.90_EXACT_ORDERED_NOTEBOOKLM_RESULT.json",
+  "notes": "Exact ordered NotebookLM research workflow on existing fresh notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c: TITLE_SET -> SOURCE_TAB direct web Fast Research field (do not open Add Source first) -> import relevant sources and require source count > 0 -> CHAT prompt fill -> send arrow -> STUDIO -> AI Audio Overview -> artifact-specific instruction/settings when available -> generate arrow -> artifact ready. Add Source remains optional only for user-provided PDF/image/video/Drive/YouTube material. one_shot means AutoResume must judge the direct agent exit/result receipt instead of waiting for state.json agentVersion to become 1.1.90. No duplicate notebook, no Bridge0.2.39 change, no normal Chrome/OAuth/scope change."
 }
