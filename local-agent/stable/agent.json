@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.90",
-  "releasedAt": "2026-08-30T10:08:00+09:00",
-  "gitBlobSha1": "a1325df9487447d157e0f6bb21ae43e9965a880f",
+  "version": "1.1.91",
+  "releasedAt": "2026-08-30T10:27:00+09:00",
+  "gitBlobSha1": "dd0833cb29bc7d08fce73a236f55c7eed876f072",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.90_EXACT_ORDERED_NOTEBOOKLM_RESULT.json",
-  "notes": "Exact ordered NotebookLM research workflow on existing fresh notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c: TITLE_SET -> SOURCE_TAB direct web Fast Research field (do not open Add Source first) -> import relevant sources and require source count > 0 -> CHAT prompt fill -> send arrow -> STUDIO -> AI Audio Overview -> artifact-specific instruction/settings when available -> generate arrow -> artifact ready. Add Source remains optional only for user-provided PDF/image/video/Drive/YouTube material. one_shot means AutoResume must judge the direct agent exit/result receipt instead of waiting for state.json agentVersion to become 1.1.90. No duplicate notebook, no Bridge0.2.39 change, no normal Chrome/OAuth/scope change."
+  "resultReceipt": "AGENT_1.1.91_EXACT_ORDER_RETURNFIX_RESULT.json",
+  "notes": "Minimal retry of the exact ordered NotebookLM research workflow on existing fresh notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Preserves helper V1 blob and Bridge0.2.39; patches only PowerShell runtime token return$z.result to return $z.result before execution. Exact order remains TITLE_SET -> SOURCE_TAB direct Web/Fast Research -> import sources -> source count >0 -> CHAT send -> STUDIO -> AI Audio Overview settings -> GENERATE -> artifact ready. No duplicate notebook, normal Chrome, OAuth or scope change."
 }
