@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.98",
-  "releasedAt": "2026-08-30T12:29:00+09:00",
-  "gitBlobSha1": "70a46ef3336719fa0114d6c73a271bcff32bdeba",
+  "version": "1.1.99",
+  "releasedAt": "2026-08-30T12:37:00+09:00",
+  "gitBlobSha1": "cc5884de3083d3d73810a4740fa08dc5bc996fcf",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.98_FAST_RESEARCH_IMPORT_ONLY_RESULT.json",
-  "notes": "Exact existing notebook only. 1.1.97 proved Fast Research complete with result list visible and a single 가져오기 action, while the query textarea is readonly/disabled. Pre-runtime JS unicode/regex escaping was corrected and PS5.1 CI rerun passed. Do not retype or resubmit research. Open Sources, require Fast Research complete, click exactly one visible enabled Import/가져오기 button, then verify source count changes from 0 to >0. No new notebook, no Chat/Studio/Generate, Bridge0.2.39 unchanged, normal Chrome/OAuth/scope unchanged."
+  "resultReceipt": "AGENT_1.1.99_WAKE_EXISTING_NOTEBOOKLM_AUTO_POLL_ONCE_RESULT.json",
+  "notes": "Wake-only minimal delta after exact fresh notebook source import reached 7 stored sources. Connect to the already running dedicated Bridge0.2.39 service worker on CDP 9223 and dispatch its existing RUN_AUTO_POLL message once. Do not create/modify queue tasks, do not change runner/generation/download code, do not touch normal Chrome/OAuth/scope. Canonical row430 AUDIO_OVERVIEW remains the sole READY artifact task; background.js performs existing listTasks→claimTask→RUN_NOTEBOOK_TASK path."
 }
