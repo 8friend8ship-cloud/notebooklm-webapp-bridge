@@ -15,6 +15,7 @@ on:
       - 'local-agent/releases/1.1.98/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.1.99/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.1.100/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.101/HomeDesignLocalAgent.ps1'
       - 'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
 jobs:
   parse:
@@ -38,6 +39,7 @@ jobs:
             'local-agent/releases/1.1.98/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.1.99/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.1.100/HomeDesignLocalAgent.ps1',
+            'local-agent/releases/1.1.101/HomeDesignLocalAgent.ps1',
             'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
           )
           $bad=$false
@@ -60,4 +62,6 @@ jobs:
           foreach($needle in @('AGENT_1.1.99_WAKE_EXISTING_NOTEBOOKLM_AUTO_POLL_ONCE','RUN_AUTO_POLL','nlmManualAutoPollWakeV1','queueTaskCreated=$false','bridgeChanged=$false','normalChromeTouched=$false','0.2.39')){if(-not $diag99.Contains($needle)){Write-Host ('MISSING_DIAG99_CONTRACT '+$needle);$bad=$true}}
           $diag100=Get-Content 'local-agent/releases/1.1.100/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
           foreach($needle in @('AGENT_1.1.100_RUN_EXISTING_AUTO_POLL_DIAGNOSTIC_ONCE','DiagnoseNotebookLMAutoPoll.ps1','AGENT_1.1.100_WAKE_ONCE.done','d035e37d8093a07737a7e7ada16e36e5959c4d9d','serviceWorkerFound','bridgeVersion','queueTaskCreated=$false','normalChromeTouched=$false','bridgeChanged=$false')){if(-not $diag100.Contains($needle)){Write-Host ('MISSING_DIAG100_CONTRACT '+$needle);$bad=$true}}
+          $diag101=Get-Content 'local-agent/releases/1.1.101/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          foreach($needle in @('AGENT_1.1.101_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE','8d1eda83-cfe3-4487-b2bc-266a5be3465c','03_OUTPUT_AUDIO_VIDEO_SLIDES','sourceVerified','chatSubmitted','studioSelected','audioSelected','artifactReady','downloadClicked','driveCopy','Get-FileHash','normalChromeTouched=$false','bridgeChanged=$false')){if(-not $diag101.Contains($needle)){Write-Host ('MISSING_DIAG101_CONTRACT '+$needle);$bad=$true}}
           if($bad){exit 1}
