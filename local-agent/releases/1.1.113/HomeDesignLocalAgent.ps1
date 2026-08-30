@@ -13,7 +13,13 @@ function SaveCentral([string]$Name,$Object){try{$j=$Object|ConvertTo-Json -Depth
 $result=[ordered]@{ok=$false;action='AGENT_1.1.113_CHAT_PROMPT_BASE64_FIX_WRAPPER';version=$Version;startedAt=(Get-Date).ToString('o');innerFetched=$false;base64Patched=$false;innerParsed=$false;innerExit=$null;chatSubmitted=$false;innerResult=$null;normalChromeTouched=$false;bridgeChanged=$false;oauthChanged=$false;scopeChanged=$false;stage='START';error=''}
 try{
  $result.stage='FETCH_INNER';$u='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/releases/1.1.112/HomeDesignLocalAgent.ps1?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $Inner -TimeoutSec 30;$result.innerFetched=$true
- $s=Get-Content -LiteralPath $Inner -Raw -Encoding UTF8;$patched=[regex]::Replace($s,"(?m)^\$PromptB64='[^']*'",("`$PromptB64='"+$ValidPromptB64+"'"),1);if($patched-eq$s){throw 'PROMPT_B64_PATCH_ANCHOR_NOT_FOUND'};[IO.File]::WriteAllText($Inner,$patched,(New-Object Text.UTF8Encoding($true)));$result.base64Patched=$true
+ $s=Get-Content -LiteralPath $Inner -Raw -Encoding UTF8
+ $pattern='(?m)^\$PromptB64=''[^'']*''\s*$'
+ $replacement='$PromptB64='''+$ValidPromptB64+''''
+ $patched=[regex]::Replace($s,$pattern,$replacement,1)
+ if($patched-eq$s){throw 'PROMPT_B64_PATCH_ANCHOR_NOT_FOUND'}
+ [void][Convert]::FromBase64String($ValidPromptB64)
+ [IO.File]::WriteAllText($Inner,$patched,(New-Object Text.UTF8Encoding($true)));$result.base64Patched=$true
  $tok=$null;$pe=$null;[void][Management.Automation.Language.Parser]::ParseFile($Inner,[ref]$tok,[ref]$pe);if($pe.Count){throw ('INNER_PARSE_FAIL '+(($pe|ForEach-Object{$_.Message})-join' | '))};$result.innerParsed=$true
  $out=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Inner 2>&1|Out-String;$result.innerExit=[int]$LASTEXITCODE
  if(Test-Path -LiteralPath $InnerResult){$ir=Get-Content -LiteralPath $InnerResult -Raw -Encoding UTF8|ConvertFrom-Json;$result.innerResult=$ir;$result.chatSubmitted=[bool]$ir.chatSubmitted;$result.ok=([bool]$ir.ok -and $result.chatSubmitted -and $result.innerExit-eq0)}else{throw ('INNER_RESULT_NOT_FOUND '+$out.Trim())}
