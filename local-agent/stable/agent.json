@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.83",
-  "releasedAt": "2026-08-30T08:18:55+09:00",
-  "gitBlobSha1": "286f9e393185ebcfb6bc9120f6b409518bd53cbf",
+  "version": "1.1.84",
+  "releasedAt": "2026-08-30T08:35:00+09:00",
+  "gitBlobSha1": "a7e95c650caea2ec0dc6cf996578b896c930599a",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Minimal retry of the exact same fresh NotebookLM V3 helper after Agent 1.1.82 failed before dispatch on GitHub Contents API HTTP 403. Reuses a locally verified helper when present or downloads from raw.githubusercontent.com and verifies the exact Git blob SHA before execution. Canonical row450 remains held to prevent duplicate notebook creation. Bridge 0.2.39 generation/download LAST_GOOD and normal Chrome/OAuth/scopes remain unchanged."
+  "notes": "Source-only recovery for the already-created fresh NotebookLM tab. It never creates another notebook. It selects the existing non-historical notebook, opens Sources, Add source, Paste text, verifies source count/marker, optionally fills the Chat prompt, then selects Studio. The previously overwritten LAST_GOOD claim/start diagnostic was restored in commit c4bb0799c62308cb125db226ab5d2ec0387cbb4b. Bridge 0.2.39 generation/download, normal Chrome, OAuth and scopes remain unchanged."
 }
