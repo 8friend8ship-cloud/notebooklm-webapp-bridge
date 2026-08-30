@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - '.github/workflows/notebooklm-exact-order-ps51-parse.yml'
+      - 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
       - 'local-agent/releases/1.1.90/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1'
       - 'local-agent/releases/1.1.92/HomeDesignLocalAgent.ps1'
@@ -20,6 +21,7 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $files=@(
+            'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1',
             'local-agent/releases/1.1.90/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.1.91/HomeDesignLocalAgent.ps1',
             'local-agent/releases/1.1.92/HomeDesignLocalAgent.ps1',
@@ -32,14 +34,10 @@ jobs:
           foreach($f in $files){
             $tokens=$null; $errors=$null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
-            if($errors.Count){
-              $bad=$true
-              Write-Host "PARSE_FAIL $f"
-              foreach($e in $errors){ Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message) }
-            } else { Write-Host "PARSE_PASS $f" }
+            if($errors.Count){$bad=$true;Write-Host "PARSE_FAIL $f";foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)}}else{Write-Host "PARSE_PASS $f"}
           }
+          $resume=Get-Content 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' -Raw -Encoding UTF8
+          foreach($needle in @('RESUME_ONE_SHOT_FETCH_FALLBACK_V2_20260830','RAW_VERIFIED','AUTO_RESUME_FETCH_PATH_LATEST.json','Start-Process powershell.exe','DIRECT_AGENT.stderr.log')){if(-not $resume.Contains($needle)){Write-Host ('MISSING_RESUME_CONTRACT '+$needle);$bad=$true}}
           $diag=Get-Content 'local-agent/releases/1.1.95/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
-          foreach($needle in @('AGENT_1.1.95_NOTEBOOKLM_SOURCE_PANEL_READONLY','sourceLikeElements','checkboxCount','possibleSourceCountTokens','normalChromeTouched=$false','bridgeChanged=$false')){
-            if(-not $diag.Contains($needle)){ Write-Host ('MISSING_DIAG_CONTRACT '+$needle); $bad=$true }
-          }
-          if($bad){ exit 1 }
+          foreach($needle in @('AGENT_1.1.95_NOTEBOOKLM_SOURCE_PANEL_READONLY','sourceLikeElements','checkboxCount','possibleSourceCountTokens','normalChromeTouched=$false','bridgeChanged=$false')){if(-not $diag.Contains($needle)){Write-Host ('MISSING_DIAG_CONTRACT '+$needle);$bad=$true}}
+          if($bad){exit 1}
