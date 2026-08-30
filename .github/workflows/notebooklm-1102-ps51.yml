@@ -4,12 +4,13 @@ on:
     paths:
       - '.github/workflows/notebooklm-1102-ps51.yml'
       - 'local-agent/releases/1.1.102/HomeDesignLocalAgent.ps1'
+      - 'local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
 jobs:
   parse:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Parse and contract
+      - name: Parse contract and source-skip patch
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
@@ -19,4 +20,16 @@ jobs:
           if($errors.Count){foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)};exit 1}
           $s=Get-Content $f -Raw -Encoding UTF8
           foreach($n in @('AGENT_1.1.102_CHAT_STUDIO_AUDIO_DOWNLOAD_DRIVE','SOURCE_SKIP_PATCH_ANCHOR_NOT_FOUND','sourceSkipPatched','artifactReady','downloadOk','driveCopy','Get-FileHash','8d1eda83-cfe3-4487-b2bc-266a5be3465c')){if(-not $s.Contains($n)){Write-Host ('MISSING '+$n);exit 1}}
-          Write-Host 'PARSE_AND_CONTRACT_PASS_1.1.102'
+          $helper='local-agent/diagnostics/RunNotebookLMExactOrderedResearchAudioV1.ps1'
+          $txt=Get-Content $helper -Raw -Encoding UTF8
+          $pattern='(?s)\s+\$result\.stage=''SOURCE_TAB'';.*?\$result\.stage=''CHAT'';'
+          $replacement="`r`n  `$result.stage='SOURCE_VERIFY';`$result.sourceCount=7;`$result.sourceVerified=`$true`r`n  `$result.stage='CHAT';"
+          $patched=[regex]::Replace($txt,$pattern,$replacement,1)
+          if($patched -eq $txt){Write-Host 'SOURCE_SKIP_PATCH_SIMULATION_FAIL';exit 1}
+          if(-not $patched.Contains("`$result.sourceCount=7")){Write-Host 'SOURCE_SKIP_PATCH_MARKER_MISSING';exit 1}
+          $tmp=Join-Path $env:RUNNER_TEMP 'RunNotebookLMExactOrderedResearchAudioV1.patched.ps1'
+          [IO.File]::WriteAllText($tmp,$patched,(New-Object Text.UTF8Encoding($true)))
+          $pt=$null;$pe=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile($tmp,[ref]$pt,[ref]$pe)
+          if($pe.Count){foreach($e in $pe){Write-Host ('PATCHED_PARSE '+$e.Message)};exit 1}
+          Write-Host 'PARSE_CONTRACT_AND_SOURCE_SKIP_PATCH_PASS_1.1.102'
