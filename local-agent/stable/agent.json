@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.96",
-  "releasedAt": "2026-08-30T12:05:00+09:00",
-  "gitBlobSha1": "2373c5b2dbc01e84fc36d07d9d9bb86dac7587bc",
+  "version": "1.1.97",
+  "releasedAt": "2026-08-30T12:18:00+09:00",
+  "gitBlobSha1": "18bbd302eb68892a4369bb75ccd05778d9e85172",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.96_FAST_RESEARCH_RESULTS_READONLY_RESULT.json",
-  "notes": "Minimal source-only diagnostic on existing exact NotebookLM notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Reuse the known research query, open Sources/Add source/Fast Research, submit search, and capture the exact post-search checkbox/import controls before any import click. Do not create a notebook. importClicked=false, Chat/Studio/Generate=false, Bridge0.2.39 unchanged, normal Chrome/OAuth/scope unchanged."
+  "resultReceipt": "AGENT_1.1.97_FAST_RESEARCH_EDITOR_READONLY_RESULT.json",
+  "notes": "Read-only exact-notebook diagnostic after 1.1.96 proved Sources click + Fast Research visible but research editor selector missed two visible editors. Capture editor tag/type/role/id/name/placeholder/data-placeholder/aria/title/class/parentText/outerHTML and search-looking buttons only. No typing, no research submit, no import, no Chat/Studio/Generate, no new notebook, Bridge0.2.39 unchanged, normal Chrome/OAuth/scope unchanged."
 }
