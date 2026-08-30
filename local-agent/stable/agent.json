@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "version": "1.1.98",
-  "releasedAt": "2026-08-30T12:25:00+09:00",
-  "gitBlobSha1": "caaceb047cc07b28e87cefef728f75d287a0520e",
+  "releasedAt": "2026-08-30T12:29:00+09:00",
+  "gitBlobSha1": "70a46ef3336719fa0114d6c73a271bcff32bdeba",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
   "resultReceipt": "AGENT_1.1.98_FAST_RESEARCH_IMPORT_ONLY_RESULT.json",
-  "notes": "Exact existing notebook only. 1.1.97 proved Fast Research complete with result list visible and a single 가져오기 action, while the query textarea is readonly/disabled. Do not retype or resubmit research. Open Sources, require Fast Research complete, click exactly one visible enabled Import/가져오기 button, then verify source count changes from 0 to >0. No new notebook, no Chat/Studio/Generate, Bridge0.2.39 unchanged, normal Chrome/OAuth/scope unchanged."
+  "notes": "Exact existing notebook only. 1.1.97 proved Fast Research complete with result list visible and a single 가져오기 action, while the query textarea is readonly/disabled. Pre-runtime JS unicode/regex escaping was corrected and PS5.1 CI rerun passed. Do not retype or resubmit research. Open Sources, require Fast Research complete, click exactly one visible enabled Import/가져오기 button, then verify source count changes from 0 to >0. No new notebook, no Chat/Studio/Generate, Bridge0.2.39 unchanged, normal Chrome/OAuth/scope unchanged."
 }
