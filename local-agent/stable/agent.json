@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.103",
-  "releasedAt": "2026-08-30T14:21:23+09:00",
-  "gitBlobSha1": "d20ae3386c17b7d1e4ed2484e649207e802d68ea",
+  "version": "1.1.104",
+  "releasedAt": "2026-08-30T14:28:20+09:00",
+  "gitBlobSha1": "e7d70929949c4e5c2f5dbc1dd2c8cd25ff095f49",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.103_EXACT_TAB_THEN_AUDIO_DRIVE_RESULT.json",
-  "notes": "Minimal recovery for 1.1.102 NO_NOTEBOOKLM_PAGE. Before delegating the unchanged 1.1.102 audio-to-Drive one-shot, restore only the dedicated CDP 9223 exact notebook page using the proven V5 pattern: exact page if present, otherwise Page.navigate on an existing dedicated page, Target.createTarget if no page exists, and dedicated Chrome start only if CDP itself is down. Delegate 1.1.102 is raw fetched and Git-blob SHA verified. Bridge0.2.39, notebook ID, 7 imported sources, normal Chrome, OAuth and scopes remain unchanged. Download policy remains legacy DirectCDPDownloadSyncedV3 primary; CaptureBridge/raw-byte mirror and Python raw watcher remain verification/fallback only. Final PASS still requires fresh real audio binary, stable nonzero bytes, Drive project copy, exact size/SHA256 and Drive API file ID/MIME/size/readback."
+  "resultReceipt": "AGENT_1.1.104_CHAT_STUDIO_DOM_READONLY_RESULT.json",
+  "notes": "Read-only changed-condition diagnostic after 1.1.103 physically proved exactTabVerified=true but child failed CHAT_TAB_NOT_FOUND. Inspect only the exact fresh notebook DOM for visible Chat/Studio headings, buttons and editors. No clicks, no submit, no generation, no download, no source changes, no normal Chrome/OAuth/scope/Bridge changes. Use evidence to patch only the exact Chat selector, then return to the existing 1.1.103 + immutable 1.1.102 audio-to-Drive chain."
 }
