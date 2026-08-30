@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.85",
-  "releasedAt": "2026-08-30T09:08:00+09:00",
-  "gitBlobSha1": "7bef0dc07b88af913c761fc5255b9898c63ce6d1",
+  "version": "1.1.86",
+  "releasedAt": "2026-08-30T09:12:00+09:00",
+  "gitBlobSha1": "597c75ad4c9182bf0b5f2c34a7ef8d847f67c50f",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Read-only diagnostic after Agent1.1.84 proved CDP 9223 had no nonhistorical fresh notebook while the user's visible Test Chrome showed fresh notebooks. Inventory ports 9222-9230 and remote-debugging Chrome process command lines only; do not click, create, navigate, change Bridge0.2.39, OAuth, scopes, or normal Chrome."
+  "notes": "Exact source-only bind to the physically verified fresh NotebookLM ID 8d1eda83-cfe3-4487-b2bc-266a5be3465c found by read-only CDP inventory and matching the user's screenshot. It navigates CDP 9223 to that exact existing notebook, adds the canonical full SOURCE_TEXT through Sources > Add source > Paste text, verifies source >0, fills the Audio Overview instruction in Chat, and selects Studio. It never creates a notebook and does not change Bridge0.2.39, normal Chrome, OAuth or scopes."
 }
