@@ -1,0 +1,22 @@
+name: NotebookLM 1.1.105 PS51 Parse
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1105-ps51.yml'
+      - 'local-agent/releases/1.1.105/HomeDesignLocalAgent.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and source-only contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.105/HomeDesignLocalAgent.ps1'
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+          if($errors.Count){foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)};exit 1}
+          $s=Get-Content $f -Raw -Encoding UTF8
+          foreach($n in @('AGENT_1.1.105_FAST_RESEARCH_IMPORT_ACTUAL_SOURCE_VERIFY','ACTUAL_SAVED_SOURCE_ZERO_AFTER_IMPORT','exactCount','sourceLikeCount','empty','importClicked','chatSubmitted=$false','studioSelected=$false','generateClicked=$false','downloadClicked=$false','normalChromeTouched=$false','bridgeChanged=$false')){if(-not $s.Contains($n)){Write-Host ('MISSING '+$n);exit 1}}
+          Write-Host 'SOURCE_ONLY_PARSE_CONTRACT_PASS_1.1.105'
