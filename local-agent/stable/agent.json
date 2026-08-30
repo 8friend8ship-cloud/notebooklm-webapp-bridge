@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.93",
-  "releasedAt": "2026-08-30T10:36:00+09:00",
-  "gitBlobSha1": "dec59055d02404f74cf7da751b94d89496e6022b",
+  "version": "1.1.94",
+  "releasedAt": "2026-08-30T10:41:00+09:00",
+  "gitBlobSha1": "66d8be6cce3d39cc7d79e26114451b7db7cad436",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.93_EXACT_ORDER_TABFIX_RESULT.json",
-  "notes": "Minimal UI selector retry on exact notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Preserves Bridge0.2.39 and helper V1. Keeps PowerShell keyword spacing fixes and changes only Source/Chat/Studio tab matching from equality on concatenated text to includes. Physical title readback already PASS. No duplicate notebook, normal Chrome, OAuth or scope changes."
+  "resultReceipt": "AGENT_1.1.94_EXACT_ORDER_TABFIX_B64_RESULT.json",
+  "notes": "Exact notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Same Bridge0.2.39 and helper V1. Fixes tab selector patch transport only by decoding exact old/new Source Chat Studio comparison strings from base64, while retaining return/throw keyword spacing fixes. Title already physically verified. No duplicate notebook, normal Chrome, OAuth or scope changes."
 }
