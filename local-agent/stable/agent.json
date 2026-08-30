@@ -2,10 +2,10 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.87",
-  "releasedAt": "2026-08-30T09:17:00+09:00",
-  "gitBlobSha1": "fa47942e46ee797643c5dc56e83c8868aa2ab47a",
+  "version": "1.1.88",
+  "releasedAt": "2026-08-30T09:53:00+09:00",
+  "gitBlobSha1": "fdd66396a8b3a5199335039463124c698a95533d",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "notes": "Minimal runtime fix for Agent1.1.86 PAGE_CONNECT failure. Keeps exact fresh notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c and V5 source-binding logic unchanged; only suppresses PowerShell method output and returns one typed ClientWebSocket instead of System.Object[]. No notebook creation, Bridge0.2.39 change, normal Chrome change, OAuth or scope change."
+  "notes": "Minimal chat-first recovery on the already-created fresh NotebookLM ID 8d1eda83-cfe3-4487-b2bc-266a5be3465c. Close any source modal, select Chat, fill the canonical work prompt into '질문하거나 창작하세요', submit with the send arrow, wait for auto-source/response readiness, then select Studio and AI Audio Overview. It does not create a notebook, does not manually add a source, and does not change Bridge0.2.39, normal Chrome, OAuth or scopes."
 }
