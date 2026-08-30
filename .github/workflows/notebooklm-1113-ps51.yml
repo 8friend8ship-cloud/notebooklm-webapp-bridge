@@ -1,0 +1,33 @@
+name: NotebookLM 1.1.113 PS51 Parse
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1113-ps51.yml'
+      - 'local-agent/releases/1.1.113/HomeDesignLocalAgent.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and validate prompt patch
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.113/HomeDesignLocalAgent.ps1'
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+          if($errors.Count){foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)};exit 1}
+          $s=Get-Content $f -Raw -Encoding UTF8
+          $m=[regex]::Match($s,"\$ValidPromptB64='([^']+)'",[Text.RegularExpressions.RegexOptions]::Singleline)
+          if(-not $m.Success){throw 'VALID_PROMPT_B64_NOT_FOUND'}
+          $bytes=[Convert]::FromBase64String($m.Groups[1].Value)
+          $prompt=[Text.Encoding]::UTF8.GetString($bytes)
+          if($prompt -notlike '*NLM_FRESH_ALL_20260829_1915*'){throw 'PROMPT_MARKER_MISSING'}
+          $inner=Get-Content 'local-agent/releases/1.1.112/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          $patched=[regex]::Replace($inner,"(?m)^\$PromptB64='[^']*'",("`$PromptB64='"+$m.Groups[1].Value+"'"),1)
+          if($patched -eq $inner){throw 'PATCH_ANCHOR_NOT_FOUND'}
+          $tmp=Join-Path $env:RUNNER_TEMP '1112.fixed.ps1'
+          [IO.File]::WriteAllText($tmp,$patched,(New-Object Text.UTF8Encoding($true)))
+          $t=$null;$pe=$null;[void][System.Management.Automation.Language.Parser]::ParseFile($tmp,[ref]$t,[ref]$pe)
+          if($pe.Count){throw ('PATCHED_INNER_PARSE_FAIL '+(($pe|ForEach-Object{$_.Message})-join' | '))}
+          Write-Host 'PARSE_BASE64_PATCH_PASS_1.1.113'
