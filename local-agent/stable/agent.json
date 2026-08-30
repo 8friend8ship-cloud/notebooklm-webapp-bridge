@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.120",
-  "releasedAt": "2026-08-31T00:02:45+09:00",
-  "gitBlobSha1": "42c153e9fabfc774e2e52daf7ee66707e810ec0b",
+  "version": "1.1.121",
+  "releasedAt": "2026-08-31T00:07:45+09:00",
+  "gitBlobSha1": "bd7ded77266119c070aae7824aec571c5f372721",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.120_SOURCE_RESEARCH_STATE_READONLY_RESULT.json",
-  "notes": "Read-only rerun of proven 1.1.110 source-state diagnostic against exact existing notebook. Inspect current source tab, saved-source signals, Fast Research/import/view state only. No source add/import click, no Chat/Studio/download, no normal Chrome/Bridge/OAuth/scope changes."
+  "resultReceipt": "AGENT_1.1.121_AUDIO_READY_DOWNLOAD_DRIVE_VERIFY_RESULT.json",
+  "notes": "Exact existing fresh notebook only. Open Studio tab before ready check. Reuse proven 1.1.117 chain: legacy/CDP DirectCDPDownloadSyncedV3 primary, Python raw verifier independent/fallback integrity check, then copy original binary to NOTEBOOKLM_FACTORY/03_OUTPUT_AUDIO_VIDEO_SLIDES/project and require size+SHA match. No new notebook/source/Bridge/OAuth/scope/normal Chrome changes."
 }
