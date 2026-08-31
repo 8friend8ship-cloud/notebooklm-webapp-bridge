@@ -5,6 +5,7 @@ on:
     paths:
       - 'apps-script/CentralLearningQaAutomation.gs'
       - 'apps-script/CentralResultAudit.gs'
+      - 'apps-script/CentralMediaQaSeedLoop.gs'
       - '.github/workflows/test-central-learning-qa.yml'
   workflow_dispatch:
 permissions:
@@ -23,9 +24,10 @@ jobs:
           const fs=require('fs');
           const q=fs.readFileSync('apps-script/CentralLearningQaAutomation.gs','utf8');
           const a=fs.readFileSync('apps-script/CentralResultAudit.gs','utf8');
-          function ok(v,m){if(!v) throw new Error(m); console.log('PASS',m)}
-          ok(/function\s+installCentralLearningQaTriggersV1/.test(q),'trigger installer exists');
-          ok(/everyMinutes\(5\)/.test(q),'5-minute incremental trigger');
+          const m=fs.readFileSync('apps-script/CentralMediaQaSeedLoop.gs','utf8');
+          function ok(v,msg){if(!v) throw new Error(msg); console.log('PASS',msg)}
+          ok(/function\s+installCentralLearningQaTriggersV1/.test(q),'legacy central QA trigger installer exists');
+          ok(/everyMinutes\(5\)/.test(q),'5-minute incremental central QA trigger preserved');
           ok(/function\s+runCentralDriveLearningQaCycleV1/.test(q),'Drive QA cycle exists');
           ok(/function\s+inferExpectedOutputContractV1/.test(q),'output inference exists');
           ok(q.indexOf('IMAGE_ASSET_T1')>=0 && q.indexOf('IMAGE_ASSET_T1')<q.indexOf('FLOW_RESULT_GENERIC_V1'),'image type precedes generic Flow fallback');
@@ -39,5 +41,21 @@ jobs:
           ok(/centralAuditResultV1\(/.test(q) && /function\s+centralAuditResultV1/.test(a),'existing central audit integration');
           ok(/35_INTERNAL_SEED_REGISTRY/.test(a) && /77_TEMPLATE_EVOLUTION_FACTORY/.test(a),'Seed/template learning writeback exists');
           ok(/testCentralLearningQaFunctionsV1/.test(q),'runtime fixture test exists');
-          console.log('CENTRAL_LEARNING_QA_STATIC_REGRESSION_PASS');
+
+          ok(/function\s+requiresStrictMediaGateV1_/.test(a),'generic audit strict-media guard exists');
+          ok(/\^\(IMAGE\|VIDEO\|MEDIA_DATA\)\$/.test(a),'IMAGE VIDEO MEDIA_DATA are guarded');
+          ok(/HOLD_MEDIA_STRICT_GATE/.test(a) && /STRICT_MEDIA_X2_REQUIRED/.test(a),'generic media PASS is held before Seed promotion');
+          ok(/else\s+promoteCentralResult_\(result,\s*audit\)/.test(a),'non-media generic Seed promotion remains available');
+
+          ok(/function\s+runCentralMediaQaSeedLoop/.test(m),'strict media closed-loop handler exists');
+          ok(/function\s+evaluateCentralMediaGateV1/.test(m),'strict media pure gate exists');
+          ok(/STRICT_PASS_X1_CANDIDATE/.test(m) && /STRICT_PASS_X2_PROMOTED/.test(m),'X1 candidate and X2 promotion states exist');
+          ok(/CRITICAL_CONSTRAINT_MISS/.test(m) && /PROMPT_FIDELITY_BELOW_90/.test(m),'prompt/critical constraint failure gates exist');
+          ok(/VIDEO_CONTINUITY_BELOW_90/.test(m),'video continuity gate exists');
+          ok(/TABLET_SCREEN_OFF_CONTINUITY_FAIL/.test(m),'tablet screen-off gate exists');
+          ok(/RESULT_HASH_MISSING/.test(m) && /LINEAGE_INCOMPLETE/.test(m),'physical hash and lineage gates exist');
+          ok(!/ScriptApp\.newTrigger/.test(m),'strict media handler creates no physical trigger');
+          ok(/quarantineLegacyGenericMediaSeedV1_/.test(m),'legacy generic media Seed quarantine path exists');
+          ok(/promoteCentralMediaStrictPassV1_/.test(m),'strict media x2 Seed promotion path exists');
+          console.log('CENTRAL_LEARNING_AND_MEDIA_GUARD_STATIC_REGRESSION_PASS');
           NODE
