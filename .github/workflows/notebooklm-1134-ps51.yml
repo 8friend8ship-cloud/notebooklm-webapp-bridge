@@ -1,0 +1,23 @@
+name: NotebookLM 1.1.134 Slides Real Card Readonly PS51
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1134-ps51.yml'
+      - 'local-agent/releases/1.1.134/HomeDesignLocalAgent.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.134/HomeDesignLocalAgent.ps1'
+          $t=$null;$e=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$t,[ref]$e)
+          if($e.Count){foreach($x in $e){Write-Host ($x.Extent.StartLineNumber.ToString()+':'+$x.Extent.StartColumnNumber+' '+$x.Message)};exit 1}
+          $s=Get-Content $f -Raw -Encoding UTF8
+          foreach($n in @('8d1eda83-cfe3-4487-b2bc-266a5be3465c','AGENT_1.1.134_SLIDES_REAL_CARD_WAIT_READONLY_RESULT.json','49836,46972,51060,46300,32,51088,47308','readOnly=$true','waitSeconds=240','busySeen','candidateCount','REAL_SLIDES_CARD_NOT_READY_WITH_MENU')){if(-not $s.Contains($n)){Write-Host ('MISSING '+$n);exit 1}}
+          foreach($forbidden in @('Input.dispatchMouseEvent','Copy-Item','Browser.setDownloadBehavior','Page.navigate','Generate')){if($s.Contains($forbidden)){Write-Host ('FORBIDDEN '+$forbidden);exit 1}}
+          Write-Host 'PARSE_AND_READONLY_WAIT_CONTRACT_PASS_1.1.134'
