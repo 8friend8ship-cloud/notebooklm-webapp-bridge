@@ -1,0 +1,38 @@
+name: NotebookLM 1.1.129 PS51 Parse
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1129-ps51.yml'
+      - 'local-agent/releases/1.1.129/HomeDesignLocalAgent.ps1'
+      - 'local-agent/releases/1.1.117/HomeDesignLocalAgent.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse wrapper and simulated runtime
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.129/HomeDesignLocalAgent.ps1'
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+          if($errors.Count){foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)};exit 1}
+          $src=Get-Content 'local-agent/releases/1.1.117/HomeDesignLocalAgent.ps1' -Raw -Encoding UTF8
+          $txt=$src.Replace('1.1.117','1.1.129')
+          $txt=$txt.Replace('AGENT_1.1.117_AUDIO_READY_DOWNLOAD_DRIVE_VERIFY_RESULT.json','AGENT_1.1.129_AUDIO_READY_DOWNLOAD_DRIVE_VERIFY_RESULT.json')
+          $txt=$txt.Replace('AGENT_1.1.117_AUDIO_READY_DOWNLOAD_DRIVE_VERIFY','AGENT_1.1.129_AUDIO_READY_DOWNLOAD_DRIVE_VERIFY')
+          $anchor="[void](Send `$w ([ref]`$q) 'Runtime.enable' @{});[void](Send `$w ([ref]`$q) 'Page.bringToFront' @{})"
+          $insert=@'
+          ;[void](Eval $w ([ref]$q) "(() => {for(const e of [...document.querySelectorAll('[role=tab]')]){const s=String(e.innerText||e.textContent||'').trim().toLowerCase();if(s==='studio'||s.includes('\uC2A4\uD29C\uB514\uC624')){e.click();return true}}return false})()")
+            Start-Sleep -Milliseconds 1000
+          '@
+          if(-not $txt.Contains($anchor)){throw 'STUDIO_PRECHECK_PATCH_ANCHOR_NOT_FOUND'}
+          $txt=$txt.Replace($anchor,$anchor+$insert)
+          $runtime=Join-Path $env:TEMP 'nlm129.runtime.ps1'
+          [IO.File]::WriteAllText($runtime,$txt,(New-Object Text.UTF8Encoding($true)))
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile($runtime,[ref]$tokens,[ref]$errors)
+          if($errors.Count){foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)};exit 1}
+          foreach($n in @('PRIMARY_DOWNLOAD','PYTHON_INDEPENDENT_VERIFY','DRIVE_COPY_PRIMARY','notebooklm_raw_download_capture.py','RunNotebookLMDirectCDPDownloadSyncedV3.ps1','expected-media audio','DRIVE_COPY_SIZE_OR_SHA_MISMATCH')){if(-not $txt.Contains($n)){throw ('MISSING_CONTRACT '+$n)}}
+          Write-Host 'PARSE_AND_CONTRACT_PASS_1.1.129'
