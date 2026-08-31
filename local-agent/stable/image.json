@@ -2,15 +2,17 @@
   "schemaVersion": 1,
   "channel": "image",
   "enabled": true,
-  "version": "1.1.71",
-  "gitBlobSha1": "49d4192a68e75c08598cc721c0d990bb573c97e0",
+  "version": "1.1.136-image-task203",
+  "gitBlobSha1": "f08f8a586f3405ce9019c370fe504557d03b3b70",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 60,
-  "maxCycleSeconds": 300,
-  "purpose": "ChatGPT Image Auto BRG_033 contract-probe lane independent from global NotebookLM stable and Flow lane; writes entry heartbeat then manifest/declared-entrypoint/contract receipts without Generate",
+  "maxCycleSeconds": 900,
+  "purpose": "Independent IMAGE lane one-shot recovery for existing fixed ContentOS TASK203. Reuses Host 1.3.0 exact allowlist and same taskId CONTENTOS_RUNTIME_TASK203_HOST_DIRECT_D115_20260828_01; no duplicate task, no new Apps Script project/deployment/trigger/OAuth/scope, no Chrome Generate or credit spend.",
   "normalChromeTouched": false,
   "generateClicked": false,
   "creditSpend": false,
   "oauthChanged": false,
-  "extensionMutated": false
+  "extensionMutated": false,
+  "appsScriptBoundSync": true,
+  "resultReceipt": "IMAGE_AGENT_CONTENTOS_TASK203_DIRECT.json"
 }
