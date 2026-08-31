@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.129",
-  "releasedAt": "2026-08-31T11:53:10+09:00",
-  "gitBlobSha1": "f301ea999303e96de4709dd9aff927fda625cb39",
+  "version": "1.1.130",
+  "releasedAt": "2026-08-31T12:01:35+09:00",
+  "gitBlobSha1": "471a6e9d8affb1ba15948e634894ddf2c132bcb9",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.129_AUDIO_READY_DOWNLOAD_DRIVE_VERIFY_RESULT.json",
-  "notes": "Final audio artifact persistence gate. Reuses proven 1.1.117/1.1.121 path only: exact notebook Studio readiness -> legacy CDP direct download primary -> Python raw-byte independent audio verification -> project Drive-sync copy -> size/SHA equality. No new generation, no new notebook, Bridge 0.2.39 unchanged. Final cloud PASS still requires Drive API filename/MIME/size/fileId/raw readback verification."
+  "resultReceipt": "AGENT_1.1.130_EXACT_AUDIO_DOWNLOAD_DRIVE_VERIFY_RESULT.json",
+  "notes": "Download-only minimal fallback after 1.1.129 primary helper argument-type failure. Uses physically proven 1.1.127 CDP primitives, exact fresh audio title, more/download controls, completed-file stable-size gate, canonical Python raw audio verifier, then project Drive-sync copy with size/SHA equality. No new generation/notebook/source; Bridge 0.2.39 unchanged. Final cloud PASS requires Drive API file metadata and raw readback SHA/size."
 }
