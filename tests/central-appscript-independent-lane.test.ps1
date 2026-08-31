@@ -14,20 +14,16 @@ if([string]::IsNullOrWhiteSpace([string]$m.gitBlobSha1)){throw 'MANIFEST_BLOB_MI
 if([string]::IsNullOrWhiteSpace([string]$m.resultReceipt)){throw 'MANIFEST_RECEIPT_MISSING'}
 if([int]$m.maxCycleSeconds -lt 180 -or [int]$m.maxCycleSeconds -gt 1800){throw 'MANIFEST_TIMEOUT_OUT_OF_RANGE'}
 
-$lane=Join-Path $root ('local-agent/releases/'+$version+'/HomeDesignLocalAgent.ps1')
+$repoLanePath=('local-agent/releases/'+$version+'/HomeDesignLocalAgent.ps1')
+$lane=Join-Path $root $repoLanePath
 if(-not(Test-Path -LiteralPath $lane -PathType Leaf)){throw ('LANE_RELEASE_MISSING:'+ $version)}
 
-function GitBlobSha1([string]$Path){
-  $bytes=[IO.File]::ReadAllBytes($Path)
-  $header=[Text.Encoding]::ASCII.GetBytes(('blob '+$bytes.Length+[char]0))
-  $all=New-Object byte[]($header.Length+$bytes.Length)
-  [Buffer]::BlockCopy($header,0,$all,0,$header.Length)
-  [Buffer]::BlockCopy($bytes,0,$all,$header.Length,$bytes.Length)
-  $sha=[Security.Cryptography.SHA1]::Create()
-  try{return (($sha.ComputeHash($all)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$sha.Dispose()}
-}
-$actualBlob=(GitBlobSha1 $lane).ToLowerInvariant()
-if($actualBlob -ne ([string]$m.gitBlobSha1).ToLowerInvariant()){throw ('MANIFEST_RELEASE_BLOB_MISMATCH actual='+$actualBlob+' expected='+[string]$m.gitBlobSha1)}
+# Windows checkout may CRLF-normalize the working-tree file, so hashing local bytes is not
+# a valid comparison to the GitHub Contents API blob. Read the canonical blob id from Git's
+# object database for HEAD:path instead; this is exactly the value the runtime API exposes.
+$repoBlob=(& git rev-parse ('HEAD:'+$repoLanePath) 2>&1|Out-String).Trim().ToLowerInvariant()
+if($LASTEXITCODE -ne 0 -or $repoBlob -notmatch '^[0-9a-f]{40}$'){throw ('GIT_OBJECT_BLOB_LOOKUP_FAILED:'+ $repoBlob)}
+if($repoBlob -ne ([string]$m.gitBlobSha1).ToLowerInvariant()){throw ('MANIFEST_RELEASE_BLOB_MISMATCH repo='+$repoBlob+' expected='+[string]$m.gitBlobSha1)}
 
 foreach($p in @($bootstrap,$lane)){
   $tokens=$null;$errors=$null
@@ -69,4 +65,4 @@ foreach($pattern in $forbiddenPatterns){if($l -match $pattern){throw ('LANE_FORB
 # Version-specific behavior belongs to its dedicated contract test; this regression only
 # guarantees that the manifest-selected release remains isolated, parseable, blob-pinned,
 # exact-targeted, and free of direct project/deployment/OAuth/Chrome mutations.
-Write-Host ('CENTRAL_APPSCRIPT_INDEPENDENT_LANE_STATIC_PASS version='+$version+' blob='+$actualBlob)
+Write-Host ('CENTRAL_APPSCRIPT_INDEPENDENT_LANE_STATIC_PASS version='+$version+' blob='+$repoBlob)
