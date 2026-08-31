@@ -4,14 +4,15 @@ $runnerRoot=Join-Path $root 'notebooklm-webapp-bridge-source-v0.2.0/scripts/wind
 $recover=Join-Path $runnerRoot 'RecoverExistingBoundAppsScript.ps1'
 $tasks=Join-Path $runnerRoot 'tasks.json'
 $runner=Join-Path $runnerRoot 'CentralAppsScriptRunnerV2.ps1'
-foreach($p in @($recover,$tasks,$runner)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw ('MISSING:'+ $p)}}
+$installer=Join-Path $runnerRoot 'Install-CentralAppsScriptRunner.ps1'
+$cmd=Join-Path $runnerRoot 'INSTALL_CENTRAL_RUNNER.cmd'
+foreach($p in @($recover,$tasks,$runner,$installer,$cmd)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw ('MISSING:'+ $p)}}
 
-$tokens=$null;$errors=$null
-[void][System.Management.Automation.Language.Parser]::ParseFile($recover,[ref]$tokens,[ref]$errors)
-if($errors.Count -gt 0){throw ('RECOVER_PARSE_FAIL:'+($errors.Message -join '|'))}
-$tokens=$null;$errors=$null
-[void][System.Management.Automation.Language.Parser]::ParseFile($runner,[ref]$tokens,[ref]$errors)
-if($errors.Count -gt 0){throw ('RUNNER_PARSE_FAIL:'+($errors.Message -join '|'))}
+foreach($p in @($recover,$runner,$installer)){
+  $tokens=$null;$errors=$null
+  [void][System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$tokens,[ref]$errors)
+  if($errors.Count -gt 0){throw ((Split-Path $p -Leaf)+':PARSE_FAIL:'+($errors.Message -join '|'))}
+}
 
 $r=Get-Content -LiteralPath $recover -Raw -Encoding UTF8
 foreach($needle in @(
@@ -30,7 +31,10 @@ if($r -match '&\s*\$claspCmd\.Source\s+push\b'){throw 'RECOVER_FORBIDDEN_CLASP_P
 if($r -match '&\s*\$claspCmd\.Source\s+deploy\b'){throw 'RECOVER_FORBIDDEN_CLASP_DEPLOY'}
 
 $j=Get-Content -LiteralPath $tasks -Raw -Encoding UTF8 | ConvertFrom-Json
-if($j.version -ne '20260831.7-readonly-startup-gate'){throw ('TASK_MANIFEST_VERSION_INVALID:'+ $j.version)}
+if($j.channel -ne 'CENTRAL_APPS_SCRIPT_RUNNER_V2'){throw ('TASK_CHANNEL_INVALID:'+ $j.channel)}
+if($j.mode -ne 'READ_ONLY_BOOTSTRAP'){throw ('TASK_MODE_INVALID:'+ $j.mode)}
+if($j.releaseRef -ne 'central-runner-readonly-bootstrap-v7'){throw ('TASK_RELEASE_REF_INVALID:'+ $j.releaseRef)}
+if($j.version -ne '20260831.8-immutable-readonly-release'){throw ('TASK_MANIFEST_VERSION_INVALID:'+ $j.version)}
 $t=@($j.tasks | Where-Object {$_.taskId -eq 'TASK_20260831_NOTEBOOKLM_BOUND_READONLY_RECOVERY_001'})
 if($t.Count -ne 1){throw ('TASK_COUNT_INVALID:'+ $t.Count)}
 $t=$t[0]
@@ -40,27 +44,30 @@ if($t.targetTitle -ne 'WEBAPP_TEMPLATE_03'){throw 'TASK_TITLE_INVALID'}
 if($t.expectedSpreadsheetId -ne '1TbQxEcCiiibu2-EmMGEdt79v4AUpE8JL2XrDEKeVRCk'){throw 'TASK_SPREADSHEET_INVALID'}
 if($t.expectedDeploymentId -ne 'AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P'){throw 'TASK_DEPLOYMENT_INVALID'}
 if([int]$t.maxAttempts -ne 1){throw 'TASK_MAX_ATTEMPTS_INVALID'}
-
-$refresh=@($j.tasks | Where-Object {$_.taskId -eq 'TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_002'})
-if($refresh.Count -ne 1 -or -not$refresh[0].enabled){throw 'READONLY_REFRESH_NOT_ENABLED'}
-if($refresh[0].targetTitle -ne 'CENTRAL_RUNNER_REFRESH_X5_READONLY'){throw 'READONLY_REFRESH_TARGET_INVALID'}
-
-$mutationCapable=@($j.tasks | Where-Object {
-  $_.enabled -and (
-    $_.taskId -eq 'TASK_20260822_CONTENTOS_BOUND_SYNC_001' -or
-    $_.taskId -eq 'TASK_20260829_CHROME_FLOW_HEALTH_RECOVERY_002' -or
-    $_.action -eq 'TRAVEL_APPS_SCRIPT_REPAIR'
-  )
-})
-if($mutationCapable.Count -ne 0){throw ('BOOTSTRAP_MUTATION_TASK_ENABLED:'+ (($mutationCapable|ForEach-Object{$_.taskId}) -join '|'))}
 $enabled=@($j.tasks | Where-Object {$_.enabled})
-$enabledIds=@($enabled | ForEach-Object {[string]$_.taskId})
-$allowedEnabled=@('TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_002','TASK_20260831_NOTEBOOKLM_BOUND_READONLY_RECOVERY_001')
-foreach($id in $enabledIds){if($allowedEnabled -notcontains $id){throw ('UNEXPECTED_BOOTSTRAP_TASK_ENABLED:'+ $id)}}
-if($enabledIds.Count -ne 2){throw ('BOOTSTRAP_ENABLED_TASK_COUNT_INVALID:'+ $enabledIds.Count)}
+if($enabled.Count -ne 1){throw ('BOOTSTRAP_ENABLED_TASK_COUNT_INVALID:'+ $enabled.Count)}
+if($enabled[0].taskId -ne 'TASK_20260831_NOTEBOOKLM_BOUND_READONLY_RECOVERY_001'){throw ('UNEXPECTED_BOOTSTRAP_TASK_ENABLED:'+ $enabled[0].taskId)}
 
+$release='central-runner-readonly-bootstrap-v7'
 $rt=Get-Content -LiteralPath $runner -Raw -Encoding UTF8
-if(-not$rt.Contains("'BOUND_APPS_SCRIPT_READONLY_RECOVERY'")){throw 'RUNNER_ACTION_MISSING'}
-if(-not$rt.Contains("mode -ne 'READ_ONLY'")){throw 'RUNNER_READONLY_RECEIPT_GUARD_MISSING'}
-if(-not$rt.Contains('mutationPerformed -ne $false')){throw 'RUNNER_MUTATION_GUARD_MISSING'}
+foreach($needle in @(
+  'CENTRAL_APPS_SCRIPT_RUNNER_V2_READONLY_BOOTSTRAP_V7_20260831',
+  $release,
+  "'BOUND_APPS_SCRIPT_READONLY_RECOVERY'",
+  "mode -ne 'READ_ONLY'",
+  'mutationPerformed -ne $false',
+  'MUTATION_ACTION_DISABLED_IN_READONLY_BOOTSTRAP_RELEASE',
+  'UNRELATED_BROWSER_ACTION_DISABLED_IN_READONLY_BOOTSTRAP_RELEASE',
+  'ENABLED_NON_READONLY_TASK_BLOCKED'
+)){if(-not$rt.Contains($needle)){throw ('RUNNER_GATE_MISSING:'+ $needle)}}
+if($rt.Contains('fix/central-appscript-runner-20260821')){throw 'RUNNER_BRANCH_DRIFT_URL_PRESENT'}
+
+$it=Get-Content -LiteralPath $installer -Raw -Encoding UTF8
+foreach($needle in @($release,'CENTRAL_APPS_SCRIPT_RUNNER_V2_READONLY_BOOTSTRAP_V7_20260831','RUNNER_MUTATION_GATE_MISSING','RUNNER_RELEASE_REF_MISMATCH')){if(-not$it.Contains($needle)){throw ('INSTALLER_PIN_MISSING:'+ $needle)}}
+if($it.Contains('fix/central-appscript-runner-20260821')){throw 'INSTALLER_BRANCH_DRIFT_URL_PRESENT'}
+
+$ct=Get-Content -LiteralPath $cmd -Raw -Encoding UTF8
+if(-not$ct.Contains($release)){throw 'CMD_RELEASE_REF_MISSING'}
+if($ct.Contains('fix/central-appscript-runner-20260821')){throw 'CMD_BRANCH_DRIFT_URL_PRESENT'}
+
 Write-Host 'CENTRAL_RUNNER_NOTEBOOKLM_BOUND_READONLY_STATIC_PASS'
