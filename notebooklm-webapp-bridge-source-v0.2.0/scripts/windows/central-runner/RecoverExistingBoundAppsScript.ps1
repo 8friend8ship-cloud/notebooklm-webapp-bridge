@@ -5,6 +5,7 @@ param(
 )
 $ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'
 $allowed=@{
+'WEBAPP_TEMPLATE_03'=@{spreadsheet='1TbQxEcCiiibu2-EmMGEdt79v4AUpE8JL2XrDEKeVRCk';deployment='AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P'};
 'WEBAPP_TEMPLATE_05'=@{spreadsheet='1gBuyuDyRZkRDYwl2DGj6oUWQUS-KnD1alapyTBWZXN8';deployment='AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo'};
 'WEBAPP_TEMPLATE_06'=@{spreadsheet='1vW1tXBLL7B5iwPS41C4tExPvHH5eALER6yctoW7crdQ';deployment='AKfycbx5Sm8FtA7D6iQVNmdoYFON-Y5xHNdNT5a-zZWoxeORL6_nFfqOBoPwA1IYEFKHcKKjoQ'};
 'WEBAPP_TEMPLATE_07'=@{spreadsheet='1De5GneJRng_RjYSpCyyWudZMA6fqJdgHStQAMBeh3lM';deployment='AKfycbyzSZZqDwMAgqltkfCYQb4-aIZ4zSFlRHkh9dyN5F_Qd7hfUev6oVNqjUSsEtYE3b4VBA'};
@@ -27,4 +28,23 @@ $sourceRoot=$snapshotDir; $claspPath=Join-Path $snapshotDir '.clasp.json'; if(Te
 if(-not(Test-Path $sourceRoot)){throw 'SOURCE_ROOT_NOT_FOUND'}
 $files=@(Get-ChildItem -LiteralPath $sourceRoot -Recurse -File|Where-Object{$_.Name -notin @('.clasp.json','.claspignore')}|Sort-Object FullName)
 $fileList=@($files|ForEach-Object{[pscustomobject]@{path=$_.FullName.Substring($sourceRoot.Length).TrimStart('\\','/');bytes=$_.Length;sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()}})
-[ordered]@{ok=$true;mode='READ_ONLY';mutationPerformed=$false;projectTitle=$TargetTitle;spreadsheetId=$ExpectedSpreadsheetId;deploymentId=$ExpectedDeploymentId;scriptId=$scriptId;sourceFileCount=$fileList.Count;sourceFiles=$fileList;timestamp=(Get-Date).ToUniversalTime().ToString('o');next='Return receipt to central evidence. No push/deploy until source diff is reviewed.'}|ConvertTo-Json -Depth 8
+$receiptName=('CENTRAL_APPS_SCRIPT_BOUND_READONLY_'+$TargetTitle+'_RESULT.json')
+$runnerDir=Join-Path $env:LOCALAPPDATA 'CentralAppsScriptRunner'; New-Item -ItemType Directory -Force -Path $runnerDir|Out-Null
+$receiptLocal=Join-Path $runnerDir $receiptName
+$centralReceiptPath=''
+try{
+  $target=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+  $myDriveKo=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
+  foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
+    $r=[string]$d.Root;if(-not$r){continue}
+    foreach($c in @((Join-Path $r $target),(Join-Path $r ($myDriveKo+'\'+$target)),(Join-Path $r ('My Drive\'+$target)),(Join-Path $r ('Google Drive\'+$target)))){
+      if(Test-Path -LiteralPath $c -PathType Container){$rd=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $rd|Out-Null;$centralReceiptPath=Join-Path $rd $receiptName;break}
+    }
+    if($centralReceiptPath){break}
+  }
+}catch{}
+$result=[ordered]@{ok=$true;mode='READ_ONLY';mutationPerformed=$false;projectTitle=$TargetTitle;spreadsheetId=$ExpectedSpreadsheetId;deploymentId=$ExpectedDeploymentId;scriptId=$scriptId;sourceFileCount=$fileList.Count;sourceFiles=$fileList;timestamp=(Get-Date).ToUniversalTime().ToString('o');receiptLocal=$receiptLocal;centralReceiptPath=$centralReceiptPath;next='Return receipt to central evidence. No push/deploy until source diff is reviewed.'}
+$json=$result|ConvertTo-Json -Depth 8
+$json|Set-Content -LiteralPath $receiptLocal -Encoding UTF8
+if($centralReceiptPath){$json|Set-Content -LiteralPath $centralReceiptPath -Encoding UTF8}
+$json
