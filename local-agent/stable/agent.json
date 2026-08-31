@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.125",
-  "releasedAt": "2026-08-31T11:19:00+09:00",
-  "gitBlobSha1": "9ab0e1647eb0019f64c0fb84a6ebabd73e7807e3",
+  "version": "1.1.126",
+  "releasedAt": "2026-08-31T11:22:00+09:00",
+  "gitBlobSha1": "1abccc810bec0c03c83a4d72d1e4f2ac520c060f",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.125_GENERATION_ONLY_AUDIO_START_RESULT.json",
-  "notes": "Minimal generation-only fix: correct Korean Studio character code, then reuse ASCII-safe Audio Overview/Generate selectors. Exact fresh notebook only; no download/mirror/ingest/Bridge/OAuth/scope/normal Chrome changes."
+  "resultReceipt": "AGENT_1.1.126_AUDIO_READINESS_READONLY_RESULT.json",
+  "notes": "Read-only follow-up after generation start PASS. Open exact fresh notebook Studio and inspect Audio Overview readiness only. No Generate click, no download, no mirror/ingest, no Bridge/OAuth/scope/normal Chrome changes."
 }
