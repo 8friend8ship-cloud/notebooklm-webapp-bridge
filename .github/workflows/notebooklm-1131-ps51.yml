@@ -18,5 +18,5 @@ jobs:
           [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
           if($errors.Count){foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)};exit 1}
           $s=Get-Content $f -Raw -Encoding UTF8
-          foreach($n in @('AGENT_1.1.131_CAPTUREBRIDGE_AUDIO_HANDOFF','35482290','1f14e203d0d8a7a2939803fb5a04e92386d95b35cc313e3c7f4a74083ef0e74c','CaptureBridge','INBOX','NotebookLM','SOURCE_VERIFY','CAPTURE_INBOX_COPY','sourceImmutableVerified')){if(-not $s.Contains($n)){throw ('MISSING_CONTRACT '+$n)}}
+          foreach($n in @('AGENT_1.1.131_CAPTUREBRIDGE_AUDIO_HANDOFF','35482290','1f14e203d0d8a7a2939803fb5a04e92386d95b35cc313e3c7f4a74083ef0e74c','CaptureBridge','INBOX','QzpcSG9tZURlc2lnbkF1dG9tYXRpb25WN1xDYXB0dXJlQnJpZGdlXElOQk9YXE5vdGVib29rTE0=','SOURCE_VERIFY','CAPTURE_INBOX_COPY','sourceImmutableVerified')){if(-not $s.Contains($n)){throw ('MISSING_CONTRACT '+$n)}}
           Write-Host 'PARSE_AND_CONTRACT_PASS_1.1.131'
