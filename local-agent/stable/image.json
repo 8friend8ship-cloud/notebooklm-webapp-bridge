@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "channel": "image",
+  "enabled": true,
+  "version": "1.1.71",
+  "gitBlobSha1": "49d4192a68e75c08598cc721c0d990bb573c97e0",
+  "file": "HomeDesignLocalAgent.ps1",
+  "pollSeconds": 60,
+  "maxCycleSeconds": 300,
+  "purpose": "ChatGPT Image Auto BRG_033 contract-probe lane independent from global NotebookLM stable and Flow lane; writes entry heartbeat then manifest/declared-entrypoint/contract receipts without Generate",
+  "normalChromeTouched": false,
+  "generateClicked": false,
+  "creditSpend": false,
+  "oauthChanged": false,
+  "extensionMutated": false
+}
