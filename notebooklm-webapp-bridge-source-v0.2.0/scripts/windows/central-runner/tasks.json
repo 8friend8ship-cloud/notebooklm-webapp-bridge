@@ -1,6 +1,6 @@
 {
   "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V2",
-  "version": "20260831.4-runner-refresh-only",
+  "version": "20260831.5-runner-refresh-v2-only",
   "pollIntervalMinutes": 5,
   "tasks": [
     {
@@ -31,11 +31,20 @@
     {
       "taskId": "TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_001",
       "action": "CONTENTOS_APPS_SCRIPT_SYNC",
+      "enabled": false,
+      "targetTitle": "CENTRAL_RUNNER_REFRESH_X5_READONLY",
+      "expectedDeploymentId": "RUNNER_REFRESH_X5_READONLY_20260831",
+      "maxAttempts": 1,
+      "notes": "Superseded after parser-safe V2 validation. Disabled to prevent stale one-attempt state from blocking the corrected retry."
+    },
+    {
+      "taskId": "TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_002",
+      "action": "CONTENTOS_APPS_SCRIPT_SYNC",
       "enabled": true,
       "targetTitle": "CENTRAL_RUNNER_REFRESH_X5_READONLY",
       "expectedDeploymentId": "RUNNER_REFRESH_X5_READONLY_20260831",
       "maxAttempts": 1,
-      "notes": "Safe bootstrap piggybacks the already-allowlisted action. It only replaces the local CentralAppsScriptRunner.ps1 with the x2-validated X5 read-only dispatcher and writes CENTRAL_APPS_SCRIPT_RUNNER_X5_READONLY_REFRESH_RESULT.json. It does not call clasp/Git/OAuth/Apps Script/deployment/trigger and it does not enable the X5 recovery tasks."
+      "notes": "Run only the x2-validated parser-safe local runner refresh. No clasp/Git/OAuth/Apps Script/deployment/trigger mutation. Writes CENTRAL_APPS_SCRIPT_RUNNER_X5_READONLY_REFRESH_RESULT.json. X5 recovery remains disabled until receipt readback."
     }
   ]
 }
