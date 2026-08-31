@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "channel": "appscript-readonly",
+  "enabled": true,
+  "version": "appscript-0.1.0",
+  "releasedAt": "2026-09-01T08:32:00+09:00",
+  "gitBlobSha1": "d8ed2414c89f04121c3b141e16ae9699ceb11fdf",
+  "file": "HomeDesignLocalAgent.ps1",
+  "maxCycleSeconds": 300,
+  "executionMode": "one_shot",
+  "resultReceipt": "AGENT_APPSCRIPT_BOOTSTRAP_V1_RESULT.json",
+  "notes": "Independent fail-closed Central Apps Script lane. Reuses existing clasp/auth only, consumes immutable central-runner-readonly-bootstrap-v7 installer blob 896c06532a0ec0db0af445ce90a78c197a4a77c9, and requires exact WEBAPP_TEMPLATE_03 bound READ_ONLY receipt before PASS. No login/project/deployment/OAuth/new trigger; same-name ScheduledTask only; valid existing receipt skips reinstallation."
+}
