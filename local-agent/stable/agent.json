@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.132",
-  "releasedAt": "2026-08-31T13:39:00+09:00",
-  "gitBlobSha1": "0ce8d365ca6a48381078dadee5623715c5ac0fdb",
+  "version": "1.1.133",
+  "releasedAt": "2026-08-31T13:44:30+09:00",
+  "gitBlobSha1": "1eb50aecbfe6bc2d536e7e75e613f984ed5d8aed",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.132_STABLE_RUNNER_SLIDES_GENERATION_RESULT.json",
-  "notes": "Sequential artifact after verified fresh audio. Exact notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c, existing sources only, no source add. Fetch and Git-blob-SHA verify the proven Bridge 0.2.39 notebooklm-runner.js, expose its existing runTask in the exact dedicated-CDP tab, execute only taskType SLIDES, wait for SLIDES_READY. Receipt marker prevents repeat generation. No download/Drive mirror in this generation stage; no normal Chrome, Bridge, OAuth or scope changes."
+  "resultReceipt": "AGENT_1.1.133_SLIDES_CARD_READONLY_RESULT.json",
+  "notes": "Read-only exact current NotebookLM Slides card inspection after 1.1.132 SLIDES_READY. Enumerate only visible slide-card roots that contain an internal more/menu control; no clicks, navigation, generation, download, Drive copy, normal Chrome, Bridge, OAuth or scope changes. Used to bind one exact fresh Slides artifact before native download."
 }
