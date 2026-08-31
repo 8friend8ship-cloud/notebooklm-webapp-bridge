@@ -1,6 +1,6 @@
 {
   "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V2",
-  "version": "20260831.6-notebooklm-bound-readonly",
+  "version": "20260831.7-readonly-startup-gate",
   "pollIntervalMinutes": 5,
   "tasks": [
     {
@@ -15,18 +15,18 @@
     {
       "taskId": "TASK_20260822_CONTENTOS_BOUND_SYNC_001",
       "action": "CONTENTOS_APPS_SCRIPT_SYNC",
-      "enabled": true,
+      "enabled": false,
       "targetTitle": "WEBAPP_TEMPLATE_05",
       "expectedDeploymentId": "AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo",
       "maxAttempts": 3,
-      "notes": "Existing task preserved."
+      "notes": "Mutation-capable ContentOS sync is intentionally gated off during bootstrap. Enable only after exact bound read-only recovery receipt and explicit downstream promotion gate are verified."
     },
     {
       "taskId": "TASK_20260829_CHROME_FLOW_HEALTH_RECOVERY_002",
       "action": "CHROME_FLOW_HEALTH",
-      "enabled": true,
+      "enabled": false,
       "maxAttempts": 5,
-      "notes": "Existing Flow health task preserved."
+      "notes": "Unrelated browser/Flow recovery is disabled during Central Apps Script Runner bootstrap. Preserve existing task without execution until the read-only Apps Script recovery gate is terminal."
     },
     {
       "taskId": "TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_001",
@@ -44,7 +44,7 @@
       "targetTitle": "CENTRAL_RUNNER_REFRESH_X5_READONLY",
       "expectedDeploymentId": "RUNNER_REFRESH_X5_READONLY_20260831",
       "maxAttempts": 1,
-      "notes": "Refresh the x2-validated parser-safe local runner only. No clasp/Git/OAuth/Apps Script/deployment/trigger mutation. Writes CENTRAL_APPS_SCRIPT_RUNNER_X5_READONLY_REFRESH_RESULT.json."
+      "notes": "Local-runner-file-only refresh. No clasp/Git/OAuth/Apps Script/deployment/trigger mutation. Writes CENTRAL_APPS_SCRIPT_RUNNER_X5_READONLY_REFRESH_RESULT.json."
     },
     {
       "taskId": "TASK_20260831_NOTEBOOKLM_BOUND_READONLY_RECOVERY_001",
