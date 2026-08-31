@@ -1,0 +1,35 @@
+name: Central Apps Script Independent Lane CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/central-appscript-independent-lane-20260901
+    paths:
+      - 'local-agent/bootstrap/AgentBootstrap.ps1'
+      - 'local-agent/stable/appscript.json'
+      - 'local-agent/releases/appscript-0.1.0/HomeDesignLocalAgent.ps1'
+      - 'tests/central-appscript-independent-lane.test.ps1'
+      - '.github/workflows/central-appscript-independent-lane-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/bootstrap/AgentBootstrap.ps1'
+      - 'local-agent/stable/appscript.json'
+      - 'local-agent/releases/appscript-0.1.0/HomeDesignLocalAgent.ps1'
+      - 'tests/central-appscript-independent-lane.test.ps1'
+      - '.github/workflows/central-appscript-independent-lane-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Independent lane contract x2
+        shell: pwsh
+        run: |
+          ./tests/central-appscript-independent-lane.test.ps1
+          ./tests/central-appscript-independent-lane.test.ps1

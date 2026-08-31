@@ -10,6 +10,8 @@ $FlowAgentFile = Join-Path $Root 'HomeDesignLocalAgent-flow.ps1'
 $FlowLaneStateFile = Join-Path $Root 'state-flow.json'
 $ImageAgentFile = Join-Path $Root 'HomeDesignLocalAgent-image.ps1'
 $ImageLaneStateFile = Join-Path $Root 'state-image.json'
+$AppScriptAgentFile = Join-Path $Root 'HomeDesignLocalAgent-appscript.ps1'
+$AppScriptLaneStateFile = Join-Path $Root 'state-appscript.json'
 $BootstrapLog = Join-Path $Root 'bootstrap.log'
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 
@@ -134,6 +136,10 @@ try {
     # Independent IMAGE lane prevents global NotebookLM/Flow activity from starving BRG_033 contract verification.
     # It is read-only until the contract probe passes; no Generate/credits/OAuth/extension mutation.
     ApplyIndependentLane 'local-agent/stable/image.json' 'IMAGE' $ImageAgentFile $ImageLaneStateFile
+
+    # Independent APPSCRIPT lane removes the dead LOCAL_* queue dependency for the already-approved read-only bootstrap.
+    # It reuses existing clasp authorization only and fails closed before any project/deployment/OAuth mutation.
+    ApplyIndependentLane 'local-agent/stable/appscript.json' 'APPSCRIPT' $AppScriptAgentFile $AppScriptLaneStateFile
 
     if ($Loop) { Start-Sleep -Seconds $pollSeconds }
   } while ($Loop)
