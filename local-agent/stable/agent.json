@@ -3,11 +3,11 @@
   "channel": "stable",
   "enabled": true,
   "version": "1.1.135",
-  "releasedAt": "2026-08-31T15:12:00+09:00",
-  "gitBlobSha1": "c44709da4b2624de0dcbfae8bcad76bc395ad1f6",
+  "releasedAt": "2026-09-01T00:08:00+09:00",
+  "gitBlobSha1": "bcf146e26164c41a426ed301928627e9cf4d0ba9",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
   "resultReceipt": "AGENT_1.1.135_NLM_FRESH_ALL_STUDIO_RECOVERY_RESULT.json",
-  "notes": "Priority recovery for LOCAL_NLM_FRESH_ALL_STUDIO_E2E_20260831_1446_01. Reuse existing AutoResume/AgentBootstrap and exact 1.1.129 fresh-all-Studio child via GitHub Contents API; marker NLM_WORKFLOW_STUDIO_ALL_20260831_1446; no duplicate notebook, no OAuth/scope/public changes, preserve Bridge 0.2.39. First gate is actual new NotebookLM Studio artifact production."
+  "notes": "Same parent lineage and same 1.1.135. Minimal recovery delta after physical 403 on GitHub Contents API child fetch: Contents API remains primary, raw.githubusercontent.com is bounded fallback for the exact pinned 1.1.129 child. Marker NLM_WORKFLOW_STUDIO_ALL_20260831_1446, Bridge 0.2.39, no duplicate notebook/artifact/task, no OAuth/scope/public changes."
 }
