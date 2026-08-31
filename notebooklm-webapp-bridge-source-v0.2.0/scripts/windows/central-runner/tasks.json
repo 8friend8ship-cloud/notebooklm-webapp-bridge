@@ -1,6 +1,6 @@
 {
   "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V2",
-  "version": "20260829.2",
+  "version": "20260831.3-x5-readonly-staged",
   "pollIntervalMinutes": 5,
   "tasks": [
     {
@@ -19,14 +19,64 @@
       "targetTitle": "WEBAPP_TEMPLATE_05",
       "expectedDeploymentId": "AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo",
       "maxAttempts": 3,
-      "notes": "Reuse existing Git/clasp authorization and existing WEBAPP_TEMPLATE_05 only. Clone/snapshot live source, copy canonical Content OS modules, inject exactly one fail-open scheduler adapter into existing processTaskQueue, push same Script ID, clean reclone readback. No new OAuth/project/deployment/physical trigger."
+      "notes": "Existing task preserved unchanged."
     },
     {
       "taskId": "TASK_20260829_CHROME_FLOW_HEALTH_RECOVERY_002",
       "action": "CHROME_FLOW_HEALTH",
       "enabled": true,
       "maxAttempts": 5,
-      "notes": "Second same-lineage Flow health wake after X1 stale claim. Preserve installed bridge/auth/session. Re-run safe bootstrap/dedicated Chrome/stable release/front/Apps Script/extension PING health so the extension service worker reloads and clears stale active handoff, then consume existing X2 READY task. No reinstall, no new OAuth/project/deployment, no Generate, no credit spend. Completion still requires Flow deep-connect RESULT/ACK x2 before any generation gate."
+      "notes": "Existing Flow health task preserved unchanged."
+    },
+    {
+      "taskId": "X5_BOUND_READONLY_05_20260831",
+      "action": "BOUND_APPS_SCRIPT_READONLY_RECOVERY",
+      "enabled": false,
+      "targetTitle": "WEBAPP_TEMPLATE_05",
+      "expectedSpreadsheetId": "1gBuyuDyRZkRDYwl2DGj6oUWQUS-KnD1alapyTBWZXN8",
+      "expectedDeploymentId": "AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo",
+      "maxAttempts": 1,
+      "notes": "Staged disabled until patched runner refresh receipt is verified. Read-only only."
+    },
+    {
+      "taskId": "X5_BOUND_READONLY_06_20260831",
+      "action": "BOUND_APPS_SCRIPT_READONLY_RECOVERY",
+      "enabled": false,
+      "targetTitle": "WEBAPP_TEMPLATE_06",
+      "expectedSpreadsheetId": "1vW1tXBLL7B5iwPS41C4tExPvHH5eALER6yctoW7crdQ",
+      "expectedDeploymentId": "AKfycbx5Sm8FtA7D6iQVNmdoYFON-Y5xHNdNT5a-zZWoxeORL6_nFfqOBoPwA1IYEFKHcKKjoQ",
+      "maxAttempts": 1,
+      "notes": "Staged disabled until patched runner refresh receipt is verified. Read-only only."
+    },
+    {
+      "taskId": "X5_BOUND_READONLY_07_20260831",
+      "action": "BOUND_APPS_SCRIPT_READONLY_RECOVERY",
+      "enabled": false,
+      "targetTitle": "WEBAPP_TEMPLATE_07",
+      "expectedSpreadsheetId": "1De5GneJRng_RjYSpCyyWudZMA6fqJdgHStQAMBeh3lM",
+      "expectedDeploymentId": "AKfycbyzSZZqDwMAgqltkfCYQb4-aIZ4zSFlRHkh9dyN5F_Qd7hfUev6oVNqjUSsEtYE3b4VBA",
+      "maxAttempts": 1,
+      "notes": "Staged disabled until patched runner refresh receipt is verified. Read-only only."
+    },
+    {
+      "taskId": "X5_BOUND_READONLY_08_20260831",
+      "action": "BOUND_APPS_SCRIPT_READONLY_RECOVERY",
+      "enabled": false,
+      "targetTitle": "WEBAPP_TEMPLATE_08",
+      "expectedSpreadsheetId": "1TGCmhXTz-XWIydv_tU0rPQ_CxrecRMdEflKRK4OApe4",
+      "expectedDeploymentId": "AKfycbxk7qhwbfJK5qL7xVQZyvHUC9CcGQSjO3WmdUa8ugzGMR0bCZNO6XynVLPHfff4kPg9",
+      "maxAttempts": 1,
+      "notes": "Staged disabled until patched runner refresh receipt is verified. Read-only only."
+    },
+    {
+      "taskId": "X5_BOUND_READONLY_09_20260831",
+      "action": "BOUND_APPS_SCRIPT_READONLY_RECOVERY",
+      "enabled": false,
+      "targetTitle": "WEBAPP_TEMPLATE_09",
+      "expectedSpreadsheetId": "1K4Bj0PnnLD-Wka8AlNmDprvfXFnsh9mCV3QXjgdbT2s",
+      "expectedDeploymentId": "AKfycby5rynajzdtrWcVuwd1W8kT37DHfFYgwg6Bg7C5dlm222FxIYrl3J5l1UQSYNp1FZ8IQg",
+      "maxAttempts": 1,
+      "notes": "Staged disabled until patched runner refresh receipt is verified. Read-only only."
     }
   ]
 }

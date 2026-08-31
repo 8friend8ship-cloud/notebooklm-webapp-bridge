@@ -1,0 +1,65 @@
+name: Central Apps Script Runner X5 Readonly CI
+on:
+  pull_request:
+    paths:
+      - 'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/**'
+      - '.github/workflows/central-appscript-runner-x5-readonly-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-x5-readonly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell parser check
+        shell: pwsh
+        run: |
+          $paths = @(
+            'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1',
+            'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/RecoverExistingBoundAppsScript.ps1'
+          )
+          foreach ($p in $paths) {
+            $tokens=$null; $errors=$null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          }
+      - name: Read-only mutation guard
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/RecoverExistingBoundAppsScript.ps1')
+          t=p.read_text(encoding='utf-8').lower()
+          forbidden=[' login',' create-script',' create ',' push ',' deploy ']
+          # comments mention forbidden operations; check executable clasp invocations instead.
+          for line in t.splitlines():
+              s=line.strip()
+              if '$claspcmd.source' in s:
+                  for bad in [' login',' create-script',' push ',' deploy ']:
+                      assert bad not in s, (bad,s)
+          assert "mode = 'read_only'" in t
+          assert 'mutationperformed = $false' in t
+          for n in range(5,10): assert f"'webapp_template_0{n}'" in t
+      - name: Manifest staged-disabled X5 contract
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/tasks.json')
+          d=json.loads(p.read_text(encoding='utf-8'))
+          xs=[x for x in d['tasks'] if x['taskId'].startswith('X5_BOUND_READONLY_')]
+          assert len(xs)==5
+          assert all(x['action']=='BOUND_APPS_SCRIPT_READONLY_RECOVERY' for x in xs)
+          assert all(x['enabled'] is False for x in xs)
+          assert len({x['targetTitle'] for x in xs})==5
+          assert len({x['expectedSpreadsheetId'] for x in xs})==5
+          assert len({x['expectedDeploymentId'] for x in xs})==5
+      - name: Dispatcher allowlist contract
+        shell: python
+        run: |
+          from pathlib import Path
+          t=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1').read_text(encoding='utf-8')
+          assert "'BOUND_APPS_SCRIPT_READONLY_RECOVERY'" in t
+          assert "RecoverExistingBoundAppsScript.ps1" in t
+          assert "mutationPerformed" in t
+          assert "CONTENTOS_APPS_SCRIPT_SYNC" in t
+          assert "CHROME_FLOW_HEALTH" in t
