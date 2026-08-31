@@ -8,6 +8,8 @@ $AgentFile = Join-Path $Root 'HomeDesignLocalAgent.ps1'
 $StateFile = Join-Path $Root 'state.json'
 $FlowAgentFile = Join-Path $Root 'HomeDesignLocalAgent-flow.ps1'
 $FlowLaneStateFile = Join-Path $Root 'state-flow.json'
+$ImageAgentFile = Join-Path $Root 'HomeDesignLocalAgent-image.ps1'
+$ImageLaneStateFile = Join-Path $Root 'state-image.json'
 $BootstrapLog = Join-Path $Root 'bootstrap.log'
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 
@@ -128,6 +130,10 @@ try {
     # Independent Flow lane prevents task-specific NotebookLM stable releases from starving Flow.
     # It has its own state marker and never changes normal Chrome/OAuth/Generate policy.
     ApplyIndependentLane 'local-agent/stable/flow.json' 'FLOW' $FlowAgentFile $FlowLaneStateFile
+
+    # Independent IMAGE lane prevents global NotebookLM/Flow activity from starving BRG_033 contract verification.
+    # It is read-only until the contract probe passes; no Generate/credits/OAuth/extension mutation.
+    ApplyIndependentLane 'local-agent/stable/image.json' 'IMAGE' $ImageAgentFile $ImageLaneStateFile
 
     if ($Loop) { Start-Sleep -Seconds $pollSeconds }
   } while ($Loop)
