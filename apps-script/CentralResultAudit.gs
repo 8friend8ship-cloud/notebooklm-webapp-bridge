@@ -34,57 +34,90 @@ function centralAuditResultV1(audit) {
 
   writeCentralAudit_(result, audit);
   writeLearningLoop_(result, audit);
-  if (status === 'PASS') promoteCentralResult_(result, audit);
-  else if (status === 'NEEDS_FIX' || status === 'REJECT') writeFailureLearning_(result, audit);
+  if (status === 'PASS') {
+    if (requiresStrictMediaGateV1_(result)) writeMediaStrictGateHoldV1_(result, audit);
+    else promoteCentralResult_(result, audit);
+  } else if (status === 'NEEDS_FIX' || status === 'REJECT') writeFailureLearning_(result, audit);
   return result;
 }
 
+function requiresStrictMediaGateV1_(r) {
+  return /^(IMAGE|VIDEO|MEDIA_DATA)$/i.test(String((r||{}).outputType||''));
+}
+
+function writeMediaStrictGateHoldV1_(r, raw) {
+  appendByHeader_('77_TEMPLATE_EVOLUTION_FACTORY', {
+    EVOLVE_ID:'EVOLVE_MEDIA_GENERIC_HOLD_'+r.auditId,
+    TRIGGER:'generic central audit PASS on media',
+    INPUT_RESULT:r.resultId,
+    MEASURE:'generic QA passed but prompt fidelity/purpose/media/x2 strict gate not yet proven',
+    BEST_COMPONENTS:'preserve generic passing evidence only',
+    WEAK_COMPONENTS:'PROMPT_OUTPUT_STRICT_GATE_PENDING',
+    NEW_TEMPLATE:'HOLD_UNTIL_runCentralMediaQaSeedLoop_X2',
+    SOURCE_PACKS:'71 generic audit evidence',
+    REPO_PATCH:'apps-script/CentralMediaQaSeedLoop.gs',
+    APPS_SCRIPT_PATCH:'runCentralMediaQaSeedLoop',
+    API_DELTA:'NONE; UI/subscription-first only if visual/video prompt QA missing',
+    PROMOTION_GATE:'STRICT_MEDIA_X2_REQUIRED',
+    REGRESSION:'actual file vs original prompt + distinct result hash x2',
+    WRITEBACK:'71/80/84/93 then 35/70 only after strict x2',
+    STATUS:'HOLD_MEDIA_STRICT_GATE',
+    VERSION:'CENTRAL_RESULT_AUDIT_MEDIA_GUARD_V1',
+    OWNER:'CENTRAL_AGENT',
+    NOTES:r.auditId+'|'+r.resultId+'|generic Seed promotion blocked'
+  });
+}
+
 function writeCentralAudit_(r, raw) {
+  const strictMediaHold = r.status==='PASS' && requiresStrictMediaGateV1_(r);
   appendByHeader_('84_OPENAI_CENTRAL_AUDIT', {
     AUDIT_ID:r.auditId, AUDIT_AT:r.auditAt, TASK_ID:r.taskId, APP_ID:r.appId,
     AUDITOR_SOURCE:'OPENAI_CHATGPT_CENTRAL_AGENT', CENTRAL_CLAIM:r.goal,
     EVIDENCE_IDS:r.evidence, OPENAI_CHECK:JSON.stringify({scores:raw.scores||{},artifactChecks:raw.artifactChecks||{}}),
     MATCH_STATE:r.status==='PASS'?'MATCH':'PURPOSE_FIT_GAP', DISCREPANCY:(r.failedDimensions||[]).join('|')+(r.hardFails.length?'|'+r.hardFails.join('|'):''),
-    CORRECTED_STATE:r.status, ACTION:r.status==='PASS'?'PROMOTE_SEED_TEMPLATE_PATTERN':'ROOT_CAUSE_MINIMUM_FIX_RETEST',
-    STATUS:r.status, API_MODE:'NO_OPENAI_API', REVIEW_METHOD:'CENTRAL_RESULT_AUDIT_V1_1', VERSION:'CENTRAL_RESULT_AUDIT_V1_1',
-    RUNTIME_EVIDENCE:r.resultId, NOTES:JSON.stringify({score:r.overallScore,artifactType:r.outputType,variantKey:r.variantKey,preventionRule:r.preventionRule})
+    CORRECTED_STATE:strictMediaHold?'PASS_GENERIC_HOLD_STRICT_MEDIA_GATE':r.status,
+    ACTION:strictMediaHold?'STRICT_MEDIA_PROMPT_OUTPUT_X2_GATE':(r.status==='PASS'?'PROMOTE_SEED_TEMPLATE_PATTERN':'ROOT_CAUSE_MINIMUM_FIX_RETEST'),
+    STATUS:strictMediaHold?'PASS_GENERIC_HOLD_STRICT_MEDIA_GATE':r.status, API_MODE:'NO_OPENAI_API', REVIEW_METHOD:'CENTRAL_RESULT_AUDIT_V1_2_MEDIA_GUARD', VERSION:'CENTRAL_RESULT_AUDIT_V1_2_MEDIA_GUARD',
+    RUNTIME_EVIDENCE:r.resultId, NOTES:JSON.stringify({score:r.overallScore,artifactType:r.outputType,variantKey:r.variantKey,preventionRule:r.preventionRule,strictMediaGateRequired:strictMediaHold})
   });
   appendByHeader_('80_DATA_RUNTIME_QA_LOG', {
     QA_ID:r.auditId, RUN_ID:r.taskId, APP_ID:r.appId, FUNCTION_ID:'centralAuditResultV1', INPUT_DATA_IDS:r.evidence,
     OUTPUT_DATA_IDS:r.resultId, RESULT_ID:r.resultId, STARTED_AT:r.auditAt, FINISHED_AT:r.auditAt,
-    STATUS:r.status, READBACK_STATE:raw.readbackOk?'PASS':'FAIL', QUALITY_SCORE:r.overallScore,
+    STATUS:strictMediaHold?'PASS_GENERIC_HOLD_STRICT_MEDIA_GATE':r.status, READBACK_STATE:raw.readbackOk?'PASS':'FAIL', QUALITY_SCORE:r.overallScore,
     ERROR_CLASS:(r.hardFails||[]).join('|') || (r.failedDimensions||[]).join('|'), RETRY_COUNT:Number(raw.retryCount||0),
-    EVIDENCE_POINTER:r.resultUrl||r.evidence, NEXT_ACTION:r.status==='PASS'?'PROMOTE_AND_LEARN':'FIX_AND_SAME_FIXTURE_RETEST'
+    EVIDENCE_POINTER:r.resultUrl||r.evidence, NEXT_ACTION:strictMediaHold?'RUN_STRICT_MEDIA_PROMPT_OUTPUT_X2_GATE':(r.status==='PASS'?'PROMOTE_AND_LEARN':'FIX_AND_SAME_FIXTURE_RETEST')
   });
   appendByHeader_('71_MULTIMODAL_QA_HISTORY', {
     RUN_ID:r.taskId, RUN_AT:r.auditAt, REQUIREMENT_ID:r.goal, ROUTE_ID:r.outputType, TEMPLATE_ID:r.variantKey,
     INPUT_HASH:raw.inputHash||'', PRIMARY_RESULT:r.resultId, FALLBACK_USED:raw.fallbackUsed||'NO',
     TEXT_QA:raw.textQa||'', IMAGE_QA:raw.imageQa||'', VIDEO_QA:raw.videoQa||'', LINEAGE_QA:raw.lineageQa||'',
     READBACK_X2:raw.readbackOk?'PASS':'FAIL', SCORE:r.overallScore, ERROR_CLASS:(r.failedDimensions||[]).join('|'),
-    FIX_APPLIED:r.fixApplied, LEARNED_RULE_OR_CHANGE_ID:r.lesson||r.preventionRule, STATUS:r.status
+    FIX_APPLIED:r.fixApplied, LEARNED_RULE_OR_CHANGE_ID:r.lesson||r.preventionRule,
+    STATUS:strictMediaHold?'PASS_GENERIC_HOLD_STRICT_MEDIA_GATE':r.status
   });
 }
 
 function writeLearningLoop_(r, raw) {
+  const strictMediaHold = r.status==='PASS' && requiresStrictMediaGateV1_(r);
   appendByHeader_('63_EVOLUTION_CHANGELOG', {
-    APP_ID:r.appId, CHANGE_TYPE:r.status==='PASS'?'LEARNED_SUCCESS_PATTERN':'LEARNED_FAILURE_PATTERN',
-    SOURCE_ID:r.resultId||r.taskId, STATUS:r.status, EVIDENCE:r.auditId+'|'+r.evidence,
-    ROOT_CAUSE:r.rootCause, FIX:r.fixApplied, NOTES:JSON.stringify({wrongAssumption:r.wrongAssumption,preventionRule:r.preventionRule,codePatch:r.codePatchCandidate,functionPatch:r.functionPatchCandidate,templateAdjustment:r.templateAdjustment}),
+    APP_ID:r.appId, CHANGE_TYPE:strictMediaHold?'LEARNED_MEDIA_PRESTRICT_HOLD':(r.status==='PASS'?'LEARNED_SUCCESS_PATTERN':'LEARNED_FAILURE_PATTERN'),
+    SOURCE_ID:r.resultId||r.taskId, STATUS:strictMediaHold?'HOLD_MEDIA_STRICT_GATE':r.status, EVIDENCE:r.auditId+'|'+r.evidence,
+    ROOT_CAUSE:r.rootCause, FIX:r.fixApplied, NOTES:JSON.stringify({wrongAssumption:r.wrongAssumption,preventionRule:r.preventionRule,codePatch:r.codePatchCandidate,functionPatch:r.functionPatchCandidate,templateAdjustment:r.templateAdjustment,strictMediaGateRequired:strictMediaHold}),
     UPDATED_AT:r.auditAt
   });
   appendByHeader_('83_TASK_PRECHECK_ASSET_MAP', {
     APP_ID:r.appId, PROJECT_ID:r.appId, TASK_ID:r.taskId, ASSET_TYPE:'LESSON_PRECHECK_RULE',
-    STATUS:r.status==='PASS'?'REUSABLE_SUCCESS_RULE':'BLOCK_REPEAT_UNTIL_FIXED',
+    STATUS:strictMediaHold?'HOLD_MEDIA_STRICT_GATE':(r.status==='PASS'?'REUSABLE_SUCCESS_RULE':'BLOCK_REPEAT_UNTIL_FIXED'),
     EVIDENCE:r.auditId+'|'+r.evidence,
-    NOTES:JSON.stringify({artifactType:r.outputType,variantKey:r.variantKey,rootCause:r.rootCause,wrongAssumption:r.wrongAssumption,effectiveFix:r.fixApplied,preventionRule:r.preventionRule,templateAdjustment:r.templateAdjustment}),
+    NOTES:JSON.stringify({artifactType:r.outputType,variantKey:r.variantKey,rootCause:r.rootCause,wrongAssumption:r.wrongAssumption,effectiveFix:r.fixApplied,preventionRule:r.preventionRule,templateAdjustment:r.templateAdjustment,strictMediaGateRequired:strictMediaHold}),
     UPDATED_AT:r.auditAt
   });
   if (r.templateAdjustment || r.codePatchCandidate || r.functionPatchCandidate) {
     appendByHeader_('77_TEMPLATE_EVOLUTION_FACTORY', {
       APP_ID:r.appId, SOURCE_ID:r.resultId||r.taskId,
-      STATUS:r.status==='PASS'?'LEARNED_CHANGE_VERIFIED':'PATCH_CANDIDATE_RETEST_REQUIRED',
+      STATUS:strictMediaHold?'HOLD_MEDIA_STRICT_GATE':(r.status==='PASS'?'LEARNED_CHANGE_VERIFIED':'PATCH_CANDIDATE_RETEST_REQUIRED'),
       SCORE:r.overallScore, EVIDENCE:r.auditId,
-      NOTES:JSON.stringify({templateAdjustment:r.templateAdjustment,codePatchCandidate:r.codePatchCandidate,functionPatchCandidate:r.functionPatchCandidate}),
+      NOTES:JSON.stringify({templateAdjustment:r.templateAdjustment,codePatchCandidate:r.codePatchCandidate,functionPatchCandidate:r.functionPatchCandidate,strictMediaGateRequired:strictMediaHold}),
       UPDATED_AT:r.auditAt
     });
   }
@@ -112,10 +145,11 @@ function centralPrecheckLessonsV1(projectKey, artifactType, errorSignature) {
 }
 
 function promoteCentralResult_(r, raw) {
+  if (requiresStrictMediaGateV1_(r)) return {held:true,reason:'STRICT_MEDIA_GATE_REQUIRED'};
   const seedText = raw.seedText || raw.resultSummary || '';
   appendByHeader_('35_INTERNAL_SEED_REGISTRY', {
     SEED_ID:'SEED_'+r.auditId, APP_ID:r.appId, SOURCE_TYPE:'CENTRAL_AUDIT_PASS', SOURCE_IDS:r.resultId,
-    TOPIC_ID:raw.topicId||r.appId, SEED_TEXT:seedText, INPUT_SCHEMA_VERSION:'CENTRAL_RESULT_AUDIT_V1_1',
+    TOPIC_ID:raw.topicId||r.appId, SEED_TEXT:seedText, INPUT_SCHEMA_VERSION:'CENTRAL_RESULT_AUDIT_V1_2_MEDIA_GUARD',
     QUEENS_STATUS:'AUDIT_PASS', STATUS:'SEED_PROMOTED_QA_PASS', CREATED_AT:r.auditAt, UPDATED_AT:r.auditAt,
     EVIDENCE:r.auditId+'|'+r.evidence
   });
