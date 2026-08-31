@@ -1,0 +1,48 @@
+name: test-central-media-qa-seed-loop
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps-script/CentralMediaQaSeedLoop.gs'
+      - 'central-agent/templates/CentralMediaResultManifestV1.json'
+      - '.github/workflows/test-central-media-qa-seed-loop.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-and-pure-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Central media prompt/output/seed gate tests
+        run: |
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm');
+          const q=fs.readFileSync('apps-script/CentralMediaQaSeedLoop.gs','utf8');
+          const m=JSON.parse(fs.readFileSync('central-agent/templates/CentralMediaResultManifestV1.json','utf8'));
+          function ok(v,msg){ if(!v) throw new Error(msg); console.log('PASS',msg); }
+          ok(/function\s+runCentralMediaQaSeedLoop/.test(q),'logical media QA handler exists');
+          ok(/function\s+evaluateCentralMediaGateV1/.test(q),'pure strict gate exists');
+          ok(/PROMPT_FIDELITY_BELOW_90/.test(q),'prompt fidelity hard threshold exists');
+          ok(/CRITICAL_CONSTRAINT_MISS/.test(q),'critical constraints 100% gate exists');
+          ok(/TABLET_SCREEN_OFF_CONTINUITY_FAIL/.test(q),'tablet screen-off gate exists');
+          ok(/STRICT_PASS_X1_CANDIDATE/.test(q) && /STRICT_PASS_X2_PROMOTED/.test(q),'x1 candidate/x2 promotion states exist');
+          ok(/SEED_HOLD_MEDIA_GATE_REQUIRED/.test(q),'legacy generic media seed quarantine exists');
+          ok(/NO_NEW_OPENAI_API/.test(q) && /SUBSCRIPTION_UI_FIRST/.test(q),'no new API budget / UI-first policy exists');
+          ok(!/newTrigger\(/.test(q) && !/timeBased\(/.test(q),'module creates no physical trigger');
+          ok(m.schema==='CENTRAL_MEDIA_RESULT_MANIFEST_V1','manifest schema exists');
+          ok(Array.isArray(m.expected_constraints.critical),'manifest has explicit critical constraints');
+          vm.runInThisContext(q,{filename:'CentralMediaQaSeedLoop.gs'});
+          const r=testCentralMediaQaSeedLoopV1();
+          ok(r.ok,'pure fixture suite passes');
+          ok(r.basePass.pass===true,'good image fixture passes');
+          ok(r.missingPrompt.pass===false && r.missingPrompt.hardFails.includes('ORIGINAL_PROMPT_MISSING'),'missing original prompt blocks promotion');
+          ok(r.lowPrompt.pass===false && r.lowPrompt.hardFails.includes('PROMPT_FIDELITY_BELOW_90'),'prompt fidelity 89 fails');
+          ok(r.lowCritical.pass===false && r.lowCritical.hardFails.includes('CRITICAL_CONSTRAINT_MISS'),'critical constraints 99 fails');
+          ok(r.tabletScreenOff.pass===false && r.tabletScreenOff.hardFails.includes('TABLET_SCREEN_OFF_CONTINUITY_FAIL'),'tablet screen-off failure blocks route');
+          ok(r.videoContinuity.pass===false && r.videoContinuity.hardFails.includes('VIDEO_CONTINUITY_BELOW_90'),'video continuity below 90 fails');
+          console.log('CENTRAL_MEDIA_QA_SEED_LOOP_STATIC_AND_PURE_PASS');
+          NODE
