@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "channel": "appscript-readonly",
+  "channel": "appscript-readonly-bind",
   "enabled": true,
-  "version": "appscript-0.1.0",
-  "releasedAt": "2026-09-01T08:32:00+09:00",
-  "gitBlobSha1": "d8ed2414c89f04121c3b141e16ae9699ceb11fdf",
+  "version": "appscript-0.1.1",
+  "releasedAt": "2026-09-01T08:48:00+09:00",
+  "gitBlobSha1": "939999e458d2abaa5f7ae4cb26125e33a4a45df2",
   "file": "HomeDesignLocalAgent.ps1",
-  "maxCycleSeconds": 300,
+  "maxCycleSeconds": 900,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_APPSCRIPT_BOOTSTRAP_V1_RESULT.json",
-  "notes": "Independent fail-closed Central Apps Script lane. Reuses existing clasp/auth only, consumes immutable central-runner-readonly-bootstrap-v7 installer blob 896c06532a0ec0db0af445ce90a78c197a4a77c9, and requires exact WEBAPP_TEMPLATE_03 bound READ_ONLY receipt before PASS. No login/project/deployment/OAuth/new trigger; same-name ScheduledTask only; valid existing receipt skips reinstallation."
+  "resultReceipt": "AGENT_APPSCRIPT_BIND_V2_RESULT.json",
+  "notes": "Two-stage fail-closed Central Apps Script lane. First requires or produces the exact WEBAPP_TEMPLATE_03 READ_ONLY receipt using immutable appscript-0.1.0 from merge c8ee143d (blob d8ed2414). Then, and only then, runs the exact receipt-gated 10m binder from commit 598693db (blob 47e81c44), which itself pins the 10m source commit 54e13999, same existing Script ID/deployment, source readback, module hash readback and rollback. Existing valid bind receipt skips all mutation. No clasp login/new project/new deployment/new trigger/OAuth/scope change. Runtime VERIFIED remains separate and requires two distinct 10m Drive 23/37/80 readbacks."
 }
