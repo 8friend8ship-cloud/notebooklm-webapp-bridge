@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.121",
-  "releasedAt": "2026-08-31T00:07:45+09:00",
-  "gitBlobSha1": "bd7ded77266119c070aae7824aec571c5f372721",
+  "version": "1.1.122",
+  "releasedAt": "2026-08-31T11:08:00+09:00",
+  "gitBlobSha1": "0919d8a711b9ab0e779804f2b8191f53b6ff5d9a",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.121_AUDIO_READY_DOWNLOAD_DRIVE_VERIFY_RESULT.json",
-  "notes": "Exact existing fresh notebook only. Open Studio tab before ready check. Reuse proven 1.1.117 chain: legacy/CDP DirectCDPDownloadSyncedV3 primary, Python raw verifier independent/fallback integrity check, then copy original binary to NOTEBOOKLM_FACTORY/03_OUTPUT_AUDIO_VIDEO_SLIDES/project and require size+SHA match. No new notebook/source/Bridge/OAuth/scope/normal Chrome changes."
+  "resultReceipt": "AGENT_1.1.122_GENERATION_ONLY_AUDIO_START_RESULT.json",
+  "notes": "Generation-only recovery. Use exact existing fresh NotebookLM notebook 8d1eda83-cfe3-4487-b2bc-266a5be3465c, open Studio, start Audio Overview generation, and verify generation started. Do not download, mirror, ingest, change Bridge/OAuth/scope, or touch normal Chrome."
 }
