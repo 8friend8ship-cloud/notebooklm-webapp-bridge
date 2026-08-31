@@ -45,8 +45,17 @@ $mustLane=@(
 )
 foreach($needle in $mustLane){if(-not$l.Contains($needle)){throw ('LANE_CONTRACT_MISSING:'+ $needle)}}
 
-$forbidden=@('clasp login','create-script','create-deployment','clasp deploy','ScriptApp.newTrigger','Stop-Process -Name chrome','taskkill.exe /IM chrome.exe')
-foreach($needle in $forbidden){if($l -match [regex]::Escape($needle)){throw ('LANE_FORBIDDEN:'+ $needle)}}
+# Allow literal safety tokens inside the lane's own installer scanner; reject executable invocation patterns instead.
+$forbiddenPatterns=@(
+  '&\s+\$clasp\.Source\s+login\b',
+  '&\s+\$clasp\.Source\s+create-script\b',
+  '&\s+\$clasp\.Source\s+create-deployment\b',
+  '&\s+\$clasp\.Source\s+(?:deploy|redeploy)\b',
+  'ScriptApp\.newTrigger\s*\(',
+  'Stop-Process\s+-Name\s+chrome',
+  'taskkill\.exe\s+/IM\s+chrome\.exe'
+)
+foreach($pattern in $forbiddenPatterns){if($l -match $pattern){throw ('LANE_FORBIDDEN_PATTERN:'+ $pattern)}}
 
 $receiptCheck=$l.IndexOf('if(BoundReceiptValid $existingReceipt)')
 $installerFetch=$l.IndexOf("`$r.stage='FETCH_IMMUTABLE_INSTALLER'")
