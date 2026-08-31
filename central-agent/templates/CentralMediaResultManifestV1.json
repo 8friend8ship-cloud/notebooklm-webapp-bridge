@@ -1,0 +1,40 @@
+{
+  "schema": "CENTRAL_MEDIA_RESULT_MANIFEST_V1",
+  "requirement_id": "REQ_EXAMPLE",
+  "app_id": "CENTRAL_AGENT",
+  "route_id": "MMR_IMAGE_BALANCED",
+  "template_id": "MMT_MEDIA_PROMPT_SEED_GATE_V1",
+  "prompt_version": "1",
+  "original_prompt": "Preserve the user's original generation prompt here.",
+  "goal": "What the asset must accomplish for the user/front/app.",
+  "use": "platform or downstream use",
+  "audience": "target audience if relevant",
+  "expected_constraints": {
+    "critical": ["all non-negotiable prompt requirements"],
+    "preferred": ["quality/style preferences"],
+    "forbidden": ["elements that must not appear"]
+  },
+  "source_asset_refs": ["Drive/GitHub/Seed/Template IDs used"],
+  "worker_id": "TABLET_ANDROID_01 or other worker",
+  "result_file_id": "DRIVE_FILE_ID",
+  "result_hash": "sha256 for large media; small files are computed by handler",
+  "input_hash": "hash of prompt+constraints when available",
+  "lineage_ok": true,
+  "qa": {
+    "critical_constraints_pct": 100,
+    "prompt_fidelity": 95,
+    "purpose_fit": 95,
+    "media_specific": 95,
+    "continuity": 95,
+    "hard_fails": []
+  },
+  "user_feedback": {
+    "satisfaction_pct": null,
+    "notes": "optional; explicit correction/dissatisfaction becomes failure evidence"
+  },
+  "runtime": {
+    "worker_id": "TABLET_ANDROID_01",
+    "screen_off_continuity_evidence": "TABLET_SCREEN_OFF_CONTINUITY.json when tablet route is used"
+  },
+  "seed_text": "only a verified reusable prompt/constraint summary; promotion still requires strict x2"
+}
