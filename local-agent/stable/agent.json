@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.126",
-  "releasedAt": "2026-08-31T11:22:00+09:00",
-  "gitBlobSha1": "1abccc810bec0c03c83a4d72d1e4f2ac520c060f",
+  "version": "1.1.127",
+  "releasedAt": "2026-08-31T11:27:00+09:00",
+  "gitBlobSha1": "5550987e4fb2f3bbd2c163bff4145163df941fe3",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.126_AUDIO_READINESS_READONLY_RESULT.json",
-  "notes": "Read-only follow-up after generation start PASS. Open exact fresh notebook Studio and inspect Audio Overview readiness only. No Generate click, no download, no mirror/ingest, no Bridge/OAuth/scope/normal Chrome changes."
+  "resultReceipt": "AGENT_1.1.127_AUDIO_READINESS_READONLY_RESULT.json",
+  "notes": "Direct read-only Studio audio readiness probe after generation-start PASS. No Generate click, no download/mirror/ingest, no Bridge/OAuth/scope/normal Chrome changes."
 }
