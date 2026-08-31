@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.127",
-  "releasedAt": "2026-08-31T11:27:00+09:00",
-  "gitBlobSha1": "5550987e4fb2f3bbd2c163bff4145163df941fe3",
+  "version": "1.1.128",
+  "releasedAt": "2026-08-31T11:30:00+09:00",
+  "gitBlobSha1": "953a3ee9cc862b581d170b5dc1e7c00fa5dab191",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
   "resultReceipt": "AGENT_1.1.127_AUDIO_READINESS_READONLY_RESULT.json",
-  "notes": "Direct read-only Studio audio readiness probe after generation-start PASS. No Generate click, no download/mirror/ingest, no Bridge/OAuth/scope/normal Chrome changes."
+  "notes": "Bounded read-only wait loop around 1.1.127 after generation-start PASS. Probe every 12 seconds up to 240 seconds; stop early when ready=true. No Generate/download/mirror/ingest/Bridge/OAuth/scope/normal Chrome changes."
 }
