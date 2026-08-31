@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.123",
-  "releasedAt": "2026-08-31T11:12:00+09:00",
-  "gitBlobSha1": "8d56421deac11914056c8be043b4bd49087fa5bf",
+  "version": "1.1.124",
+  "releasedAt": "2026-08-31T11:14:00+09:00",
+  "gitBlobSha1": "e848c73a979ddbfd55b9fd74a649a74a6909a749",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.122_GENERATION_ONLY_AUDIO_START_RESULT.json",
-  "notes": "Generation-only selector repair. Re-run 1.1.122 child with Unicode-safe Studio/Audio/Generate selectors. No download, Drive mirror, ingest, Bridge/OAuth/scope change, or normal Chrome mutation."
+  "resultReceipt": "AGENT_1.1.124_GENERATION_ONLY_AUDIO_START_RESULT.json",
+  "notes": "ASCII-safe generation-only recovery using String.fromCharCode selectors plus role-tab fallback. Exact fresh notebook only. No download, Drive mirror, ingest, Bridge/OAuth/scope change, or normal Chrome mutation."
 }
