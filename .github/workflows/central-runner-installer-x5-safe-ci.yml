@@ -1,0 +1,61 @@
+name: Central Runner Installer X5 Safe CI
+on:
+  pull_request:
+    paths:
+      - 'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/**'
+      - '.github/workflows/central-runner-installer-x5-safe-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse installer and runner PowerShell
+        shell: pwsh
+        run: |
+          $files=@(
+            'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/Install-CentralAppsScriptRunner.ps1',
+            'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1',
+            'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/ContentOSAppsScriptSync.ps1',
+            'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/RecoverExistingBoundAppsScript.ps1'
+          )
+          foreach($f in $files){$t=$null;$e=$null;[Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$t,[ref]$e)|Out-Null;if($e.Count){$e|%{Write-Error $_};exit 1}}
+      - name: Installer fail-closed safety contract
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/Install-CentralAppsScriptRunner.ps1')
+          t=p.read_text(encoding='utf-8').lower()
+          assert 'existing_clasp_cmd_required_no_install_started' in t
+          assert 'show-authorized-user' in t
+          assert 'register-scheduledtask' in t
+          assert 'runlevel limited' in t or "-runlevel limited" in t
+          for bad in ['npm.cmd.source install','@google/clasp@latest',' clasp login','login --','clasp create','clasp push','clasp deploy']:
+              assert bad not in t, bad
+          assert 'centralappsscriptrunnerv2.ps1' in t
+          assert 'initial_run_failed' in t
+          assert 'runner_state_not_created' in t
+      - name: X5 sequencing contract
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          d=json.loads(Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/tasks.json').read_text(encoding='utf-8'))
+          ids={x['taskId']:x for x in d['tasks']}
+          r=ids['TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_002']
+          assert r['enabled'] is True and r['maxAttempts']==1
+          assert r['action']=='CONTENTOS_APPS_SCRIPT_SYNC'
+          assert r['targetTitle']=='CENTRAL_RUNNER_REFRESH_X5_READONLY'
+          old=ids.get('TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_001')
+          assert old is None or old.get('enabled') is False
+          assert not [x for x in d['tasks'] if x.get('action')=='BOUND_APPS_SCRIPT_READONLY_RECOVERY' and x.get('enabled') is True]
+      - name: Read-only recovery contract
+        shell: python
+        run: |
+          from pathlib import Path
+          r=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1').read_text(encoding='utf-8')
+          h=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/RecoverExistingBoundAppsScript.ps1').read_text(encoding='utf-8')
+          assert "'BOUND_APPS_SCRIPT_READONLY_RECOVERY'" in r
+          assert 'mutationPerformed=$false' in h or 'mutationPerformed = $false' in h
+          for n in range(5,10): assert f"'WEBAPP_TEMPLATE_0{n}'" in h
