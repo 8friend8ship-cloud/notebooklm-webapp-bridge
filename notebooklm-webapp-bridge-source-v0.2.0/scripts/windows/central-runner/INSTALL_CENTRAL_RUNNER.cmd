@@ -2,14 +2,16 @@
 setlocal
 set "INSTALL_DIR=%LOCALAPPDATA%\CentralAppsScriptRunner"
 set "INSTALLER=%INSTALL_DIR%\Install-CentralAppsScriptRunner.ps1"
-set "URL=https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/fix/central-appscript-runner-20260821/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/Install-CentralAppsScriptRunner.ps1"
+set "RELEASE_REF=central-runner-readonly-bootstrap-v7"
+set "URL=https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/%RELEASE_REF%/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/Install-CentralAppsScriptRunner.ps1"
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -OutFile '%INSTALLER%'"
 if errorlevel 1 goto :fail
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%INSTALLER%" -IntervalMinutes 5
 if errorlevel 1 goto :fail
 echo.
-echo CENTRAL APPS SCRIPT RUNNER INSTALLED AND INITIAL RUN COMPLETED.
+echo CENTRAL APPS SCRIPT READ-ONLY RUNNER INSTALLED AND INITIAL RUN COMPLETED.
+echo RELEASE_REF=%RELEASE_REF%
 exit /b 0
 :fail
 echo.
