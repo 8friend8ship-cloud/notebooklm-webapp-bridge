@@ -1,6 +1,8 @@
 {
   "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V2",
-  "version": "20260831.7-readonly-startup-gate",
+  "mode": "READ_ONLY_BOOTSTRAP",
+  "releaseRef": "central-runner-readonly-bootstrap-v7",
+  "version": "20260831.8-immutable-readonly-release",
   "pollIntervalMinutes": 5,
   "tasks": [
     {
@@ -10,7 +12,7 @@
       "targetTitle": "WEBAPP_TEMPLATE_07",
       "expectedDeploymentId": "AKfycbyzSZZqDwMAgqltkfCYQb4-aIZ4zSFlRHkh9dyN5F_Qd7hfUev6oVNqjUSsEtYE3b4VBA",
       "maxAttempts": 3,
-      "notes": "Known-good Travel runtime preserved. Disabled to prevent duplicate repair."
+      "notes": "Known-good Travel runtime preserved. Mutation disabled in read-only bootstrap release."
     },
     {
       "taskId": "TASK_20260822_CONTENTOS_BOUND_SYNC_001",
@@ -19,14 +21,14 @@
       "targetTitle": "WEBAPP_TEMPLATE_05",
       "expectedDeploymentId": "AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo",
       "maxAttempts": 3,
-      "notes": "Mutation-capable ContentOS sync is intentionally gated off during bootstrap. Enable only after exact bound read-only recovery receipt and explicit downstream promotion gate are verified."
+      "notes": "ContentOS mutation is disabled in read-only bootstrap release. A separately reviewed promotion release is required."
     },
     {
       "taskId": "TASK_20260829_CHROME_FLOW_HEALTH_RECOVERY_002",
       "action": "CHROME_FLOW_HEALTH",
       "enabled": false,
       "maxAttempts": 5,
-      "notes": "Unrelated browser/Flow recovery is disabled during Central Apps Script Runner bootstrap. Preserve existing task without execution until the read-only Apps Script recovery gate is terminal."
+      "notes": "Unrelated browser/Flow action disabled in read-only bootstrap release."
     },
     {
       "taskId": "TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_001",
@@ -35,16 +37,16 @@
       "targetTitle": "CENTRAL_RUNNER_REFRESH_X5_READONLY",
       "expectedDeploymentId": "RUNNER_REFRESH_X5_READONLY_20260831",
       "maxAttempts": 1,
-      "notes": "Superseded after parser-safe V2 validation. Disabled to prevent stale one-attempt state from blocking the corrected retry."
+      "notes": "Superseded. Fresh installer already installs the pinned read-only release runner."
     },
     {
       "taskId": "TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_002",
       "action": "CONTENTOS_APPS_SCRIPT_SYNC",
-      "enabled": true,
+      "enabled": false,
       "targetTitle": "CENTRAL_RUNNER_REFRESH_X5_READONLY",
       "expectedDeploymentId": "RUNNER_REFRESH_X5_READONLY_20260831",
       "maxAttempts": 1,
-      "notes": "Local-runner-file-only refresh. No clasp/Git/OAuth/Apps Script/deployment/trigger mutation. Writes CENTRAL_APPS_SCRIPT_RUNNER_X5_READONLY_REFRESH_RESULT.json."
+      "notes": "Disabled in immutable bootstrap release. Fresh installer verifies the pinned runner before scheduling it."
     },
     {
       "taskId": "TASK_20260831_NOTEBOOKLM_BOUND_READONLY_RECOVERY_001",
@@ -54,7 +56,7 @@
       "expectedSpreadsheetId": "1TbQxEcCiiibu2-EmMGEdt79v4AUpE8JL2XrDEKeVRCk",
       "expectedDeploymentId": "AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P",
       "maxAttempts": 1,
-      "notes": "Read-only recovery only: reuse existing clasp authorization, resolve exact Script ID by exact title, clone source and verify deployment invariant, write local/central receipt. No push/deploy/trigger/project/OAuth mutation."
+      "notes": "Sole enabled bootstrap task. Reuse existing clasp authorization, resolve exact Script ID by exact title, clone source and verify deployment invariant, write local/central receipt. No push/deploy/trigger/project/OAuth mutation."
     }
   ]
 }
