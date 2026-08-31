@@ -7,12 +7,14 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 if ($IntervalMinutes -lt 5) { throw 'IntervalMinutes must be at least 5.' }
 
+$releaseRef = 'central-runner-readonly-bootstrap-v7'
+$expectedRunnerVersion = 'CENTRAL_APPS_SCRIPT_RUNNER_V2_READONLY_BOOTSTRAP_V7_20260831'
 $installDir = Join-Path $env:LOCALAPPDATA 'CentralAppsScriptRunner'
 $runnerPath = Join-Path $installDir 'CentralAppsScriptRunner.ps1'
 $wrapperPath = Join-Path $installDir 'CentralAppsScriptRunnerWrapper.ps1'
 $statePath = Join-Path $installDir 'state.json'
 $logPath = Join-Path $installDir 'install.log'
-$runnerUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/fix/central-appscript-runner-20260821/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1'
+$runnerUrl = "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/$releaseRef/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1"
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 
 function Write-InstallLog([string]$Message) {
@@ -20,13 +22,9 @@ function Write-InstallLog([string]$Message) {
 }
 
 try {
-  # Fail closed: this installer may reuse an already-approved clasp installation,
-  # but it must never install/update clasp or start a new login/project/deployment.
   $claspCmd = Get-Command clasp.cmd -ErrorAction SilentlyContinue
   if (!$claspCmd) { throw 'EXISTING_CLASP_CMD_REQUIRED_NO_INSTALL_STARTED' }
 
-  # Reuse only the authorization already verified on this Windows profile.
-  # Never start a new clasp login or create a new project/deployment here.
   & $claspCmd.Source show-authorized-user --json *> $null
   if ($LASTEXITCODE -ne 0) {
     & $claspCmd.Source show-authorized-user *> $null
@@ -34,8 +32,16 @@ try {
   }
   Write-InstallLog 'Existing clasp authorization verified through clasp.cmd.'
 
-  Invoke-WebRequest -UseBasicParsing -Uri $runnerUrl -OutFile $runnerPath
-  if (!(Test-Path $runnerPath) -or (Get-Item $runnerPath).Length -lt 1000) { throw 'RUNNER_DOWNLOAD_FAILED' }
+  Invoke-WebRequest -UseBasicParsing -Uri $runnerUrl -OutFile $runnerPath -TimeoutSec 30
+  if (!(Test-Path $runnerPath) -or (Get-Item $runnerPath).Length -lt 2000) { throw 'RUNNER_DOWNLOAD_FAILED' }
+  $tokens=$null; $parseErrors=$null
+  [System.Management.Automation.Language.Parser]::ParseFile($runnerPath,[ref]$tokens,[ref]$parseErrors) | Out-Null
+  if ($parseErrors.Count -gt 0) { throw 'RUNNER_PARSE_FAILED' }
+  $runnerText = Get-Content -Raw -LiteralPath $runnerPath
+  if ($runnerText -notmatch [regex]::Escape($expectedRunnerVersion)) { throw 'RUNNER_VERSION_MISMATCH' }
+  if ($runnerText -notmatch "MUTATION_ACTION_DISABLED_IN_READONLY_BOOTSTRAP_RELEASE") { throw 'RUNNER_MUTATION_GATE_MISSING' }
+  if ($runnerText -notmatch [regex]::Escape($releaseRef)) { throw 'RUNNER_RELEASE_REF_MISMATCH' }
+  Write-InstallLog "Pinned read-only runner verified releaseRef=$releaseRef version=$expectedRunnerVersion."
 
   $wrapper = @'
 & "$env:LOCALAPPDATA\CentralAppsScriptRunner\CentralAppsScriptRunner.ps1"
@@ -62,10 +68,11 @@ exit $LASTEXITCODE
   if (!(Test-Path $statePath)) { throw 'RUNNER_STATE_NOT_CREATED' }
 
   $registered = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
-  Write-InstallLog "INSTALL_VERIFIED taskState=$($registered.State) runner=V2"
+  Write-InstallLog "INSTALL_VERIFIED taskState=$($registered.State) runner=$expectedRunnerVersion releaseRef=$releaseRef"
 
   Write-Host 'CENTRAL_APPS_SCRIPT_RUNNER_INSTALLED'
-  Write-Host 'RUNNER_VERSION=CENTRAL_APPS_SCRIPT_RUNNER_V2_20260822'
+  Write-Host "RUNNER_VERSION=$expectedRunnerVersion"
+  Write-Host "RELEASE_REF=$releaseRef"
   Write-Host "TASK_NAME=$TaskName"
   Write-Host "INTERVAL_MINUTES=$IntervalMinutes"
   Write-Host "RUNNER_PATH=$runnerPath"
