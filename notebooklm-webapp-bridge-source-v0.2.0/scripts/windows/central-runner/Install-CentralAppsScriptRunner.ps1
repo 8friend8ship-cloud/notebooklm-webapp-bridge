@@ -20,16 +20,10 @@ function Write-InstallLog([string]$Message) {
 }
 
 try {
+  # Fail closed: this installer may reuse an already-approved clasp installation,
+  # but it must never install/update clasp or start a new login/project/deployment.
   $claspCmd = Get-Command clasp.cmd -ErrorAction SilentlyContinue
-  if (!$claspCmd) {
-    $npmCmd = Get-Command npm.cmd -ErrorAction SilentlyContinue
-    if (!$npmCmd) { throw 'CLASP_CMD_AND_NPM_CMD_NOT_FOUND' }
-    Write-InstallLog 'clasp.cmd missing; installing current @google/clasp with npm.cmd.'
-    & $npmCmd.Source install --global '@google/clasp@latest'
-    if ($LASTEXITCODE -ne 0) { throw 'CLASP_INSTALL_FAILED' }
-    $claspCmd = Get-Command clasp.cmd -ErrorAction SilentlyContinue
-    if (!$claspCmd) { throw 'CLASP_CMD_NOT_FOUND_AFTER_INSTALL' }
-  }
+  if (!$claspCmd) { throw 'EXISTING_CLASP_CMD_REQUIRED_NO_INSTALL_STARTED' }
 
   # Reuse only the authorization already verified on this Windows profile.
   # Never start a new clasp login or create a new project/deployment here.
