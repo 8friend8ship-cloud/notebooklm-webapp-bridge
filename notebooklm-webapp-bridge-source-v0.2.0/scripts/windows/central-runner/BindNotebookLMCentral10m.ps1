@@ -54,6 +54,33 @@ function Get-ScriptFiles([string]$Root) {
   return @(Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object { $_.Extension.ToLowerInvariant() -in @('.gs','.js') })
 }
 
+function Resolve-ClaspRoot([string]$CloneDir) {
+  $configPath = Join-Path $CloneDir '.clasp.json'
+  $rootDir = $CloneDir
+  $primaryExt = '.gs'
+  if (Test-Path -LiteralPath $configPath) {
+    $cfg = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
+    if ($cfg.rootDir) { $rootDir = [IO.Path]::GetFullPath((Join-Path $CloneDir ([string]$cfg.rootDir))) }
+    if ($cfg.scriptExtensions -and @($cfg.scriptExtensions).Count -gt 0) {
+      $e = [string]@($cfg.scriptExtensions)[0]
+      if (!$e.StartsWith('.')) { $e = '.' + $e }
+      if ($e -in @('.gs','.js')) { $primaryExt = $e }
+    }
+  }
+  if (!(Test-Path -LiteralPath $rootDir -PathType Container)) { throw 'CLASP_ROOT_DIR_MISSING' }
+  return [ordered]@{ rootDir=$rootDir; primaryExt=$primaryExt }
+}
+
+function Find-QueueFile([string]$Root) {
+  $hits = @()
+  foreach ($f in (Get-ScriptFiles $Root)) {
+    $text = Get-Content -Raw -LiteralPath $f.FullName
+    if ($text -match 'function\s+processTaskQueue\s*\(\s*\)\s*\{') { $hits += $f }
+  }
+  if ($hits.Count -ne 1) { throw "PROCESS_TASK_QUEUE_DEFINITION_COUNT:$($hits.Count)" }
+  return $hits[0].FullName
+}
+
 $runtimeReadback = Find-CentralRuntimeReadback
 if ([string]::IsNullOrWhiteSpace($ReceiptPath)) {
   if ([string]::IsNullOrWhiteSpace($runtimeReadback)) { throw 'CENTRAL_RUNTIME_READBACK_FOLDER_NOT_FOUND' }
@@ -84,9 +111,10 @@ if ($deploymentBefore -notmatch [regex]::Escape($ExpectedDeploymentId)) { throw 
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $workRoot = Join-Path $env:TEMP "notebooklm-central-10m-bind-$stamp"
 $liveDir = Join-Path $workRoot 'live-before'
+$backupDir = Join-Path $workRoot 'rollback-before'
 $verifyDir = Join-Path $workRoot 'verify-after'
 $downloadDir = Join-Path $workRoot 'source'
-New-Item -ItemType Directory -Force -Path $workRoot,$liveDir,$verifyDir,$downloadDir | Out-Null
+New-Item -ItemType Directory -Force -Path $workRoot,$liveDir,$backupDir,$verifyDir,$downloadDir | Out-Null
 
 Push-Location $liveDir
 try {
@@ -97,29 +125,15 @@ try {
   }
 } finally { Pop-Location }
 
-$configPath = Join-Path $liveDir '.clasp.json'
-$rootDir = $liveDir
-$primaryExt = '.gs'
-if (Test-Path -LiteralPath $configPath) {
-  $cfg = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
-  if ($cfg.rootDir) { $rootDir = [IO.Path]::GetFullPath((Join-Path $liveDir ([string]$cfg.rootDir))) }
-  if ($cfg.scriptExtensions -and @($cfg.scriptExtensions).Count -gt 0) {
-    $e = [string]@($cfg.scriptExtensions)[0]
-    if (!$e.StartsWith('.')) { $e = '.' + $e }
-    if ($e -in @('.gs','.js')) { $primaryExt = $e }
-  }
+Get-ChildItem -LiteralPath $liveDir -Force | ForEach-Object {
+  Copy-Item -LiteralPath $_.FullName -Destination $backupDir -Recurse -Force
 }
-if (!(Test-Path -LiteralPath $rootDir -PathType Container)) { throw 'CLASP_ROOT_DIR_MISSING' }
 
+$resolved = Resolve-ClaspRoot $liveDir
+$rootDir = [string]$resolved.rootDir
+$primaryExt = [string]$resolved.primaryExt
+$queueFile = Find-QueueFile $rootDir
 $beforeFiles = Get-ScriptFiles $rootDir
-$queueHits = @()
-foreach ($f in $beforeFiles) {
-  $t = Get-Content -Raw -LiteralPath $f.FullName
-  if ($t -match 'function\s+processTaskQueue\s*\(\s*\)\s*\{') { $queueHits += $f }
-}
-if ($queueHits.Count -ne 1) { throw "PROCESS_TASK_QUEUE_DEFINITION_COUNT:$($queueHits.Count)" }
-$queueFile = $queueHits[0].FullName
-$queueBeforeText = Get-Content -Raw -LiteralPath $queueFile
 
 $sourcePath = Join-Path $downloadDir 'DriveAutoClassifySeedWriteback10m.gs'
 Invoke-WebRequest -UseBasicParsing -Uri $SourceUrl -OutFile $sourcePath -TimeoutSec 30
@@ -129,9 +143,15 @@ if ($sourceText -notmatch 'DRIVE_AUTO_CLASSIFY_SEED_WRITEBACK_V1_20260831') { th
 if ($sourceText -notmatch 'function\s+runDriveAutoClassifySeedWriteback10m\s*\(') { throw 'PINNED_10M_HANDLER_MISSING' }
 if ($sourceText -notmatch 'function\s+runDriveAutoClassifySeedWriteback10mFromFactoryV1\s*\(') { throw 'PINNED_10M_FACTORY_HANDLER_MISSING' }
 if ($sourceText -match 'ScriptApp\.newTrigger\s*\(') { throw 'PINNED_10M_SOURCE_FORBIDDEN_NEW_TRIGGER' }
+$sourceSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $sourcePath).Hash.ToLowerInvariant()
 
 $targetModule = Join-Path $rootDir ('DriveAutoClassifySeedWriteback10m' + $primaryExt)
-Copy-Item -Force -LiteralPath $sourcePath -Destination $targetModule
+if (Test-Path -LiteralPath $targetModule) {
+  $existingModuleSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $targetModule).Hash.ToLowerInvariant()
+  if ($existingModuleSha -ne $sourceSha256) { throw 'PREEXISTING_10M_MODULE_HASH_MISMATCH_ABORT' }
+} else {
+  Copy-Item -LiteralPath $sourcePath -Destination $targetModule
+}
 
 $hookNeedle = 'runDriveAutoClassifySeedWriteback10mFromFactoryV1'
 $queueText = Get-Content -Raw -LiteralPath $queueFile
@@ -154,45 +174,62 @@ if ($queueAfterText -match 'ScriptApp\.newTrigger\s*\(') { throw 'LOCAL_QUEUE_FO
 $beforeManifest = @($beforeFiles | ForEach-Object {
   [ordered]@{path=$_.FullName.Substring($rootDir.Length).TrimStart('\\','/');sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()}
 })
-$sourceSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $sourcePath).Hash.ToLowerInvariant()
 
-Push-Location $liveDir
+$pushPerformed = $false
+$rollbackPerformed = $false
 try {
-  & $clasp.Source show-file-status *> $null
-  if ($LASTEXITCODE -ne 0) { throw 'CLASP_SHOW_FILE_STATUS_FAILED' }
-  & $clasp.Source push --force
-  if ($LASTEXITCODE -ne 0) { throw 'CLASP_PUSH_FAILED' }
-} finally { Pop-Location }
+  Push-Location $liveDir
+  try {
+    & $clasp.Source show-file-status *> $null
+    if ($LASTEXITCODE -ne 0) { throw 'CLASP_SHOW_FILE_STATUS_FAILED' }
+    & $clasp.Source push --force
+    if ($LASTEXITCODE -ne 0) { throw 'CLASP_PUSH_FAILED' }
+    $pushPerformed = $true
+  } finally { Pop-Location }
 
-Push-Location $verifyDir
-try {
-  & $clasp.Source clone-script $scriptId *> $null
-  if ($LASTEXITCODE -ne 0) {
-    & $clasp.Source clone $scriptId *> $null
-    if ($LASTEXITCODE -ne 0) { throw 'CLASP_VERIFY_CLONE_FAILED' }
+  Push-Location $verifyDir
+  try {
+    & $clasp.Source clone-script $scriptId *> $null
+    if ($LASTEXITCODE -ne 0) {
+      & $clasp.Source clone $scriptId *> $null
+      if ($LASTEXITCODE -ne 0) { throw 'CLASP_VERIFY_CLONE_FAILED' }
+    }
+  } finally { Pop-Location }
+
+  $verifyResolved = Resolve-ClaspRoot $verifyDir
+  $verifyRoot = [string]$verifyResolved.rootDir
+  $verifyFiles = Get-ScriptFiles $verifyRoot
+  $verifyAll = ($verifyFiles | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
+  if (([regex]::Matches($verifyAll, 'function\s+runDriveAutoClassifySeedWriteback10m\s*\(')).Count -ne 1) { throw 'READBACK_HANDLER_DEFINITION_COUNT_NOT_ONE' }
+  $verifyQueueFile = Find-QueueFile $verifyRoot
+  $verifyQueueText = Get-Content -Raw -LiteralPath $verifyQueueFile
+  if (([regex]::Matches($verifyQueueText, [regex]::Escape($hookNeedle) + '\s*\(')).Count -ne 1) { throw 'READBACK_FACTORY_HOOK_COUNT_NOT_ONE' }
+  if ($verifyQueueText -match 'ScriptApp\.newTrigger\s*\(') { throw 'READBACK_QUEUE_FORBIDDEN_NEW_TRIGGER' }
+
+  $deploymentAfter = (& $clasp.Source list-deployments $scriptId 2>&1 | Out-String)
+  if ($LASTEXITCODE -ne 0) { throw 'CLASP_LIST_DEPLOYMENTS_AFTER_FAILED' }
+  if ($deploymentAfter -notmatch [regex]::Escape($ExpectedDeploymentId)) { throw 'EXPECTED_DEPLOYMENT_NOT_FOUND_AFTER' }
+
+  $verifyModule = @($verifyFiles | Where-Object { $_.BaseName -eq 'DriveAutoClassifySeedWriteback10m' })
+  if ($verifyModule.Count -ne 1) { throw "READBACK_10M_MODULE_COUNT:$($verifyModule.Count)" }
+  $verifyModuleSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $verifyModule[0].FullName).Hash.ToLowerInvariant()
+  if ($verifyModuleSha256 -ne $sourceSha256) { throw 'READBACK_10M_MODULE_HASH_MISMATCH' }
+} catch {
+  $bindError = $_.Exception.Message
+  if ($pushPerformed) {
+    try {
+      Push-Location $backupDir
+      try {
+        & $clasp.Source push --force *> $null
+        if ($LASTEXITCODE -ne 0) { throw 'ROLLBACK_CLASP_PUSH_FAILED' }
+        $rollbackPerformed = $true
+      } finally { Pop-Location }
+    } catch {
+      throw "BIND_FAILED_AND_ROLLBACK_FAILED:$bindError|$($_.Exception.Message)"
+    }
   }
-} finally { Pop-Location }
-
-$verifyConfig = Join-Path $verifyDir '.clasp.json'
-$verifyRoot = $verifyDir
-if (Test-Path -LiteralPath $verifyConfig) {
-  $vcfg = Get-Content -Raw -LiteralPath $verifyConfig | ConvertFrom-Json
-  if ($vcfg.rootDir) { $verifyRoot = [IO.Path]::GetFullPath((Join-Path $verifyDir ([string]$vcfg.rootDir))) }
+  throw "BIND_FAILED_ROLLED_BACK:$bindError"
 }
-$verifyFiles = Get-ScriptFiles $verifyRoot
-$verifyAll = ($verifyFiles | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
-if (([regex]::Matches($verifyAll, 'function\s+runDriveAutoClassifySeedWriteback10m\s*\(')).Count -ne 1) { throw 'READBACK_HANDLER_DEFINITION_COUNT_NOT_ONE' }
-if (([regex]::Matches($verifyAll, [regex]::Escape($hookNeedle) + '\s*\(')).Count -ne 1) { throw 'READBACK_FACTORY_HOOK_COUNT_NOT_ONE' }
-if ($verifyAll -match 'ScriptApp\.newTrigger\s*\(') { throw 'READBACK_FORBIDDEN_NEW_TRIGGER' }
-
-$deploymentAfter = (& $clasp.Source list-deployments $scriptId 2>&1 | Out-String)
-if ($LASTEXITCODE -ne 0) { throw 'CLASP_LIST_DEPLOYMENTS_AFTER_FAILED' }
-if ($deploymentAfter -notmatch [regex]::Escape($ExpectedDeploymentId)) { throw 'EXPECTED_DEPLOYMENT_NOT_FOUND_AFTER' }
-
-$verifyModule = @($verifyFiles | Where-Object { $_.BaseName -eq 'DriveAutoClassifySeedWriteback10m' })
-if ($verifyModule.Count -ne 1) { throw "READBACK_10M_MODULE_COUNT:$($verifyModule.Count)" }
-$verifyModuleSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $verifyModule[0].FullName).Hash.ToLowerInvariant()
-if ($verifyModuleSha256 -ne $sourceSha256) { throw 'READBACK_10M_MODULE_HASH_MISMATCH' }
 
 $result = [ordered]@{
   ok = $true
@@ -214,6 +251,8 @@ $result = [ordered]@{
   handlerDefinitionCount = 1
   sourceReadback = $true
   moduleHashReadback = $true
+  rollbackSnapshotCreated = $true
+  rollbackPerformed = $rollbackPerformed
   newProjectCreated = $false
   oauthChanged = $false
   scopeChanged = $false
