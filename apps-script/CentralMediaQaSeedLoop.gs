@@ -379,7 +379,10 @@ function countPriorCentralMediaStrictPassesV1_(requirementId, templateId, curren
     const row=data[i]; if(String(row[h.REQUIREMENT_ID]||'')!==String(requirementId))continue;
     if(templateId && String(row[h.TEMPLATE_ID]||'')!==String(templateId))continue;
     if(!/^STRICT_PASS_X[12]/.test(String(row[h.STATUS]||'')))continue;
-    const blob=String(row[h.IMAGE_QA]||row[h.VIDEO_QA]||''); let j={}; try{j=JSON.parse(blob);}catch(e){}
+    const imageBlob=String(row[h.IMAGE_QA]||'');
+    const videoBlob=String(row[h.VIDEO_QA]||'');
+    const blob=imageBlob && imageBlob!=='N/A' ? imageBlob : videoBlob;
+    let j={}; try{j=JSON.parse(blob);}catch(e){}
     const rh=String(j.resultHash||''); if(rh && rh!==String(currentHash||''))hashes[rh]=1;
   }
   return Object.keys(hashes).length;
