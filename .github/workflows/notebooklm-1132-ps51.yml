@@ -1,0 +1,22 @@
+name: NotebookLM 1.1.132 Slides PS51
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1132-ps51.yml'
+      - 'local-agent/releases/1.1.132/HomeDesignLocalAgent.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.132/HomeDesignLocalAgent.ps1'
+          $t=$null;$e=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$t,[ref]$e)
+          if($e.Count){foreach($x in $e){Write-Host ($x.Extent.StartLineNumber.ToString()+':'+$x.Extent.StartColumnNumber+' '+$x.Message)};exit 1}
+          $s=Get-Content $f -Raw -Encoding UTF8
+          foreach($n in @('8d1eda83-cfe3-4487-b2bc-266a5be3465c','855098a7c3549c8eabe7c128b694fd2a567ff974','NLM_FRESH_SLIDES_20260829_1915_01','taskType=''SLIDES''','__NLM_RUN_TASK__','generationReady','downloadAttempted=$false','driveMirrorAttempted=$false','AGENT_1.1.132_STABLE_RUNNER_SLIDES_GENERATION_RESULT.json')){if(-not $s.Contains($n)){Write-Host ('MISSING '+$n);exit 1}}
+          Write-Host 'PARSE_AND_CONTRACT_PASS_1.1.132'
