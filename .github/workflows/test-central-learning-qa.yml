@@ -54,6 +54,8 @@ jobs:
           ok(/VIDEO_CONTINUITY_BELOW_90/.test(m),'video continuity gate exists');
           ok(/TABLET_SCREEN_OFF_CONTINUITY_FAIL/.test(m),'tablet screen-off gate exists');
           ok(/RESULT_HASH_MISSING/.test(m) && /LINEAGE_INCOMPLETE/.test(m),'physical hash and lineage gates exist');
+          ok(!m.includes("row[h.IMAGE_QA]||row[h.VIDEO_QA]"),'video X2 history N/A bug is absent');
+          ok(m.includes("const blob=imageBlob && imageBlob!=='N/A' ? imageBlob : videoBlob;"),'video X2 history uses VIDEO_QA fallback');
           ok(!/ScriptApp\.newTrigger/.test(m),'strict media handler creates no physical trigger');
           ok(/quarantineLegacyGenericMediaSeedV1_/.test(m),'legacy generic media Seed quarantine path exists');
           ok(/promoteCentralMediaStrictPassV1_/.test(m),'strict media x2 Seed promotion path exists');
