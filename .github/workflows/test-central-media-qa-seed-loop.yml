@@ -31,6 +31,8 @@ jobs:
           ok(/TABLET_SCREEN_OFF_CONTINUITY_FAIL/.test(q),'tablet screen-off gate exists');
           ok(/STRICT_PASS_X1_CANDIDATE/.test(q) && /STRICT_PASS_X2_PROMOTED/.test(q),'x1 candidate/x2 promotion states exist');
           ok(/SEED_HOLD_MEDIA_GATE_REQUIRED/.test(q),'legacy generic media seed quarantine exists');
+          ok(!q.includes("row[h.IMAGE_QA]||row[h.VIDEO_QA]"),'video X2 history does not stop at IMAGE_QA N/A');
+          ok(q.includes("const blob=imageBlob && imageBlob!=='N/A' ? imageBlob : videoBlob;"),'video X2 history falls back to VIDEO_QA when IMAGE_QA is N/A');
           ok(/NO_NEW_OPENAI_API/.test(q) && /SUBSCRIPTION_UI_FIRST/.test(q),'no new API budget / UI-first policy exists');
           ok(!/newTrigger\(/.test(q) && !/timeBased\(/.test(q),'module creates no physical trigger');
           ok(m.schema==='CENTRAL_MEDIA_RESULT_MANIFEST_V1','manifest schema exists');
