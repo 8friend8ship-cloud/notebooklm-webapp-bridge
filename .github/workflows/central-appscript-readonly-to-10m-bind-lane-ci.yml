@@ -1,0 +1,33 @@
+name: Central Apps Script Readonly To 10m Bind Lane CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/appscript-readonly-to-10m-bind-lane-20260901
+    paths:
+      - 'local-agent/stable/appscript.json'
+      - 'local-agent/releases/appscript-0.1.1/HomeDesignLocalAgent.ps1'
+      - 'tests/central-appscript-readonly-to-10m-bind-lane.test.ps1'
+      - '.github/workflows/central-appscript-readonly-to-10m-bind-lane-ci.yml'
+  pull_request:
+    paths:
+      - 'local-agent/stable/appscript.json'
+      - 'local-agent/releases/appscript-0.1.1/HomeDesignLocalAgent.ps1'
+      - 'tests/central-appscript-readonly-to-10m-bind-lane.test.ps1'
+      - '.github/workflows/central-appscript-readonly-to-10m-bind-lane-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Two-stage lane contract x2
+        shell: pwsh
+        run: |
+          ./tests/central-appscript-readonly-to-10m-bind-lane.test.ps1
+          ./tests/central-appscript-readonly-to-10m-bind-lane.test.ps1
