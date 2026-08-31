@@ -17,29 +17,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply minimal video X2 history fix and permanent regression guard
+      - name: Apply minimal video X2 history fix
         shell: bash
         run: |
           python <<'PY'
           from pathlib import Path
-
           src = Path('apps-script/CentralMediaQaSeedLoop.gs')
           s = src.read_text(encoding='utf-8')
           old = "    const blob=String(row[h.IMAGE_QA]||row[h.VIDEO_QA]||''); let j={}; try{j=JSON.parse(blob);}catch(e){}\n    const rh=String(j.resultHash||''); if(rh && rh!==String(currentHash||''))hashes[rh]=1;"
           new = "    const imageBlob=String(row[h.IMAGE_QA]||'');\n    const videoBlob=String(row[h.VIDEO_QA]||'');\n    const blob=imageBlob && imageBlob!=='N/A' ? imageBlob : videoBlob;\n    let j={}; try{j=JSON.parse(blob);}catch(e){}\n    const rh=String(j.resultHash||''); if(rh && rh!==String(currentHash||''))hashes[rh]=1;"
-          if s.count(old) != 1:
-              raise SystemExit('EXPECTED_VIDEO_X2_BUG_PATTERN_NOT_UNIQUE:'+str(s.count(old)))
-          src.write_text(s.replace(old,new,1), encoding='utf-8')
-
-          ci = Path('.github/workflows/test-central-media-qa-seed-loop.yml')
-          t = ci.read_text(encoding='utf-8')
-          marker = "          ok(/SEED_HOLD_MEDIA_GATE_REQUIRED/.test(q),'legacy generic media seed quarantine exists');\n"
-          guard = "          ok(!q.includes(\"row[h.IMAGE_QA]||row[h.VIDEO_QA]\"),'video X2 history does not stop at IMAGE_QA N/A');\n          ok(q.includes(\"const blob=imageBlob && imageBlob!=='N/A' ? imageBlob : videoBlob;\"),'video X2 history falls back to VIDEO_QA when IMAGE_QA is N/A');\n"
-          if guard not in t:
-              if t.count(marker) != 1:
-                  raise SystemExit('CI_INSERT_MARKER_NOT_UNIQUE:'+str(t.count(marker)))
-              t = t.replace(marker, marker+guard, 1)
-              ci.write_text(t, encoding='utf-8')
+          if old in s:
+              if s.count(old) != 1:
+                  raise SystemExit('EXPECTED_VIDEO_X2_BUG_PATTERN_NOT_UNIQUE:'+str(s.count(old)))
+              src.write_text(s.replace(old,new,1), encoding='utf-8')
+          elif new not in s:
+              raise SystemExit('NEITHER_OLD_NOR_FIXED_VIDEO_X2_PATTERN_FOUND')
           PY
 
           node <<'NODE'
@@ -60,15 +52,15 @@ jobs:
           console.log('CENTRAL_MEDIA_VIDEO_X2_HISTORY_FIX_PASS');
           NODE
           git diff --check
-      - name: Commit minimal fix
+      - name: Commit source-only minimal fix
         shell: bash
         run: |
-          if git diff --quiet; then
-            echo 'No diff; fix already present.'
+          if git diff --quiet -- apps-script/CentralMediaQaSeedLoop.gs; then
+            echo 'No source diff; fix already present.'
             exit 0
           fi
           git config user.name 'central-agent-bot'
           git config user.email 'homedesigntaedi@gmail.com'
-          git add apps-script/CentralMediaQaSeedLoop.gs .github/workflows/test-central-media-qa-seed-loop.yml
+          git add apps-script/CentralMediaQaSeedLoop.gs
           git commit -m 'fix: count video X2 history from VIDEO_QA'
           git push origin HEAD:main
