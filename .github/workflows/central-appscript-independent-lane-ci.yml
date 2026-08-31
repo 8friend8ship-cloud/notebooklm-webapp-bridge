@@ -1,6 +1,7 @@
 name: Central Apps Script Independent Lane CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - fix/central-appscript-independent-lane-20260901
