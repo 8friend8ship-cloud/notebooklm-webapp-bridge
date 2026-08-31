@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.130",
-  "releasedAt": "2026-08-31T12:01:35+09:00",
-  "gitBlobSha1": "471a6e9d8affb1ba15948e634894ddf2c132bcb9",
+  "version": "1.1.131",
+  "releasedAt": "2026-08-31T12:45:44+09:00",
+  "gitBlobSha1": "91be5fc037f4bc34eb2a880f8ff9a4658fabc8c2",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.130_EXACT_AUDIO_DOWNLOAD_DRIVE_VERIFY_RESULT.json",
-  "notes": "Download-only minimal fallback after 1.1.129 primary helper argument-type failure. Uses physically proven 1.1.127 CDP primitives, exact fresh audio title, more/download controls, completed-file stable-size gate, canonical Python raw audio verifier, then project Drive-sync copy with size/SHA equality. No new generation/notebook/source; Bridge 0.2.39 unchanged. Final cloud PASS requires Drive API file metadata and raw readback SHA/size."
+  "resultReceipt": "AGENT_1.1.131_CAPTUREBRIDGE_AUDIO_HANDOFF_RESULT.json",
+  "notes": "Exact already-downloaded NotebookLM M4A handoff only: require 35,482,290 bytes and SHA256 1f14e203d0d8a7a2939803fb5a04e92386d95b35cc313e3c7f4a74083ef0e74c, copy unchanged into proven NotebookLM CaptureBridge local inbox, verify destination size/SHA and source immutability, then let existing reconcile mirror to Drive cloud. No regenerate/redownload, no Chrome/NotebookLM/Bridge/OAuth/scope changes; Bridge 0.2.39 preserved. Final PASS requires Drive cloud file metadata + raw readback SHA/size and canonical project output copy/readback."
 }
