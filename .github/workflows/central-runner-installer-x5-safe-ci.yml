@@ -26,16 +26,18 @@ jobs:
         run: |
           from pathlib import Path
           p=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/Install-CentralAppsScriptRunner.ps1')
-          t=p.read_text(encoding='utf-8').lower()
+          raw=p.read_text(encoding='utf-8')
+          t=raw.lower()
+          code='\n'.join(line.split('#',1)[0] for line in raw.splitlines()).lower()
           assert 'existing_clasp_cmd_required_no_install_started' in t
-          assert 'show-authorized-user' in t
-          assert 'register-scheduledtask' in t
-          assert 'runlevel limited' in t or "-runlevel limited" in t
-          for bad in ['npm.cmd.source install','@google/clasp@latest',' clasp login','login --','clasp create','clasp push','clasp deploy']:
-              assert bad not in t, bad
-          assert 'centralappsscriptrunnerv2.ps1' in t
-          assert 'initial_run_failed' in t
-          assert 'runner_state_not_created' in t
+          assert 'show-authorized-user' in code
+          assert 'register-scheduledtask' in code
+          assert '-runlevel limited' in code
+          for bad in ['npm.cmd.source install','@google/clasp@latest','clasp login','login --','clasp create','clasp push','clasp deploy']:
+              assert bad not in code, bad
+          assert 'centralappsscriptrunnerv2.ps1' in code
+          assert 'initial_run_failed' in code
+          assert 'runner_state_not_created' in code
       - name: X5 sequencing contract
         shell: python
         run: |
