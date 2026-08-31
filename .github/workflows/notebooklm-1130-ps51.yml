@@ -1,0 +1,22 @@
+name: NotebookLM 1.1.130 PS51 Parse
+on:
+  push:
+    paths:
+      - '.github/workflows/notebooklm-1130-ps51.yml'
+      - 'local-agent/releases/1.1.130/HomeDesignLocalAgent.ps1'
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $f='local-agent/releases/1.1.130/HomeDesignLocalAgent.ps1'
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+          if($errors.Count){foreach($e in $errors){Write-Host ($e.Extent.StartLineNumber.ToString()+':'+$e.Extent.StartColumnNumber+' '+$e.Message)};exit 1}
+          $s=Get-Content $f -Raw -Encoding UTF8
+          foreach($n in @('AGENT_1.1.130_EXACT_AUDIO_DOWNLOAD_DRIVE_VERIFY','EXACT_CARD','DOWNLOAD_MENU','WAIT_REAL_FILE','PYTHON_VERIFY','DRIVE_COPY','Browser.setDownloadBehavior','Page.setDownloadBehavior','notebooklm_raw_download_capture.py','--expected-media audio','DRIVE_COPY_SIZE_OR_SHA_MISMATCH','7ZqM7IKs66W8IO2GteynuOuhnCDsnpDrj5ntmZTtlZjripQgQUkg7JuM7YGs7ZSM66Gc')){if(-not $s.Contains($n)){throw ('MISSING_CONTRACT '+$n)}}
+          Write-Host 'PARSE_AND_CONTRACT_PASS_1.1.130'
