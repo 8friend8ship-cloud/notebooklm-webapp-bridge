@@ -1,6 +1,6 @@
 {
   "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V2",
-  "version": "20260831.5-runner-refresh-v2-only",
+  "version": "20260831.6-notebooklm-bound-readonly",
   "pollIntervalMinutes": 5,
   "tasks": [
     {
@@ -44,7 +44,17 @@
       "targetTitle": "CENTRAL_RUNNER_REFRESH_X5_READONLY",
       "expectedDeploymentId": "RUNNER_REFRESH_X5_READONLY_20260831",
       "maxAttempts": 1,
-      "notes": "Run only the x2-validated parser-safe local runner refresh. No clasp/Git/OAuth/Apps Script/deployment/trigger mutation. Writes CENTRAL_APPS_SCRIPT_RUNNER_X5_READONLY_REFRESH_RESULT.json. X5 recovery remains disabled until receipt readback."
+      "notes": "Refresh the x2-validated parser-safe local runner only. No clasp/Git/OAuth/Apps Script/deployment/trigger mutation. Writes CENTRAL_APPS_SCRIPT_RUNNER_X5_READONLY_REFRESH_RESULT.json."
+    },
+    {
+      "taskId": "TASK_20260831_NOTEBOOKLM_BOUND_READONLY_RECOVERY_001",
+      "action": "BOUND_APPS_SCRIPT_READONLY_RECOVERY",
+      "enabled": true,
+      "targetTitle": "WEBAPP_TEMPLATE_03",
+      "expectedSpreadsheetId": "1TbQxEcCiiibu2-EmMGEdt79v4AUpE8JL2XrDEKeVRCk",
+      "expectedDeploymentId": "AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P",
+      "maxAttempts": 1,
+      "notes": "Read-only recovery only: reuse existing clasp authorization, resolve exact Script ID by exact title, clone source and verify deployment invariant, write local/central receipt. No push/deploy/trigger/project/OAuth mutation."
     }
   ]
 }
