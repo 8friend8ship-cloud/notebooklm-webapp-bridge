@@ -1,6 +1,6 @@
 {
   "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V2",
-  "version": "20260829.2",
+  "version": "20260831.4-runner-refresh-only",
   "pollIntervalMinutes": 5,
   "tasks": [
     {
@@ -19,14 +19,23 @@
       "targetTitle": "WEBAPP_TEMPLATE_05",
       "expectedDeploymentId": "AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo",
       "maxAttempts": 3,
-      "notes": "Reuse existing Git/clasp authorization and existing WEBAPP_TEMPLATE_05 only. Clone/snapshot live source, copy canonical Content OS modules, inject exactly one fail-open scheduler adapter into existing processTaskQueue, push same Script ID, clean reclone readback. No new OAuth/project/deployment/physical trigger."
+      "notes": "Existing task preserved."
     },
     {
       "taskId": "TASK_20260829_CHROME_FLOW_HEALTH_RECOVERY_002",
       "action": "CHROME_FLOW_HEALTH",
       "enabled": true,
       "maxAttempts": 5,
-      "notes": "Second same-lineage Flow health wake after X1 stale claim. Preserve installed bridge/auth/session. Re-run safe bootstrap/dedicated Chrome/stable release/front/Apps Script/extension PING health so the extension service worker reloads and clears stale active handoff, then consume existing X2 READY task. No reinstall, no new OAuth/project/deployment, no Generate, no credit spend. Completion still requires Flow deep-connect RESULT/ACK x2 before any generation gate."
+      "notes": "Existing Flow health task preserved."
+    },
+    {
+      "taskId": "TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_001",
+      "action": "CONTENTOS_APPS_SCRIPT_SYNC",
+      "enabled": true,
+      "targetTitle": "CENTRAL_RUNNER_REFRESH_X5_READONLY",
+      "expectedDeploymentId": "RUNNER_REFRESH_X5_READONLY_20260831",
+      "maxAttempts": 1,
+      "notes": "Safe bootstrap piggybacks the already-allowlisted action. It only replaces the local CentralAppsScriptRunner.ps1 with the x2-validated X5 read-only dispatcher and writes CENTRAL_APPS_SCRIPT_RUNNER_X5_READONLY_REFRESH_RESULT.json. It does not call clasp/Git/OAuth/Apps Script/deployment/trigger and it does not enable the X5 recovery tasks."
     }
   ]
 }
