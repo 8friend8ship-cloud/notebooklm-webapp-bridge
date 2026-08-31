@@ -62,8 +62,8 @@ if($gate -lt 0 -or $push -le $gate -or $readback -le $push -or $deploymentAfter 
 
 if(([regex]::Matches($b,'&\s+\$clasp\.Source\s+push\s+--force')).Count -ne 2){throw 'BIND_PUSH_COUNT_EXPECT_PRIMARY_PLUS_ROLLBACK'}
 if(([regex]::Matches($b,'Assert-ReadOnlyReceipt')).Count -lt 2){throw 'BIND_READONLY_GATE_NOT_DEFINED_AND_CALLED'}
-if($b -notmatch "mutationPerformed\s*=\s*\$true"){throw 'BIND_MUTATION_SCOPE_NOT_EXPLICIT'}
-if($b -notmatch "rollbackPerformed\s*=\s*\$rollbackPerformed"){throw 'BIND_ROLLBACK_RESULT_MISSING'}
+if($b -notmatch 'mutationPerformed\s*=\s*\$true'){throw 'BIND_MUTATION_SCOPE_NOT_EXPLICIT'}
+if($b -notmatch 'rollbackPerformed\s*=\s*\$rollbackPerformed'){throw 'BIND_ROLLBACK_RESULT_MISSING'}
 
 $sourceMust=@(
   "DRIVE_AUTO_CLASSIFY_SEED_WRITEBACK_V1_20260831",
