@@ -1,58 +1,44 @@
 param(
-  [string]$TaskManifestUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/fix/central-appscript-runner-20260821/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/tasks.json'
+  [string]$TaskManifestUrl = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/central-runner-readonly-bootstrap-v7/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/tasks.json'
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$RunnerVersion = 'CENTRAL_APPS_SCRIPT_RUNNER_V2_X5_READONLY_20260831'
+$RunnerVersion = 'CENTRAL_APPS_SCRIPT_RUNNER_V2_READONLY_BOOTSTRAP_V7_20260831'
+$ReleaseRef = 'central-runner-readonly-bootstrap-v7'
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CentralAppsScriptRunner'
 $StatePath = Join-Path $StateRoot 'state.json'
 $LogPath = Join-Path $StateRoot 'runner.log'
-$AssetBase = 'https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/fix/central-appscript-runner-20260821/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner'
+$AssetBase = "https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/$ReleaseRef/notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner"
 New-Item -ItemType Directory -Force -Path $StateRoot | Out-Null
 
 function Write-RunnerLog([string]$Message) {
   Add-Content -LiteralPath $LogPath -Value "$(Get-Date -Format o) $Message"
 }
 function Load-State() {
-  if (!(Test-Path $StatePath)) { return [ordered]@{ runnerVersion=$RunnerVersion; tasks=@{} } }
+  if (!(Test-Path $StatePath)) { return [ordered]@{ runnerVersion=$RunnerVersion; releaseRef=$ReleaseRef; tasks=@{} } }
   try {
     $raw = Get-Content -Raw -LiteralPath $StatePath | ConvertFrom-Json
     $tasks = @{}
     if ($raw.tasks) { foreach ($p in $raw.tasks.PSObject.Properties) { $tasks[$p.Name] = $p.Value } }
-    return [ordered]@{ runnerVersion=$RunnerVersion; tasks=$tasks }
+    return [ordered]@{ runnerVersion=$RunnerVersion; releaseRef=$ReleaseRef; tasks=$tasks }
   } catch {
     Write-RunnerLog "STATE_PARSE_FAILED $($_.Exception.Message)"
-    return [ordered]@{ runnerVersion=$RunnerVersion; tasks=@{} }
+    return [ordered]@{ runnerVersion=$RunnerVersion; releaseRef=$ReleaseRef; tasks=@{} }
   }
 }
 function Save-State($State) {
-  [ordered]@{ runnerVersion=$RunnerVersion; updatedAt=(Get-Date).ToUniversalTime().ToString('o'); tasks=$State.tasks } |
+  [ordered]@{ runnerVersion=$RunnerVersion; releaseRef=$ReleaseRef; updatedAt=(Get-Date).ToUniversalTime().ToString('o'); tasks=$State.tasks } |
     ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $StatePath -Encoding UTF8
 }
 function Download-ActionScript([string]$Name) {
   $dest = Join-Path $StateRoot $Name
-  Invoke-WebRequest -UseBasicParsing -Uri "$AssetBase/$Name" -OutFile $dest
+  Invoke-WebRequest -UseBasicParsing -Uri "$AssetBase/$Name" -OutFile $dest -TimeoutSec 30
   if (!(Test-Path $dest) -or (Get-Item $dest).Length -lt 500) { throw "ACTION_SCRIPT_DOWNLOAD_FAILED:$Name" }
   return $dest
 }
 function Invoke-AllowlistedTask($Task) {
   switch ([string]$Task.action) {
-    'CONTENTOS_APPS_SCRIPT_SYNC' {
-      $script = Download-ActionScript 'ContentOSAppsScriptSync.ps1'
-      $json = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -TargetTitle ([string]$Task.targetTitle) -ExpectedDeploymentId ([string]$Task.expectedDeploymentId) 2>&1 | Out-String)
-      if ($LASTEXITCODE -ne 0) { throw "CONTENTOS_SYNC_FAILED:$json" }
-      try { return ($json | ConvertFrom-Json) } catch { return [ordered]@{ok=$true; action='CONTENTOS_APPS_SCRIPT_SYNC'; raw=$json.Trim()} }
-    }
-    'CHROME_FLOW_HEALTH' {
-      $script = Download-ActionScript 'ChromeFlowHealth.ps1'
-      $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$script)
-      if ($Task.appsScriptUrl) { $args += @('-AppsScriptUrl',[string]$Task.appsScriptUrl) }
-      if ($Task.frontendUrl) { $args += @('-FrontendUrl',[string]$Task.frontendUrl) }
-      $json = (& powershell.exe @args 2>&1 | Out-String)
-      if ($LASTEXITCODE -ne 0) { throw "CHROME_FLOW_HEALTH_FAILED:$json" }
-      try { return ($json | ConvertFrom-Json) } catch { return [ordered]@{ok=$true; action='CHROME_FLOW_HEALTH'; raw=$json.Trim()} }
-    }
     'BOUND_APPS_SCRIPT_READONLY_RECOVERY' {
       $script = Download-ActionScript 'RecoverExistingBoundAppsScript.ps1'
       $json = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script `
@@ -68,20 +54,26 @@ function Invoke-AllowlistedTask($Task) {
         throw "BOUND_READONLY_RECEIPT_PARSE_FAILED:$json"
       }
     }
+    'CONTENTOS_APPS_SCRIPT_SYNC' { throw 'MUTATION_ACTION_DISABLED_IN_READONLY_BOOTSTRAP_RELEASE' }
+    'CHROME_FLOW_HEALTH' { throw 'UNRELATED_BROWSER_ACTION_DISABLED_IN_READONLY_BOOTSTRAP_RELEASE' }
+    'TRAVEL_APPS_SCRIPT_REPAIR' { throw 'MUTATION_ACTION_DISABLED_IN_READONLY_BOOTSTRAP_RELEASE' }
     default { throw 'ACTION_NOT_WHITELISTED' }
   }
 }
 
 try {
-  Write-RunnerLog "RUN_START version=$RunnerVersion"
+  Write-RunnerLog "RUN_START version=$RunnerVersion releaseRef=$ReleaseRef"
   $manifest = Invoke-RestMethod -Uri $TaskManifestUrl -Method Get
-  if ([string]$manifest.channel -notin @('CENTRAL_APPS_SCRIPT_RUNNER_V1','CENTRAL_APPS_SCRIPT_RUNNER_V2')) { throw 'TASK_CHANNEL_MISMATCH' }
+  if ([string]$manifest.channel -ne 'CENTRAL_APPS_SCRIPT_RUNNER_V2') { throw 'TASK_CHANNEL_MISMATCH' }
+  if ([string]$manifest.mode -ne 'READ_ONLY_BOOTSTRAP') { throw 'TASK_MODE_MISMATCH' }
+  if ([string]$manifest.releaseRef -ne $ReleaseRef) { throw 'TASK_RELEASE_REF_MISMATCH' }
   $state = Load-State
   $runHadFailure = $false
   foreach ($task in @($manifest.tasks)) {
     if (!$task.enabled) { continue }
     $taskId = [string]$task.taskId
     if ([string]::IsNullOrWhiteSpace($taskId)) { continue }
+    if ([string]$task.action -ne 'BOUND_APPS_SCRIPT_READONLY_RECOVERY') { throw "ENABLED_NON_READONLY_TASK_BLOCKED:$taskId" }
     $existing = $state.tasks[$taskId]
     if ($existing -and [string]$existing.status -eq 'COMPLETED') { continue }
     $attempts = if ($existing -and $existing.attempts) { [int]$existing.attempts } else { 0 }
