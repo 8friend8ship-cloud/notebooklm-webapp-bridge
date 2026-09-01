@@ -53,8 +53,12 @@ function runNotebookLmMaxSafeCapacityGovernor5mIfDue_(now) {
     const candidates = rows.slice(1).map((row, i) => ({row, rowNumber:i + 2}))
       .filter(x => isNotebookLmReadyTask_(x.row, headers));
 
+    // Maximum safe capacity is live worker capacity, not all queued jobs at once.
+    // Default tablet UI concurrency is 1 unless the runner explicitly proves a higher safe value.
+    const safeSlots = Math.max(1, Math.min(5, Number(worker.safeConcurrency) || 1));
     let claimed = 0;
     for (const item of candidates) {
+      if (claimed >= safeSlots) break;
       const elapsed = Date.now() - started;
       const ratio = elapsed / NLM_CAPACITY_GOVERNOR_V1.executionBudgetMs;
       if (ratio >= NLM_CAPACITY_GOVERNOR_V1.stopAtRatio) break;
@@ -63,8 +67,8 @@ function runNotebookLmMaxSafeCapacityGovernor5mIfDue_(now) {
       claimNotebookLmTask_(queue, item, headers, current, worker.runnerId);
       claimed += 1;
 
-      // The governor claims as many safe tasks as the live execution budget permits.
       // Actual UI execution remains with the tablet worker and returns RESULT/ACK.
+      // Another slot is claimed only when the runner has explicitly reported safe concurrency.
       if (ratio >= NLM_CAPACITY_GOVERNOR_V1.throttleAtRatio) break;
     }
 
@@ -73,6 +77,7 @@ function runNotebookLmMaxSafeCapacityGovernor5mIfDue_(now) {
       status:claimed ? 'MAX_SAFE_CAPACITY_CLAIMED' : 'NO_READY_NOTEBOOKLM_TASK',
       owner:worker.runnerId,
       claimed,
+      safeSlots,
       laptopFallback:false,
       elapsedMs:Date.now() - started
     });
@@ -112,7 +117,10 @@ function findNotebookLmTabletWorker_(sheet, now) {
     const uiState = String(read_(row, h, ['UI_CONTROL_STATE','STATUS']) || '').toUpperCase();
     const fresh = Number.isFinite(age) && age >= 0 && age <= NLM_CAPACITY_GOVERNOR_V1.heartbeatFreshMs;
     const uiProof = /POSITIVE|UI_PASS|RUNTIME_VERIFIED|READY/.test(uiState);
-    return {runnerId, fresh, uiProof, reason:fresh ? 'POSITIVE_UI_PROOF_REQUIRED' : 'FRESH_HEARTBEAT_REQUIRED'};
+    const slotMatch = notes.match(/SAFE_CONCURRENCY=(\d+)/);
+    const safeConcurrency = slotMatch ? Number(slotMatch[1]) : 1;
+    return {runnerId, fresh, uiProof, safeConcurrency,
+      reason:fresh ? 'POSITIVE_UI_PROOF_REQUIRED' : 'FRESH_HEARTBEAT_REQUIRED'};
   }
   return {runnerId:NLM_CAPACITY_GOVERNOR_V1.owner, fresh:false, uiProof:false, reason:'TABLET_RUNNER_NOT_REGISTERED'};
 }
