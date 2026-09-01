@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.1.0",
-  "releasedAt": "2026-09-01T08:32:00+09:00",
-  "gitBlobSha1": "d8ed2414c89f04121c3b141e16ae9699ceb11fdf",
+  "version": "appscript-0.2.0-webapp05-deployment-discovery",
+  "releasedAt": "2026-09-01T16:43:00+09:00",
+  "gitBlobSha1": "325dd2b9302f9c8254a62e9c5e8cf5c179fc883a",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_APPSCRIPT_BOOTSTRAP_V1_RESULT.json",
-  "notes": "Independent fail-closed Central Apps Script lane. Reuses existing clasp/auth only, consumes immutable central-runner-readonly-bootstrap-v7 installer blob 896c06532a0ec0db0af445ce90a78c197a4a77c9, and requires exact WEBAPP_TEMPLATE_03 bound READ_ONLY receipt before PASS. No login/project/deployment/OAuth/new trigger; same-name ScheduledTask only; valid existing receipt skips reinstallation."
+  "resultReceipt": "APPSCRIPT_DISCOVER_WEBAPP_TEMPLATE_05_BY_DEPLOYMENT_0.2.0.json",
+  "notes": "Read-only exact discovery for existing WEBAPP_TEMPLATE_05 Apps Script. Reuse existing clasp auth only; enumerate existing Script IDs and match exact deployment AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo. No push, no deployment update, no project, no trigger, no OAuth/scope changes. Exact deployment match count must equal 1 before any later mutation lane is allowed."
 }
