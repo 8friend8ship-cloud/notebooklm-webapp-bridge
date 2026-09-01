@@ -1,14 +1,13 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "enabled": true,
-  "version": "1.1.147-bootstrap-maintenance-sentinel",
-  "releasedAt": "2026-09-01T16:33:00+09:00",
-  "gitBlobSha1": "5d4d75dfed94381034fa4fa600989cf6af54961b",
+  "enabled": false,
+  "version": "1.1.138",
+  "releasedAt": "2026-09-01T09:53:00+09:00",
+  "gitBlobSha1": "3c06deee79bae05dc22fd4efd275f2e7811b5bd7",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "maxCycleSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "BOOTSTRAP_MAINTENANCE_SENTINEL_1.1.147.json",
-  "notes": "BOOTSTRAP_MAINTENANCE_ONLY_V1. Temporary safe maintenance signal to refresh/restart only AgentBootstrap -Loop so current independent IMAGE/APPSCRIPT lanes load. Resume wrapper must bypass normal NotebookLM core while this flag is present. No Chrome/NotebookLM generation/Host/tablet lock/OAuth/task/trigger/deployment mutation. After maintenance receipt restore this stable metadata to TABLET_PRIMARY_HOLD 1.1.138 disabled."
+  "resultReceipt": "AGENT_1.1.138_NOTEBOOKLM_FRONT_CONSENT_LOOP_BYPASS_RESULT.json",
+  "notes": "TABLET_PRIMARY_HOLD_20260901. NotebookLM stable laptop lane is intentionally disabled while TABLET_ANDROID_01 owns or is eligible to own NotebookLM UI under LOCK_TABLET_ANDROID_01_UI. AgentBootstrap/AutoResume remain active for independent Flow, Image and Apps Script lanes. Re-enable this stable NotebookLM lane only after central traffic arbitration records tablet heartbeat stale/fail-closed or explicit WORKER=LAPTOP reassignment and releases the tablet NotebookLM claim/lock. Do not treat AGENT_STABLE_DISABLED as a failure during this hold."
 }
