@@ -1,13 +1,13 @@
 {
   "schemaVersion": 2,
   "channel": "stable",
-  "enabled": true,
+  "enabled": false,
   "version": "1.1.138",
-  "releasedAt": "2026-09-01T16:00:00+09:00",
+  "releasedAt": "2026-09-01T20:09:56+09:00",
   "gitBlobSha1": "3c06deee79bae05dc22fd4efd275f2e7811b5bd7",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
   "resultReceipt": "AGENT_1.1.138_NOTEBOOKLM_FRONT_CONSENT_LOOP_BYPASS_RESULT.json",
-  "notes": "LAPTOP_FALLBACK_REASSIGNED_20260901. Central traffic arbitration now records TABLET_ANDROID_01 as capability-blocked at a safe checkpoint because positive NotebookLM UI runtime proof could not be obtained after the Android16 permission-layer failure. Re-enable the existing stable NotebookLM laptop recovery lane exactly once. Preserve existing account/session/Bridge and do not create duplicate notebook/task. After recovery receipt PASS, continue the existing 2026-09-01 NotebookLM task lineage only; current quota-aware recovery target is Audio Overview + Slides, with Drive raw readback before Seed/Template promotion."
+  "notes": "TABLET_PRIMARY_HOLD_20260901_2009. Newest central queue state at 2026-09-01 19:28 KST explicitly returns NotebookLM ownership to TABLET_ANDROID_01 and disables laptop fallback for row457. Keep laptop NotebookLM stable disabled. Do not run laptop NotebookLM recovery or dedicated laptop NotebookLM while this hold is active. Global AutoResume remains valid for independent Flow/Image/AppScript lanes. Re-enable only after central traffic arbitration explicitly releases tablet NotebookLM ownership and records WORKER=LAPTOP reassignment."
 }
