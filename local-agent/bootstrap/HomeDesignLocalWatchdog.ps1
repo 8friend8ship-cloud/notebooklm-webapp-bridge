@@ -2,7 +2,7 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 
-$WatchdogVersion='WATCHDOG_V5_NOTEBOOKLM_RUNTIME_HEALTH_20260901'
+$WatchdogVersion='WATCHDOG_V6_TABLET_PRIMARY_HOLD_AWARE_20260901'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $StateFile=Join-Path $Root 'state.json'
@@ -48,7 +48,19 @@ function StateFresh{
   try{$item=Get-Item -LiteralPath $StateFile -ErrorAction Stop;return (((Get-Date)-$item.LastWriteTime).TotalSeconds -le $MaxStateAgeSeconds)}catch{return $false}
 }
 function CurrentAgentVersion{if(-not(Test-Path -LiteralPath $StateFile)){return ''};try{return [string]((Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8|ConvertFrom-Json).agentVersion)}catch{return ''}}
-function StableTargetVersion{try{$meta=Invoke-RestMethod -Uri ($StableMetaUrl+'?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Method Get -TimeoutSec 5;if($meta -and $meta.enabled){return [string]$meta.version}}catch{};return ''}
+function StableTargetState{
+  $result=[ordered]@{reachable=$false;enabled=$true;version='';notes='';error=''}
+  try{
+    $meta=Invoke-RestMethod -Uri ($StableMetaUrl+'?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Method Get -TimeoutSec 5
+    if($meta){
+      $result.reachable=$true
+      $result.enabled=[bool]$meta.enabled
+      $result.version=[string]$meta.version
+      $result.notes=[string]$meta.notes
+    }
+  }catch{$result.error=$_.Exception.Message}
+  return [pscustomobject]$result
+}
 function KillTree([int]$ProcessId){try{& taskkill.exe /PID $ProcessId /T /F 2>$null|Out-Null}catch{try{Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue}catch{}}}
 function NotebookLMRuntimeHealth{
   $result=[ordered]@{ok=$false;dedicatedProcessCount=0;cdpReachable=$false;serviceWorkerFound=$false;extensionId='';pageTargetFound=$false;error=''}
@@ -72,20 +84,28 @@ function NotebookLMRuntimeHealth{
 
 $startedAt=Get-Date
 $started=$startedAt.ToString('o')
-SaveEntryReceipt ([ordered]@{ok=$true;action='WATCHDOG_ENTRY_V5';version=$WatchdogVersion;pid=$PID;startedAt=$started;autoResumeTimeoutSeconds=$AutoResumeTimeoutSeconds;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false})
+SaveEntryReceipt ([ordered]@{ok=$true;action='WATCHDOG_ENTRY_V6';version=$WatchdogVersion;pid=$PID;startedAt=$started;autoResumeTimeoutSeconds=$AutoResumeTimeoutSeconds;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false})
 
 $hostOk=HostHealthy
 $bootstrapOk=BootstrapLoopPresent
 $stateOk=StateFresh
 $currentVersion=CurrentAgentVersion
-$targetVersion=StableTargetVersion
+$stable=StableTargetState
+$tabletPrimaryHold=[bool]($stable.reachable -and -not $stable.enabled -and ([string]$stable.notes -match 'TABLET_PRIMARY_HOLD'))
+if($tabletPrimaryHold){
+  Log ('TABLET_PRIMARY_HOLD stableEnabled=0 current='+$currentVersion+' stableVersion='+[string]$stable.version)
+  SaveReceipt ([ordered]@{ok=$true;action='WATCHDOG_TABLET_PRIMARY_HOLD_V6';version=$WatchdogVersion;startedAt=$started;completedAt=(Get-Date).ToString('o');hostHealthy=$hostOk;bootstrapLoopPresent=$bootstrapOk;stateFresh=$stateOk;currentVersion=$currentVersion;targetVersion=[string]$stable.version;stableMetaReachable=$true;stableEnabled=$false;stableNotes=[string]$stable.notes;notebooklmRuntimeChecked=$false;autoResumeInvoked=$false;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=0})
+  exit 0
+}
+
+$targetVersion=if($stable.enabled){[string]$stable.version}else{''}
 $versionOk=(!$targetVersion -or ($currentVersion -eq $targetVersion))
 $nlm=NotebookLMRuntimeHealth
 $notebooklmRuntimeOk=[bool]$nlm.ok
 
 if($hostOk -and $bootstrapOk -and $stateOk -and $versionOk -and $notebooklmRuntimeOk){
   Log ('PASS host=1 bootstrap=1 stateFresh=1 notebooklmRuntime=1 current='+$currentVersion+' target='+$targetVersion)
-  SaveReceipt ([ordered]@{ok=$true;action='WATCHDOG_PASS_V5';version=$WatchdogVersion;startedAt=$started;completedAt=(Get-Date).ToString('o');hostHealthy=$true;bootstrapLoopPresent=$true;stateFresh=$true;notebooklmRuntimeHealthy=$true;notebooklmRuntime=$nlm;currentVersion=$currentVersion;targetVersion=$targetVersion;autoResumeInvoked=$false;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=0})
+  SaveReceipt ([ordered]@{ok=$true;action='WATCHDOG_PASS_V6';version=$WatchdogVersion;startedAt=$started;completedAt=(Get-Date).ToString('o');hostHealthy=$true;bootstrapLoopPresent=$true;stateFresh=$true;notebooklmRuntimeHealthy=$true;notebooklmRuntime=$nlm;currentVersion=$currentVersion;targetVersion=$targetVersion;stableMetaReachable=[bool]$stable.reachable;stableEnabled=[bool]$stable.enabled;autoResumeInvoked=$false;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=0})
   exit 0
 }
 
@@ -113,7 +133,7 @@ try{
   $nlmAfter=NotebookLMRuntimeHealth
   $recovered=[bool]($rc-eq0 -and $hostAfter -and $bootstrapAfter -and $nlmAfter.ok)
   Log ("AUTO_RESUME_EXIT=$rc hostAfter="+[int]$hostAfter+" bootstrapAfter="+[int]$bootstrapAfter+" notebooklmAfter="+[int][bool]$nlmAfter.ok)
-  SaveReceipt ([ordered]@{ok=$recovered;action='AUTO_RESUME_COMPLETED_V5';version=$WatchdogVersion;startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;notebooklmRuntimeBefore=$nlm;notebooklmRuntimeAfter=$nlmAfter;autoResumeInvoked=$true;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=$rc;hostAfter=$hostAfter;bootstrapAfter=$bootstrapAfter})
+  SaveReceipt ([ordered]@{ok=$recovered;action='AUTO_RESUME_COMPLETED_V6';version=$WatchdogVersion;startedAt=$started;completedAt=(Get-Date).ToString('o');currentVersion=$currentVersion;targetVersion=$targetVersion;notebooklmRuntimeBefore=$nlm;notebooklmRuntimeAfter=$nlmAfter;autoResumeInvoked=$true;timedOut=$false;timeoutSeconds=$AutoResumeTimeoutSeconds;exitCode=$rc;hostAfter=$hostAfter;bootstrapAfter=$bootstrapAfter})
   if($recovered){exit 0}else{exit 2}
 }catch{
   $nlmAfterException=NotebookLMRuntimeHealth

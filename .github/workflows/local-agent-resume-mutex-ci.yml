@@ -22,23 +22,30 @@ jobs:
           $p='local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
           $null=[scriptblock]::Create((Get-Content -LiteralPath $p -Raw -Encoding UTF8))
           Write-Host 'WinPS5.1 parse PASS'
-      - name: Mutex-safe bootstrap-loop contract
+      - name: Pinned-core and self-refresh contract x2
         shell: powershell
         run: |
-          $s=Get-Content -LiteralPath 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' -Raw -Encoding UTF8
-          $required=@(
-            'function EnsureBootstrapLoop',
-            'HomeDesignLocalAgentBootstrapV1',
-            'WaitOne(0,$false)',
-            'BootstrapLoopProcesses',
-            "'-Loop'",
-            'EXISTING_LOOP_VERIFIED',
-            'NEW_LOOP_STARTED_VERIFIED',
-            'BOOTSTRAP_LOOP_VERIFY_TIMEOUT',
-            'BOOTSTRAP_LOOP_NOT_VERIFIED',
-            'RESUME_TELEMETRY_V2_20260829'
-          )
-          foreach($n in $required){if(-not $s.Contains($n)){throw "MISSING_CONTRACT:$n"}}
-          if($s -match 'schtasks\.exe\s+/Create'){throw 'FORBIDDEN_NEW_TASK_CREATION'}
-          if($s -match '(?i)clasp\s+login'){throw 'FORBIDDEN_NEW_CLASP_LOGIN'}
-          Write-Host 'Mutex-safe loop contract PASS'
+          1..2 | ForEach-Object {
+            $s=Get-Content -LiteralPath 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' -Raw -Encoding UTF8
+            $required=@(
+              "`$CoreCommit='57939ad6809b2a8402880e8d760b1d09b13bbdba'",
+              "`$CoreExpectedSha='30c5f438e942979b2013c1410a7ca0cdcd9ee27a'",
+              'function GitBlobSha1',
+              'function RefreshCurrent',
+              "RefreshCurrent 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' `$WatchdogLocal 'WATCHDOG'",
+              "RefreshCurrent 'local-agent/bootstrap/HomeDesignAutoResume.ps1' `$AutoResumeLocal 'AUTORESUME'",
+              'RunBounded $Core 420',
+              "action='AUTO_RESUME_IMAGE_TASK203_HOOK'",
+              "version='V4_WATCHDOG_SELF_REFRESH_20260901'",
+              'exit $coreExit'
+            )
+            foreach($n in $required){if(-not $s.Contains($n)){throw "MISSING_CONTRACT:$n"}}
+            $watchdogRefresh=$s.IndexOf("RefreshCurrent 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'")
+            $autoResumeRefresh=$s.IndexOf("RefreshCurrent 'local-agent/bootstrap/HomeDesignAutoResume.ps1'")
+            $core=$s.IndexOf("$coreUrl='https://raw.githubusercontent.com/'")
+            if($watchdogRefresh-lt0 -or $autoResumeRefresh-le$watchdogRefresh -or $core-le$autoResumeRefresh){throw 'SELF_REFRESH_ORDER_INVALID'}
+            if($s -match 'schtasks\.exe\s+/Create'){throw 'FORBIDDEN_NEW_TASK_CREATION'}
+            if($s -match '(?i)clasp\s+login'){throw 'FORBIDDEN_NEW_CLASP_LOGIN'}
+            if($s -match 'Stop-Process\s+-Name\s+chrome'){throw 'FORBIDDEN_NORMAL_CHROME_KILL'}
+            Write-Host "Pinned-core/self-refresh contract PASS $_"
+          }

@@ -1,17 +1,23 @@
-name: NotebookLM Watchdog Runtime Health V5 CI
+name: NotebookLM Watchdog Runtime Health V6 CI
 
 on:
   pull_request:
     paths:
       - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - 'local-agent/bootstrap/HomeDesignAutoResume.ps1'
+      - 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
       - 'tests/notebooklm-watchdog-runtime-health-v5.test.ps1'
+      - 'tests/notebooklm-watchdog-tablet-hold-v6.test.ps1'
       - '.github/workflows/notebooklm-watchdog-runtime-health-v5-ci.yml'
   push:
     branches:
-      - 'fix/notebooklm-watchdog-runtime-health-20260901'
+      - 'fix/notebooklm-tablet-hold-watchdog-v6'
     paths:
       - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - 'local-agent/bootstrap/HomeDesignAutoResume.ps1'
+      - 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1'
       - 'tests/notebooklm-watchdog-runtime-health-v5.test.ps1'
+      - 'tests/notebooklm-watchdog-tablet-hold-v6.test.ps1'
       - '.github/workflows/notebooklm-watchdog-runtime-health-v5-ci.yml'
 
 jobs:
@@ -19,8 +25,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: NotebookLM-aware watchdog contract x2
+      - name: NotebookLM watchdog runtime-health and tablet-hold contracts x2
         shell: pwsh
         run: |
           ./tests/notebooklm-watchdog-runtime-health-v5.test.ps1
+          ./tests/notebooklm-watchdog-tablet-hold-v6.test.ps1
           ./tests/notebooklm-watchdog-runtime-health-v5.test.ps1
+          ./tests/notebooklm-watchdog-tablet-hold-v6.test.ps1
