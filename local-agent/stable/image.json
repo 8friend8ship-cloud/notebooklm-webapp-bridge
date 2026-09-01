@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "channel": "image",
   "enabled": true,
-  "version": "1.1.148-image-task203-deploymentid-script-discovery",
-  "gitBlobSha1": "4482ca7fbe4d176409b589a76d7751b13e329a95",
+  "version": "1.1.149-image-task203-gitobject-deploymentid",
+  "gitBlobSha1": "4c0e60351363313c82bff552c1aa67b380a377ea",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 1800,
-  "purpose": "Existing approved task203 recovery plus Central Librarian binding only. Reuse existing Git/clasp credentials. Discover the exact existing Apps Script by matching the known deployment ID instead of the unreliable title WEBAPP_TEMPLATE_05; exact deployment match count must equal 1. Then snapshot the same Script, add only Central_Librarian_Knowledge_Automation plus doPost dispatcher and processTaskQueue logical 15m call, push to the same Script, update the same deployment ID, assert deployment set unchanged, require librarian audit physicalTriggerCount=0 and preflight x2. Fail closed and roll back librarian-stage changes on failure. No duplicate task, no new Apps Script project/deployment/physical trigger/OAuth/scope, no normal Chrome Generate or credit spend.",
+  "purpose": "Corrected existing task203 + Central Librarian binding. Base directly on full 1.1.144 transaction, then apply both proven fixes before execution: verify private contents-os-git source with git object SHA (avoids CRLF false mismatch) and discover the exact existing Apps Script by matching the known deployment ID (avoids title lookup failure). Require exact deployment match count=1 before any same-Script patch; preserve snapshot/rollback, same deployment set, zero new physical Librarian trigger, audit and preflight x2. No duplicate task/project/deployment/trigger/OAuth/scope, no normal Chrome Generate or credit spend.",
   "normalChromeTouched": false,
   "generateClicked": false,
   "creditSpend": false,
   "oauthChanged": false,
   "extensionMutated": false,
   "appsScriptBoundSync": true,
-  "hostRecoveryReceipt": "IMAGE_TASK203_DEPLOYMENTID_LIBRARIAN_1.1.148.json",
-  "resultReceipt": "IMAGE_TASK203_DEPLOYMENTID_LIBRARIAN_1.1.148.json"
+  "hostRecoveryReceipt": "IMAGE_TASK203_GITOBJECT_DEPLOYMENTID_LIBRARIAN_1.1.149.json",
+  "resultReceipt": "IMAGE_TASK203_GITOBJECT_DEPLOYMENTID_LIBRARIAN_1.1.149.json"
 }
