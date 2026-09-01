@@ -25,7 +25,7 @@ $coreUrl='https://raw.githubusercontent.com/'+$Repo+'/'+$CoreCommit+'/local-agen
 $coreTmp=$Core+'.download'
 try{Invoke-WebRequest -UseBasicParsing -Uri $coreUrl -OutFile $coreTmp -TimeoutSec 30;$coreSha=(GitBlobSha1 $coreTmp).ToLowerInvariant();if($coreSha-ne$CoreExpectedSha){throw('CORE_SHA_MISMATCH:'+ $coreSha)};Move-Item $coreTmp $Core -Force;$coreExit=RunBounded $Core 420}catch{$coreExit=3;$coreError=$_.Exception.Message}
 
-$hook=[ordered]@{ok=$false;action='AUTO_RESUME_IMAGE_TASK203_HOOK';version='V2_RAW_MANIFEST_20260901';coreCommit=$CoreCommit;coreExit=[int]$coreExit;imageEnabled=$false;imageVersion='';imageFetchMode='RAW_MAIN_SHA_VERIFIED';alreadyPassed=$false;attempt=0;maxAttempts=2;imageExit=$null;ranImage=$false;startedAt=(Get-Date).ToString('o');completedAt='';error=''}
+$hook=[ordered]@{ok=$false;action='AUTO_RESUME_IMAGE_TASK203_HOOK';version='V3_VERSION_AWARE_RETRY_20260901';coreCommit=$CoreCommit;coreExit=[int]$coreExit;imageEnabled=$false;imageVersion='';imageFetchMode='RAW_MAIN_SHA_VERIFIED';alreadyPassed=$false;attempt=0;maxAttempts=2;stateImageVersion='';attemptResetForNewVersion=$false;imageExit=$null;ranImage=$false;startedAt=(Get-Date).ToString('o');completedAt='';error=''}
 try{
   $m=(RawText 'local-agent/stable/image.json')|ConvertFrom-Json
   $hook.imageEnabled=[bool]$m.enabled
@@ -34,7 +34,10 @@ try{
   if(-not$hook.imageEnabled){$hook.ok=$true;$hook.error='IMAGE_LANE_DISABLED'}
   elseif(ExistingImagePass $receiptName){$hook.ok=$true;$hook.alreadyPassed=$true}
   else{
-    $attempt=0;if(Test-Path -LiteralPath $ImageHookState){try{$s=Get-Content -LiteralPath $ImageHookState -Raw -Encoding UTF8|ConvertFrom-Json;$attempt=[int]$s.attempt}catch{}}
+    $attempt=0;$stateVersion=''
+    if(Test-Path -LiteralPath $ImageHookState){try{$s=Get-Content -LiteralPath $ImageHookState -Raw -Encoding UTF8|ConvertFrom-Json;$attempt=[int]$s.attempt;$stateVersion=[string]$s.imageVersion}catch{}}
+    $hook.stateImageVersion=$stateVersion
+    if($stateVersion -ne [string]$m.version){$attempt=0;$hook.attemptResetForNewVersion=$true}
     $hook.attempt=$attempt
     if($attempt-ge2){$hook.error='MAX_2_REACHED_DIAGNOSTIC_HOLD'}
     else{
