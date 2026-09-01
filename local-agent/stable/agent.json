@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.136",
-  "releasedAt": "2026-09-01T09:20:00+09:00",
-  "gitBlobSha1": "a0b364e58d01489613d408b3ab831dffc11f8f53",
+  "version": "1.1.137",
+  "releasedAt": "2026-09-01T09:24:00+09:00",
+  "gitBlobSha1": "8a5ebfd07649d6d18f739fc46b0c67a114d9cdf2",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.136_NOTEBOOKLM_RUNTIME_RESTART_RESULT.json",
-  "notes": "Emergency NotebookLM runtime recovery only. Restarts only the dedicated ChromeForTesting profile HomeDesignAutomationV7\\ChromeUserData, preserves normal Chrome/account/OAuth/scope/extension files, verifies NotebookLM page + extension service worker + auto-poll alarm over CDP 9223, and invokes existing poll once. Does not run Flow, Image, Apps Script bind, artifact generation, or create duplicate queue tasks."
+  "resultReceipt": "AGENT_1.1.137_NOTEBOOKLM_RUNTIME_RESTART_RESULT.json",
+  "notes": "Emergency NotebookLM runtime recovery using the existing proven DiagnoseNotebookLMAutoPoll.ps1 blob d035e37d8093a07737a7e7ada16e36e5959c4d9d. Restarts only the dedicated ChromeForTesting profile, verifies extension service worker/session/alarms, then opens notebook.google.com on the same dedicated profile and verifies a CDP page target. No normal Chrome, OAuth/scope, extension-file, Flow/Image/AppScript, generation, or duplicate queue mutation."
 }
