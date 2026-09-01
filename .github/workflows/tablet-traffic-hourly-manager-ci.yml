@@ -1,0 +1,22 @@
+name: Tablet Traffic Hourly Manager CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps-script/TabletTrafficHourlyManager.gs'
+      - 'tests/tablet-traffic-hourly-manager.test.mjs'
+      - '.github/workflows/tablet-traffic-hourly-manager-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Contract run 1
+        run: node tests/tablet-traffic-hourly-manager.test.mjs
+      - name: Contract run 2
+        run: node tests/tablet-traffic-hourly-manager.test.mjs
