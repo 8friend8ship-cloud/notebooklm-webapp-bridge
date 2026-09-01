@@ -132,6 +132,7 @@ function readGoogleAiQuotaRowsV1_(sheet) {
       liveModelCost: String(row[idx.LIVE_MODEL_COST] || ''),
       platformObjective: String(row[idx.PLATFORM_OBJECTIVE] || ''),
       requiredOutput: String(row[idx.REQUIRED_OUTPUT] || ''),
+      priorityScore: Number(row[idx.PRIORITY_SCORE] || 0),
       status: String(row[idx.STATUS] || '')
     };
   });
