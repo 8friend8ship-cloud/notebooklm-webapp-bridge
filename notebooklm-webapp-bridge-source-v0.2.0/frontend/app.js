@@ -22,7 +22,7 @@ function clearSessionForRenewal(){
   state.sessionToken="";
   state.user=null;
   sessionStorage.removeItem("nlmSessionToken");
-  $("#loginStatus").textContent="자동 재로그인 확인 중";
+  $("#loginStatus").textContent="로그인 필요";
   window.postMessage({source:CONTROL_SOURCE,type:"CLEAR_PERSISTED_SESSION"},location.origin);
 }
 function fillConfigForm(){
@@ -45,7 +45,7 @@ function saveBridgeConfig(){
   CONFIG=next;
   state.extension=null;
   setMessage("브리지 설정을 저장했습니다. 연결 진단을 실행하세요.");
-  initGoogle(true,!state.sessionToken);
+  initGoogle(true);
 }
 async function api(action,payload={}){
   if(!CONFIG.APPS_SCRIPT_URL.startsWith("https://script.google.com/macros/s/")) throw new Error("Apps Script Web App URL이 설정되지 않았습니다.");
@@ -56,8 +56,8 @@ async function api(action,payload={}){
   if(!data.ok){
     if(action!=="login" && isSessionError(data.error)){
       clearSessionForRenewal();
-      setMessage("브리지 세션이 만료되어 Google 계정 자동 재확인을 시도합니다.");
-      setTimeout(()=>initGoogle(true,true),50);
+      setMessage("브리지 세션이 만료되었습니다. Google 로그인 버튼을 눌러 재인증하세요.",true);
+      initGoogle(true);
     }
     throw new Error(data.error||"API 오류");
   }
@@ -123,29 +123,23 @@ function handleGoogleCredential(response){
   }).catch((error)=>setMessage(error.message,true));
 }
 let googleInitializedFor="";
-let googlePromptAttempted=false;
-function initGoogle(force=false,promptIfNeeded=false){
-  if(force){ googleInitializedFor=""; googlePromptAttempted=false; $("#googleButton").replaceChildren(); }
+function initGoogle(force=false){
+  if(force){ googleInitializedFor=""; $("#googleButton").replaceChildren(); }
   const timer=setInterval(()=>{if(!globalThis.google?.accounts?.id)return;clearInterval(timer);
     if(!CONFIG.GOOGLE_CLIENT_ID.endsWith(".apps.googleusercontent.com")){setMessage("브리지 연결 설정에서 Google OAuth Web Client ID를 입력하세요.",true);return;}
-    if(googleInitializedFor===CONFIG.GOOGLE_CLIENT_ID){
-      if(promptIfNeeded && !state.sessionToken && !googlePromptAttempted){
-        googlePromptAttempted=true;
-        try{google.accounts.id.prompt();}catch{}
-      }
-      return;
-    }
+    if(googleInitializedFor===CONFIG.GOOGLE_CLIENT_ID) return;
     googleInitializedFor=CONFIG.GOOGLE_CLIENT_ID;
-    google.accounts.id.initialize({client_id:CONFIG.GOOGLE_CLIENT_ID,callback:handleGoogleCredential,auto_select:true});
+    google.accounts.id.initialize({client_id:CONFIG.GOOGLE_CLIENT_ID,callback:handleGoogleCredential,auto_select:false});
     google.accounts.id.renderButton($("#googleButton"),{theme:"outline",size:"large",text:"signin_with"});
-    if(promptIfNeeded && !state.sessionToken && !googlePromptAttempted){
-      googlePromptAttempted=true;
-      try{google.accounts.id.prompt();}catch{}
-    }
   },250);
 }
 async function validateRestoredSession(){
-  if(!state.sessionToken){ initGoogle(false,true); return; }
+  if(!state.sessionToken){
+    initGoogle(false);
+    $("#loginStatus").textContent="세션 복원 대기";
+    setMessage("저장된 브리지 세션을 복원 중입니다. 복원되지 않으면 Google 로그인 버튼을 한 번만 누르세요.");
+    return;
+  }
   try{
     const data=await api("listTasks",{date:new Date().toISOString().slice(0,10)});
     if(data.user){ state.user={email:data.user}; $("#loginStatus").textContent=data.user; }
@@ -160,5 +154,5 @@ $("#connectExtension").addEventListener("click",()=>connectExtension().then(()=>
 $("#loadTasks").addEventListener("click",()=>loadTasks().catch((e)=>setMessage(e.message,true)));
 if(state.sessionToken) $("#loginStatus").textContent="세션 복원됨";
 fillConfigForm();
-initGoogle(false,!state.sessionToken);
-setTimeout(()=>validateRestoredSession(),900);
+initGoogle(false);
+setTimeout(()=>validateRestoredSession(),1800);
