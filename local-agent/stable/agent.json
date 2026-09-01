@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.135",
-  "releasedAt": "2026-09-01T00:08:00+09:00",
-  "gitBlobSha1": "bcf146e26164c41a426ed301928627e9cf4d0ba9",
+  "version": "1.1.136",
+  "releasedAt": "2026-09-01T09:20:00+09:00",
+  "gitBlobSha1": "a0b364e58d01489613d408b3ab831dffc11f8f53",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.135_NLM_FRESH_ALL_STUDIO_RECOVERY_RESULT.json",
-  "notes": "Same parent lineage and same 1.1.135. Minimal recovery delta after physical 403 on GitHub Contents API child fetch: Contents API remains primary, raw.githubusercontent.com is bounded fallback for the exact pinned 1.1.129 child. Marker NLM_WORKFLOW_STUDIO_ALL_20260831_1446, Bridge 0.2.39, no duplicate notebook/artifact/task, no OAuth/scope/public changes."
+  "resultReceipt": "AGENT_1.1.136_NOTEBOOKLM_RUNTIME_RESTART_RESULT.json",
+  "notes": "Emergency NotebookLM runtime recovery only. Restarts only the dedicated ChromeForTesting profile HomeDesignAutomationV7\\ChromeUserData, preserves normal Chrome/account/OAuth/scope/extension files, verifies NotebookLM page + extension service worker + auto-poll alarm over CDP 9223, and invokes existing poll once. Does not run Flow, Image, Apps Script bind, artifact generation, or create duplicate queue tasks."
 }
