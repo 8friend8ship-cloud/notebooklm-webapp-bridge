@@ -1,11 +1,11 @@
 {
   "name": "notebooklm-webapp-bridge",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
-    "package": "python3 scripts/package.py"
+    "test": "node --test notebooklm-webapp-bridge-source-v0.2.0/tests/*.test.mjs",
+    "package": "python3 notebooklm-webapp-bridge-source-v0.2.0/scripts/package.py"
   },
   "engines": { "node": ">=20" }
 }
