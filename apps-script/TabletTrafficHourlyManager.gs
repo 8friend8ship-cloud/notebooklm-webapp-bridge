@@ -15,17 +15,31 @@ const TABLET_TRAFFIC_MANAGER_V1 = Object.freeze({
  *
  * Contract:
  * - One mutating tablet UI job maximum.
- * - NotebookLM remains primary until its first tablet E2E is VERIFIED.
- * - Flow/Gemini UI work is held, never deleted, while NotebookLM owns the UI.
- * - URL-open may run before accessibility, but click/type/generate requires automate_acc=1.
- * - Keep-screen-on policy is assumed for active NotebookLM UI work; no screen-off pass gate.
- * - No physical trigger creation occurs here. Existing central scheduler / ChatGPT hourly supervisor calls it.
+ * - NotebookLM stays tablet-primary until VERIFIED unless the tablet is explicitly
+ *   CAPABILITY_BLOCKED at a safe checkpoint.
+ * - A fresh heartbeat proves worker life, not service UI capability.
+ * - Known capability block releases tablet ownership and permits existing laptop fallback.
+ * - Flow/Gemini work is held, never deleted, only while tablet NotebookLM truly owns UI.
+ * - No physical trigger creation occurs here. Existing central scheduler calls it.
+ * - Quota/objective manager is called logically in the same hourly cycle.
  */
 function runTabletTrafficHourlyManagerV1(context) {
+  let quotaDecision = null;
+  if (typeof runGoogleAiQuotaObjectiveManagerV1 === 'function') {
+    try {
+      quotaDecision = runGoogleAiQuotaObjectiveManagerV1({
+        source: 'runTabletTrafficHourlyManagerV1',
+        context: context || {}
+      });
+    } catch (quotaErr) {
+      quotaDecision = { ok: false, status: 'QUOTA_MANAGER_ERROR', error: String(quotaErr) };
+    }
+  }
+
   const cfg = TABLET_TRAFFIC_MANAGER_V1;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) {
-    return { ok: false, status: 'LOCK_BUSY', lockKey: cfg.lockKey };
+    return { ok: false, status: 'LOCK_BUSY', lockKey: cfg.lockKey, quotaDecision: quotaDecision };
   }
 
   try {
@@ -52,12 +66,15 @@ function runTabletTrafficHourlyManagerV1(context) {
 
     const notebookRow = findJobRowV1_(rows, idx, cfg.notebookPrimaryJob);
     const notebookVerified = notebookRow ? truthyV1_(notebookRow[idx.VERIFIED]) : false;
-    const primaryJob = notebookVerified
+    const notebookStatus = notebookRow ? String(notebookRow[idx.STATUS] || '').toUpperCase() : '';
+    const notebookCapabilityBlocked = /CAPABILITY_BLOCKED/.test(notebookStatus);
+
+    const primaryJob = (notebookVerified || notebookCapabilityBlocked)
       ? chooseNextApprovedUiJobV1_(rows, idx, cfg.workerId)
       : cfg.notebookPrimaryJob;
 
     const heldJobs = [];
-    if (!notebookVerified) {
+    if (!notebookVerified && !notebookCapabilityBlocked) {
       rows.forEach((row, i) => {
         const jobId = String(row[idx.JOB_ID] || '');
         const worker = String(row[idx.WORKER] || '');
@@ -78,7 +95,11 @@ function runTabletTrafficHourlyManagerV1(context) {
     const activeUiJobs = rows.filter(row => isActiveUiRowV1_(row, idx, cfg.workerId));
     let decision = 'HEALTHY_SERIAL';
     let nextGate = 'CONTINUE_PRIMARY';
-    if (heartbeatStale) {
+
+    if (notebookCapabilityBlocked) {
+      decision = 'NOTEBOOKLM_TABLET_CAPABILITY_BLOCKED_RELEASED';
+      nextGate = 'LAPTOP_NOTEBOOKLM_FALLBACK_EXISTING_LINEAGE';
+    } else if (heartbeatStale) {
       decision = 'BLOCKED_STALE_HEARTBEAT';
       nextGate = 'RECOVER_TABLET_WORKER_HEARTBEAT';
     } else if (activeUiJobs.length > 1) {
@@ -89,7 +110,7 @@ function runTabletTrafficHourlyManagerV1(context) {
       nextGate = 'ENABLE_AUTOMATE_ACCESSIBILITY_THEN_NOTEBOOKLM_UI';
     } else if (!notebookVerified) {
       decision = 'NOTEBOOKLM_PRIMARY_READY';
-      nextGate = 'OPEN_NOTEBOOKLM_NEW_NOTEBOOK_SOURCE_CHAT_STUDIO_ONE';
+      nextGate = 'OPEN_NOTEBOOKLM_NEW_NOTEBOOK_SOURCE_CHAT_STUDIO_REQUIRED_ONLY';
     }
 
     const hourBucket = Utilities.formatDate(now, cfg.timeZone, 'yyyy-MM-dd HH:00');
@@ -111,7 +132,7 @@ function runTabletTrafficHourlyManagerV1(context) {
       true,
       false,
       'workerTime=' + String(workerStatus.time || '') + ';heartbeatAgeSec=' + heartbeatAgeSec + ';actionTime=' + String(actionStatus.time || ''),
-      'hourBucket=' + hourBucket + ';screenPolicy=KEEP_SCREEN_ON;noScreenOffGate=true'
+      'hourBucket=' + hourBucket + ';capabilityBlocked=' + notebookCapabilityBlocked + ';quotaStatus=' + String(quotaDecision && quotaDecision.status || '')
     ];
     if (lastBucket.indexOf(hourBucket) !== 0) traffic.appendRow(record);
 
@@ -124,13 +145,15 @@ function runTabletTrafficHourlyManagerV1(context) {
       checkedAt: record[0],
       primaryJob: primaryJob,
       notebookVerified: notebookVerified,
+      notebookCapabilityBlocked: notebookCapabilityBlocked,
       automateAcc: automateAcc,
       heartbeatAgeSec: heartbeatAgeSec,
       activeUiCount: activeUiJobs.length,
       heldJobs: heldJobs,
       decision: decision,
       nextGate: nextGate,
-      actionResult: String(actionStatus.result || '')
+      actionResult: String(actionStatus.result || ''),
+      quotaDecision: quotaDecision
     };
   } finally {
     lock.releaseLock();
@@ -164,9 +187,12 @@ function chooseNextApprovedUiJobV1_(rows, idx, workerId) {
   const candidate = rows.find(row => {
     const worker = String(row[idx.WORKER] || '');
     const approved = /APPROVED/.test(String(row[idx.APPROVAL_STATE] || ''));
-    const status = String(row[idx.STATUS] || '');
+    const status = String(row[idx.STATUS] || '').toUpperCase();
     const taskType = String(row[idx.TASK_TYPE] || '').toUpperCase();
-    return worker === workerId && approved && !/DONE|VERIFIED|STOPPED|SUPERSEDED/.test(status) && /(NOTEBOOKLM|GEMINI|FLOW)/.test(taskType);
+    return worker === workerId &&
+      approved &&
+      !/DONE|VERIFIED|STOPPED|SUPERSEDED|CAPABILITY_BLOCKED/.test(status) &&
+      /(NOTEBOOKLM|GEMINI|FLOW)/.test(taskType);
   });
   return candidate ? String(candidate[idx.JOB_ID] || '') : '';
 }
@@ -177,7 +203,7 @@ function isActiveUiRowV1_(row, idx, workerId) {
   if (!/(NOTEBOOKLM|GEMINI|FLOW)/.test(taskType)) return false;
   const status = String(row[idx.STATUS] || '').toUpperCase();
   const claim = String(row[idx.CLAIM] || '').toUpperCase();
-  if (/HOLD|DONE|VERIFIED|STOPPED|SUPERSEDED/.test(status)) return false;
+  if (/HOLD|DONE|VERIFIED|STOPPED|SUPERSEDED|CAPABILITY_BLOCKED/.test(status)) return false;
   return /CLAIMED|STARTED|RUNNING/.test(status) || (claim && claim !== 'UNCLAIMED');
 }
 
@@ -199,7 +225,7 @@ function writeCentralTabletTrafficHistoryV1_(cfg, now, decision, record, nextGat
   history.appendRow([
     Utilities.formatDate(now, cfg.timeZone, 'yyyy-MM-dd HH:mm KST'),
     'TABLET_TRAFFIC_HOURLY_CHANGED_EVIDENCE',
-    'TABLET_WORKER_STATUS + TABLET_ACTION_STATUS + TABLET_WORKER_QUEUE',
+    'TABLET_WORKER_STATUS + TABLET_ACTION_STATUS + TABLET_WORKER_QUEUE + GOOGLE_AI_QUOTA_OBJECTIVE',
     'Hourly traffic manager observed ' + decision + '. NotebookLM primary=' + cfg.notebookPrimaryJob + '; maxConcurrentUI=1.',
     'DECISION=' + decision + ';' + evidence,
     'NEXT_RESUME_POINT=' + nextGate + '; preserve held jobs; no duplicate notebook/task.'
