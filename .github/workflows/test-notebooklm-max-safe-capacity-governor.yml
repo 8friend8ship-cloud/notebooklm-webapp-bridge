@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'apps-script/NotebookLmMaxSafeCapacityGovernor.gs'
-      - 'tests/notebooklm-capacity-governor.test.js'
+      - 'tests/notebooklm-capacity-governor.test.cjs'
       - '.github/workflows/test-notebooklm-max-safe-capacity-governor.yml'
   workflow_dispatch:
 
@@ -21,4 +21,4 @@ jobs:
         with:
           node-version: '20'
       - name: Run capacity governor safety tests
-        run: node tests/notebooklm-capacity-governor.test.js
+        run: node tests/notebooklm-capacity-governor.test.cjs
