@@ -1,0 +1,62 @@
+{
+  "channel": "CENTRAL_APPS_SCRIPT_RUNNER_V2",
+  "mode": "READ_ONLY_BOOTSTRAP",
+  "releaseRef": "central-runner-readonly-bootstrap-v7",
+  "version": "20260831.8-immutable-readonly-release",
+  "pollIntervalMinutes": 5,
+  "tasks": [
+    {
+      "taskId": "TASK_20260821_TRAVEL_APPS_SCRIPT_REPAIR_001",
+      "action": "TRAVEL_APPS_SCRIPT_REPAIR",
+      "enabled": false,
+      "targetTitle": "WEBAPP_TEMPLATE_07",
+      "expectedDeploymentId": "AKfycbyzSZZqDwMAgqltkfCYQb4-aIZ4zSFlRHkh9dyN5F_Qd7hfUev6oVNqjUSsEtYE3b4VBA",
+      "maxAttempts": 3,
+      "notes": "Known-good Travel runtime preserved. Mutation disabled in read-only bootstrap release."
+    },
+    {
+      "taskId": "TASK_20260822_CONTENTOS_BOUND_SYNC_001",
+      "action": "CONTENTOS_APPS_SCRIPT_SYNC",
+      "enabled": false,
+      "targetTitle": "WEBAPP_TEMPLATE_05",
+      "expectedDeploymentId": "AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo",
+      "maxAttempts": 3,
+      "notes": "ContentOS mutation is disabled in read-only bootstrap release. A separately reviewed promotion release is required."
+    },
+    {
+      "taskId": "TASK_20260829_CHROME_FLOW_HEALTH_RECOVERY_002",
+      "action": "CHROME_FLOW_HEALTH",
+      "enabled": false,
+      "maxAttempts": 5,
+      "notes": "Unrelated browser/Flow action disabled in read-only bootstrap release."
+    },
+    {
+      "taskId": "TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_001",
+      "action": "CONTENTOS_APPS_SCRIPT_SYNC",
+      "enabled": false,
+      "targetTitle": "CENTRAL_RUNNER_REFRESH_X5_READONLY",
+      "expectedDeploymentId": "RUNNER_REFRESH_X5_READONLY_20260831",
+      "maxAttempts": 1,
+      "notes": "Superseded. Fresh installer already installs the pinned read-only release runner."
+    },
+    {
+      "taskId": "TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_002",
+      "action": "CONTENTOS_APPS_SCRIPT_SYNC",
+      "enabled": false,
+      "targetTitle": "CENTRAL_RUNNER_REFRESH_X5_READONLY",
+      "expectedDeploymentId": "RUNNER_REFRESH_X5_READONLY_20260831",
+      "maxAttempts": 1,
+      "notes": "Disabled in immutable bootstrap release. Fresh installer verifies the pinned runner before scheduling it."
+    },
+    {
+      "taskId": "TASK_20260831_NOTEBOOKLM_BOUND_READONLY_RECOVERY_001",
+      "action": "BOUND_APPS_SCRIPT_READONLY_RECOVERY",
+      "enabled": true,
+      "targetTitle": "WEBAPP_TEMPLATE_03",
+      "expectedSpreadsheetId": "1TbQxEcCiiibu2-EmMGEdt79v4AUpE8JL2XrDEKeVRCk",
+      "expectedDeploymentId": "AKfycbynWKaVwG1SRE6uWJ6d4r0Q5wEvKbB5foIuphQBGDwi8P2r2qaP6K0FRAV8krr9R70P",
+      "maxAttempts": 1,
+      "notes": "Sole enabled bootstrap task. Reuse existing clasp authorization, resolve exact Script ID by exact title, clone source and verify deployment invariant, write local/central receipt. No push/deploy/trigger/project/OAuth mutation."
+    }
+  ]
+}
