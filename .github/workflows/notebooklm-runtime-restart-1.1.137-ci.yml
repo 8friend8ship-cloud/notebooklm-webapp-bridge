@@ -1,0 +1,28 @@
+name: NotebookLM Runtime Restart 1.1.137 CI
+
+on:
+  pull_request:
+    paths:
+      - 'local-agent/releases/1.1.137/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - 'tests/notebooklm-runtime-restart-1.1.137.test.ps1'
+      - '.github/workflows/notebooklm-runtime-restart-1.1.137-ci.yml'
+  push:
+    branches:
+      - 'fix/notebooklm-runtime-restart-20260901'
+    paths:
+      - 'local-agent/releases/1.1.137/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - 'tests/notebooklm-runtime-restart-1.1.137.test.ps1'
+      - '.github/workflows/notebooklm-runtime-restart-1.1.137-ci.yml'
+
+jobs:
+  contract:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: NotebookLM runtime restart 1.1.137 contract x2
+        shell: pwsh
+        run: |
+          ./tests/notebooklm-runtime-restart-1.1.137.test.ps1
+          ./tests/notebooklm-runtime-restart-1.1.137.test.ps1
