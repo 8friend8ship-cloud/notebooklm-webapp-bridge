@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.137",
-  "releasedAt": "2026-09-01T09:24:00+09:00",
-  "gitBlobSha1": "8a5ebfd07649d6d18f739fc46b0c67a114d9cdf2",
+  "version": "1.1.138",
+  "releasedAt": "2026-09-01T09:53:00+09:00",
+  "gitBlobSha1": "3c06deee79bae05dc22fd4efd275f2e7811b5bd7",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "AGENT_1.1.137_NOTEBOOKLM_RUNTIME_RESTART_RESULT.json",
-  "notes": "Emergency NotebookLM runtime recovery using the existing proven DiagnoseNotebookLMAutoPoll.ps1 blob d035e37d8093a07737a7e7ada16e36e5959c4d9d. Restarts only the dedicated ChromeForTesting profile, verifies extension service worker/session/alarms, then opens notebook.google.com on the same dedicated profile and verifies a CDP page target. No normal Chrome, OAuth/scope, extension-file, Flow/Image/AppScript, generation, or duplicate queue mutation."
+  "resultReceipt": "AGENT_1.1.138_NOTEBOOKLM_FRONT_CONSENT_LOOP_BYPASS_RESULT.json",
+  "notes": "Runs the exact pinned 1.1.137 NotebookLM dedicated-Chrome recovery first, then closes only notebooklm-webapp-bridge.vercel.app page targets over CDP 9223 while preserving notebook.google.com targets and the extension runtime. Immediate workaround for the production Google One Tap/FedCM consent loop while Vercel deployment is rate-limited. No normal Chrome, OAuth/scope, extension-file, Flow/Image/AppScript, artifact generation, queue duplication, or Vercel mutation."
 }
