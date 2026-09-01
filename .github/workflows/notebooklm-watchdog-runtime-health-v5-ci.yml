@@ -1,0 +1,26 @@
+name: NotebookLM Watchdog Runtime Health V5 CI
+
+on:
+  pull_request:
+    paths:
+      - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - 'tests/notebooklm-watchdog-runtime-health-v5.test.ps1'
+      - '.github/workflows/notebooklm-watchdog-runtime-health-v5-ci.yml'
+  push:
+    branches:
+      - 'fix/notebooklm-watchdog-runtime-health-20260901'
+    paths:
+      - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - 'tests/notebooklm-watchdog-runtime-health-v5.test.ps1'
+      - '.github/workflows/notebooklm-watchdog-runtime-health-v5-ci.yml'
+
+jobs:
+  contract:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: NotebookLM-aware watchdog contract x2
+        shell: pwsh
+        run: |
+          ./tests/notebooklm-watchdog-runtime-health-v5.test.ps1
+          ./tests/notebooklm-watchdog-runtime-health-v5.test.ps1
