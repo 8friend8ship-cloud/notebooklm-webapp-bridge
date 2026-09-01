@@ -44,5 +44,5 @@ $forbidden=@(
 )
 foreach($needle in $forbidden){if($a.Contains($needle)){throw ('FORBIDDEN:'+ $needle)}}
 if(([regex]::Matches($a,'Stop-Process -Id')).Count-lt1){throw 'DEDICATED_PID_STOP_MISSING'}
-if(-not($a.Contains("-like \"*`$DedicatedUserData*\""))){throw 'DEDICATED_PROCESS_FILTER_MISSING'}
+if($a -notmatch '\-like\s+"\*\$DedicatedUserData\*"'){throw 'DEDICATED_PROCESS_FILTER_MISSING'}
 Write-Host 'NOTEBOOKLM_RUNTIME_RESTART_1_1_136_STATIC_PASS'
