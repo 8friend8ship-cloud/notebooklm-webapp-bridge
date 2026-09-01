@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "channel": "stable",
   "enabled": true,
-  "version": "1.1.135",
-  "releasedAt": "2026-09-01T00:08:00+09:00",
-  "gitBlobSha1": "bcf146e26164c41a426ed301928627e9cf4d0ba9",
+  "version": "1.1.139-image-resume-transport",
+  "releasedAt": "2026-09-01T09:04:00+09:00",
+  "gitBlobSha1": "66a7d2e99b1f0853de247abe42bd73dc53eed9d4",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "executionMode": "one_shot",
   "resultReceipt": "AGENT_1.1.135_NLM_FRESH_ALL_STUDIO_RECOVERY_RESULT.json",
-  "notes": "Same parent lineage and same 1.1.135. Minimal recovery delta after physical 403 on GitHub Contents API child fetch: Contents API remains primary, raw.githubusercontent.com is bounded fallback for the exact pinned 1.1.129 child. Marker NLM_WORKFLOW_STUDIO_ALL_20260831_1446, Bridge 0.2.39, no duplicate notebook/artifact/task, no OAuth/scope/public changes."
+  "notes": "TRANSIENT DELIVERY ONLY: raw+SHA deliver patched RESUME_LOCAL_AGENT_ONCE for independent IMAGE task203, then execute the exact prior global 1.1.135 blob bcf146e26164c41a426ed301928627e9cf4d0ba9 unchanged. Restore stable/agent.json to 1.1.135 immediately after IMAGE task203 receipt is verified. No duplicate task, OAuth/scope/public/Chrome policy change."
 }
