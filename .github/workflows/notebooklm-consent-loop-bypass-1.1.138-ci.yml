@@ -1,0 +1,21 @@
+name: NotebookLM Consent Loop Bypass 1.1.138 CI
+
+on:
+  pull_request:
+    paths:
+      - 'local-agent/releases/1.1.138/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/agent.json'
+      - 'tests/notebooklm-consent-loop-bypass-1.1.138.test.ps1'
+      - '.github/workflows/notebooklm-consent-loop-bypass-1.1.138-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: NotebookLM consent-loop bypass contract x2
+        shell: pwsh
+        run: |
+          ./tests/notebooklm-consent-loop-bypass-1.1.138.test.ps1
+          ./tests/notebooklm-consent-loop-bypass-1.1.138.test.ps1
