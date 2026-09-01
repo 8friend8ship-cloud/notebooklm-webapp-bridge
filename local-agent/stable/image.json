@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "channel": "image",
   "enabled": true,
-  "version": "1.1.143-image-task203-submitdiag",
-  "gitBlobSha1": "8fb41540071c9cd46d2dc35ea18f9923735399b9",
+  "version": "1.1.144-image-task203-privategit-librarian",
+  "gitBlobSha1": "c9b9fe80349ef0bef9d2431b06cd54197f05ed2f",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 1800,
-  "purpose": "Use the already-running verified Host 1.3.0 from 1.1.142 and reuse the exact existing task203 ID. Capture the /run HTTP response body on failure plus local Host log tail and CommandResults status/result before and after submit, then poll the same task if accepted. Diagnostic execution only; no duplicate task, no Host restart, no Apps Script project/deployment/trigger/OAuth/scope change, no normal Chrome Generate or credit spend.",
+  "purpose": "Existing approved task203 recovery plus Central Librarian binding only. Because contents-os-git is private and unauthenticated raw/API returns 404, first attempt a non-interactive git clone using the laptop's already-existing Git credentials. If private clone/auth fails, make no Apps Script changes. If it succeeds, verify the exact existing Repair blob and Librarian blob, run the existing task203 Repair, then snapshot the same WEBAPP_TEMPLATE_05 Script ID, add only Central_Librarian_Knowledge_Automation plus doPost dispatcher and processTaskQueue logical 15m call, push to the same Script, update the same deployment ID, assert deployment set unchanged, require librarian audit physicalTriggerCount=0 and preflight x2. Roll back the librarian patch on librarian-stage failure. No duplicate task, no new Apps Script project/deployment/physical trigger/OAuth/scope, no normal Chrome Generate or credit spend.",
   "normalChromeTouched": false,
   "generateClicked": false,
   "creditSpend": false,
   "oauthChanged": false,
   "extensionMutated": false,
   "appsScriptBoundSync": true,
-  "hostRecoveryReceipt": "IMAGE_TASK203_HOST130_SUBMIT_DIAG_1.1.143.json",
-  "resultReceipt": "IMAGE_AGENT_CONTENTOS_TASK203_DIRECT.json"
+  "hostRecoveryReceipt": "IMAGE_TASK203_PRIVATEGIT_LIBRARIAN_1.1.144.json",
+  "resultReceipt": "IMAGE_TASK203_PRIVATEGIT_LIBRARIAN_1.1.144.json"
 }
