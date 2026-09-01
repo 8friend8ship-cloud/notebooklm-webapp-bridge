@@ -3,39 +3,79 @@ $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
-$OriginalBlob='bc5fd70c2609f30fc8e9d46027665f1f6444066a'
-$ExpectedBootstrapSha='728d39aa7e3d78457263e3a585a5e6945bd1362a'
-$Bootstrap=Join-Path $Root 'AgentBootstrap.ps1'
-$Receipt='BOOTSTRAP_MAINTENANCE_RESUME_V1.json'
-$Marker=Join-Path $Root 'BOOTSTRAP_MAINTENANCE_SENTINEL_147.json'
+$CoreCommit='57939ad6809b2a8402880e8d760b1d09b13bbdba'
+$CoreExpectedSha='30c5f438e942979b2013c1410a7ca0cdcd9ee27a'
+$Core=Join-Path $Root 'RESUME_LOCAL_AGENT_CORE_PINNED_20260831.ps1'
+$WatchdogLocal=Join-Path $Root 'HomeDesignLocalWatchdog.ps1'
+$AutoResumeLocal=Join-Path $Root 'HomeDesignAutoResume.ps1'
+$ImageRecovery=Join-Path $Root 'IMAGE_LANE_CURRENT.ps1'
+$ImageHookState=Join-Path $Root 'AUTO_RESUME_IMAGE_HOOK_STATE.json'
+$ImageHookReceipt='AUTO_RESUME_IMAGE_HOOK_LATEST.json'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
+
 function GitBlobSha1([string]$Path){$b=[IO.File]::ReadAllBytes($Path);$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
+function RawUrl([string]$Path){'https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?hdcb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
+function RawText([string]$Path){(Invoke-WebRequest -UseBasicParsing -Uri (RawUrl $Path) -Headers @{'User-Agent'='HomeDesign-Resume-Image-Hook'} -TimeoutSec 30).Content}
+function RawFileVerified([string]$Path,[string]$Dest,[string]$Expected){$tmp=$Dest+'.download';Invoke-WebRequest -UseBasicParsing -Uri (RawUrl $Path) -Headers @{'User-Agent'='HomeDesign-Resume-Image-Hook'} -OutFile $tmp -TimeoutSec 30;$actual=(GitBlobSha1 $tmp).ToLowerInvariant();if($Expected -and $actual-ne$Expected.ToLowerInvariant()){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw('IMAGE_RAW_SHA_MISMATCH path='+$Path+' actual='+$actual+' expected='+$Expected)};Move-Item $tmp $Dest -Force;return $actual}
+function ApiContent([string]$Path){$headers=@{'User-Agent'='HomeDesign-Resume-SelfRefresh';'Accept'='application/vnd.github+json'};$url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec 30}
+function RefreshCurrent([string]$RepoPath,[string]$Dest,[string]$Label){
+  $tmp=$Dest+'.selfrefresh';$expected='';$mode=''
+  try{
+    $r=ApiContent $RepoPath
+    [IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$r.content-replace'\s','')))
+    $expected=([string]$r.sha).ToLowerInvariant();$mode='API'
+  }catch{
+    Invoke-WebRequest -UseBasicParsing -Uri (RawUrl $RepoPath) -Headers @{'User-Agent'='HomeDesign-Resume-SelfRefresh'} -OutFile $tmp -TimeoutSec 30
+    $mode='RAW'
+  }
+  $actual=(GitBlobSha1 $tmp).ToLowerInvariant()
+  if($expected -and $actual-ne$expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw("${Label}_SHA_MISMATCH actual=$actual expected=$expected")}
+  Move-Item -LiteralPath $tmp -Destination $Dest -Force
+  return [pscustomobject]@{ok=$true;label=$Label;mode=$mode;sha=$actual}
+}
 function FindCentral{$target=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$my=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){$r=[string]$d.Root;if(-not$r){continue};foreach($c in @((Join-Path $r $target),(Join-Path $r ($my+'\'+$target)),(Join-Path $r ('My Drive\'+$target)),(Join-Path $r ('Google Drive\'+$target)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}};return ''}
-function Save($o){$j=$o|ConvertTo-Json -Depth 30;$j|Set-Content -LiteralPath (Join-Path $Root $Receipt) -Encoding UTF8;try{$c=FindCentral;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content -LiteralPath (Join-Path $d $Receipt) -Encoding UTF8}}catch{}}
-function ApiContent([string]$Path){$headers=@{'User-Agent'='HomeDesign-Resume-Maintenance';'Accept'='application/vnd.github+json'};$url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec 30}
-function RefreshBootstrap{
-  $m=ApiContent 'local-agent/bootstrap/AgentBootstrap.ps1';if(([string]$m.sha).ToLowerInvariant()-ne$ExpectedBootstrapSha){throw('BOOTSTRAP_API_SHA_MISMATCH:'+([string]$m.sha))}
-  $tmp=$Bootstrap+'.maintenance';[IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$m.content-replace'\s','')));$a=(GitBlobSha1 $tmp).ToLowerInvariant();if($a-ne$ExpectedBootstrapSha){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw('BOOTSTRAP_LOCAL_SHA_MISMATCH:'+ $a)};Move-Item $tmp $Bootstrap -Force;return $a
-}
-function RestartBootstrapLoop{
-  $loops=@(Get-CimInstance Win32_Process -ErrorAction Stop|Where-Object{$_.Name -match '(?i)powershell|pwsh' -and [string]$_.CommandLine -match '(?i)AgentBootstrap\.ps1' -and [string]$_.CommandLine -match '(?i)(?:^|\s)-Loop(?:\s|$)'})
-  if($loops.Count-ne1){throw('AGENTBOOTSTRAP_LOOP_COUNT:'+ $loops.Count)}
-  $old=[int]$loops[0].ProcessId;[ordered]@{done=$true;bootstrapSha=$ExpectedBootstrapSha;oldPid=$old;source='RESUME_MAINTENANCE_V1';at=(Get-Date).ToString('o')}|ConvertTo-Json|Set-Content -LiteralPath $Marker -Encoding UTF8
-  $helper=Join-Path $Root 'RESTART_AGENTBOOTSTRAP_LOOP_RESUME_V1.ps1';$ht=@'
-param([int]$OldPid,[string]$Bootstrap,[string]$Root)
-$ErrorActionPreference='SilentlyContinue'
-Start-Sleep -Seconds 3
-try{$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$OldPid);if($p -and [string]$p.CommandLine -match '(?i)AgentBootstrap\.ps1' -and [string]$p.CommandLine -match '(?i)(?:^|\s)-Loop(?:\s|$)'){Stop-Process -Id $OldPid -Force -ErrorAction SilentlyContinue}}catch{}
-Start-Sleep -Seconds 2
-try{Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',('"'+$Bootstrap+'"'),'-Loop') -WindowStyle Hidden|Out-Null}catch{}
-try{[ordered]@{ok=$true;action='AGENTBOOTSTRAP_LOOP_RESTART_FROM_RESUME';oldPid=$OldPid;bootstrap=$Bootstrap;at=(Get-Date).ToString('o')}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $Root 'BOOTSTRAP_LOOP_RESTART_FROM_RESUME.json') -Encoding UTF8}catch{}
-'@;Set-Content -LiteralPath $helper -Value $ht -Encoding UTF8;Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',('"'+$helper+'"'),'-OldPid',[string]$old,'-Bootstrap',('"'+$Bootstrap+'"'),'-Root',('"'+$Root+'"')) -WindowStyle Hidden|Out-Null;return $old
-}
-$stable=$null;try{$stable=ApiContent 'local-agent/stable/agent.json';$stable=([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$stable.content-replace'\s',''))))|ConvertFrom-Json}catch{}
-if($stable -and [string]$stable.notes -match 'BOOTSTRAP_MAINTENANCE_ONLY_V1'){
-  $r=[ordered]@{ok=$false;action='BOOTSTRAP_MAINTENANCE_RESUME_ONLY';normalNotebooklmCoreRan=$false;bootstrapSha='';oldBootstrapPid=0;helperStarted=$false;normalChromeTouched=$false;hostTouched=$false;tabletLockTouched=$false;oauthChanged=$false;newTask=$false;newTrigger=$false;newDeployment=$false;startedAt=(Get-Date).ToString('o');completedAt='';error=''}
-  try{$r.bootstrapSha=RefreshBootstrap;$r.oldBootstrapPid=RestartBootstrapLoop;$r.helperStarted=$true;$r.ok=$true}catch{$r.error=$_.Exception.Message}
-  $r.completedAt=(Get-Date).ToString('o');Save $r;if($r.ok){exit 0}else{exit 2}
-}
-# No maintenance flag: delegate byte-for-byte to the last verified normal Resume blob.
-try{$headers=@{'User-Agent'='HomeDesign-Resume-Verified-Delegate';'Accept'='application/vnd.github+json'};$b=Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/git/blobs/'+$OriginalBlob) -Headers $headers -Method Get -TimeoutSec 30;$p=Join-Path $Root ('RESUME_ORIGINAL_'+$OriginalBlob+'.ps1');[IO.File]::WriteAllBytes($p,[Convert]::FromBase64String(([string]$b.content-replace'\s','')));if((GitBlobSha1 $p).ToLowerInvariant()-ne$OriginalBlob){throw 'ORIGINAL_RESUME_BLOB_MISMATCH'};& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $p;exit $LASTEXITCODE}catch{exit 3}
+function SaveHook($o){$j=$o|ConvertTo-Json -Depth 40;$j|Set-Content -LiteralPath (Join-Path $Root $ImageHookReceipt) -Encoding UTF8;$c=FindCentral;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content -LiteralPath (Join-Path $d $ImageHookReceipt) -Encoding UTF8}}
+function ExistingImagePass([string]$ReceiptName){if(-not$ReceiptName){$ReceiptName='IMAGE_AGENT_CONTENTOS_TASK203_DIRECT.json'};$c=FindCentral;if($c){$p=Join-Path (Join-Path $c 'Runtime_Readback') $ReceiptName;if(Test-Path -LiteralPath $p -PathType Leaf){try{$j=Get-Content -LiteralPath $p -Raw -Encoding UTF8|ConvertFrom-Json;return [bool]$j.ok}catch{}}};$p=Join-Path $Root $ReceiptName;if(Test-Path -LiteralPath $p -PathType Leaf){try{$j=Get-Content -LiteralPath $p -Raw -Encoding UTF8|ConvertFrom-Json;return [bool]$j.ok}catch{}};return $false}
+function RunBounded([string]$Path,[int]$Seconds){$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.Arguments="-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$Path`"";$p=[Diagnostics.Process]::Start($psi);if(-not$p.WaitForExit($Seconds*1000)){try{& taskkill.exe /PID ([int]$p.Id) /T /F 2>$null|Out-Null}catch{};return 124};try{return [int]$p.ExitCode}catch{return 1}}
+
+# Delivery bridge: the currently installed V4 Watchdog calls an older AutoResume, but that AutoResume
+# refreshes THIS Resume script before every invocation. Refresh Watchdog + AutoResume here first so
+# one existing scheduled cycle can self-upgrade without a new task, manual CMD, OAuth, or Chrome action.
+$selfRefresh=[ordered]@{watchdog=$null;autoResume=$null;error=''}
+try{$selfRefresh.watchdog=RefreshCurrent 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $WatchdogLocal 'WATCHDOG'}catch{$selfRefresh.error='WATCHDOG_REFRESH_FAILED:'+ $_.Exception.Message}
+try{$selfRefresh.autoResume=RefreshCurrent 'local-agent/bootstrap/HomeDesignAutoResume.ps1' $AutoResumeLocal 'AUTORESUME'}catch{if($selfRefresh.error){$selfRefresh.error+='|'};$selfRefresh.error+='AUTORESUME_REFRESH_FAILED:'+ $_.Exception.Message}
+
+# Preserve the previously verified normal Resume behavior exactly.
+$coreUrl='https://raw.githubusercontent.com/'+$Repo+'/'+$CoreCommit+'/local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$coreTmp=$Core+'.download'
+try{Invoke-WebRequest -UseBasicParsing -Uri $coreUrl -OutFile $coreTmp -TimeoutSec 30;$coreSha=(GitBlobSha1 $coreTmp).ToLowerInvariant();if($coreSha-ne$CoreExpectedSha){throw('CORE_SHA_MISMATCH:'+ $coreSha)};Move-Item $coreTmp $Core -Force;$coreExit=RunBounded $Core 420}catch{$coreExit=3;$coreError=$_.Exception.Message}
+
+$hook=[ordered]@{ok=$false;action='AUTO_RESUME_IMAGE_TASK203_HOOK';version='V4_WATCHDOG_SELF_REFRESH_20260901';coreCommit=$CoreCommit;coreExit=[int]$coreExit;selfRefresh=$selfRefresh;imageEnabled=$false;imageVersion='';imageFetchMode='RAW_MAIN_SHA_VERIFIED';alreadyPassed=$false;attempt=0;maxAttempts=2;stateImageVersion='';attemptResetForNewVersion=$false;imageExit=$null;ranImage=$false;startedAt=(Get-Date).ToString('o');completedAt='';error=''}
+try{
+  $m=(RawText 'local-agent/stable/image.json')|ConvertFrom-Json
+  $hook.imageEnabled=[bool]$m.enabled
+  $hook.imageVersion=[string]$m.version
+  $receiptName=[string]$m.resultReceipt;if(-not$receiptName){$receiptName='IMAGE_AGENT_CONTENTOS_TASK203_DIRECT.json'}
+  if(-not$hook.imageEnabled){$hook.ok=$true;$hook.error='IMAGE_LANE_DISABLED'}
+  elseif(ExistingImagePass $receiptName){$hook.ok=$true;$hook.alreadyPassed=$true}
+  else{
+    $attempt=0;$stateVersion=''
+    if(Test-Path -LiteralPath $ImageHookState){try{$s=Get-Content -LiteralPath $ImageHookState -Raw -Encoding UTF8|ConvertFrom-Json;$attempt=[int]$s.attempt;$stateVersion=[string]$s.imageVersion}catch{}}
+    $hook.stateImageVersion=$stateVersion
+    if($stateVersion -ne [string]$m.version){$attempt=0;$hook.attemptResetForNewVersion=$true}
+    $hook.attempt=$attempt
+    if($attempt-ge2){$hook.error='MAX_2_REACHED_DIAGNOSTIC_HOLD'}
+    else{
+      $expected=([string]$m.gitBlobSha1).ToLowerInvariant()
+      $releasePath='local-agent/releases/'+[string]$m.version+'/'+[string]$m.file
+      [void](RawFileVerified $releasePath $ImageRecovery $expected)
+      $attempt++;$hook.attempt=$attempt;[ordered]@{attempt=$attempt;imageVersion=[string]$m.version;at=(Get-Date).ToString('o')}|ConvertTo-Json|Set-Content -LiteralPath $ImageHookState -Encoding UTF8
+      $timeout=900;if($m.maxCycleSeconds){$timeout=[Math]::Max(180,[Math]::Min(1800,[int]$m.maxCycleSeconds))}
+      $hook.ranImage=$true;$hook.imageExit=RunBounded $ImageRecovery $timeout;$hook.ok=ExistingImagePass $receiptName
+      if(-not$hook.ok){$hook.error='IMAGE_TASK203_RESULT_NOT_PASS'}
+    }
+  }
+}catch{$hook.error=$_.Exception.Message}
+$hook.completedAt=(Get-Date).ToString('o');SaveHook $hook
+# IMAGE hook and self-refresh evidence are independent and must never destabilize the normal Resume lane.
+exit $coreExit
