@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.2-webapp05-exact-script-readonly-source-inspector",
-  "releasedAt": "2026-09-02T18:21:00+09:00",
-  "gitBlobSha1": "bd7c8adadf00d4785a248c5f9806a5e6a0928ac8",
+  "version": "appscript-0.3.3-webapp05-exact-deployment-version-source-inspector",
+  "releasedAt": "2026-09-02T18:23:00+09:00",
+  "gitBlobSha1": "7048b83e196318f7f0984f31b849719b363e3028",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_WEBAPP05_EXACT_SCRIPT_SOURCE_INSPECTOR_0.3.2.json",
-  "notes": "Read-only inspection of exact existing WEBAPP_TEMPLATE_05 Script ID 1XzludErvxZ3px6qf1aLNU4LZWVU9NqJXYzSrnOm0HoDjUR9XN8flhSir discovered by exact deployment under existing canonical clasp auth. Clone only; record file names, function names and signatures including processTaskQueue/contentOsUnifiedSchedulerTick/doPost/doGet. No push, deployment change, new project, trigger, OAuth, scope or Chrome mutation."
+  "resultReceipt": "APPSCRIPT_WEBAPP05_EXACT_DEPLOYMENT_VERSION_INSPECTOR_0.3.3.json",
+  "notes": "Read-only inspection of the exact existing deployment/version for WEBAPP_TEMPLATE_05 Script ID 1XzludErvxZ3px6qf1aLNU4LZWVU9NqJXYzSrnOm0HoDjUR9XN8flhSir under existing canonical clasp auth. List deployments, parse target deployment version when available, clone that immutable version rather than assuming HEAD, and record files/functions/signatures. No push, deployment change, project, trigger, OAuth, scope or Chrome mutation."
 }
