@@ -6,8 +6,8 @@
   "releasedAt": "2026-09-01T20:09:56+09:00",
   "gitBlobSha1": "3c06deee79bae05dc22fd4efd275f2e7811b5bd7",
   "file": "HomeDesignLocalAgent.ps1",
-  "pollSeconds": 300,
+  "pollSeconds": 900,
   "executionMode": "one_shot",
   "resultReceipt": "AGENT_1.1.138_NOTEBOOKLM_FRONT_CONSENT_LOOP_BYPASS_RESULT.json",
-  "notes": "TABLET_OWNER_LOCK_ACTIVE_SOURCE_REFRESH_WINDOW_20260902_1825. NotebookLM ownership remains TABLET_ANDROID_01 and laptop NotebookLM stable remains disabled (enabled=false). This temporary marker intentionally allows the already-installed V7 watchdog to enter AutoResume only so AutoResume can self-refresh HomeDesignLocalWatchdog and AgentBootstrap using API→RAW fallback. The pinned normal Resume core must stop at AGENT_STABLE_DISABLED and must not launch laptop NotebookLM. Independent FLOW/IMAGE/APPSCRIPT lanes remain allowed. Restore the canonical TABLET_PRIMARY_HOLD marker immediately after WATCHDOG V9/Bootstrap refresh readback. No OAuth, scope, project, deployment, trigger, normal Chrome, Flow generation or credit change in this refresh window."
+  "notes": "TABLET_OWNER_LOCK_ACTIVE_SOURCE_REFRESH_WINDOW_20260902_1825. NotebookLM ownership remains TABLET_ANDROID_01 and laptop NotebookLM stable remains disabled (enabled=false). During this temporary transport-recovery window, legacy Bootstrap polling is throttled to 900s so one successful metadata read breaks the unauthenticated GitHub Contents API self-exhaustion loop and leaves quota for Flow maintenance 1.1.155 / Watchdog V10 / Bootstrap V2 recovery. V7 may delegate to AutoResume only for source refresh; the pinned normal Resume core must stop at AGENT_STABLE_DISABLED and must not launch laptop NotebookLM. Restore canonical TABLET_PRIMARY_HOLD and normal polling only after V10/Bootstrap V2 physical readback. No OAuth, scope, project, deployment, trigger, normal Chrome, Flow generation or credit change in this refresh window."
 }
