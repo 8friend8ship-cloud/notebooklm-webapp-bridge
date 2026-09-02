@@ -2,7 +2,10 @@ const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
 
-const source = fs.readFileSync(__dirname + '/NotebookLmMaxSafeCapacityGovernor.gs', 'utf8');
+const sourcePath = fs.existsSync(__dirname + '/NotebookLmMaxSafeCapacityGovernor.gs')
+  ? __dirname + '/NotebookLmMaxSafeCapacityGovernor.gs'
+  : __dirname + '/../apps-script/NotebookLmMaxSafeCapacityGovernor.gs';
+const source = fs.readFileSync(sourcePath, 'utf8');
 
 function makeSheet(rows) {
   const writes = [];
