@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.1-webapp05-history-exactdeployment-discovery-argsfix",
-  "releasedAt": "2026-09-02T18:18:00+09:00",
-  "gitBlobSha1": "9793675f4679e0edbf55a6a2d8d225a6b7a92129",
+  "version": "appscript-0.3.2-webapp05-exact-script-readonly-source-inspector",
+  "releasedAt": "2026-09-02T18:21:00+09:00",
+  "gitBlobSha1": "bd7c8adadf00d4785a248c5f9806a5e6a0928ac8",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_DISCOVER_WEBAPP_TEMPLATE_05_ARGSFIX_0.3.1_WRAPPER.json",
-  "notes": "Read-only exact Script ID recovery for existing WEBAPP_TEMPLATE_05. Fixes PowerShell automatic $args collision in RunClasp by patching the verified 0.3.0 blob to use ClaspArgs. Reuse existing canonical clasp authorization only; no login/OAuth change. Recover candidates from existing local/browser evidence, match exact existing deployment, clone read-only, require processTaskQueue signature. No push, deployment change, new project, trigger, OAuth, scope or Chrome mutation."
+  "resultReceipt": "APPSCRIPT_WEBAPP05_EXACT_SCRIPT_SOURCE_INSPECTOR_0.3.2.json",
+  "notes": "Read-only inspection of exact existing WEBAPP_TEMPLATE_05 Script ID 1XzludErvxZ3px6qf1aLNU4LZWVU9NqJXYzSrnOm0HoDjUR9XN8flhSir discovered by exact deployment under existing canonical clasp auth. Clone only; record file names, function names and signatures including processTaskQueue/contentOsUnifiedSchedulerTick/doPost/doGet. No push, deployment change, new project, trigger, OAuth, scope or Chrome mutation."
 }
