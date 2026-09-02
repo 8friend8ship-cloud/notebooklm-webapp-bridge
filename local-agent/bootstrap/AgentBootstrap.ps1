@@ -40,7 +40,11 @@ function CurrentStateVersion {
 }
 function CurrentLaneVersion([string]$Path){
   if(-not(Test-Path -LiteralPath $Path)){ return '' }
-  try { return [string]((Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json).appliedVersion) } catch { return '' }
+  try {
+    $state=Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    if($null-ne$state.exitCode -and [int]$state.exitCode-ne0){ return '' }
+    return [string]$state.appliedVersion
+  } catch { return '' }
 }
 function SaveLaneState([string]$Path,[string]$Lane,[string]$Version,[int]$ExitCode){
   try{[ordered]@{lane=$Lane;appliedVersion=$Version;exitCode=$ExitCode;updatedAt=(Get-Date).ToString('o')}|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $Path -Encoding UTF8}catch{}
@@ -53,7 +57,7 @@ function StopStaleAgentProcesses([int]$MaxAgeSeconds=1800){
       if($cmd -notmatch '(?i)HomeDesignLocalAgent(?:-1\.1\.\d+-patched)?\.ps1'){continue}
       $created=$null;try{$created=[datetime]$p.CreationDate}catch{}
       if(-not $created){continue}
-      $age=[Math]::Floor(($now-$created).TotalSeconds);if($age -le $MaxAgeSeconds){continue}
+      $age=[Math]::Floor(($now-$created).TotalSeconds);if($age-le$MaxAgeSeconds){continue}
       try{& taskkill.exe /PID ([int]$p.ProcessId) /T /F 2>$null|Out-Null;$killed+=[int]$p.ProcessId;BLog "Killed stale Local Agent pid=$($p.ProcessId) ageSec=$age."}catch{}
     }
   }catch{}
@@ -80,7 +84,7 @@ function ApplyIndependentLane([string]$MetaPath,[string]$LaneName,[string]$Dest,
     $needsFile= -not(Test-Path -LiteralPath $Dest);if(-not$needsFile){$needsFile=((GitBlobSha1 $Dest)-ne$expected)}
     if($needsFile){$tmp=$Dest+'.download';WriteApiFile $r $tmp;$actual=GitBlobSha1 $tmp;if($actual-ne$expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw "Lane $LaneName local SHA mismatch"};Move-Item $tmp $Dest -Force;BLog "Lane $LaneName updated to $version sha=$expected."}
     $laneVersion=CurrentLaneVersion $LaneStatePath
-    if($needsFile -or $laneVersion-ne$version){$timeout=300;if($m.maxCycleSeconds){$timeout=[Math]::Max(180,[Math]::Min(1800,[int]$m.maxCycleSeconds))};$rc=RunAgentBounded $Dest $timeout;SaveLaneState $LaneStatePath $LaneName $version $rc;if($rc-ne0){BLog "Lane $LaneName exit=$rc version=$version."}else{BLog "Lane $LaneName apply complete version=$version."}}
+    if($needsFile -or $laneVersion-ne$version){$timeout=300;if($m.maxCycleSeconds){$timeout=[Math]::Max(180,[Math]::Min(1800,[int]$m.maxCycleSeconds))};$rc=RunAgentBounded $Dest $timeout;SaveLaneState $LaneStatePath $LaneName $version $rc;if($rc-ne0){BLog "Lane $LaneName exit=$rc version=$version; retry remains enabled."}else{BLog "Lane $LaneName apply complete version=$version."}}
     else{BLog "Lane $LaneName unchanged; skip reapply version=$version."}
   }catch{BLog("Lane $LaneName error: "+$_.Exception.Message)}
 }
@@ -103,7 +107,7 @@ try {
         $releasePath='local-agent/releases/'+[string]$meta.version+'/HomeDesignLocalAgent.ps1'
         $releaseResp=ApiContent $releasePath
         $apiSha=([string]$releaseResp.sha).ToLowerInvariant()
-        if($apiSha -ne $expected){throw "Agent API blob mismatch: api=$apiSha expected=$expected"}
+        if($apiSha-ne$expected){throw "Agent API blob mismatch: api=$apiSha expected=$expected"}
 
         $needsFile = -not (Test-Path -LiteralPath $AgentFile)
         if (-not $needsFile) { $needsFile = (GitBlobSha1 $AgentFile) -ne $expected }
@@ -121,7 +125,7 @@ try {
         [void](StopStaleAgentProcesses ([Math]::Max(1800,$maxCycleSeconds+300)))
         if($needsApply){
           $rc=RunAgentBounded $AgentFile $maxCycleSeconds
-          if($rc -ne 0){BLog "Agent cycle exit=$rc maxCycleSeconds=$maxCycleSeconds."}
+          if($rc-ne0){BLog "Agent cycle exit=$rc maxCycleSeconds=$maxCycleSeconds."}
           else{BLog "Agent apply complete version=$($meta.version)."}
         }else{
           BLog "Stable unchanged; skip one-shot Agent reapply version=$($meta.version)."
