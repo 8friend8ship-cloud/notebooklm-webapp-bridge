@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.9-task203-role-split-transport-resilient",
-  "releasedAt": "2026-09-02T21:03:00+09:00",
-  "gitBlobSha1": "9899e5eb5f4b67b3aa78d219d0bcab02a146f08b",
+  "version": "appscript-0.3.10-task203-role-split-syntaxfix",
+  "releasedAt": "2026-09-02T21:07:00+09:00",
+  "gitBlobSha1": "50d34afff45a1ee7771ec6948b0997177d3c1c2a",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 900,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_ROLE_SPLIT_RESILIENT_0.3.9.json",
-  "notes": "READ-ONLY resilient role-split preflight. Supersedes 0.3.8 before physical apply. Exact 0.3.6 target baselines are rechecked. Fourteen Analyzer sources are fetched over public raw with pinned Git blob SHA validation. Two private contents-os-git compatibility sources are read only through existing gh auth if available; otherwise they are marked as requiring a private Drive snapshot before any write. Function/global collisions, doGet/doPost risk, trigger tokens, duplicate symbols and target role plan are reported. safeToPush remains false. No Apps Script push/project/deployment/trigger/OAuth/scope/normal Chrome mutation."
+  "resultReceipt": "APPSCRIPT_TASK203_ROLE_SPLIT_SYNTAXFIX_0.3.10.json",
+  "notes": "READ-ONLY syntaxfix wrapper for 0.3.9. Fetch pinned 0.3.9 public release blob, verify Git blob SHA 9899e5eb..., replace only missing whitespace pattern throw' -> throw ' in memory, execute patched child, then mirror child receipt. No Apps Script push/project/deployment/trigger/OAuth/scope/normal Chrome mutation. safeToPush remains false until child role report passes and central review completes."
 }
