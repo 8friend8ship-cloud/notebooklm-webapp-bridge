@@ -2,13 +2,16 @@
   "schemaVersion": 1,
   "channel": "flow",
   "enabled": true,
-  "version": "1.1.69",
-  "gitBlobSha1": "9dce2a7bb83d96a3d846a92e24f468b7a67cb38a",
+  "version": "1.1.155-flow-source-transport-recovery-v10-bootstrap-v2",
+  "gitBlobSha1": "4f0d71df4714d00185d983d315d18fb99c5fdba0",
   "file": "HomeDesignLocalAgent.ps1",
-  "pollSeconds": 60,
+  "pollSeconds": 300,
   "maxCycleSeconds": 300,
-  "purpose": "Flow Agent Bridge 0.1.0 no-credit R10 recovery/health lane independent from global NotebookLM one-shot stable channel. Temporary Apps Script discovery route 1.1.150 is retired because exact-deployment discovery now lives in IMAGE task203 release 1.1.151.",
+  "purpose": "ONE-SHOT SOURCE TRANSPORT RECOVERY ONLY. On the first successful legacy Bootstrap read of this Flow lane, replace only HomeDesignLocalWatchdog.ps1 with Watchdog V10 and AgentBootstrap.ps1 with Bootstrap V2 using raw.githubusercontent.com + Git blob verification, then restart only the Bootstrap -Loop process. Preserve TABLET_ANDROID_01 NotebookLM ownership, do not touch normal Chrome, Flow Generate, Host, OAuth, scope, projects, deployments, triggers or credits. Receipt FLOW_SOURCE_TRANSPORT_RECOVERY_V10_BOOTSTRAP_V2_1.1.155.json is required before restoring normal Flow 1.1.69 lane.",
   "normalChromeTouched": false,
   "generateClicked": false,
-  "creditSpend": false
+  "creditSpend": false,
+  "oauthChanged": false,
+  "extensionMutated": false,
+  "resultReceipt": "FLOW_SOURCE_TRANSPORT_RECOVERY_V10_BOOTSTRAP_V2_1.1.155.json"
 }
