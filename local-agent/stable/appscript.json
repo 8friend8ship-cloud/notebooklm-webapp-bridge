@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.0-webapp05-history-exactdeployment-discovery",
-  "releasedAt": "2026-09-02T12:25:00+09:00",
-  "gitBlobSha1": "0d168954a5755b0556605dae121ab19adedeb3fe",
+  "version": "appscript-0.3.1-webapp05-history-exactdeployment-discovery-argsfix",
+  "releasedAt": "2026-09-02T18:18:00+09:00",
+  "gitBlobSha1": "9793675f4679e0edbf55a6a2d8d225a6b7a92129",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_DISCOVER_WEBAPP_TEMPLATE_05_BY_HISTORY_EXACT_DEPLOYMENT_0.3.0.json",
-  "notes": "Read-only exact Script ID recovery for existing WEBAPP_TEMPLATE_05 without deprecated clasp list-scripts. Reuse the existing canonical clasp authorization only. Recover candidate Script IDs from existing local .clasp.json files and browser/session evidence, verify the known deployment with clasp list-deployments, clone read-only, and require the existing processTaskQueue source signature. No push, deployment change, new project, trigger, OAuth, or scope mutation."
+  "resultReceipt": "APPSCRIPT_DISCOVER_WEBAPP_TEMPLATE_05_ARGSFIX_0.3.1_WRAPPER.json",
+  "notes": "Read-only exact Script ID recovery for existing WEBAPP_TEMPLATE_05. Fixes PowerShell automatic $args collision in RunClasp by patching the verified 0.3.0 blob to use ClaspArgs. Reuse existing canonical clasp authorization only; no login/OAuth change. Recover candidates from existing local/browser evidence, match exact existing deployment, clone read-only, require processTaskQueue signature. No push, deployment change, new project, trigger, OAuth, scope or Chrome mutation."
 }
