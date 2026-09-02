@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.4-webapp05-bound-parent-factory-owner-inspector",
-  "releasedAt": "2026-09-02T19:41:00+09:00",
-  "gitBlobSha1": "17e3d70b30ea5a88f8a15e1aefe63ad41fab8f1a",
+  "version": "appscript-0.3.5-webapp05-bound-parent-factory-owner-argsfix",
+  "releasedAt": "2026-09-02T20:02:00+09:00",
+  "gitBlobSha1": "cbc31a8445779038f5852fc2e6100c30128feb21",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_WEBAPP05_BOUND_PARENT_FACTORY_OWNER_INSPECTOR_0.3.4.json",
-  "notes": "Read-only discovery of the actual WEBAPP_TEMPLATE_05 container-bound Factory trigger owner. Reuse existing canonical clasp OAuth only; recover existing Script ID candidates from local/browser evidence; call Apps Script projects.get and projects.getContent without modifying source; require metadata parentId=1gBuyuDyRZkRDYwl2DGj6oUWQUS-KnD1alapyTBWZXN8 plus HEAD processTaskQueue signature; require exactly one owner and require it to differ from known WebApp deployment Script candidate 1XzludErvxZ3px6qf1aLNU4LZWVU9NqJXYzSrnOm0HoDjUR9XN8flhSir. No push, deployment, project, trigger, OAuth scope or Chrome mutation."
+  "resultReceipt": "APPSCRIPT_WEBAPP05_BOUND_PARENT_FACTORY_OWNER_INSPECTOR_0.3.5.json",
+  "notes": "Read-only retry of 0.3.4 with one regression fix only: PowerShell RunClasp parameter $Args is deterministically replaced with $ClaspArgs before executing the verified 0.3.4 source blob. Existing canonical clasp OAuth only; no new project/deployment/trigger, no push, no OAuth/scope/Chrome mutation. Continue requiring exact WEBAPP_TEMPLATE_05 parentId + processTaskQueue signature and exactly one trigger-owner Script ID distinct from the known WebApp deployment Script 1XzludErvxZ3px6qf1aLNU4LZWVU9NqJXYzSrnOm0HoDjUR9XN8flhSir."
 }
