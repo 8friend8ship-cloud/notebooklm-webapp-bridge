@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "channel": "image",
   "enabled": true,
-  "version": "1.1.151-image-task203-exactdeployment-repair",
-  "gitBlobSha1": "baed5cd7bf98b81a313892d640960db26fec77f3",
+  "version": "1.1.152-image-task203-central-factory-v14",
+  "gitBlobSha1": "d1ee150032ea984032111eb6752c0aa46b3f7e43",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 1800,
-  "purpose": "Existing approved task203 + Central Librarian binding. Reuse existing private Git and clasp authorization only. Patch the cloned repair script locally so both the repair stage and Librarian stage resolve the exact existing Apps Script project by unique match to deployment AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo, never by title. Remove create/deploy fallback: update the existing deployment only. Snapshot/rollback same Script, require deployment set unchanged, Librarian source/dispatcher/wake readback, physical Librarian trigger count=0, and preflight x2. No duplicate task/project/deployment/trigger/OAuth/scope and no Flow/Image generation credit spend.",
+  "purpose": "Existing approved Task203 continuation only. First recover the exact existing WEBAPP_TEMPLATE_05 Script ID using the read-only appscript-0.3.0 history/exact-deployment lane, then snapshot the same bound Script and overlay the 13 current Analyzer-12.09 central production modules at canonical commit a31f97cd41c2256dbacd3ad426037743090a11cc, including Unified Scheduler V14, central tablet remote dispatcher, CWBX/audit/DryWriter repair and OpenAI W1-W5 factory runtime. Reuse the existing processTaskQueue physical wake, push the same Script ID, update only the existing deployment, clean-clone readback, and rollback on failure. OpenAI Work is not a scheduler dependency. No duplicate task/project/deployment/trigger/OAuth/scope and no Chrome/Flow generation or credit spend in this source-sync lane.",
   "normalChromeTouched": false,
   "generateClicked": false,
   "creditSpend": false,
   "oauthChanged": false,
   "extensionMutated": false,
   "appsScriptBoundSync": true,
-  "hostRecoveryReceipt": "IMAGE_TASK203_EXACTDEPLOY_REPAIR_LIBRARIAN_1.1.151.json",
-  "resultReceipt": "IMAGE_TASK203_EXACTDEPLOY_REPAIR_LIBRARIAN_1.1.151.json"
+  "hostRecoveryReceipt": "IMAGE_TASK203_CENTRAL_FACTORY_V14_1.1.152.json",
+  "resultReceipt": "IMAGE_TASK203_CENTRAL_FACTORY_V14_1.1.152.json"
 }
