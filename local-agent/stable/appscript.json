@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.6-task203-dual-role-exact-snapshot",
-  "releasedAt": "2026-09-02T20:18:00+09:00",
-  "gitBlobSha1": "d3e1f73815c96c6f733ed9aab22948b78505575a",
+  "version": "appscript-0.3.7-task203-role-split-preflight",
+  "releasedAt": "2026-09-02T20:43:30+09:00",
+  "gitBlobSha1": "99f48c7e5da331c0c9b59c57a2fdcf686918f2fa",
   "file": "HomeDesignLocalAgent.ps1",
-  "maxCycleSeconds": 600,
+  "maxCycleSeconds": 900,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_DUAL_ROLE_EXACT_SNAPSHOT_0.3.6.json",
-  "notes": "PREWRITE READ-ONLY DUAL SNAPSHOT. Existing canonical clasp auth only. Snapshot WEBAPP_TEMPLATE_05 Script 1Xzl... immutable deployment @1 plus HEAD, and APP_ANALYZER_BACKEND Factory-owner Script 14OHC... HEAD. Record per-file bytes/SHA256, aggregate hash, function list, role signatures, parentId where available, and WebApp HEAD drift from deployed @1. Require factory processTaskQueue=true and deployed WebApp processTaskQueue=false. No push, project, deployment, trigger, OAuth/scope or normal Chrome mutation."
+  "resultReceipt": "APPSCRIPT_TASK203_ROLE_SPLIT_PREFLIGHT_0.3.7.json",
+  "notes": "READ-ONLY ROLE-SPLIT PREFLIGHT. Re-clone exact existing WEBAPP_TEMPLATE_05 and APP_ANALYZER_BACKEND and fail closed on baseline drift from 0.3.6. Clone Analyzer-12.09 + contents-os-git canonical sources and inspect 13 original Task203 source candidates plus current central-contract candidates. Report global functions/variables, WebApp/Factory collisions, doGet/doPost entrypoint risk, trigger mutation tokens, duplicate source symbols and heuristic role. safeToPush is hard-false. No clasp push, no project/deployment/trigger/OAuth/scope/normal Chrome mutation."
 }
