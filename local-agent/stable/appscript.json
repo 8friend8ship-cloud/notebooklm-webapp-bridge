@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.2.0-webapp05-deployment-discovery",
-  "releasedAt": "2026-09-01T16:43:00+09:00",
-  "gitBlobSha1": "325dd2b9302f9c8254a62e9c5e8cf5c179fc883a",
+  "version": "appscript-0.3.0-webapp05-history-exactdeployment-discovery",
+  "releasedAt": "2026-09-02T12:25:00+09:00",
+  "gitBlobSha1": "0d168954a5755b0556605dae121ab19adedeb3fe",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 300,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_DISCOVER_WEBAPP_TEMPLATE_05_BY_DEPLOYMENT_0.2.0.json",
-  "notes": "Read-only exact discovery for existing WEBAPP_TEMPLATE_05 Apps Script. Reuse existing clasp auth only; enumerate existing Script IDs and match exact deployment AKfycbzz247_Mwl9c6N1WxmpHAttwHQJB6RCFtaY08XlHgxysz1iEzg7HWDXa3i5oXhDS1jo. No push, no deployment update, no project, no trigger, no OAuth/scope changes. Exact deployment match count must equal 1 before any later mutation lane is allowed."
+  "resultReceipt": "APPSCRIPT_DISCOVER_WEBAPP_TEMPLATE_05_BY_HISTORY_EXACT_DEPLOYMENT_0.3.0.json",
+  "notes": "Read-only exact Script ID recovery for existing WEBAPP_TEMPLATE_05 without deprecated clasp list-scripts. Reuse the existing canonical clasp authorization only. Recover candidate Script IDs from existing local .clasp.json files and browser/session evidence, verify the known deployment with clasp list-deployments, clone read-only, and require the existing processTaskQueue source signature. No push, deployment change, new project, trigger, OAuth, or scope mutation."
 }
