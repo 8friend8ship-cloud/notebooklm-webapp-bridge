@@ -2,16 +2,16 @@
   "schemaVersion": 1,
   "channel": "flow",
   "enabled": true,
-  "version": "1.1.156-flow-source-transport-recovery-v10-bootstrap-v2-shafix",
-  "gitBlobSha1": "c94481f23f42af7c900fc230ce21ecf9275e7c23",
+  "version": "1.1.157-flow-transport-settle-after-v10-bootstrap-v2",
+  "gitBlobSha1": "d242870ecf916838e7a3d441019328614082e3e1",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "maxCycleSeconds": 300,
-  "purpose": "ONE-SHOT SOURCE TRANSPORT RECOVERY ONLY. Correct the 1.1.155 Watchdog V10 expected Git blob SHA mismatch. On the first successful legacy Bootstrap read of this Flow lane, replace only HomeDesignLocalWatchdog.ps1 with verified Watchdog V10 blob 1e0ad6bc6e11d295f9f89762523fb04392dada06 and AgentBootstrap.ps1 with verified Bootstrap V2 blob c0a009215590835abcd5b867ca1af0a85bbb2f3b, then restart only the Bootstrap -Loop process. Preserve TABLET_ANDROID_01 NotebookLM ownership; do not touch normal Chrome, Flow Generate, Host, OAuth, scope, projects, deployments, triggers or credits. Receipt FLOW_SOURCE_TRANSPORT_RECOVERY_V10_BOOTSTRAP_V2_1.1.156.json is required before restoring normal Flow lane.",
+  "maxCycleSeconds": 180,
+  "purpose": "ONE-SHOT SETTLE AFTER PHYSICAL WATCHDOG V10 + BOOTSTRAP V2 READBACK. Verify the already-installed Watchdog V10 and Bootstrap V2 Git blob SHAs plus one live Bootstrap -Loop process, write a receipt, and exit 0. Do not kill/restart the parent Bootstrap from its child lane. This allows Bootstrap V2 to persist FLOW success state and continue immediately to IMAGE/APPSCRIPT independent lanes. No normal Chrome, Flow Generate, Host, OAuth, scope, project, deployment, trigger or credit mutation.",
   "normalChromeTouched": false,
   "generateClicked": false,
   "creditSpend": false,
   "oauthChanged": false,
   "extensionMutated": false,
-  "resultReceipt": "FLOW_SOURCE_TRANSPORT_RECOVERY_V10_BOOTSTRAP_V2_1.1.156.json"
+  "resultReceipt": "FLOW_TRANSPORT_SETTLE_V10_BOOTSTRAP_V2_1.1.157.json"
 }
