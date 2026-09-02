@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "channel": "image",
   "enabled": true,
-  "version": "1.1.153-image-task203-central-factory-v14-immediate-tablet",
-  "gitBlobSha1": "d9318b25126171c96ce38880905d524e5f3116b1",
+  "version": "1.1.154-image-task203-central-factory-v14-immediate-tablet-discoveryfix",
+  "gitBlobSha1": "d0a59e3726ba9cb12b0d9d52ac2646e4a537db52",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 1800,
-  "purpose": "Existing approved Task203 continuation only. Reuse the exact existing WEBAPP_TEMPLATE_05 Script/deployment and existing clasp auth. Verify the prior 1.1.152 runner blob, patch its Analyzer pin from a31f97cd41c2256dbacd3ad426037743090a11cc to canonical 3f0265aeb5242bdf245ae93039a4474eb30a186b, then overlay the same 13 central modules including CentralTabletRemoteDispatcher V2 immediate/warm routing. V2 corrects the live TABLET_WORKER_STATUS Drive file binding, allows Flow warm-open before Interact proof, and adds synchronous queue-mutation dispatch; existing processTaskQueue 5m wake is fallback/self-heal only. Push only the same Script ID, update only the existing deployment, clean-clone readback and rollback on failure. OpenAI Work is not a scheduler dependency. No duplicate task/project/deployment/trigger/OAuth/scope and no Chrome/Flow generation or credit spend in this source-sync lane.",
+  "purpose": "Existing approved Task203 continuation only. Reuse the exact existing WEBAPP_TEMPLATE_05 Script/deployment and existing clasp auth. Verify the prior 1.1.152 runner blob, replace the discovery lane with appscript-0.3.1 argsfix so clasp command arguments are actually forwarded, pin Analyzer canonical commit 3f0265aeb5242bdf245ae93039a4474eb30a186b, and overlay the same 13 central modules including CentralTabletRemoteDispatcher V2 immediate/warm routing. Existing processTaskQueue 5m wake is fallback/self-heal only. Push only the same Script ID, update only the existing deployment, clean-clone readback and rollback on failure. No new OAuth/login, project, deployment, trigger, OpenAI Work scheduler, Chrome mutation, Flow generation or credit spend in this source-sync lane.",
   "normalChromeTouched": false,
   "generateClicked": false,
   "creditSpend": false,
   "oauthChanged": false,
   "extensionMutated": false,
   "appsScriptBoundSync": true,
-  "hostRecoveryReceipt": "IMAGE_TASK203_CENTRAL_FACTORY_V14_1.1.153.json",
-  "resultReceipt": "IMAGE_TASK203_CENTRAL_FACTORY_V14_1.1.153.json"
+  "hostRecoveryReceipt": "IMAGE_TASK203_CENTRAL_FACTORY_V14_1.1.154.json",
+  "resultReceipt": "IMAGE_TASK203_CENTRAL_FACTORY_V14_1.1.154.json"
 }
