@@ -1,0 +1,45 @@
+name: Task203 image 1.1.152 central factory CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/releases/1.1.152-image-task203-central-factory-v14/HomeDesignLocalAgent.ps1'
+      - 'local-agent/stable/image.json'
+      - '.github/workflows/task203-image-152-central-factory-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: powershell
+        run: |
+          $path='local-agent/releases/1.1.152-image-task203-central-factory-v14/HomeDesignLocalAgent.ps1'
+          $tokens=$null;$errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){$errors|Format-List|Out-String|Write-Error;exit 1}
+      - name: Verify central factory contract
+        shell: powershell
+        run: |
+          $path='local-agent/releases/1.1.152-image-task203-central-factory-v14/HomeDesignLocalAgent.ps1'
+          $s=Get-Content $path -Raw
+          foreach($required in @(
+            '1.1.152-image-task203-central-factory-v14',
+            'appscript-0.3.0-webapp05-history-exactdeployment-discovery',
+            'a31f97cd41c2256dbacd3ad426037743090a11cc',
+            'EnsureFactoryWakeAdapter',
+            'ContentOS_Unified_Scheduler.gs',
+            'CentralTabletRemoteDispatcher_20260902.gs',
+            'OpenAI_5_Worker_Runtime_20260902.gs',
+            'CONTENTOS_UNIFIED_SCHEDULER_V14_TABLET_FACTORY_20260902',
+            'EXISTING_DEPLOYMENT_UPDATE_FAILED_NO_CREATE_FALLBACK',
+            'DONE_WAIT_NATURAL_FACTORY_WAKE'
+          )){if(-not$s.Contains($required)){throw "MISSING_152_CONTRACT:$required"}}
+          $m=[regex]::Match($s,'(?s)\$sourceNames=@\((.*?)\)\s*foreach\(\$name in \$sourceNames\)')
+          if(-not$m.Success){throw 'SOURCE_NAMES_BLOCK_NOT_FOUND'}
+          $count=[regex]::Matches($m.Groups[1].Value,"'[^']+\.gs'").Count
+          if($count-ne13){throw "ANALYZER_OVERLAY_COUNT_$count"}
+          if($s.Contains('clasp create-deployment') -or $s.Contains('clasp deploy --deploymentId')){throw 'NEW_DEPLOYMENT_FALLBACK_REINTRODUCED'}
+          Write-Host 'TASK203_IMAGE_152_STATIC_CONTRACT_PASS'
