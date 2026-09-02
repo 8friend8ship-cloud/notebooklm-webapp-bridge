@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.7-task203-role-split-preflight",
-  "releasedAt": "2026-09-02T20:43:30+09:00",
-  "gitBlobSha1": "99f48c7e5da331c0c9b59c57a2fdcf686918f2fa",
+  "version": "appscript-0.3.8-task203-source-transport-preflight",
+  "releasedAt": "2026-09-02T21:00:00+09:00",
+  "gitBlobSha1": "8aa665c68c7252b37ba8c3156d189ee22364c754",
   "file": "HomeDesignLocalAgent.ps1",
-  "maxCycleSeconds": 900,
+  "maxCycleSeconds": 600,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_ROLE_SPLIT_PREFLIGHT_0.3.7.json",
-  "notes": "READ-ONLY ROLE-SPLIT PREFLIGHT. Re-clone exact existing WEBAPP_TEMPLATE_05 and APP_ANALYZER_BACKEND and fail closed on baseline drift from 0.3.6. Clone Analyzer-12.09 + contents-os-git canonical sources and inspect 13 original Task203 source candidates plus current central-contract candidates. Report global functions/variables, WebApp/Factory collisions, doGet/doPost entrypoint risk, trigger mutation tokens, duplicate source symbols and heuristic role. safeToPush is hard-false. No clasp push, no project/deployment/trigger/OAuth/scope/normal Chrome mutation."
+  "resultReceipt": "APPSCRIPT_TASK203_SOURCE_TRANSPORT_PREFLIGHT_0.3.8.json",
+  "notes": "READ-ONLY transport preflight after 0.3.7 ANALYZER_CLONE_FAIL. Re-check exact WebApp/Factory 0.3.6 baselines. Test public Analyzer raw fetch with Git blob SHA verification, existing gh auth read-only fetch for the two private contents-os-git compatibility sources, and git ls-remote diagnostic only. No clone/push/project/deployment/trigger/OAuth/scope/normal Chrome mutation."
 }
