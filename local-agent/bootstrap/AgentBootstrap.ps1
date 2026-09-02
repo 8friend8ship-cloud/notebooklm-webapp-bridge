@@ -2,7 +2,7 @@ param([switch]$Loop)
 
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$BootstrapVersion='BOOTSTRAP_V2_API_RAW_FALLBACK_20260902'
+$BootstrapVersion='BOOTSTRAP_V3_WATCHDOG_NUDGE_20260902'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $AgentFile=Join-Path $Root 'HomeDesignLocalAgent.ps1'
