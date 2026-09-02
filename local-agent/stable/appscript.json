@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.8-task203-source-transport-preflight",
-  "releasedAt": "2026-09-02T21:00:00+09:00",
-  "gitBlobSha1": "8aa665c68c7252b37ba8c3156d189ee22364c754",
+  "version": "appscript-0.3.9-task203-role-split-transport-resilient",
+  "releasedAt": "2026-09-02T21:03:00+09:00",
+  "gitBlobSha1": "9899e5eb5f4b67b3aa78d219d0bcab02a146f08b",
   "file": "HomeDesignLocalAgent.ps1",
-  "maxCycleSeconds": 600,
+  "maxCycleSeconds": 900,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_SOURCE_TRANSPORT_PREFLIGHT_0.3.8.json",
-  "notes": "READ-ONLY transport preflight after 0.3.7 ANALYZER_CLONE_FAIL. Re-check exact WebApp/Factory 0.3.6 baselines. Test public Analyzer raw fetch with Git blob SHA verification, existing gh auth read-only fetch for the two private contents-os-git compatibility sources, and git ls-remote diagnostic only. No clone/push/project/deployment/trigger/OAuth/scope/normal Chrome mutation."
+  "resultReceipt": "APPSCRIPT_TASK203_ROLE_SPLIT_RESILIENT_0.3.9.json",
+  "notes": "READ-ONLY resilient role-split preflight. Supersedes 0.3.8 before physical apply. Exact 0.3.6 target baselines are rechecked. Fourteen Analyzer sources are fetched over public raw with pinned Git blob SHA validation. Two private contents-os-git compatibility sources are read only through existing gh auth if available; otherwise they are marked as requiring a private Drive snapshot before any write. Function/global collisions, doGet/doPost risk, trigger tokens, duplicate symbols and target role plan are reported. safeToPush remains false. No Apps Script push/project/deployment/trigger/OAuth/scope/normal Chrome mutation."
 }
