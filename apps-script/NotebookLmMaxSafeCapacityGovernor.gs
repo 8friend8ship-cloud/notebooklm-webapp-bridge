@@ -19,6 +19,7 @@ const NLM_CAPACITY_GOVERNOR_V1 = Object.freeze({
   stopAtRatio: 0.95,
   throttleAtRatio: 0.80,
   heartbeatFreshMs: 10 * 60 * 1000,
+  recoveryRetryMs: 5 * 60 * 1000,
   leaseMs: 15 * 60 * 1000,
   owner: 'TABLET_ANDROID_01',
   laptopFallback: false
@@ -36,22 +37,27 @@ function runNotebookLmMaxSafeCapacityGovernor5mIfDue_(now) {
     const runners = ss.getSheetByName(NLM_CAPACITY_GOVERNOR_V1.runnerSheet);
     if (!queue || !runners) throw new Error('REQUIRED_CENTRAL_SHEET_MISSING');
 
-    const worker = findNotebookLmTabletWorker_(runners, current);
-    if (!worker.fresh || !worker.uiProof) {
-      return writeNotebookLmGovernorQa_(ss, {
-        ok:true,
-        status:'TABLET_PRIMARY_HOLD',
-        owner:NLM_CAPACITY_GOVERNOR_V1.owner,
-        reason:worker.reason || 'FRESH_HEARTBEAT_AND_POSITIVE_UI_PROOF_REQUIRED',
-        claimed:0,
-        laptopFallback:false
-      });
-    }
-
     const rows = queue.getDataRange().getValues();
     const headers = headerMap_(rows[0]);
     const candidates = rows.slice(1).map((row, i) => ({row, rowNumber:i + 2}))
       .filter(x => isNotebookLmReadyTask_(x.row, headers));
+
+    const worker = findNotebookLmTabletWorker_(runners, current);
+    if (!worker.fresh || !worker.uiProof) {
+      return writeNotebookLmGovernorQa_(ss, {
+        ok:true,
+        status:'TABLET_RECOVERY_ARMED',
+        owner:NLM_CAPACITY_GOVERNOR_V1.owner,
+        reason:worker.reason || 'FRESH_HEARTBEAT_AND_POSITIVE_UI_PROOF_REQUIRED',
+        claimed:0,
+        pending:candidates.length,
+        retryAt:new Date(current.getTime() + NLM_CAPACITY_GOVERNOR_V1.recoveryRetryMs).toISOString(),
+        workflowContinues:true,
+        blockingScope:'NOTEBOOKLM_UI_ONLY',
+        queuePreserved:true,
+        laptopFallback:false
+      });
+    }
 
     // Maximum safe capacity is live worker capacity, not all queued jobs at once.
     // Default tablet UI concurrency is 1 unless the runner explicitly proves a higher safe value.
