@@ -1,11 +1,12 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V7_CONTENTS_API_TABLET_HOLD_GUARD_20260901'
+$Version='WATCHDOG_V8_CONTENTS_API_TABLET_HOLD_RUNTIME_STOP_20260902'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $LegacyBlob='ecd3a75d2ad8314a44772d91df1905632eeec94d'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
+$DedicatedUserData=Join-Path $Base 'ChromeUserData'
 $Receipt=Join-Path $Root 'WATCHDOG_LAST.json'
 $Entry=Join-Path $Root 'WATCHDOG_ENTRY_LATEST.json'
 $State=Join-Path $Root 'state.json'
@@ -16,15 +17,27 @@ function Save([string]$Local,[string]$Name,$o){try{$j=$o|ConvertTo-Json -Depth 4
 function HostHealthy{try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -TimeoutSec 3;[bool]$h.ok}catch{$false}}
 function BootstrapPresent{try{@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name-match'(?i)powershell|pwsh'-and[string]$_.CommandLine-match'(?i)AgentBootstrap\.ps1'-and[string]$_.CommandLine-match'(?i)(?:^|\s)-Loop(?:\s|$)'}).Count-gt0}catch{$false}}
 function CurrentVersion{try{if(Test-Path $State){[string]((Get-Content $State -Raw -Encoding UTF8|ConvertFrom-Json).agentVersion)}else{''}}catch{''}}
+function DedicatedNotebookProcesses{try{return @(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine-and([string]$_.CommandLine-like('*'+$DedicatedUserData+'*'))})}catch{return @()}}
+function StopDedicatedNotebookLM{
+  $before=@(DedicatedNotebookProcesses)
+  foreach($p in $before){try{Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction SilentlyContinue}catch{}}
+  if($before.Count-gt0){Start-Sleep -Seconds 2}
+  $after=@(DedicatedNotebookProcesses)
+  return [pscustomobject]@{before=[int]$before.Count;after=[int]$after.Count;stopped=[int]([Math]::Max(0,$before.Count-$after.Count));ok=([int]$after.Count-eq0)}
+}
 function StableViaApi{
   $o=[ordered]@{ok=$false;enabled=$true;version='';notes='';sha='';error=''}
-  try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/stable/agent.json?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod -Uri $u -Headers @{'User-Agent'='HomeDesign-Watchdog-V7';'Accept'='application/vnd.github+json'} -TimeoutSec 10;$o.sha=[string]$x.sha;$j=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$x.content-replace'\s','')))|ConvertFrom-Json;$o.enabled=[bool]$j.enabled;$o.version=[string]$j.version;$o.notes=[string]$j.notes;$o.ok=$true}catch{$o.error=$_.Exception.Message};[pscustomobject]$o
+  try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/stable/agent.json?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod -Uri $u -Headers @{'User-Agent'='HomeDesign-Watchdog-V8';'Accept'='application/vnd.github+json'} -TimeoutSec 10;$o.sha=[string]$x.sha;$j=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$x.content-replace'\s','')))|ConvertFrom-Json;$o.enabled=[bool]$j.enabled;$o.version=[string]$j.version;$o.notes=[string]$j.notes;$o.ok=$true}catch{$o.error=$_.Exception.Message};[pscustomobject]$o
 }
-$start=(Get-Date).ToString('o');Save $Entry 'WATCHDOG_ENTRY_LATEST.json' ([ordered]@{ok=$true;action='WATCHDOG_ENTRY_V7_API_GUARD';version=$Version;pid=$PID;startedAt=$start;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false})
+$start=(Get-Date).ToString('o');Save $Entry 'WATCHDOG_ENTRY_LATEST.json' ([ordered]@{ok=$true;action='WATCHDOG_ENTRY_V8_API_TABLET_HOLD_RUNTIME_STOP';version=$Version;pid=$PID;startedAt=$start;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false})
 $s=StableViaApi
 $hold=[bool]($s.ok-and-not$s.enabled-and([string]$s.notes-match'TABLET_PRIMARY_HOLD'))
-if($hold){Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$true;action='WATCHDOG_TABLET_PRIMARY_HOLD_V7_API_GUARD';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');hostHealthy=(HostHealthy);bootstrapLoopPresent=(BootstrapPresent);currentVersion=(CurrentVersion);targetVersion=[string]$s.version;stableMetaReachable=$true;stableMetaTransport='GITHUB_CONTENTS_API';stableContentSha=[string]$s.sha;stableEnabled=$false;stableNotes=[string]$s.notes;notebooklmRuntimeChecked=$false;autoResumeInvoked=$false;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;exitCode=0});exit 0}
+if($hold){
+  $shutdown=StopDedicatedNotebookLM
+  Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=[bool]$shutdown.ok;action='WATCHDOG_TABLET_PRIMARY_HOLD_V8_RUNTIME_STOP';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');hostHealthy=(HostHealthy);bootstrapLoopPresent=(BootstrapPresent);currentVersion=(CurrentVersion);targetVersion=[string]$s.version;stableMetaReachable=$true;stableMetaTransport='GITHUB_CONTENTS_API';stableContentSha=[string]$s.sha;stableEnabled=$false;stableNotes=[string]$s.notes;notebooklmRuntimeChecked=$true;dedicatedNotebookChromeBefore=[int]$shutdown.before;dedicatedNotebookChromeStopped=[int]$shutdown.stopped;dedicatedNotebookChromeAfter=[int]$shutdown.after;autoResumeInvoked=$false;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;exitCode=($(if($shutdown.ok){0}else{4}))})
+  if($shutdown.ok){exit 0}else{exit 4}
+}
 # If API is unreachable, fail closed instead of recovering NotebookLM while tablet ownership may exist.
-if(-not$s.ok){Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$true;action='WATCHDOG_STABLE_API_UNREACHABLE_FAIL_CLOSED_V7';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');hostHealthy=(HostHealthy);bootstrapLoopPresent=(BootstrapPresent);currentVersion=(CurrentVersion);stableMetaReachable=$false;stableMetaTransport='GITHUB_CONTENTS_API';autoResumeInvoked=$false;normalChromeTouched=$false;error=[string]$s.error;exitCode=0});exit 0}
+if(-not$s.ok){Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$true;action='WATCHDOG_STABLE_API_UNREACHABLE_FAIL_CLOSED_V8';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');hostHealthy=(HostHealthy);bootstrapLoopPresent=(BootstrapPresent);currentVersion=(CurrentVersion);stableMetaReachable=$false;stableMetaTransport='GITHUB_CONTENTS_API';autoResumeInvoked=$false;normalChromeTouched=$false;error=[string]$s.error;exitCode=0});exit 0}
 # Non-hold mode delegates byte-for-byte to the previously verified V6 watchdog.
-try{$u='https://api.github.com/repos/'+$Repo+'/git/blobs/'+$LegacyBlob;$b=Invoke-RestMethod -Uri $u -Headers @{'User-Agent'='HomeDesign-Watchdog-V7';'Accept'='application/vnd.github+json'} -TimeoutSec 20;$p=Join-Path $Root 'HomeDesignLocalWatchdog-V6-delegate.ps1';[IO.File]::WriteAllBytes($p,[Convert]::FromBase64String(([string]$b.content-replace'\s','')));if((GitBlobSha1 $p).ToLowerInvariant()-ne$LegacyBlob){throw 'WATCHDOG_V6_BLOB_MISMATCH'};& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $p;exit $LASTEXITCODE}catch{Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$false;action='WATCHDOG_V7_DELEGATE_ERROR';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');autoResumeInvoked=$false;error=$_.Exception.Message;exitCode=3});exit 3}
+try{$u='https://api.github.com/repos/'+$Repo+'/git/blobs/'+$LegacyBlob;$b=Invoke-RestMethod -Uri $u -Headers @{'User-Agent'='HomeDesign-Watchdog-V8';'Accept'='application/vnd.github+json'} -TimeoutSec 20;$p=Join-Path $Root 'HomeDesignLocalWatchdog-V6-delegate.ps1';[IO.File]::WriteAllBytes($p,[Convert]::FromBase64String(([string]$b.content-replace'\s','')));if((GitBlobSha1 $p).ToLowerInvariant()-ne$LegacyBlob){throw 'WATCHDOG_V6_BLOB_MISMATCH'};& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $p;exit $LASTEXITCODE}catch{Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$false;action='WATCHDOG_V8_DELEGATE_ERROR';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');autoResumeInvoked=$false;error=$_.Exception.Message;exitCode=3});exit 3}
