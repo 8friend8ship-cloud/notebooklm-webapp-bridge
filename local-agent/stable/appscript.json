@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.10-task203-role-split-syntaxfix",
-  "releasedAt": "2026-09-02T21:07:00+09:00",
-  "gitBlobSha1": "50d34afff45a1ee7771ec6948b0997177d3c1c2a",
+  "version": "appscript-0.3.11-task203-role-split-force-receipt",
+  "releasedAt": "2026-09-03T13:07:00+09:00",
+  "gitBlobSha1": "e4ae62380b1d6517a09186d12c5019a6d8ac002d",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 900,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_ROLE_SPLIT_SYNTAXFIX_0.3.10.json",
-  "notes": "READ-ONLY syntaxfix wrapper for 0.3.9. Fetch pinned 0.3.9 public release blob, verify Git blob SHA 9899e5eb..., replace only missing whitespace pattern throw' -> throw ' in memory, execute patched child, then mirror child receipt. No Apps Script push/project/deployment/trigger/OAuth/scope/normal Chrome mutation. safeToPush remains false until child role report passes and central review completes."
+  "resultReceipt": "APPSCRIPT_TASK203_ROLE_SPLIT_FORCE_RECEIPT_0.3.11.json",
+  "notes": "READ-ONLY force-receipt nudge for existing Task203 lane. Same pinned 0.3.9 child and same immutable baseline/auth checks as 0.3.10; version bump only forces an already-running AgentBootstrap APPSCRIPT lane to reapply once and emit a fresh receipt. No Apps Script push/project/deployment/trigger/OAuth/scope/normal Chrome mutation. safeToPush remains false until child role report passes and central review completes."
 }
