@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.11-task203-role-split-force-receipt",
-  "releasedAt": "2026-09-03T13:07:00+09:00",
-  "gitBlobSha1": "e4ae62380b1d6517a09186d12c5019a6d8ac002d",
+  "version": "appscript-0.3.12-task203-clone-auth-proof-force",
+  "releasedAt": "2026-09-03T14:15:00+09:00",
+  "gitBlobSha1": "a61d3c0805e2f57ec5ff1743e90e9147f9f431d5",
   "file": "HomeDesignLocalAgent.ps1",
-  "maxCycleSeconds": 900,
+  "maxCycleSeconds": 1200,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_ROLE_SPLIT_FORCE_RECEIPT_0.3.11.json",
-  "notes": "READ-ONLY force-receipt nudge for existing Task203 lane. Same pinned 0.3.9 child and same immutable baseline/auth checks as 0.3.10; version bump only forces an already-running AgentBootstrap APPSCRIPT lane to reapply once and emit a fresh receipt. No Apps Script push/project/deployment/trigger/OAuth/scope/normal Chrome mutation. safeToPush remains false until child role report passes and central review completes."
+  "resultReceipt": "APPSCRIPT_TASK203_CLONE_AUTH_PROOF_FORCE_0.3.12.json",
+  "notes": "READ-ONLY forced verification route after fresh 0.3.9 receipt failed only at CLASP_AUTH_UNAVAILABLE. Do not wait for Apps Script trigger. Prove existing clasp auth by exact read-only clone of both canonical WebApp and Factory Script IDs; only then bypass the incompatible show-authorized-user command and run pinned 0.3.9 full baseline/role/source analysis. No secret output, no new OAuth/project/deployment/trigger, no Apps Script push."
 }
