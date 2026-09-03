@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.12-task203-clone-auth-proof-force",
-  "releasedAt": "2026-09-03T14:15:00+09:00",
-  "gitBlobSha1": "a61d3c0805e2f57ec5ff1743e90e9147f9f431d5",
+  "version": "appscript-0.3.13-task203-clone-auth-proof-force-retry",
+  "releasedAt": "2026-09-03T14:33:00+09:00",
+  "gitBlobSha1": "94b93e25ec04d4299c14f13b7d29a76c27109626",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 1200,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_CLONE_AUTH_PROOF_FORCE_0.3.12.json",
-  "notes": "READ-ONLY forced verification route after fresh 0.3.9 receipt failed only at CLASP_AUTH_UNAVAILABLE. Do not wait for Apps Script trigger. Prove existing clasp auth by exact read-only clone of both canonical WebApp and Factory Script IDs; only then bypass the incompatible show-authorized-user command and run pinned 0.3.9 full baseline/role/source analysis. No secret output, no new OAuth/project/deployment/trigger, no Apps Script push."
+  "resultReceipt": "APPSCRIPT_TASK203_CLONE_AUTH_PROOF_FORCE_0.3.13.json",
+  "notes": "READ-ONLY forced retry of exact WebApp+Factory clone auth proof after live child 0.3.9 receipt at 14:18 returned CLASP_AUTH_UNAVAILABLE. Version nudge only so the existing APPSCRIPT independent lane reapplies once. No secret output, no new OAuth/project/deployment/trigger, no Apps Script push."
 }
