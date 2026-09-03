@@ -1,7 +1,7 @@
 const TABLET_TRAFFIC_MANAGER_V1 = Object.freeze({
   tabletSheetId: '1pZFNTeu-F0CjhYAuoKazD92UMn6A-9nkse6QyYwj2yA',
   centralManagerSheetId: '147pycCA4XT2u4TxFYZOaR9na0RtpplbNmRJmmN2o-3w',
-  workerStatusFileId: '1jJrdrC1u8a2ic-0aWrQpMfmJj5Ib_Qho',
+  workerStatusFileId: '1cH1q2h5qZQh7e4Mvgj1xYqbOflhBTMdw',
   actionStatusFileId: '1s0iZXTqL5dOIkQk9LuJr6Ijk63lHDdZ0',
   workerId: 'TABLET_ANDROID_01',
   notebookPrimaryJob: 'TASK_TABLET_NOTEBOOKLM_E2E_20260901_1005',
