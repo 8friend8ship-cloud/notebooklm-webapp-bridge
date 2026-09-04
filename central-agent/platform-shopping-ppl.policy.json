@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "PLATFORM_SHOPPING_PPL_POLICY_V1",
+  "updatedAt": "2026-08-29",
+  "purpose": "Convert verified shopping/affiliate evidence into useful article, card, video, Shorts/Reels and Pin drafts without hidden advertising, spam or unverified offer claims.",
+  "globalRules": {
+    "editorialValueFirst": true,
+    "shoppingSlotOptional": true,
+    "noHiddenAdvertising": true,
+    "commercialRelationshipDisclosureRequired": true,
+    "liveOfferRequiredForRankedRecommendation": true,
+    "singleReviewNeverFact": true,
+    "affiliateClickAloneNeverLearningSuccess": true,
+    "publicPublishHumanGate": true,
+    "providerSecretsServerOnly": true,
+    "noCaptchaOrLoginAutomation": true,
+    "noMassSpamPosting": true
+  },
+  "articleTemplate": {
+    "flow": ["user problem/context", "useful explanation", "why an item is needed", "verified recommendation reason", "2 alternatives", "price/delivery timestamp", "optional affiliate link", "clear disclosure"],
+    "maxCommercialDensity": "do not repeat the same product/link mechanically; one useful slot per natural section unless the comparison itself is the article purpose"
+  },
+  "videoTemplate": {
+    "flow": ["hook/value", "story or demonstration", "natural product/prop moment", "brief evidence-backed reason", "optional CTA", "disclosure metadata", "continue content"],
+    "pplFields": ["productId", "seedId", "sceneId", "placementReason", "visibilityWindowSec", "dialogueOptional", "ctaOptional", "fatigueCap", "disclosureRequired", "brandSafetyState", "offerVerifiedAt"],
+    "rule": "PPL is a scene asset, not a forced commercial break. Remove it when it harms story, usefulness, retention or policy compliance."
+  },
+  "platformMatrix": {
+    "YOUTUBE": {
+      "shopping": "Use YouTube Shopping/product tagging when the channel/item is eligible; otherwise use allowed description/link routes.",
+      "ppl": "Paid product placements, sponsorships or endorsements must be declared with YouTube paid-promotion controls when applicable. Do not embed advertiser-supplied pre/mid/post-roll style video ads where YouTube offers comparable ad formats.",
+      "draftGate": "prepare metadata, product tags/links, disclosure and PPL scene plan; public publish remains gated"
+    },
+    "INSTAGRAM": {
+      "shopping": "Use supported product/affiliate link surfaces only when available to the account and region.",
+      "ppl": "Branded-content/commercial relationships require the platform's paid partnership/branded-content disclosure where applicable.",
+      "draftGate": "Reels/post/story package includes disclosure state before publish"
+    },
+    "TIKTOK": {
+      "shopping": "Use supported shopping/creator commerce surfaces only when account/region eligible.",
+      "ppl": "Content promoting a brand, product or service must carry the commercial-content disclosure setting; branded content is labeled as paid partnership where applicable.",
+      "draftGate": "commercial-content disclosure state is mandatory before branded-content publish"
+    },
+    "PINTEREST": {
+      "shopping": "Affiliate links may be used when transparent, original and useful; avoid spam and artificial distribution.",
+      "ppl": "Paid partnership/commercial content requires clear disclosure or available paid-partnership label.",
+      "draftGate": "Pin must add unique value and relevant board context; no link-spam templates"
+    },
+    "NAVER_BLOG": {
+      "shopping": "Keep promotional links proportional to informational value. Avoid repeated mechanically generated promotional posts or repeated external-link promotion.",
+      "ppl": "Use clear Korean disclosure for advertising/sponsorship/affiliate relationships when applicable.",
+      "automation": "No unattended public posting/login/search scraping through browser automation without an explicitly permitted route; Publisher Core stays draft/approval-first."
+    },
+    "NAVER_CAFE": {
+      "shopping": "Follow community and cafe rules; no repetitive promotion or referral spam.",
+      "ppl": "Commercial nature must be clear when applicable.",
+      "automation": "draft/approval only unless an official or explicitly permitted publish route exists"
+    },
+    "NAVER_CLIP": {
+      "shopping": "Treat as short-video commerce only when platform/account supports it.",
+      "ppl": "clear commercial disclosure; reuse SHORTS PPL template but platform-specific QA required",
+      "automation": "draft/approval only until verified provider route"
+    },
+    "BLOGGER": {
+      "shopping": "Article shopping links are optional and must be useful, current and disclosed when affiliate/commercial.",
+      "ppl": "video embeds and article mentions inherit the originating platform disclosure requirements",
+      "draftGate": "Blogger draft may be prepared automatically under existing route; public publish follows Publisher Core gate"
+    }
+  },
+  "contentOsIntegration": {
+    "stages": ["front intent", "shopping need check", "Seed reuse", "BRG_032/product evidence if needed", "live offer verification", "article/video slot plan", "platform cook", "QA", "Publisher Core", "performance writeback"],
+    "outputs": ["SHOPPING_REASON_CARD", "ARTICLE_SHOPPING_SLOT", "VIDEO_PPL_SLOT", "PLATFORM_DISCLOSURE_METADATA", "AFFILIATE_LINK_METADATA"],
+    "fallback": "If price, delivery, eligibility, disclosure or product identity is uncertain, publish an organic draft without shopping/PPL and keep the commerce lane PENDING."
+  },
+  "learning": {
+    "successRequires": ["content quality pass", "offer validity", "task fit", "disclosure pass", "no critical policy regression", "verified audience/use outcome when available"],
+    "metrics": ["retention", "click", "conversion when available", "comments", "complaints", "ppl fatigue", "offer freshness", "delivery success signal", "content usefulness"],
+    "writeback": ["35_INTERNAL_SEED_REGISTRY", "63_EVOLUTION_CHANGELOG", "75_ORCHESTRA_WORKFLOW_MAP", "77_TEMPLATE_EVOLUTION_FACTORY", "target app T1/T2 template"],
+    "negativeLearning": ["forced placement", "stale offer", "irrelevant product", "missing disclosure", "spammy repetition", "content quality drop", "unknown delivery"]
+  }
+}
