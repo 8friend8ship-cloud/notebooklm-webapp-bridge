@@ -1,7 +1,7 @@
 param([switch]$ForceRestart)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_KEEPALIVE_V2_TRANSPORT_AWARE_20260909'
+$Version='REMOTE_DC_KEEPALIVE_V3_EXACT_NODE_TRANSPORT_20260909'
 $Package='@wonderwhy-er/desktop-commander@0.2.48'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -33,7 +33,7 @@ function Save-Receipt($o){
   }catch{}
 }
 function Get-AllProc{try{@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)}catch{@()}}
-function Get-RemoteProc([array]$p){@($p|Where-Object{([string]$_.CommandLine)-match'(?i)desktop-commander' -and ([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'})}
+function Get-RemoteProc([array]$p){@($p|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and ([string]$_.CommandLine)-match'(?i)desktop-commander' -and ([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'})}
 function Get-IsolatedRemote([array]$p){$e=[regex]::Escape($DcCache);@(Get-RemoteProc $p|Where-Object{([string]$_.CommandLine)-match$e})}
 function Get-LegacyRemote([array]$p){@(Get-RemoteProc $p|Where-Object{([string]$_.CommandLine)-match'(?i)AppData\\Local\\npm-cache\\_npx'})}
 function Get-TcpCount([array]$p){

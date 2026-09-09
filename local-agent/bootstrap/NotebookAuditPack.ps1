@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V1_20260909'
+$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V2_EXACT_NODE_20260909'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $AuditRoot=Join-Path $Base 'NotebookAudit'
@@ -45,7 +45,7 @@ function GetRemoteProcesses{
   param([array]$Processes)
   return @($Processes|Where-Object{
     $cmd=[string]$_.CommandLine
-    $cmd -and $cmd -match '(?i)desktop-commander' -and $cmd -match '(?i)(?:^|\s)remote(?:\s|$)'
+    ([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and $cmd -and $cmd -match '(?i)desktop-commander' -and $cmd -match '(?i)(?:^|\s)remote(?:\s|$)'
   })
 }
 function GetLegacyGlobalRemoteProcesses{
