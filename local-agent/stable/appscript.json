@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.13-task203-clone-auth-proof-force-retry",
-  "releasedAt": "2026-09-09T10:37:00+09:00",
-  "gitBlobSha1": "94b93e25ec04d4299c14f13b7d29a76c27109626",
+  "version": "appscript-0.3.15-task203-ps51-envfix-wrapper",
+  "releasedAt": "2026-09-09T21:24:00+09:00",
+  "gitBlobSha1": "6e52e71989ee18d13f47b329387f2b9050efd771",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 600,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_CLONE_AUTH_PROOF_FORCE_0.3.13.json",
-  "notes": "RESUMED_AFTER_REMOTE_DC_RECOVERY_20260909. Prior Task203 lineage restored exactly after Remote DC command/read/write x2 and NotebookAuditPack local/watchdog x2 proof. Temporary appscript-0.3.14 recovery lane is retired from stable but its recovery evidence remains preserved. Continue read-only exact clone/auth proof flow; no new OAuth/project/deployment/physical-trigger change. NotebookLM stable ownership remains separate and unchanged."
+  "resultReceipt": "APPSCRIPT_TASK203_PS51_ENVFIX_0.3.15.json",
+  "notes": "PS5.1 compatibility repair for the resumed Task203 read-only clone/auth proof lane. Preserves 0.3.13 as source blob 94b93e25ec04d4299c14f13b7d29a76c27109626 and applies exactly two safe runtime compatibility transforms before execution: ConvertTo-Json Depth 120 to 100, and empty ComSpec fallback to resolved cmd.exe for clasp.cmd. No new OAuth, project, deployment, trigger, push, scope, normal Chrome, global ExecutionPolicy, or broad process changes. COMPLETE requires inner Task203 receipt PASS plus bootstrap state/readback verification."
 }
