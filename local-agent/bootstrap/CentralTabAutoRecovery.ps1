@@ -1,7 +1,7 @@
 param([string]$Reason='')
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='CENTRAL_TAB_AUTO_RECOVERY_V1_20260909'
+$Version='CENTRAL_TAB_AUTO_RECOVERY_V2_CDP_ONLY_CHROME137_20260909'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $Receipt=Join-Path $Root 'CENTRAL_TAB_RECOVERY_LAST.json'
@@ -18,11 +18,10 @@ if(-not$before.host){
 if(-not$before.cdp){
  try{
   $chrome=Get-ChildItem -LiteralPath (Join-Path $Base 'ChromeForTesting') -Recurse -Filter chrome.exe -File -ErrorAction Stop|Sort-Object FullName -Descending|Select-Object -First 1
-  $ext=Join-Path $Base 'Extension\NotebookLM-WebApp-Bridge'
-  if($chrome-and(Test-Path $ext)){
-   $args=@("--user-data-dir=$(Join-Path $Base 'ChromeUserData')",'--profile-directory=Default',"--load-extension=$ext",'--remote-debugging-port=9224','--remote-debugging-address=127.0.0.1','--no-first-run','--no-default-browser-check','--disable-session-crashed-bubble','https://labs.google/fx/tools/flow')
+  if($chrome){
+   $args=@("--user-data-dir=$(Join-Path $Base 'ChromeUserData')",'--profile-directory=Default','--remote-debugging-port=9224','--remote-debugging-address=127.0.0.1','--no-first-run','--no-default-browser-check','--disable-session-crashed-bubble','https://labs.google/fx/tools/flow')
    Start-Process -FilePath $chrome.FullName -ArgumentList $args -WorkingDirectory $chrome.DirectoryName|Out-Null
-   $actions+='CFT_9224_RECOVERY_INVOKED'
+   $actions+='CFT_9224_CDP_ONLY_RECOVERY_INVOKED'
   }else{$actions+='CFT_9224_RECOVERY_MISSING'}
  }catch{$actions+=('CFT_9224_RECOVERY_ERROR:'+$_.Exception.Message)}
 }
@@ -44,6 +43,8 @@ $out=[ordered]@{
  before=$before
  actions=$actions
  after=$after
+ chrome137LoadExtensionRemoved=$true
+ recoveryMode='DIRECT_CDP_ONLY'
 }
 $out|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $Receipt -Encoding UTF8
 $out|ConvertTo-Json -Depth 20 -Compress
