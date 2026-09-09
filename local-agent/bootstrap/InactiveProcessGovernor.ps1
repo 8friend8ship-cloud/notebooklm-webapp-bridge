@@ -1,7 +1,7 @@
 param([switch]$SelfTest)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='INACTIVE_PROCESS_GOVERNOR_V2_5M_EXACT_PID_20260909'
+$Version='INACTIVE_PROCESS_GOVERNOR_V1_R2_5M_EXACT_PID_20260909'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $StatePath=Join-Path $Root 'WINDOW_ACTIVITY_STATE.json'
 $Receipt=Join-Path $Root 'INACTIVE_PROCESS_GOVERNOR_LAST.json'
