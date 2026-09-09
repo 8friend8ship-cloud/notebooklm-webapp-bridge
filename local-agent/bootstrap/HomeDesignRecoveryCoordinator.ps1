@@ -1,0 +1,69 @@
+param()
+$ErrorActionPreference='Continue'
+$ProgressPreference='SilentlyContinue'
+$Version='RECOVERY_COORDINATOR_V1_20260909'
+$Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
+$Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
+$Root=Join-Path $Base 'LocalAgent'
+$Audit=Join-Path $Root 'NotebookAuditPack.ps1'
+$Watchdog=Join-Path $Root 'HomeDesignLocalWatchdog.ps1'
+$Receipt=Join-Path $Root 'RECOVERY_COORDINATOR_LAST.json'
+New-Item -ItemType Directory -Force -Path $Root|Out-Null
+
+function FindCentral{
+  $n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
+  $m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
+  foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
+    if(-not$d.Root){continue}
+    foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){
+      if(Test-Path -LiteralPath $c -PathType Container){return $c}
+    }
+  }
+  return ''
+}
+function Save($o){
+  try{
+    $j=$o|ConvertTo-Json -Depth 50
+    $j|Set-Content -LiteralPath $Receipt -Encoding UTF8
+    $c=FindCentral
+    if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content -LiteralPath (Join-Path $d 'RECOVERY_COORDINATOR_LAST.json') -Encoding UTF8}
+  }catch{}
+}
+function GitBlob([byte[]]$b){
+  $h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length)
+  [Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length)
+  $s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}
+}
+function Refresh([string]$RepoPath,[string]$Dest){
+  $url='https://api.github.com/repos/'+$Repo+'/contents/'+$RepoPath+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $x=Invoke-RestMethod -Uri $url -Headers @{'User-Agent'='HomeDesign-Recovery-Coordinator';'Accept'='application/vnd.github+json'} -TimeoutSec 30
+  $b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''))
+  $expected=([string]$x.sha).ToLowerInvariant();$actual=(GitBlob $b).ToLowerInvariant()
+  if(-not$expected-or$actual-ne$expected){throw ('SHA_MISMATCH:'+ $RepoPath)}
+  $tmp=$Dest+'.download';[IO.File]::WriteAllBytes($tmp,$b);Move-Item -LiteralPath $tmp -Destination $Dest -Force
+  return $actual
+}
+function RunHidden([string]$Path,[int]$TimeoutSeconds){
+  if(-not(Test-Path -LiteralPath $Path)){return 127}
+  $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true
+  $psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "'+$Path+'"'
+  $p=[Diagnostics.Process]::Start($psi)
+  if(-not$p.WaitForExit($TimeoutSeconds*1000)){try{& taskkill.exe /PID ([int]$p.Id) /T /F 2>$null|Out-Null}catch{};return 124}
+  try{return [int]$p.ExitCode}catch{return 1}
+}
+
+$mutex=New-Object System.Threading.Mutex($false,'HomeDesignRecoveryCoordinatorV1')
+if(-not$mutex.WaitOne(0,$false)){exit 0}
+$r=[ordered]@{ok=$false;action='NOTEBOOK_AUDIT_PLUS_EXISTING_WATCHDOG';version=$Version;startedAt=(Get-Date).ToString('o');completedAt='';auditSha='';watchdogSha='';auditExit=$null;watchdogExit=$null;errors=@();newTrigger=$false;newOAuth=$false;normalChromeTouched=$false}
+try{
+  try{$r.auditSha=Refresh 'local-agent/bootstrap/NotebookAuditPack.ps1' $Audit}catch{$r.errors+=('AUDIT_REFRESH:'+ $_.Exception.Message)}
+  try{$r.watchdogSha=Refresh 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$r.errors+=('WATCHDOG_REFRESH:'+ $_.Exception.Message)}
+  $r.auditExit=RunHidden $Audit 360
+  $r.watchdogExit=RunHidden $Watchdog 420
+  $r.ok=([int]$r.auditExit-eq0 -and ([int]$r.watchdogExit-eq0 -or [int]$r.watchdogExit-eq4))
+}catch{$r.errors+=('COORDINATOR:'+ $_.Exception.Message)}finally{
+  $r.completedAt=(Get-Date).ToString('o');Save $r
+  try{$mutex.ReleaseMutex()}catch{};$mutex.Dispose()
+}
+$r|ConvertTo-Json -Depth 50 -Compress
+if($r.ok){exit 0}else{exit 2}
