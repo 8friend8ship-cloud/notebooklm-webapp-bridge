@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.13-task203-clone-auth-proof-force-retry",
-  "releasedAt": "2026-09-03T14:33:00+09:00",
-  "gitBlobSha1": "94b93e25ec04d4299c14f13b7d29a76c27109626",
+  "version": "appscript-0.3.14-notebook-audit-rdc-recovery",
+  "releasedAt": "2026-09-09T09:24:00+09:00",
+  "gitBlobSha1": "b71a1f8f923fb7f38784c54d5554c8f7fd4ffd3c",
   "file": "HomeDesignLocalAgent.ps1",
-  "maxCycleSeconds": 1200,
+  "maxCycleSeconds": 600,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_CLONE_AUTH_PROOF_FORCE_0.3.13.json",
-  "notes": "READ-ONLY forced retry of exact WebApp+Factory clone auth proof after live child 0.3.9 receipt at 14:18 returned CLASP_AUTH_UNAVAILABLE. Version nudge only so the existing APPSCRIPT independent lane reapplies once. No secret output, no new OAuth/project/deployment/trigger, no Apps Script push."
+  "resultReceipt": "APPSCRIPT_NOTEBOOK_AUDIT_RDC_RECOVERY_0.3.14.json",
+  "notes": "TEMPORARY_P0_REMOTE_DC_RECOVERY_20260909. Existing Bootstrap independent APPSCRIPT lane is reused only to deliver NotebookAuditPack while NotebookLM stable remains disabled for TABLET_PRIMARY ownership. The prior appscript-0.3.13 Task203 checkpoint is preserved in central RESUME_QUEUE and is deferred, not deleted. This recovery uses an isolated HomeDesignAutomationV7/DesktopCommander npm cache, pinned Desktop Commander 0.2.48, exact remote-process handling only, no global npm cache clean, no broad Node kill, no global ExecutionPolicy change, no OAuth/project/deployment/physical-trigger change. If local audit cannot establish an isolated Remote DC process, nonzero exit keeps the existing Bootstrap retry behavior enabled at the normal 300s poll. After actual Remote DC directory-read/write/readback x2, restore/resume the prior Apps Script task lineage and bind periodic notebook audit to the existing HomeDesignLocalWatchdog 5m path."
 }
