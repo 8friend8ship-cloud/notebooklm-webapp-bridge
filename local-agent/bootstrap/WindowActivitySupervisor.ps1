@@ -41,13 +41,13 @@ if($rootElement){
  try{$tops=$rootElement.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.Condition]::TrueCondition)}catch{$tops=@();$enumErrors+=$_.Exception.Message}
  foreach($e in @($tops)){
   try{
-   $c=$e.Current;$pid=[int]$c.ProcessId;$hwnd=[int64]$c.NativeWindowHandle;$title=[string]$c.Name
-   if($pid-le0-or$hwnd-le0-or[string]::IsNullOrWhiteSpace($title)-or[bool]$c.IsOffscreen){continue}
-   $p=Get-Process -Id $pid -ErrorAction Stop;$r=$c.BoundingRectangle
-   $key=([string]$pid+':'+[string]$hwnd);$now=(Get-Date).ToUniversalTime().ToString('o');$first=$now;$last=$now;$unchanged=0
+   $c=$e.Current;$winPid=[int]$c.ProcessId;$hwnd=[int64]$c.NativeWindowHandle;$title=[string]$c.Name
+   if($winPid-le0-or$hwnd-le0-or[string]::IsNullOrWhiteSpace($title)-or[bool]$c.IsOffscreen){continue}
+   $p=Get-Process -Id $winPid -ErrorAction Stop;$r=$c.BoundingRectangle
+   $key=([string]$winPid+':'+[string]$hwnd);$now=(Get-Date).ToUniversalTime().ToString('o');$first=$now;$last=$now;$unchanged=0
    if($prevByKey.ContainsKey($key)){$old=$prevByKey[$key];$first=[string]$old.firstSeenUtc;if([string]$old.title-eq$title){$unchanged=[int]$old.unchangedSamples+1;$last=[string]$old.lastChangedUtc}}
    $reg=$null;if($registeredHwnd.ContainsKey([string]$hwnd)){$reg=$registeredHwnd[[string]$hwnd]}
-   $windows+=[pscustomobject][ordered]@{key=$key;pid=$pid;hwnd=$hwnd;process=[string]$p.ProcessName;processStartUtc=$(try{$p.StartTime.ToUniversalTime().ToString('o')}catch{''});title=$title;family=(Family-FromTitle $title);left=[int]$r.Left;top=[int]$r.Top;right=[int]$r.Right;bottom=[int]$r.Bottom;foreground=$false;unchangedSamples=$unchanged;firstSeenUtc=$first;lastChangedUtc=$last;registered=[bool]($null-ne$reg);registeredState=$(if($reg){[string]$reg.state}else{''});registeredOwner=$(if($reg){[string]$reg.owner}else{''});registeredKeepOpen=$(if($reg){[bool]$reg.keepOpen}else{$false})}
+   $windows+=[pscustomobject][ordered]@{key=$key;pid=$winPid;hwnd=$hwnd;process=[string]$p.ProcessName;processStartUtc=$(try{$p.StartTime.ToUniversalTime().ToString('o')}catch{''});title=$title;family=(Family-FromTitle $title);left=[double]$r.Left;top=[double]$r.Top;right=[double]$r.Right;bottom=[double]$r.Bottom;foreground=$false;unchangedSamples=$unchanged;firstSeenUtc=$first;lastChangedUtc=$last;registered=[bool]($null-ne$reg);registeredState=$(if($reg){[string]$reg.state}else{''});registeredOwner=$(if($reg){[string]$reg.owner}else{''});registeredKeepOpen=$(if($reg){[bool]$reg.keepOpen}else{$false})}
   }catch{$enumErrors+=$_.Exception.Message}
  }
 }
