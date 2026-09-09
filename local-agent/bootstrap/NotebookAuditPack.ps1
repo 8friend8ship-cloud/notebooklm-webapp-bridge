@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V2_EXACT_NODE_20260909'
+$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V3_EXACT_NODE_ARRAYSAFE_20260909'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $AuditRoot=Join-Path $Base 'NotebookAudit'
@@ -82,7 +82,7 @@ function WarmIsolatedCache{
 }
 function ResetIsolatedNpxCache{
   param([array]$Processes)
-  $isolated=GetIsolatedRemoteProcesses $Processes
+  $isolated=@(GetIsolatedRemoteProcesses $Processes)
   $stopped=StopExactProcesses $isolated
   $npx=Join-Path $DcCache '_npx'
   $removed=$false
@@ -99,7 +99,7 @@ function StartRemoteHidden{
     $p=Start-Process -FilePath 'npx.cmd' -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $DcOutLog -RedirectStandardError $DcErrLog -PassThru
     Start-Sleep -Seconds 4
     $all=GetCommandProcesses
-    $remote=GetRemoteProcesses $all
+    $remote=@(GetRemoteProcesses $all)
     return [pscustomobject]@{started=$true;launcherPid=[int]$p.Id;remoteCount=[int]$remote.Count;remotePids=@($remote|ForEach-Object{[int]$_.ProcessId})}
   }catch{return [pscustomobject]@{started=$false;launcherPid=0;remoteCount=0;remotePids=@();error=$_.Exception.Message}}
   finally{$env:npm_config_cache=$old}
@@ -107,15 +107,15 @@ function StartRemoteHidden{
 function EnsureRemoteDc{
   $startedAt=(Get-Date).ToString('o')
   $all=GetCommandProcesses
-  $remote=GetRemoteProcesses $all
-  $legacy=GetLegacyGlobalRemoteProcesses $all
-  $isolated=GetIsolatedRemoteProcesses $all
+  $remote=@(GetRemoteProcesses $all)
+  $legacy=@(GetLegacyGlobalRemoteProcesses $all)
+  $isolated=@(GetIsolatedRemoteProcesses $all)
   $actions=@();$errors=@();$warm=$null;$launch=$null
   if($legacy.Count-gt0){
     $ids=StopExactProcesses $legacy
     $actions+=('STOP_LEGACY_GLOBAL_REMOTE:'+($ids -join ','))
     Start-Sleep -Seconds 1
-    $all=GetCommandProcesses;$remote=GetRemoteProcesses $all;$isolated=GetIsolatedRemoteProcesses $all
+    $all=GetCommandProcesses;$remote=@(GetRemoteProcesses $all);$isolated=@(GetIsolatedRemoteProcesses $all)
   }
   if($isolated.Count-eq0){
     $warm=WarmIsolatedCache
@@ -134,8 +134,8 @@ function EnsureRemoteDc{
   }else{$actions+='ISOLATED_REMOTE_ALREADY_PRESENT'}
   Start-Sleep -Milliseconds 500
   $finalAll=GetCommandProcesses
-  $finalRemote=GetRemoteProcesses $finalAll
-  $finalIsolated=GetIsolatedRemoteProcesses $finalAll
+  $finalRemote=@(GetRemoteProcesses $finalAll)
+  $finalIsolated=@(GetIsolatedRemoteProcesses $finalAll)
   $result=[ordered]@{
     ok=([int]$finalIsolated.Count-gt0)
     action='REMOTE_DC_LOCK_AWARE_ISOLATED_SELF_HEAL'
@@ -207,7 +207,7 @@ $driveFs=@(Get-Process -ErrorAction SilentlyContinue|Where-Object{$_.ProcessName
 $bootstrap=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine-and([string]$_.CommandLine-match'(?i)AgentBootstrap\.ps1')}).Count
 $receipt=[ordered]@{
   ok=[bool]$remote.ok
-  action='NOTEBOOK_AUDIT_PACK_LOCAL_V1'
+  action='NOTEBOOK_AUDIT_PACK_LOCAL_V3'
   version=$Version
   startedAt=$runStart
   completedAt=(Get-Date).ToString('o')
