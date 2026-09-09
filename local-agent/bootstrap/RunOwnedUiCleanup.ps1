@@ -1,57 +1,23 @@
 param([switch]$PreflightAuth)
-$ErrorActionPreference='Continue'
-$ProgressPreference='SilentlyContinue'
-$Version='RUN_OWNED_UI_CLEANUP_V7_STACK_FLATTEN_20260910'
-$Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
-$Registry=Join-Path $Root 'RUN_OWNED_UI_REGISTRY.json'
-$Receipt=Join-Path $Root 'RUN_OWNED_UI_CLEANUP_LAST.json'
-$GraceSeconds=300
+$ErrorActionPreference='Continue';$ProgressPreference='SilentlyContinue';$Version='RUN_OWNED_UI_CLEANUP_V7_DEAD_PRUNE_20260910'
+$Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent';$Registry=Join-Path $Root 'RUN_OWNED_UI_REGISTRY.json';$Receipt=Join-Path $Root 'RUN_OWNED_UI_CLEANUP_LAST.json';$GraceSeconds=300
 $AllowedOwners=@('CENTRAL_AGENT','REMOTE_DC','LOCAL_RUNNER','CFT_WORKER')
-New-Item -ItemType Directory -Force -Path $Root|Out-Null
 Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-public static class UiWinV6 {
- [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint pid);
- [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
- [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);
-}
+using System; using System.Runtime.InteropServices;
+public static class UiWinV8 { [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint pid); [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l); }
 '@ -ErrorAction SilentlyContinue
-function Save-Json([string]$Path,$Object){try{$Object|ConvertTo-Json -Depth 50|Set-Content -LiteralPath $Path -Encoding UTF8}catch{}}
-function Parse-Time($x){foreach($n in @('verifiedAt','completedAt','resultAckAt','openedAt','createdAt')){try{$v=$x.$n;if($v){return [datetimeoffset]::Parse([string]$v)}}catch{}};return $null}
-function Grace-Passed($x){$t=Parse-Time $x;if(-not$t){return $true};return (((Get-Date).ToUniversalTime()-$t.UtcDateTime).TotalSeconds-ge$GraceSeconds)}
-function Expand-Registry($Node){
- $result=@()
- $stack=New-Object System.Collections.Stack
- foreach($n in @($Node)){$stack.Push($n)}
- while($stack.Count-gt0){
-  $x=$stack.Pop();if($null-eq$x){continue}
-  if($x -is [System.Array]){foreach($a in $x){$stack.Push($a)};continue}
-  $names=@($x.PSObject.Properties.Name)
-  if($names -contains 'runId'){$result+=,$x;continue}
-  if($names -contains 'value'){foreach($a in @($x.value)){$stack.Push($a)}}
- }
- return @($result)
+function Parse-Time($x){foreach($n in @('verifiedAt','completedAt','resultAckAt','openedAt','createdAt')){try{$v=$x.$n;if($v){return [datetimeoffset]::Parse([string]$v)}}catch{}};$null}
+function Grace-Passed($x){$t=Parse-Time $x;if(-not$t){return $true};(((Get-Date).ToUniversalTime()-$t.UtcDateTime).TotalSeconds-ge$GraceSeconds)}
+function Expand-Registry($Node){$r=@();$s=New-Object Collections.Stack;foreach($n in @($Node)){$s.Push($n)};while($s.Count){$x=$s.Pop();if($null-eq$x){continue};if($x-is[array]){foreach($a in $x){$s.Push($a)};continue};$names=@($x.PSObject.Properties.Name);if($names-contains'runId'){$r+=,$x;continue};if($names-contains'value'){foreach($a in @($x.value)){$s.Push($a)}}};@($r)}
+function Close-Hwnd([int64]$H,[int]$P){$h=[IntPtr]$H;if(-not[UiWinV8]::IsWindow($h)){return 'ALREADY_CLOSED'};[uint32]$a=0;[void][UiWinV8]::GetWindowThreadProcessId($h,[ref]$a);if([int]$a-ne$P){return 'HWND_OWNER_MISMATCH'};[void][UiWinV8]::PostMessage($h,0x0010,[IntPtr]::Zero,[IntPtr]::Zero);Start-Sleep -Milliseconds 800;if([UiWinV8]::IsWindow($h)){'STILL_VISIBLE'}else{'CLOSED'}}
+function Cdp-State([int]$Port,[string]$Id){try{$l=@(Invoke-RestMethod "http://127.0.0.1:$Port/json/list" -TimeoutSec 3);if(@($l|Where-Object{[string]$_.id-eq$Id}).Count){'EXISTS'}else{'MISSING'}}catch{'UNKNOWN'}}
+function Close-Cdp([int]$Port,[string]$Id){$s=Cdp-State $Port $Id;if($s-ne'EXISTS'){return $s};try{[void](Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$Port/json/close/$Id" -TimeoutSec 5);Start-Sleep -Milliseconds 500;if((Cdp-State $Port $Id)-eq'MISSING'){'CLOSED'}else{'STILL_OPEN'}}catch{'ERROR'}}
+$raw=$null;$items=@();$parse='';try{if(Test-Path $Registry){$raw=Get-Content $Registry -Raw -Encoding UTF8|ConvertFrom-Json;$items=@(Expand-Registry $raw)}}catch{$parse=$_.Exception.Message}
+$results=@();$kept=@();$eligible=0;$closed=0;$pruned=0
+foreach($i in $items){$kind=[string]$i.kind;$exists='UNKNOWN';if($kind-eq'PROCESS_WINDOW'){$h=0;$p=0;try{$h=[int64]$i.hwnd;$p=[int]$i.pid}catch{};if($h-gt0-and[UiWinV8]::IsWindow([IntPtr]$h)){[uint32]$a=0;[void][UiWinV8]::GetWindowThreadProcessId([IntPtr]$h,[ref]$a);$exists=$(if([int]$a-eq$p){'EXISTS'}else{'MISSING'})}else{$exists='MISSING'}}elseif($kind-eq'CDP_TARGET'){$exists=Cdp-State ([int]$i.port) ([string]$i.targetId)}
+ if($AllowedOwners-notcontains[string]$i.owner){$kept+=,$i;continue};if($exists-eq'MISSING'){$pruned++;$results+=[pscustomobject]@{runId=[string]$i.runId;state='DEAD_REGISTRY_PRUNED'};continue}
+ $remoteShell=([string]$i.owner-eq'REMOTE_DC'-and$kind-eq'PROCESS_WINDOW'-and([string]$i.processName-match'(?i)powershell|pwsh|cmd|windowsterminal'));$do=(([bool]$i.completed-and[bool]$i.resultAckReadback-and-not[bool]$i.keepOpen-and(Grace-Passed $i))-or($remoteShell-and-not[bool]$i.keepOpen-and(Grace-Passed $i)))
+ if(-not$do){$kept+=,$i;continue};$eligible++;$state=$(if($kind-eq'PROCESS_WINDOW'){Close-Hwnd ([int64]$i.hwnd) ([int]$i.pid)}elseif($kind-eq'CDP_TARGET'){Close-Cdp ([int]$i.port) ([string]$i.targetId)}else{'UNSUPPORTED'});if($state-eq'CLOSED'){$closed++;$pruned++}else{$kept+=,$i};$results+=[pscustomobject]@{runId=[string]$i.runId;state=$state}
 }
-function Close-Hwnd([int64]$Hwnd,[int]$ExpectedPid){
- $h=[IntPtr]$Hwnd
- if(-not[UiWinV6]::IsWindow($h)){return [pscustomobject]@{state='ALREADY_CLOSED';closed=$true}}
- [uint32]$actual=0;[void][UiWinV6]::GetWindowThreadProcessId($h,[ref]$actual)
- if([int]$actual-ne$ExpectedPid){return [pscustomobject]@{state='HWND_OWNER_MISMATCH_PROTECTED';closed=$false}}
- [void][UiWinV6]::PostMessage($h,0x0010,[IntPtr]::Zero,[IntPtr]::Zero);Start-Sleep -Milliseconds 800
- $left=[UiWinV6]::IsWindow($h);return [pscustomobject]@{state=$(if($left){'STILL_VISIBLE'}else{'CLOSED_EXACT_HWND'});closed=(-not$left)}
-}
-function Close-Cdp([int]$Port,[string]$TargetId){try{if($Port-le0-or-not$TargetId){return 'BAD_TARGET'};$list=@(Invoke-RestMethod "http://127.0.0.1:$Port/json/list" -TimeoutSec 3);if(-not($list|Where-Object{[string]$_.id-eq$TargetId})){return 'ALREADY_CLOSED'};[void](Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$Port/json/close/$TargetId" -TimeoutSec 5);Start-Sleep -Milliseconds 500;$left=@(Invoke-RestMethod "http://127.0.0.1:$Port/json/list" -TimeoutSec 3|Where-Object{[string]$_.id-eq$TargetId});if($left.Count-eq0){return 'CLOSED'}else{return 'STILL_OPEN'}}catch{return 'ERROR:'+ $_.Exception.Message}}
-$raw=$null;$items=@();$parseError=''
-try{if(Test-Path $Registry){$raw=Get-Content $Registry -Raw -Encoding UTF8|ConvertFrom-Json;$items=@(Expand-Registry $raw)}}catch{$parseError=$_.Exception.Message}
-$results=@();$eligible=0;$closed=0
-foreach($i in $items){
- $owner=[string]$i.owner;if($AllowedOwners-notcontains$owner){continue};$kind=[string]$i.kind;$keep=[bool]$i.keepOpen;$complete=[bool]$i.completed;$ack=[bool]$i.resultAckReadback
- $remoteShell=($owner-eq'REMOTE_DC'-and$kind-eq'PROCESS_WINDOW'-and([string]$i.processName-match'(?i)powershell|pwsh|cmd|windowsterminal'))
- $eligibleNow=(($complete-and$ack-and-not$keep-and(Grace-Passed $i))-or($remoteShell-and-not$keep-and(Grace-Passed $i)))
- if(-not$eligibleNow){continue};$eligible++
- if($kind-eq'PROCESS_WINDOW'){$pidValue=0;$hwndValue=0;try{$pidValue=[int]$i.pid}catch{};try{$hwndValue=[int64]$i.hwnd}catch{};if($pidValue-le0-or$hwndValue-le0){$results+=[pscustomobject]@{runId=[string]$i.runId;state='AMBIGUOUS_PROTECTED'};continue};$r=Close-Hwnd $hwndValue $pidValue;if($r.closed){$closed++};$results+=[pscustomobject]@{runId=[string]$i.runId;kind=$kind;pid=$pidValue;hwnd=$hwndValue;state=$r.state;closed=$r.closed}}
- elseif($kind-eq'CDP_TARGET'){$port=0;try{$port=[int]$i.port}catch{};$state=Close-Cdp $port ([string]$i.targetId);if($state-eq'CLOSED'){$closed++};$results+=[pscustomobject]@{runId=[string]$i.runId;kind=$kind;port=$port;targetId=[string]$i.targetId;state=$state}}
-}
-$out=[ordered]@{ok=([string]::IsNullOrEmpty($parseError));version=$Version;time=(Get-Date).ToString('o');registryRawCount=$(if($raw){@($raw).Count}else{0});registryFlatCount=$items.Count;parseError=$parseError;eligibleCount=$eligible;closedCount=$closed;results=$results;falseClosePolicy='EXACT_HWND_OWNER_RECHECK_OR_EXACT_CDP_TARGET;NO_PROCESS_FORCE_KILL';closeMethod='WM_CLOSE_EXACT_HWND_OR_CDP_TARGET_ONLY'}
-Save-Json $Receipt $out;$out|ConvertTo-Json -Depth 50 -Compress;if($out.ok){exit 0}else{exit 4}
+if([string]::IsNullOrEmpty($parse)){ConvertTo-Json -InputObject @($kept) -Depth 50|Set-Content -LiteralPath $Registry -Encoding UTF8}
+$out=[ordered]@{ok=[string]::IsNullOrEmpty($parse);version=$Version;time=(Get-Date).ToString('o');registryRawCount=$(if($raw){@($raw).Count}else{0});registryFlatCount=$items.Count;keptCount=$kept.Count;prunedCount=$pruned;eligibleCount=$eligible;closedCount=$closed;parseError=$parse;results=$results;falseClosePolicy='EXACT_HWND_OWNER_RECHECK_OR_EXACT_CDP_TARGET;DEAD_TARGET_PRUNE;NO_BROAD_PROCESS_KILL';closeMethod='WM_CLOSE_EXACT_HWND_OR_CDP_TARGET_ONLY'};$out|ConvertTo-Json -Depth 30|Set-Content $Receipt -Encoding UTF8;$out|ConvertTo-Json -Depth 30 -Compress;if($out.ok){exit 0}else{exit 4}
