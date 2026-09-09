@@ -29,6 +29,6 @@ jobs:
           if($guard -notmatch 'screenOffAllowed=\$true'){ throw 'SCREEN_OFF_NOT_ALLOWED' }
           if($guard -notmatch 'ES_CONTINUOUS-bor\$ES_SYSTEM_REQUIRED'){ throw 'SYSTEM_REQUIRED_MISSING' }
           if($supervisor -notmatch "RequiredPowerGuardVersion='POWER_CONTINUITY_GUARD_V6_AC_SYSTEM_AWAKE_SCREEN_OFF_20260909'"){ throw 'SUPERVISOR_V6_REQUIREMENT_MISSING' }
-          if($supervisor -notmatch 'DISPLAY_CAN_OFF'){ throw 'SUPERVISOR_SCREEN_OFF_POLICY_MISSING' }
+          if($supervisor -notmatch 'SCREEN_CAN_OFF'){ throw 'SUPERVISOR_SCREEN_OFF_POLICY_MISSING' }
           if($supervisor -match 'REMOTE_DISPLAY_AWAKE'){ throw 'SUPERVISOR_DISPLAY_AWAKE_REGRESSION' }
           Write-Host 'SCREEN_OFF_CANONICAL_PASS'
