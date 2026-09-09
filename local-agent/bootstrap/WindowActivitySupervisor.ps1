@@ -11,11 +11,12 @@ Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes -ErrorAction Silentl
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
 function Save-Json([string]$Path,$Object){try{$Object|ConvertTo-Json -Depth 50|Set-Content -LiteralPath $Path -Encoding UTF8}catch{}}
 function Family-FromTitle([string]$Title){
+ $naver='(?i)(NAVER|\uB124\uC774\uBC84)';$login='(?i)(login|auth|QR|account|\uB85C\uADF8\uC778|\uC778\uC99D|\uACC4\uC815)'
  if($Title-match'(?i)Desktop Commander Remote MCP|mcp\.desktopcommander\.app.*verify'){return 'REMOTE_DC_AUTH'}
- if($Title-match'(?i)(네이버|NAVER).*(로그인|인증|QR|계정)|(?:로그인|인증|QR).*(네이버|NAVER)'){return 'NAVER_AUTH'}
- if($Title-match'(?i)NICE|나이스|본인.?인증|휴대폰.?인증|아이핀|i-?PIN'){return 'NICE_AUTH'}
- if($Title-match'(?i)Google 계정|Sign in.*Google|Google Accounts|accounts\.google'){return 'GOOGLE_AUTH'}
- if($Title-match'(?i)(카카오|Kakao).*(로그인|인증|계정)|(?:로그인|인증).*(카카오|Kakao)'){return 'KAKAO_AUTH'}
+ if($Title-match$naver-and$Title-match$login){return 'NAVER_AUTH'}
+ if($Title-match'(?i)(NICE|niceid|i-?PIN|\uB098\uC774\uC2A4|\uBCF8\uC778)'){return 'NICE_AUTH'}
+ if($Title-match'(?i)(Google Accounts|Sign in.*Google|accounts\.google|Google)'){return 'GOOGLE_AUTH'}
+ if($Title-match'(?i)(Kakao|\uCE74\uCE74\uC624)'-and$Title-match$login){return 'KAKAO_AUTH'}
  return ''
 }
 function Expand-Registry($Node){
