@@ -36,7 +36,7 @@ function Close-Hwnd([int64]$Hwnd){$h=[IntPtr]$Hwnd;$before=[UiWinV5]::IsWindow($
 function Close-CdpTarget([int]$Port,[string]$TargetId){try{if($Port-le0-or-not$TargetId){return [pscustomobject]@{state='BAD_TARGET'}};$list=@(Invoke-RestMethod -Uri ("http://127.0.0.1:$Port/json/list") -TimeoutSec 3);if(-not($list|Where-Object{[string]$_.id-eq$TargetId})){return [pscustomobject]@{state='ALREADY_CLOSED'}};[void](Invoke-WebRequest -UseBasicParsing -Uri ("http://127.0.0.1:$Port/json/close/$TargetId") -TimeoutSec 5);Start-Sleep -Milliseconds 500;$left=@(Invoke-RestMethod -Uri ("http://127.0.0.1:$Port/json/list") -TimeoutSec 3|Where-Object{[string]$_.id-eq$TargetId});[pscustomobject]@{state=$(if($left.Count-eq0){'CLOSED'}else{'STILL_OPEN'})}}catch{[pscustomobject]@{state=('ERROR:'+$_.Exception.Message)}}}
 function Remote-ProcessPresent{try{return (@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{[string]$_.CommandLine-match'(?i)desktop-commander'-and[string]$_.CommandLine-match'(?i)(?:^|\s)remote(?:\s|$)'}).Count-gt0)}catch{return $false}}
 function Waiting-AuthPid([int]$Pid,$Items){foreach($i in @($Items)){try{if([int]$i.pid-eq$Pid-and[string]$i.state-eq'WAITING_USER'-and-not[bool]$i.completed){return $true}}catch{}};return $false}
-$items=@();if(Test-Path $Registry){try{$items=@(Get-Content $Registry -Raw -Encoding UTF8|ConvertFrom-Json)}catch{}}
+$items=@();if(Test-Path $Registry){try{$parsed=Get-Content $Registry -Raw -Encoding UTF8|ConvertFrom-Json;$items=@($parsed)}catch{}}
 $results=@();$eligible=0;$closed=0
 foreach($i in $items){
  $owner=[string]$i.owner;if($AllowedOwners-notcontains$owner){continue}
