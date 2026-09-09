@@ -73,11 +73,17 @@ try{& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (J
 try{
 $cleanupLocal=Join-Path $Root 'RunOwnedUiCleanup.ps1'
 $cf=FetchRepoBytes 'local-agent/bootstrap/RunOwnedUiCleanup.ps1' 15
-if($cf.ok){$needs=(-not(Test-Path $cleanupLocal));if(-not$needs){$needs=((GitBlobSha1 $cleanupLocal).ToLowerInvariant()-ne([string]$cf.sha).ToLowerInvariant())};if($needs){[IO.File]::WriteAllBytes(($cleanupLocal+'.download'),[byte[]]$cf.bytes);Move-Item ($cleanupLocal+'.download') $cleanupLocal -Force}}
+if($cf.ok){$needs=(-not(Test-Path $cleanupLocal));$fetchedText=[Text.Encoding]::UTF8.GetString([byte[]]$cf.bytes);$localArrayFix=$false;if(Test-Path $cleanupLocal){try{$localArrayFix=[bool](Select-String -LiteralPath $cleanupLocal -Pattern '\$parsed=Get-Content' -Quiet)}catch{}};if($localArrayFix-and$fetchedText-notmatch '\$parsed=Get-Content'){$needs=$false}elseif(-not$needs){$needs=((GitBlobSha1 $cleanupLocal).ToLowerInvariant()-ne([string]$cf.sha).ToLowerInvariant())};if($needs){[IO.File]::WriteAllBytes(($cleanupLocal+'.download'),[byte[]]$cf.bytes);Move-Item ($cleanupLocal+'.download') $cleanupLocal -Force}}
 $supervisorLocal=Join-Path $Root 'CentralAgentTabSupervisor.ps1'
 $recoveryLocal=Join-Path $Root 'CentralTabAutoRecovery.ps1'
 foreach($spec in @(@('local-agent/bootstrap/CentralAgentTabSupervisor.ps1',$supervisorLocal),@('local-agent/bootstrap/CentralTabAutoRecovery.ps1',$recoveryLocal))){try{$f=FetchRepoBytes $spec[0] 12;if($f.ok){$need=(-not(Test-Path $spec[1]));if(-not$need){$need=((GitBlobSha1 $spec[1]).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())};if($need){[IO.File]::WriteAllBytes(($spec[1]+'.download'),[byte[]]$f.bytes);Move-Item ($spec[1]+'.download') $spec[1] -Force}}}catch{}}
 if(Test-Path $supervisorLocal){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $supervisorLocal|Out-Null}elseif(Test-Path $cleanupLocal){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $cleanupLocal|Out-Null}
+}catch{}
+try{
+  $auditLocal=Join-Path $Root 'NotebookAuditPack.ps1'
+  if(Test-Path -LiteralPath $auditLocal -PathType Leaf){
+    & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $auditLocal | Out-Null
+  }
 }catch{}
 $chatgptAutoOpenDisabled=$true # User policy 2026-09-06: periodic/mobile chat sync must never open or foreground ChatGPT.
 $s=StableMeta
