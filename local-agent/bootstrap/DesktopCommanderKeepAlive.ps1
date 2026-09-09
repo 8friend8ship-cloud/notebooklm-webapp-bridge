@@ -1,7 +1,7 @@
 param([switch]$ForceRestart)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_KEEPALIVE_V4_WITHDRAWAL_AWARE_ARRAYSAFE_20260909'
+$Version='REMOTE_DC_KEEPALIVE_V5_SINGLETON_DEDUP_20260910'
 $Package='@wonderwhy-er/desktop-commander@0.2.48'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -12,6 +12,10 @@ $ErrLog=Join-Path $DcRoot 'remote.stderr.log'
 $Receipt=Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json'
 $CooldownSeconds=120
 New-Item -ItemType Directory -Force -Path $Root,$DcRoot,$DcCache|Out-Null
+$Mutex=New-Object System.Threading.Mutex($false,'HomeDesignDesktopCommanderKeepAliveV5')
+$MutexHeld=$false
+try{$MutexHeld=$Mutex.WaitOne(30000,$false)}catch [System.Threading.AbandonedMutexException]{$MutexHeld=$true}
+if(-not$MutexHeld){try{if(Test-Path $Receipt){Get-Content -LiteralPath $Receipt -Raw -Encoding UTF8|Write-Output}}catch{};try{$Mutex.Dispose()}catch{};exit 6}
 
 function Find-Central{
   $n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
@@ -92,7 +96,7 @@ $tail=((Read-Tail $OutLog)+"`n"+(Read-Tail $ErrLog))
 $logFailure=Has-NewerFailure $tail
 $internet=Test-Internet443
 $reason='HEALTHY_LOCAL_TRANSPORT'
-if($remote.Count-eq0){$reason='REMOTE_PROCESS_ABSENT'}elseif($tcpBefore-eq0){$reason='REMOTE_PROCESS_NO_ESTABLISHED_TCP'}elseif($logFailure){$reason='REMOTE_CHANNEL_ERROR_OR_WITHDRAWAL_AFTER_LAST_READY'}
+if($remote.Count-eq0){$reason='REMOTE_PROCESS_ABSENT'}elseif($isolated.Count-gt1){$reason='REMOTE_PROCESS_DUPLICATE_CHAINS'}elseif($tcpBefore-eq0){$reason='REMOTE_PROCESS_NO_ESTABLISHED_TCP'}elseif($logFailure){$reason='REMOTE_CHANNEL_ERROR_OR_WITHDRAWAL_AFTER_LAST_READY'}
 $restartNeeded=[bool]($ForceRestart-or$reason-ne'HEALTHY_LOCAL_TRANSPORT')
 $cooldown=Cooldown-Active
 $actions=@();$errors=@();$restartAttempted=$false;$humanGate=$false
@@ -133,4 +137,5 @@ $out=[ordered]@{
 }
 Save-Receipt $out
 $out|ConvertTo-Json -Depth 40 -Compress
+try{if($MutexHeld){$Mutex.ReleaseMutex()};$Mutex.Dispose()}catch{}
 if($ok){exit 0}elseif($humanGate){exit 5}else{exit 4}
