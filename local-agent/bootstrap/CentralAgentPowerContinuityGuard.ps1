@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='POWER_CONTINUITY_GUARD_V4_REMOTE_DISPLAY_AWAKE_20260909'
+$Version='POWER_CONTINUITY_GUARD_V3_REMOTE_DISPLAY_AWAKE_20260909'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $Receipt=Join-Path $Root 'POWER_CONTINUITY_GUARD_LAST.json'
@@ -47,7 +47,7 @@ function Remote-Present{
   try{return (@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{[string]$_.CommandLine -match '(?i)desktop-commander' -and [string]$_.CommandLine -match '(?i)(?:^|\s)remote(?:\s|$)'}).Count -gt 0)}catch{return $false}
 }
 
-$mutex=New-Object Threading.Mutex($false,'HomeDesignPowerContinuityGuardV4')
+$mutex=New-Object Threading.Mutex($false,'HomeDesignPowerContinuityGuardV3')
 if(-not $mutex.WaitOne(0,$false)){exit 0}
 # PowerShell 5.1 parses 0x80000000 as signed Int32; Convert.ToUInt32 avoids InvalidCastIConvertible.
 $ES_CONTINUOUS=[Convert]::ToUInt32('80000000',16)
