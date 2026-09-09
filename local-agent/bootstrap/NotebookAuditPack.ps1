@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V3_EXACT_NODE_ARRAYSAFE_20260909'
+$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V4_COMMAND_PLANE_20260909'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $AuditRoot=Join-Path $Base 'NotebookAudit'
@@ -57,6 +57,12 @@ function GetIsolatedRemoteProcesses{
   $escaped=[regex]::Escape($DcCache)
   return @(GetRemoteProcesses $Processes|Where-Object{([string]$_.CommandLine) -match $escaped})
 }
+function GetRemoteTcpEstablished{
+  param([array]$Processes)
+  $ids=@($Processes|ForEach-Object{try{[int]$_.ProcessId}catch{0}}|Where-Object{$_ -gt 0})
+  if($ids.Count-eq0){return 0}
+  try{return [int](@(Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue|Where-Object{$ids -contains [int]$_.OwningProcess}).Count)}catch{return 0}
+}
 function StopExactProcesses{
   param([array]$Processes)
   $stopped=@()
@@ -110,12 +116,13 @@ function EnsureRemoteDc{
   $remote=@(GetRemoteProcesses $all)
   $legacy=@(GetLegacyGlobalRemoteProcesses $all)
   $isolated=@(GetIsolatedRemoteProcesses $all)
+  $tcpBefore=GetRemoteTcpEstablished $isolated
   $actions=@();$errors=@();$warm=$null;$launch=$null
   if($legacy.Count-gt0){
     $ids=StopExactProcesses $legacy
     $actions+=('STOP_LEGACY_GLOBAL_REMOTE:'+($ids -join ','))
     Start-Sleep -Seconds 1
-    $all=GetCommandProcesses;$remote=@(GetRemoteProcesses $all);$isolated=@(GetIsolatedRemoteProcesses $all)
+    $all=GetCommandProcesses;$remote=@(GetRemoteProcesses $all);$isolated=@(GetIsolatedRemoteProcesses $all);$tcpBefore=GetRemoteTcpEstablished $isolated
   }
   if($isolated.Count-eq0){
     $warm=WarmIsolatedCache
@@ -131,13 +138,26 @@ function EnsureRemoteDc{
       $launch=StartRemoteHidden
       if($launch.started){$actions+='REMOTE_HIDDEN_START'}else{$errors+=('REMOTE_START:'+[string]$launch.error)}
     }else{$errors+=('CACHE_WARM:'+[string]$warm.output)}
-  }else{$actions+='ISOLATED_REMOTE_ALREADY_PRESENT'}
+  }elseif($tcpBefore-gt0){
+    $actions+='ISOLATED_REMOTE_ALREADY_PRESENT_HEALTHY'
+  }else{
+    $ids=StopExactProcesses $isolated
+    if($ids.Count-eq0){
+      $errors+='STALE_REMOTE_EXACT_STOP_FAILED'
+    }else{
+      $actions+=('RESTART_STALE_ISOLATED_REMOTE_NO_TCP:'+($ids -join ','))
+      Start-Sleep -Seconds 2
+      $launch=StartRemoteHidden
+      if($launch.started){$actions+='REMOTE_HIDDEN_RESTART'}else{$errors+=('REMOTE_RESTART:'+[string]$launch.error)}
+    }
+  }
   Start-Sleep -Milliseconds 500
   $finalAll=GetCommandProcesses
   $finalRemote=@(GetRemoteProcesses $finalAll)
   $finalIsolated=@(GetIsolatedRemoteProcesses $finalAll)
+  $tcpAfter=GetRemoteTcpEstablished $finalIsolated
   $result=[ordered]@{
-    ok=([int]$finalIsolated.Count-gt0)
+    ok=([int]$finalIsolated.Count-gt0 -and [int]$tcpAfter-gt0)
     action='REMOTE_DC_LOCK_AWARE_ISOLATED_SELF_HEAL'
     version=$Version
     startedAt=$startedAt
@@ -147,8 +167,10 @@ function EnsureRemoteDc{
     remoteBefore=[int]$remote.Count
     legacyGlobalBefore=[int]$legacy.Count
     isolatedBefore=[int]$isolated.Count
+    tcpEstablishedBefore=[int]$tcpBefore
     isolatedAfter=[int]$finalIsolated.Count
     remoteAfter=[int]$finalRemote.Count
+    tcpEstablishedAfter=[int]$tcpAfter
     remotePids=@($finalRemote|ForEach-Object{[int]$_.ProcessId})
     actions=$actions
     errors=$errors
