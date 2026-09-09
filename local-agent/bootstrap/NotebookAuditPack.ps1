@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V4_COMMAND_PLANE_20260909'
+$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V5_COMMAND_PLANE_POSTCHECK_20260909'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $AuditRoot=Join-Path $Base 'NotebookAudit'
@@ -156,6 +156,30 @@ function EnsureRemoteDc{
   $finalRemote=@(GetRemoteProcesses $finalAll)
   $finalIsolated=@(GetIsolatedRemoteProcesses $finalAll)
   $tcpAfter=GetRemoteTcpEstablished $finalIsolated
+  if($finalIsolated.Count-eq0 -or $tcpAfter-eq0){
+    Start-Sleep -Seconds 2
+    $confirmAll=GetCommandProcesses
+    $confirmRemote=@(GetRemoteProcesses $confirmAll)
+    $confirmIsolated=@(GetIsolatedRemoteProcesses $confirmAll)
+    $confirmTcp=GetRemoteTcpEstablished $confirmIsolated
+    if($confirmIsolated.Count-eq0 -or $confirmTcp-eq0){
+      if($confirmIsolated.Count-gt0){
+        $ids=StopExactProcesses $confirmIsolated
+        if($ids.Count-gt0){$actions+=('POSTCHECK_COMMAND_PLANE_DROP_STOP:'+($ids -join ','))}else{$errors+='POSTCHECK_EXACT_STOP_FAILED'}
+        Start-Sleep -Seconds 2
+      }else{$actions+='POSTCHECK_REMOTE_PROCESS_DROPPED'}
+      $launch=StartRemoteHidden
+      if($launch.started){$actions+='POSTCHECK_REMOTE_HIDDEN_RESTART'}else{$errors+=('POSTCHECK_REMOTE_RESTART:'+[string]$launch.error)}
+      Start-Sleep -Milliseconds 500
+      $finalAll=GetCommandProcesses
+      $finalRemote=@(GetRemoteProcesses $finalAll)
+      $finalIsolated=@(GetIsolatedRemoteProcesses $finalAll)
+      $tcpAfter=GetRemoteTcpEstablished $finalIsolated
+    }else{
+      $actions+='POSTCHECK_COMMAND_PLANE_RECOVERED_WITHOUT_RESTART'
+      $finalAll=$confirmAll;$finalRemote=$confirmRemote;$finalIsolated=$confirmIsolated;$tcpAfter=$confirmTcp
+    }
+  }
   $result=[ordered]@{
     ok=([int]$finalIsolated.Count-gt0 -and [int]$tcpAfter-gt0)
     action='REMOTE_DC_LOCK_AWARE_ISOLATED_SELF_HEAL'
@@ -229,7 +253,7 @@ $driveFs=@(Get-Process -ErrorAction SilentlyContinue|Where-Object{$_.ProcessName
 $bootstrap=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine-and([string]$_.CommandLine-match'(?i)AgentBootstrap\.ps1')}).Count
 $receipt=[ordered]@{
   ok=[bool]$remote.ok
-  action='NOTEBOOK_AUDIT_PACK_LOCAL_V3'
+  action='NOTEBOOK_AUDIT_PACK_LOCAL_V5'
   version=$Version
   startedAt=$runStart
   completedAt=(Get-Date).ToString('o')
