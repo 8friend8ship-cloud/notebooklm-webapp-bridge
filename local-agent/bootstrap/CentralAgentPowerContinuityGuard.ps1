@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='POWER_CONTINUITY_GUARD_V3_REMOTE_DISPLAY_AWAKE_20260909'
+$Version='POWER_CONTINUITY_GUARD_V6_AC_SYSTEM_AWAKE_SCREEN_OFF_20260909'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $Receipt=Join-Path $Root 'POWER_CONTINUITY_GUARD_LAST.json'
@@ -51,7 +51,6 @@ $mutex=New-Object Threading.Mutex($false,'HomeDesignPowerContinuityGuardV3')
 if(-not $mutex.WaitOne(0,$false)){exit 0}
 $ES_CONTINUOUS=[Convert]::ToUInt32('80000000',16)
 $ES_SYSTEM_REQUIRED=[uint32]1
-$ES_DISPLAY_REQUIRED=[uint32]2
 $systemHeld=$false
 $displayHeld=$false
 $started=(Get-Date).ToString('o')
@@ -65,28 +64,29 @@ try{
     $leaseActive=[bool]($remote-or$now-lt$remoteLeaseUntil)
     $remaining=0
     if($leaseActive-and$remoteLeaseUntil-gt$now){$remaining=[Math]::Max(0,[int][Math]::Ceiling(($remoteLeaseUntil-$now).TotalSeconds))}
+    $shouldHold=[bool]$power.ac
     [uint32]$callResult=0
     $lastError=0
-    if($leaseActive){
+    if($shouldHold){
       try{
-        $flags=$ES_CONTINUOUS-bor$ES_SYSTEM_REQUIRED-bor$ES_DISPLAY_REQUIRED
+        $flags=$ES_CONTINUOUS-bor$ES_SYSTEM_REQUIRED
         $callResult=[HDPowerGuard]::SetThreadExecutionState($flags)
         if($callResult-eq0){$lastError=[Runtime.InteropServices.Marshal]::GetLastWin32Error()}else{$lastError=0}
         $systemHeld=($callResult-ne0)
-        $displayHeld=$systemHeld
+        $displayHeld=$false
       }catch{$systemHeld=$false;$displayHeld=$false;$lastError=-1}
     }else{
-      if($systemHeld-or$displayHeld){try{[void][HDPowerGuard]::SetThreadExecutionState($ES_CONTINUOUS)}catch{}}
+      if($systemHeld){try{[void][HDPowerGuard]::SetThreadExecutionState($ES_CONTINUOUS)}catch{}}
       $systemHeld=$false;$displayHeld=$false
     }
     $o=[ordered]@{
-      ok=[bool]((-not$leaseActive)-or($systemHeld-and$displayHeld));version=$Version;pid=$PID;startedAt=$started;heartbeatAt=$now.ToString('o')
+      ok=[bool]((-not$shouldHold)-or$systemHeld);version=$Version;pid=$PID;startedAt=$started;heartbeatAt=$now.ToString('o')
       acPower=[bool]$power.ac;batteryPercent=$power.batteryPercent;remoteProcessPresent=$remote;remoteLeaseActive=$leaseActive;remoteGraceSeconds=$RemoteGraceSeconds;remoteLeaseRemainingSeconds=$remaining
-      systemRequiredHeld=$systemHeld;displayRequiredHeld=$displayHeld;screenOffAllowed=$false;executionStateCallResult=[uint64]$callResult;lastWin32Error=$lastError
-      mode='REMOTE_DC_ACTIVE_OR_10M_GRACE;PREVENT_SYSTEM_SLEEP_AND_DISPLAY_OFF;NO_GLOBAL_POWERCFG_MUTATION'
+      systemRequiredHeld=$systemHeld;displayRequiredHeld=$false;screenOffAllowed=$true;executionStateCallResult=[uint64]$callResult;lastWin32Error=$lastError
+      mode='AC_SYSTEM_REQUIRED;ALLOW_DISPLAY_OFF;REMOTE_DIAGNOSTIC_GRACE_10M;NO_GLOBAL_POWERCFG_MUTATION'
       powercfgChanged=$false;sleepTimeoutChanged=$false;monitorTimeoutChanged=$false;hibernateChanged=$false;lidPolicyChanged=$false;adminRequired=$false
-      batteryPolicy='REMOTE_SESSION_HAS_PRIORITY;SYSTEM_AND_DISPLAY_HELD_EVEN_ON_BATTERY;RELEASE_AFTER_10M_GRACE';batteryDrainRisk=[bool]($leaseActive-and-not[bool]$power.ac)
-      newTrigger=$false;newOAuth=$false;ps51UInt32Fix=$true
+      batteryPolicy='ON_DC_CLEAR_ES_SYSTEM_REQUIRED;DISPLAY_ALWAYS_ALLOWED_OFF';batteryDrainRisk=$false
+      newTrigger=$false;newOAuth=$false;ps51UInt32Fix=$true;canonicalInstruction='INST_20260829_NIGHT_DISPLAY_ONLY_POWER_CONTINUITY_001'
     }
     Save $o
     Start-Sleep -Seconds $HeartbeatSeconds
