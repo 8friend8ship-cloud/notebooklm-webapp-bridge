@@ -3,13 +3,14 @@ param(
 )
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WINDOW_ACTIVITY_SUPERVISOR_V1_SEQUENCE_DUAL_MONITOR_20260909'
+$Version='WINDOW_ACTIVITY_SUPERVISOR_V2_AUTH_TTL_10M_20260909'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $StatePath=Join-Path $Root 'WINDOW_ACTIVITY_STATE.json'
 $Receipt=Join-Path $Root 'WINDOW_ACTIVITY_LAST.json'
 $CaptureDir=Join-Path $Root 'WindowActivity'
 $Registry=Join-Path $Root 'RUN_OWNED_UI_REGISTRY.json'
 $VisualIntervalSec=600
+$AuthWindowTtlSec=600
 $StaleSamples=2
 New-Item -ItemType Directory -Force -Path $Root,$CaptureDir|Out-Null
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
@@ -18,7 +19,7 @@ Add-Type @'
 using System;
 using System.Text;
 using System.Runtime.InteropServices;
-public static class WinActivityV1 {
+public static class WinActivityV2 {
  public delegate bool EnumWindowsProc(IntPtr h,IntPtr l);
  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc cb,IntPtr l);
@@ -53,7 +54,7 @@ function Rect-Intersect([int]$l1,[int]$t1,[int]$r1,[int]$b1,[int]$l2,[int]$t2,[i
  if($r-le$l-or$b-le$t){return $null};return[System.Drawing.Rectangle]::FromLTRB($l,$t,$r,$b)
 }
 function Close-Exact([int64]$Hwnd){
- try{$h=[IntPtr]$Hwnd;if(-not[WinActivityV1]::IsWindow($h)){return[pscustomobject]@{closed=$true;state='ALREADY_CLOSED'}};$sent=[WinActivityV1]::PostMessage($h,0x0010,[IntPtr]::Zero,[IntPtr]::Zero);Start-Sleep -Milliseconds 700;$left=[WinActivityV1]::IsWindow($h);return[pscustomobject]@{closed=(-not$left);state=$(if(-not$left){'CLOSED_EXACT_HWND'}elseif($sent){'CLOSE_SENT_STILL_VISIBLE'}else{'CLOSE_SEND_FAIL'})}}catch{return[pscustomobject]@{closed=$false;state=('ERROR:'+$_.Exception.Message)}}
+ try{$h=[IntPtr]$Hwnd;if(-not[WinActivityV2]::IsWindow($h)){return[pscustomobject]@{closed=$true;state='ALREADY_CLOSED'}};$sent=[WinActivityV2]::PostMessage($h,0x0010,[IntPtr]::Zero,[IntPtr]::Zero);Start-Sleep -Milliseconds 700;$left=[WinActivityV2]::IsWindow($h);return[pscustomobject]@{closed=(-not$left);state=$(if(-not$left){'CLOSED_EXACT_HWND'}elseif($sent){'CLOSE_SENT_STILL_VISIBLE'}else{'CLOSE_SEND_FAIL'})}}catch{return[pscustomobject]@{closed=$false;state=('ERROR:'+$_.Exception.Message)}}
 }
 function Find-Central{
  $n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
@@ -66,12 +67,12 @@ $registeredHwnd=@{};foreach($ri in $registryItems){try{if([int64]$ri.hwnd-gt0){$
 $virtual=[System.Windows.Forms.SystemInformation]::VirtualScreen
 $fullBmp=$null;$fullGraphics=$null
 try{$fullBmp=New-Object System.Drawing.Bitmap($virtual.Width,$virtual.Height);$fullGraphics=[System.Drawing.Graphics]::FromImage($fullBmp);$fullGraphics.CopyFromScreen($virtual.Left,$virtual.Top,0,0,$fullBmp.Size)}catch{}
-$fg=[WinActivityV1]::GetForegroundWindow().ToInt64()
+$fg=[WinActivityV2]::GetForegroundWindow().ToInt64()
 $windows=New-Object System.Collections.Generic.List[object]
-$cb=[WinActivityV1+EnumWindowsProc]{param($h,$l)
+$cb=[WinActivityV2+EnumWindowsProc]{param($h,$l)
  try{
-  if(-not[WinActivityV1]::IsWindowVisible($h)){return $true};$sb=New-Object Text.StringBuilder 2048;[void][WinActivityV1]::GetWindowText($h,$sb,$sb.Capacity);$title=$sb.ToString();if([string]::IsNullOrWhiteSpace($title)){return $true}
-  [uint32]$pid=0;[void][WinActivityV1]::GetWindowThreadProcessId($h,[ref]$pid);$r=New-Object WinActivityV1+RECT;if(-not[WinActivityV1]::GetWindowRect($h,[ref]$r)){return $true};if(($r.Right-$r.Left)-lt120-or($r.Bottom-$r.Top)-lt80){return $true}
+  if(-not[WinActivityV2]::IsWindowVisible($h)){return $true};$sb=New-Object Text.StringBuilder 2048;[void][WinActivityV2]::GetWindowText($h,$sb,$sb.Capacity);$title=$sb.ToString();if([string]::IsNullOrWhiteSpace($title)){return $true}
+  [uint32]$pid=0;[void][WinActivityV2]::GetWindowThreadProcessId($h,[ref]$pid);$r=New-Object WinActivityV2+RECT;if(-not[WinActivityV2]::GetWindowRect($h,[ref]$r)){return $true};if(($r.Right-$r.Left)-lt120-or($r.Bottom-$r.Top)-lt80){return $true}
   $meta=Get-ProcessMeta ([int]$pid);$family=Family-FromTitle $title;$key=([string]$pid+':'+$h.ToInt64());$contentHash=''
   $shouldHash=($family-ne''-or$meta.name-match'(?i)chrome|msedge|powershell|pwsh|cmd|windowsterminal')
   if($shouldHash-and$fullBmp){$ix=Rect-Intersect $r.Left $r.Top $r.Right $r.Bottom $virtual.Left $virtual.Top ($virtual.Left+$virtual.Width) ($virtual.Top+$virtual.Height);if($ix){try{$rel=New-Object System.Drawing.Rectangle(($ix.Left-$virtual.Left),($ix.Top-$virtual.Top),$ix.Width,$ix.Height);$crop=$fullBmp.Clone($rel,$fullBmp.PixelFormat);try{$contentHash=Bitmap-Hash $crop}finally{$crop.Dispose()}}catch{}}}
@@ -83,7 +84,7 @@ $cb=[WinActivityV1+EnumWindowsProc]{param($h,$l)
  }catch{}
  return $true
 }
-[WinActivityV1]::EnumWindows($cb,[IntPtr]::Zero)|Out-Null
+[WinActivityV2]::EnumWindows($cb,[IntPtr]::Zero)|Out-Null
 $nowUtc=(Get-Date).ToUniversalTime();$visualDue=$true
 try{if($prev.lastVisualCaptureUtc){$visualDue=(($nowUtc-[datetime]::Parse([string]$prev.lastVisualCaptureUtc).ToUniversalTime()).TotalSeconds-ge$VisualIntervalSec)}}catch{}
 $captures=@();$screenMotion=@{}
@@ -93,18 +94,23 @@ if($visualDue-and$fullBmp){
  }
 }
 if($fullGraphics){$fullGraphics.Dispose()};if($fullBmp){$fullBmp.Dispose()}
-$closed=@();$stale=@();$duplicateFamilies=@();$families=@($windows|Where-Object{$_.family-ne''}|Group-Object family)
+$closed=@();$stale=@();$expiredSingle=@();$duplicateFamilies=@();$families=@($windows|Where-Object{$_.family-ne''}|Group-Object family)
 foreach($grp in $families){
  $arr=@($grp.Group);if($arr.Count-gt1){$duplicateFamilies+=$grp.Name
   $canonical=@($arr|Where-Object{$_.foreground}|Select-Object -First 1);if($canonical.Count-eq0){$canonical=@($arr|Sort-Object @{Expression={try{[datetime]$_.processStartUtc}catch{[datetime]::MinValue}};Descending=$true},@{Expression={$_.hwnd};Descending=$true}|Select-Object -First 1)};$c=$canonical[0]
   foreach($w in $arr){if($w.hwnd-eq$c.hwnd){continue};$older=$false;try{$older=([datetime]$w.processStartUtc-lt[datetime]$c.processStartUtc)}catch{};$inactive=([int]$w.unchangedSamples-ge1-and-not[bool]$w.foreground);if($older-or$inactive){$r=Close-Exact ([int64]$w.hwnd);$closed+=[pscustomobject]@{family=$grp.Name;hwnd=$w.hwnd;pid=$w.pid;canonicalHwnd=$c.hwnd;reason='SUPERSEDED_STALE_DUPLICATE';unchangedSamples=$w.unchangedSamples;registered=$w.registered;registeredState=$w.registeredState;closeState=$r.state;closed=$r.closed}}}
- }elseif($arr.Count-eq1){$w=$arr[0];if([int]$w.unchangedSamples-ge$StaleSamples-and-not[bool]$w.foreground){$stale+=[pscustomobject]@{family=$w.family;hwnd=$w.hwnd;pid=$w.pid;reason='STALE_REOPEN_REQUIRED';unchangedSamples=$w.unchangedSamples;registered=$w.registered;registeredState=$w.registeredState}}}
+ }elseif($arr.Count-eq1){
+  $w=$arr[0];$ageSec=0;try{$ageSec=($nowUtc-[datetime]::Parse([string]$w.firstSeenUtc).ToUniversalTime()).TotalSeconds}catch{try{$ageSec=($nowUtc-[datetime]::Parse([string]$w.processStartUtc).ToUniversalTime()).TotalSeconds}catch{}}
+  if($ageSec-ge$AuthWindowTtlSec){$r=Close-Exact ([int64]$w.hwnd);$rec=[pscustomobject]@{family=$w.family;hwnd=$w.hwnd;pid=$w.pid;reason='SINGLE_AUTH_TTL_EXPIRED_10M';ageSec=[math]::Round($ageSec,0);unchangedSamples=$w.unchangedSamples;foreground=$w.foreground;registered=$w.registered;registeredState=$w.registeredState;closeState=$r.state;closed=$r.closed};$expiredSingle+=$rec;$closed+=$rec}
+  elseif([int]$w.unchangedSamples-ge$StaleSamples){$stale+=[pscustomobject]@{family=$w.family;hwnd=$w.hwnd;pid=$w.pid;reason='WAIT_AUTH_TTL_LT10M';ageSec=[math]::Round($ageSec,0);unchangedSamples=$w.unchangedSamples;registered=$w.registered;registeredState=$w.registeredState}}
+ }
 }
-$preReopenClosed=@();if($BeforeReopenFamily){$target=$BeforeReopenFamily.ToUpperInvariant();foreach($w in @($windows|Where-Object{([string]$_.family).ToUpperInvariant()-eq$target})){if(-not$w.foreground-or$w.unchangedSamples-ge1){$r=Close-Exact ([int64]$w.hwnd);$preReopenClosed+=[pscustomobject]@{family=$w.family;hwnd=$w.hwnd;pid=$w.pid;reason='PRE_REOPEN_CLOSE_OLD_WINDOW';closeState=$r.state;closed=$r.closed}}}}
-$remainingDup=0;foreach($grp in @($windows|Where-Object{$_.family-ne''}|Group-Object family)){try{$alive=@($grp.Group|Where-Object{[WinActivityV1]::IsWindow([IntPtr][int64]$_.hwnd)});if($alive.Count-gt1){$remainingDup++}}catch{}}
+$preReopenClosed=@();if($BeforeReopenFamily){$target=$BeforeReopenFamily.ToUpperInvariant();foreach($w in @($windows|Where-Object{([string]$_.family).ToUpperInvariant()-eq$target})){$r=Close-Exact ([int64]$w.hwnd);$preReopenClosed+=[pscustomobject]@{family=$w.family;hwnd=$w.hwnd;pid=$w.pid;reason='PRE_REOPEN_CLOSE_OLD_WINDOW';closeState=$r.state;closed=$r.closed}}}
+$remainingDup=0;foreach($grp in @($windows|Where-Object{$_.family-ne''}|Group-Object family)){try{$alive=@($grp.Group|Where-Object{[WinActivityV2]::IsWindow([IntPtr][int64]$_.hwnd)});if($alive.Count-gt1){$remainingDup++}}catch{}}
+$ttlCloseFailures=@($expiredSingle|Where-Object{-not$_.closed}).Count
 $state=[ordered]@{version=$Version;timeUtc=$nowUtc.ToString('o');lastVisualCaptureUtc=$(if($visualDue){$nowUtc.ToString('o')}elseif($prev){[string]$prev.lastVisualCaptureUtc}else{''});windows=@($windows);captures=$captures}
 Save-Json $StatePath $state
-$out=[ordered]@{ok=($remainingDup-eq0);version=$Version;time=(Get-Date).ToString('o');visualDue=$visualDue;monitorCount=@([System.Windows.Forms.Screen]::AllScreens).Count;captureCount=$captures.Count;captures=$captures;windowCount=$windows.Count;authWindowCount=@($windows|Where-Object{$_.family-ne''}).Count;duplicateFamilies=@($duplicateFamilies|Sort-Object -Unique);duplicateFamiliesRemaining=$remainingDup;closedSuperseded=@($closed);closedSupersededCount=@($closed|Where-Object{$_.closed}).Count;staleReopenRequired=@($stale);preReopenFamily=$BeforeReopenFamily;preReopenClosed=@($preReopenClosed);activityRule='VISIBLE_NOT_EQUAL_WORKING;SEQUENTIAL_WINDOW_CONTENT_HASH+FOREGROUND+PROCESS_START;LATEST_ACTIVE_CANONICAL';closeRule='NEW_CANONICAL_ACTIVE=>OLDER_UNCHANGED_DUPLICATE_CLOSE_EXACT_HWND;WAITING_USER_DOES_NOT_PROTECT_SUPERSEDED_WINDOW;SINGLE_STALE=>REOPEN_REQUIRED_ONLY';capturePolicy='DUAL_OR_ALL_MONITORS_10M;RAW_HASH_ONLY;SAVED_SCREENSHOTS_MASK_AUTH_WINDOWS;KEEP_LAST_AND_PREV'}
+$out=[ordered]@{ok=($remainingDup-eq0-and$ttlCloseFailures-eq0);version=$Version;time=(Get-Date).ToString('o');visualDue=$visualDue;monitorCount=@([System.Windows.Forms.Screen]::AllScreens).Count;captureCount=$captures.Count;captures=$captures;windowCount=$windows.Count;authWindowCount=@($windows|Where-Object{$_.family-ne''}).Count;authWindowTtlSec=$AuthWindowTtlSec;duplicateFamilies=@($duplicateFamilies|Sort-Object -Unique);duplicateFamiliesRemaining=$remainingDup;closedSuperseded=@($closed);closedSupersededCount=@($closed|Where-Object{$_.closed}).Count;expiredSingleAuth=@($expiredSingle);expiredSingleAuthCount=@($expiredSingle|Where-Object{$_.closed}).Count;ttlCloseFailures=$ttlCloseFailures;staleBeforeTtl=@($stale);preReopenFamily=$BeforeReopenFamily;preReopenClosed=@($preReopenClosed);activityRule='VISIBLE_NOT_EQUAL_WORKING;SEQUENTIAL_WINDOW_CONTENT_HASH+FOREGROUND+PROCESS_START;LATEST_ACTIVE_CANONICAL';closeRule='AUTH_WINDOW_HARD_TTL_10M;SINGLE_OR_DUPLICATE_EXPIRED_AUTH_CLOSE_EXACT_HWND;NEW_CANONICAL_ACTIVE=>OLDER_DUPLICATE_CLOSE;WAITING_USER_DOES_NOT_OVERRIDE_10M_TTL;PRE_REOPEN_ALWAYS_CLOSE_OLD_FAMILY';capturePolicy='DUAL_OR_ALL_MONITORS_10M;RAW_HASH_ONLY;SAVED_SCREENSHOTS_MASK_AUTH_WINDOWS;KEEP_LAST_AND_PREV'}
 $json=$out|ConvertTo-Json -Depth 50
 $json|Set-Content -LiteralPath $Receipt -Encoding UTF8
 try{$c=Find-Central;if($c){$d=Join-Path $c 'Runtime_Readback\WindowActivity';New-Item -ItemType Directory -Force -Path $d|Out-Null;$json|Set-Content -LiteralPath (Join-Path $d 'WINDOW_ACTIVITY_LAST.json') -Encoding UTF8;foreach($cap in $captures){$idx=[int]$cap.monitor;$src=[string]$cap.maskedPath;$dst=Join-Path $d ("MONITOR_${idx}_LAST.png");$old=Join-Path $d ("MONITOR_${idx}_PREV.png");if(Test-Path $dst){Copy-Item $dst $old -Force};if(Test-Path $src){Copy-Item $src $dst -Force}}}}catch{}
