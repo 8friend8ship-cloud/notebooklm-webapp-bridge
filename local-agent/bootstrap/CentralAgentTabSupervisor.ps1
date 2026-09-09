@@ -1,7 +1,7 @@
 param([switch]$SelfTestRecovery)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='CENTRAL_AGENT_TAB_SUPERVISOR_V3_ACTIVITY_WINDOW_ROUTE_20260909'
+$Version='CENTRAL_AGENT_TAB_SUPERVISOR_V4_AUTH_TTL10M_WINDOW_V2_20260909'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Cleanup=Join-Path $Root 'RunOwnedUiCleanup.ps1'
@@ -19,14 +19,26 @@ function GitBlob([byte[]]$b){$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Leng
 function Refresh-Verified([string]$RepoPath,[string]$Dest){try{$u='https://api.github.com/repos/'+$Repo+'/contents/'+$RepoPath+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod -Uri $u -Headers @{'User-Agent'='HomeDesign-Central-Supervisor';'Accept'='application/vnd.github+json'} -TimeoutSec 15;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$sha=(GitBlob $b).ToLowerInvariant();if($sha-ne([string]$x.sha).ToLowerInvariant()){throw'SHA_MISMATCH'};$tmp=$Dest+'.download';[IO.File]::WriteAllBytes($tmp,$b);Move-Item $tmp $Dest -Force;return $sha}catch{return''}}
 function PowerGuard-Processes{try{return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{[string]$_.CommandLine-match'(?i)CentralAgentPowerContinuityGuard\.ps1'})}catch{return @()}}
 function Ensure-PowerGuard{$o=[ordered]@{sha='';before=0;started=$false;after=0;ok=$false;error=''};try{$o.before=[int](PowerGuard-Processes).Count;$o.sha=Refresh-Verified 'local-agent/bootstrap/CentralAgentPowerContinuityGuard.ps1' $PowerGuard;if(-not$o.sha){throw'POWER_GUARD_REFRESH_FAILED'};if((PowerGuard-Processes).Count-eq0){Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',$PowerGuard) -WindowStyle Hidden|Out-Null;Start-Sleep -Seconds 2;$o.started=$true};$o.after=[int](PowerGuard-Processes).Count;$o.ok=($o.after-gt0)}catch{$o.error=$_.Exception.Message};return[pscustomobject]$o}
-function Run-JsonScript([string]$Path){$o=[ordered]@{ok=$false;exit=9;raw='';obj=$null;error=''};try{$o.raw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Path 2>&1|Out-String;$o.exit=$LASTEXITCODE;$o.obj=$o.raw|ConvertFrom-Json;$o.ok=[bool]$o.obj.ok}catch{$o.error=$_.Exception.Message};return[pscustomobject]$o}
+function Run-JsonScript([string]$Path){
+ $o=[ordered]@{ok=$false;exit=9;raw='';obj=$null;error=''}
+ try{
+  $o.raw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Path 2>&1|Out-String
+  $o.exit=$LASTEXITCODE
+  try{$o.obj=$o.raw|ConvertFrom-Json}catch{
+   $jsonLines=@($o.raw -split "`r?`n"|Where-Object{$_.Trim().StartsWith('{')})
+   if($jsonLines.Count-gt0){$o.obj=$jsonLines[-1]|ConvertFrom-Json}else{throw}
+  }
+  $o.ok=[bool]$o.obj.ok
+ }catch{$o.error=$_.Exception.Message}
+ return[pscustomobject]$o
+}
 $started=(Get-Date).ToString('o')
 $issues=New-Object System.Collections.Generic.List[string]
 $powerGuard=Ensure-PowerGuard;if(-not$powerGuard.ok){$issues.Add('POWER_CONTINUITY_GUARD_DOWN')}
 $activitySha=Refresh-Verified 'local-agent/bootstrap/WindowActivitySupervisor.ps1' $WindowActivity
 $activity=$null
 if(-not$activitySha){$issues.Add('WINDOW_ACTIVITY_REFRESH_FAILED')}
-elseif(Test-Path $WindowActivity){$activity=Run-JsonScript $WindowActivity;if(-not$activity.obj){$issues.Add('WINDOW_ACTIVITY_NO_READBACK')}elseif([string]$activity.obj.version-notmatch'^WINDOW_ACTIVITY_SUPERVISOR_V1_'){$issues.Add('WINDOW_ACTIVITY_VERSION_MISMATCH')}}else{$issues.Add('WINDOW_ACTIVITY_MISSING')}
+elseif(Test-Path $WindowActivity){$activity=Run-JsonScript $WindowActivity;if(-not$activity.obj){$issues.Add('WINDOW_ACTIVITY_NO_READBACK')}elseif([string]$activity.obj.version-notmatch'^WINDOW_ACTIVITY_SUPERVISOR_V[12]_'){$issues.Add('WINDOW_ACTIVITY_VERSION_MISMATCH')}elseif(-not[bool]$activity.obj.ok){$issues.Add('WINDOW_ACTIVITY_NOT_OK')}}else{$issues.Add('WINDOW_ACTIVITY_MISSING')}
 $cleanup=$null
 if(Test-Path $Cleanup){$cleanup=Run-JsonScript $Cleanup;if(-not$cleanup.obj){$issues.Add('CLEANUP_NO_READBACK')}elseif(-not[bool]$cleanup.obj.ok){$issues.Add('CLEANUP_NOT_OK')}elseif([string]$cleanup.obj.version-notmatch'RUN_OWNED_UI_CLEANUP_V[45]_'){$issues.Add('CLEANUP_VERSION_MISMATCH')}}else{$issues.Add('CLEANUP_MISSING')}
 $registryCount=0;$registryOk=$true;$r=@();try{$r=Get-Content $Registry -Raw -Encoding UTF8|ConvertFrom-Json;$registryCount=@($r).Count}catch{$registryOk=$false;$issues.Add('REGISTRY_PARSE_FAIL')}
@@ -36,7 +48,7 @@ if($registryOk-and$pruneIds.Count-gt0){try{$kept=@($r|Where-Object{$pruneIds-not
 $hostOk=Test-Host;$cdpOk=Test-Cdp;$remoteOk=Test-Remote
 if(-not$hostOk){$issues.Add('LOCAL_HOST_DOWN')};if(-not$cdpOk){$issues.Add('CFT_CDP_9224_DOWN')};if(-not$remoteOk){$issues.Add('REMOTE_DC_OFFLINE')}
 $authDupRemain=$false
-if($activity-and$activity.obj){if([int]$activity.obj.duplicateFamiliesRemaining-gt0){$authDupRemain=$true}}
+if($activity-and$activity.obj){if([int]$activity.obj.duplicateFamiliesRemaining-gt0){$authDupRemain=$true};if([int]$activity.obj.ttlCloseFailures-gt0){$issues.Add('AUTH_TTL_CLOSE_FAILURE')}}
 if(-not$authDupRemain-and$cleanup-and$cleanup.obj-and$cleanup.obj.authActions){foreach($a in @($cleanup.obj.authActions)){if([int]$a.found-gt1-and[int]$a.closed-eq0-and[string]$a.action-notmatch'PROTECT_WAITING_USER'){$authDupRemain=$true}}}
 if($authDupRemain){$issues.Add('AUTH_DUPLICATE_REMAINS')}
 if($SelfTestRecovery){$issues.Add('SELF_TEST_RECOVERY_TRIGGER')}
@@ -44,16 +56,18 @@ $recoveryTriggered=$false;$recoveryCooldown=$false;$recoveryExit=$null
 if($issues.Count-gt0-and(Test-Path $Recovery)){$recent=$false;try{if(Test-Path $RecoveryReceipt){$recent=(((Get-Date)-(Get-Item $RecoveryReceipt).LastWriteTime).TotalSeconds-lt120)}}catch{};if($recent-and-not$SelfTestRecovery){$recoveryCooldown=$true}else{try{$reason=($issues-join',');& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Recovery -Reason $reason|Out-Null;$recoveryExit=$LASTEXITCODE;$recoveryTriggered=$true}catch{$recoveryExit=9}}}
 $hostAfter=Test-Host;$cdpAfter=Test-Cdp;$remoteAfter=Test-Remote
 $activityObj=$(if($activity){$activity.obj}else{$null});$cleanupObj=$(if($cleanup){$cleanup.obj}else{$null})
+$activityHealthy=[bool]($activityObj-and[bool]$activityObj.ok-and[string]$activityObj.version-match'^WINDOW_ACTIVITY_SUPERVISOR_V[12]_')
+$cleanupHealthy=[bool]($cleanupObj-and[bool]$cleanupObj.ok-and[string]$cleanupObj.version-match'RUN_OWNED_UI_CLEANUP_V[45]_')
 $out=[ordered]@{
- ok=[bool]($issues.Count-eq0-or($powerGuard.ok-and$hostAfter-and$cdpAfter-and$remoteAfter-and-not$authDupRemain))
- version=$Version;startedAt=$started;completedAt=(Get-Date).ToString('o');phase='POWER+WINDOW_ACTIVITY+MID_CLEAN+VERIFY+RECOVER'
+ ok=[bool]($powerGuard.ok-and$activityHealthy-and$cleanupHealthy-and$hostAfter-and$cdpAfter-and$remoteAfter-and-not$authDupRemain)
+ version=$Version;startedAt=$started;completedAt=(Get-Date).ToString('o');phase='POWER+WINDOW_ACTIVITY_V2_AUTH_TTL+MID_CLEAN+VERIFY+RECOVER'
  powerGuardOk=[bool]$powerGuard.ok;powerGuardSha=[string]$powerGuard.sha;powerGuardStarted=[bool]$powerGuard.started;powerGuardProcessAfter=[int]$powerGuard.after;powerGuardError=[string]$powerGuard.error
- windowActivitySha=$activitySha;windowActivityVersion=$(if($activityObj){[string]$activityObj.version}else{''});windowActivityOk=$(if($activityObj){[bool]$activityObj.ok}else{$false});windowActivityMonitorCount=$(if($activityObj){[int]$activityObj.monitorCount}else{0});windowActivityCaptureCount=$(if($activityObj){[int]$activityObj.captureCount}else{0});windowActivityClosedSuperseded=$(if($activityObj){[int]$activityObj.closedSupersededCount}else{0});windowActivityStaleReopenRequired=$(if($activityObj){@($activityObj.staleReopenRequired).Count}else{0});windowActivityDuplicateFamiliesRemaining=$(if($activityObj){[int]$activityObj.duplicateFamiliesRemaining}else{0})
+ windowActivitySha=$activitySha;windowActivityVersion=$(if($activityObj){[string]$activityObj.version}else{''});windowActivityOk=$activityHealthy;windowActivityMonitorCount=$(if($activityObj){[int]$activityObj.monitorCount}else{0});windowActivityCaptureCount=$(if($activityObj){[int]$activityObj.captureCount}else{0});windowActivityClosedSuperseded=$(if($activityObj){[int]$activityObj.closedSupersededCount}else{0});windowActivityExpiredSingleAuth=$(if($activityObj){[int]$activityObj.expiredSingleAuthCount}else{0});windowActivityTtlCloseFailures=$(if($activityObj){[int]$activityObj.ttlCloseFailures}else{0});windowActivityStaleBeforeTtl=$(if($activityObj){@($activityObj.staleBeforeTtl).Count}else{0});windowActivityDuplicateFamiliesRemaining=$(if($activityObj){[int]$activityObj.duplicateFamiliesRemaining}else{0});windowActivityAuthTtlSec=$(if($activityObj){[int]$activityObj.authWindowTtlSec}else{0})
  cleanupExit=$(if($cleanup){$cleanup.exit}else{9});cleanupVersion=$(if($cleanupObj){[string]$cleanupObj.version}else{''});cleanupClosed=$(if($cleanupObj){[int]$cleanupObj.closedCount}else{-1})
  registryOk=$registryOk;registryCount=$registryCount;registryPruned=$registryPruned;registryCountAfter=$registryCountAfter
  hostOk=$hostAfter;cdp9224Ok=$cdpAfter;remoteDcOk=$remoteAfter;authDuplicateRemains=$authDupRemain;issues=@($issues)
  recoveryTriggered=$recoveryTriggered;recoveryExit=$recoveryExit;recoveryCooldown=$recoveryCooldown
- policy='VISIBLE_NOT_EQUAL_WORKING;SEQUENTIAL_ACTIVITY_WINS;LATEST_ACTIVE_AUTH_CANONICAL;SUPERSEDED_STALE_WAITING_WINDOW_CLOSE;10M_MASKED_MULTI_MONITOR_CAPTURE;AC_REMOTE_PRESENT=>ES_SYSTEM_REQUIRED_ONLY;USER_WINDOWS_PROTECTED;REMOTE_EXACT_REPAIR'
+ policy='VISIBLE_NOT_EQUAL_WORKING;AUTH_WINDOW_HARD_TTL_600S;WAITING_USER_NOT_INDEFINITE;PRE_REOPEN_CLOSE_OLD_FAMILY;LATEST_ACTIVE_AUTH_CANONICAL;SUPERSEDED_DUPLICATE_CLOSE;10M_MASKED_MULTI_MONITOR_CAPTURE;AC_REMOTE_PRESENT=>ES_SYSTEM_REQUIRED_ONLY;USER_NONAUTH_WINDOWS_PROTECTED;REMOTE_EXACT_REPAIR'
  googleControlPlane='DRIVE_RUNTIME_READBACK_EXISTING_AUTH';windowsExecutionIdentity='EXISTING_USER_TASK;NO_GOOGLE_PERMISSION_BYPASS'
 }
 $json=$out|ConvertTo-Json -Depth 30;$json|Set-Content -LiteralPath $Receipt -Encoding UTF8
