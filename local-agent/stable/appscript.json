@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.15-task203-ps51-envfix-wrapper",
-  "releasedAt": "2026-09-09T21:24:00+09:00",
-  "gitBlobSha1": "6e52e71989ee18d13f47b329387f2b9050efd771",
+  "version": "appscript-0.3.16-task203-ps51-authproof-direct",
+  "releasedAt": "2026-09-09T21:33:00+09:00",
+  "gitBlobSha1": "47ee2e3f67b27f93f902409e6e45498523a5cf00",
   "file": "HomeDesignLocalAgent.ps1",
   "maxCycleSeconds": 600,
   "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_PS51_ENVFIX_0.3.15.json",
-  "notes": "PS5.1 compatibility repair for the resumed Task203 read-only clone/auth proof lane. Preserves 0.3.13 as source blob 94b93e25ec04d4299c14f13b7d29a76c27109626 and applies exactly two safe runtime compatibility transforms before execution: ConvertTo-Json Depth 120 to 100, and empty ComSpec fallback to resolved cmd.exe for clasp.cmd. No new OAuth, project, deployment, trigger, push, scope, normal Chrome, global ExecutionPolicy, or broad process changes. COMPLETE requires inner Task203 receipt PASS plus bootstrap state/readback verification."
+  "resultReceipt": "APPSCRIPT_TASK203_PS51_DIRECT_0.3.16.json",
+  "notes": "Direct PS5.1-safe Task203 read-only lane. Verifies existing clasp auth via exact Web/Factory clone files, validates source 0.3.9 blob, patches only empty ComSpec cmd fallback and the single show-authorized-user check after clone proof, then runs the preserved 0.3.9 analyzer. No push, new OAuth, project, deployment, trigger, scope, normal Chrome, global ExecutionPolicy, or broad process changes. COMPLETE requires child analyzer PASS plus bootstrap/readback verification."
 }
