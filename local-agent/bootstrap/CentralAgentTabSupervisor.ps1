@@ -18,7 +18,7 @@ $RequiredRemoteGuardPattern='^REMOTE_DC_KEEPALIVE_V5_'
 $Pins=@{
  'local-agent/bootstrap/CentralAgentPowerContinuityGuard.ps1'=@{commit='b40b7b2e4ca3e5e44e8ad792e436bee3b990095d';sha='42a44d82401e44caf2320e137dac27a3199c3b99';dest=$PowerGuardScript}
  'local-agent/bootstrap/DesktopCommanderKeepAlive.ps1'=@{commit='6bf8e97c869a1cdfa2bc1e6cee9bd17f298351ab';sha='b0c95ac00154d8d1577523c6663f6204af184fe3';dest=$RemoteGuardScript}
- 'local-agent/bootstrap/WindowActivitySupervisor.ps1'=@{commit='76f80405e2ab3d330527d829344cd1e10169f14b';sha='cee9d0dc032f267827acf024d4ad260e95bea5ed';dest=$WindowActivityScript}
+ 'local-agent/bootstrap/WindowActivitySupervisor.ps1'=@{commit='78cb14a84a8ecadbdfabd87de33c1d530a7a0d22';sha='b8bbc8d96adda28d3fb967b2736b8043dbc06da2';dest=$WindowActivityScript}
  'local-agent/bootstrap/InactiveProcessGovernor.ps1'=@{commit='5d4cd5171d031c9d8252f03adb06925f5380181f';sha='5a9df27edd089d62f2eaf473a6cbdb984bd287b2';dest=$InactiveGovernorScript}
  'local-agent/bootstrap/RunOwnedUiCleanup.ps1'=@{commit='e835625b149290f37d9c6f5cc20eb1f16684c7ee';sha='059d8fed9384a3403a4599ef4d0572a75f9bf2c3';dest=$CleanupScript}
 }
