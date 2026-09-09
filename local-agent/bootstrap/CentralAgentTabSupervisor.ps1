@@ -25,9 +25,13 @@ if(Test-Path $Cleanup){
 }else{$issues.Add('CLEANUP_MISSING')}
 if(-not$cleanupObj){$issues.Add('CLEANUP_NO_READBACK')}
 elseif(-not[bool]$cleanupObj.ok){$issues.Add('CLEANUP_NOT_OK')}
-elseif([string]$cleanupObj.version-notmatch'AUTH_DEDUP_MULTI_HWND'){ $issues.Add('CLEANUP_VERSION_MISMATCH') }
+elseif([string]$cleanupObj.version-notmatch'RUN_OWNED_UI_CLEANUP_V[45]_'){ $issues.Add('CLEANUP_VERSION_MISMATCH') }
 $registryCount=0;$registryOk=$true
 try{$r=Get-Content $Registry -Raw -Encoding UTF8|ConvertFrom-Json;$registryCount=@($r).Count}catch{$registryOk=$false;$issues.Add('REGISTRY_PARSE_FAIL')}
+$registryPruned=0;$registryCountAfter=$registryCount
+$pruneIds=@()
+if($registryOk-and$cleanupObj-and$cleanupObj.results){foreach($rr in @($cleanupObj.results)){if([string]$rr.state-match '^(ALREADY_NOT_VISIBLE|CLOSED_EXACT_HWND|HWND_REUSED_OWNER_MISMATCH|ALREADY_CLOSED|CLOSED)$' -and [string]$rr.runId){$pruneIds+=[string]$rr.runId}};$pruneIds=@($pruneIds|Sort-Object -Unique)}
+if($registryOk-and$pruneIds.Count-gt0){try{$kept=@($r|Where-Object{$pruneIds-notcontains[string]$_.runId});if($kept.Count-lt$registryCount){$tmp=$Registry+'.compact';ConvertTo-Json -InputObject ([object[]]$kept) -Depth 30|Set-Content -LiteralPath $tmp -Encoding UTF8;Move-Item $tmp $Registry -Force;$registryPruned=$registryCount-$kept.Count;$registryCountAfter=$kept.Count}}catch{$issues.Add('REGISTRY_COMPACT_FAIL')}}
 $hostOk=Test-Host;$cdpOk=Test-Cdp;$remoteOk=Test-Remote
 if(-not$hostOk){$issues.Add('LOCAL_HOST_DOWN')}
 if(-not$cdpOk){$issues.Add('CFT_CDP_9224_DOWN')}
@@ -57,6 +61,8 @@ $out=[ordered]@{
  cleanupClosed=$(if($cleanupObj){[int]$cleanupObj.closedCount}else{-1})
  registryOk=$registryOk
  registryCount=$registryCount
+ registryPruned=$registryPruned
+ registryCountAfter=$registryCountAfter
  hostOk=$hostOk
  cdp9224Ok=$cdpOk
  remoteDcOk=$remoteOk
