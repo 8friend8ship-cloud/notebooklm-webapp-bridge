@@ -1,7 +1,7 @@
 param([switch]$PreflightAuth)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='RUN_OWNED_UI_CLEANUP_V6_FLAT_REGISTRY_EXACT_HWND_20260909'
+$Version='RUN_OWNED_UI_CLEANUP_V7_STACK_FLATTEN_20260910'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Registry=Join-Path $Root 'RUN_OWNED_UI_REGISTRY.json'
 $Receipt=Join-Path $Root 'RUN_OWNED_UI_CLEANUP_LAST.json'
@@ -21,16 +21,17 @@ function Save-Json([string]$Path,$Object){try{$Object|ConvertTo-Json -Depth 50|S
 function Parse-Time($x){foreach($n in @('verifiedAt','completedAt','resultAckAt','openedAt','createdAt')){try{$v=$x.$n;if($v){return [datetimeoffset]::Parse([string]$v)}}catch{}};return $null}
 function Grace-Passed($x){$t=Parse-Time $x;if(-not$t){return $true};return (((Get-Date).ToUniversalTime()-$t.UtcDateTime).TotalSeconds-ge$GraceSeconds)}
 function Expand-Registry($Node){
- $list=New-Object System.Collections.Generic.List[object]
- function Walk-Registry($x){
-  if($null-eq$x){return}
-  if($x -is [System.Array]){foreach($a in $x){Walk-Registry $a};return}
+ $result=@()
+ $stack=New-Object System.Collections.Stack
+ foreach($n in @($Node)){$stack.Push($n)}
+ while($stack.Count-gt0){
+  $x=$stack.Pop();if($null-eq$x){continue}
+  if($x -is [System.Array]){foreach($a in $x){$stack.Push($a)};continue}
   $names=@($x.PSObject.Properties.Name)
-  if($names -contains 'runId'){$list.Add($x);return}
-  if($names -contains 'value'){Walk-Registry $x.value}
+  if($names -contains 'runId'){$result+=,$x;continue}
+  if($names -contains 'value'){foreach($a in @($x.value)){$stack.Push($a)}}
  }
- Walk-Registry $Node
- return @($list)
+ return @($result)
 }
 function Close-Hwnd([int64]$Hwnd,[int]$ExpectedPid){
  $h=[IntPtr]$Hwnd
