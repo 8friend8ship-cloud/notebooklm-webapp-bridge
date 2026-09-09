@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='POWER_CONTINUITY_GUARD_V2_AC_REMOTE_SCREENOFF_20260909'
+$Version='POWER_CONTINUITY_GUARD_V3_PS51_UINT32_FIX_20260909'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $Receipt=Join-Path $Root 'POWER_CONTINUITY_GUARD_LAST.json'
@@ -37,33 +37,44 @@ function Save($o){
   try{$j=$o|ConvertTo-Json -Depth 20;$j|Set-Content -LiteralPath $Receipt -Encoding UTF8;$c=Find-Central;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content -LiteralPath (Join-Path $d 'POWER_CONTINUITY_GUARD_LAST.json') -Encoding UTF8}}catch{}
 }
 function On-AC{
-  try{$s=New-Object HDPowerGuard+SYSTEM_POWER_STATUS;if([HDPowerGuard]::GetSystemPowerStatus([ref]$s)){return ([int]$s.ACLineStatus-eq1)}}catch{}
+  try{$s=New-Object HDPowerGuard+SYSTEM_POWER_STATUS;if([HDPowerGuard]::GetSystemPowerStatus([ref]$s)){return ([int]$s.ACLineStatus -eq 1)}}catch{}
   try{return ((Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue|Select-Object -First 1).BatteryStatus -in 2,6,7,8,9,11)}catch{return $true}
 }
-function Remote-Present{try{return (@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{[string]$_.CommandLine-match'(?i)desktop-commander'-and[string]$_.CommandLine-match'(?i)(?:^|\s)remote(?:\s|$)'}).Count-gt0)}catch{return $false}}
+function Remote-Present{
+  try{return (@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{[string]$_.CommandLine -match '(?i)desktop-commander' -and [string]$_.CommandLine -match '(?i)(?:^|\s)remote(?:\s|$)'}).Count -gt 0)}catch{return $false}
+}
 
 $mutex=New-Object Threading.Mutex($false,'HomeDesignPowerContinuityGuardV2')
-if(-not$mutex.WaitOne(0,$false)){exit 0}
-$ES_CONTINUOUS=[uint32]0x80000000
-$ES_SYSTEM_REQUIRED=[uint32]0x00000001
+if(-not $mutex.WaitOne(0,$false)){exit 0}
+# PowerShell 5.1 parses 0x80000000 as signed Int32; Convert.ToUInt32 avoids InvalidCastIConvertible.
+$ES_CONTINUOUS=[Convert]::ToUInt32('80000000',16)
+$ES_SYSTEM_REQUIRED=[uint32]1
 $held=$false
 $started=(Get-Date).ToString('o')
 try{
   while($true){
-    $ac=On-AC;$remote=Remote-Present
-    $shouldHold=[bool]($ac-and$remote)
-    $callResult=0
+    $ac=On-AC
+    $remote=Remote-Present
+    $shouldHold=[bool]($ac -and $remote)
+    [uint32]$callResult=0
+    $lastError=0
     if($shouldHold){
-      try{$callResult=[HDPowerGuard]::SetThreadExecutionState($ES_CONTINUOUS-bor$ES_SYSTEM_REQUIRED);$held=($callResult-ne0)}catch{$held=$false}
+      try{
+        $flags=$ES_CONTINUOUS -bor $ES_SYSTEM_REQUIRED
+        $callResult=[HDPowerGuard]::SetThreadExecutionState($flags)
+        $lastError=[Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        $held=($callResult -ne 0)
+      }catch{$held=$false;$lastError=-1}
     }else{
       if($held){try{[void][HDPowerGuard]::SetThreadExecutionState($ES_CONTINUOUS)}catch{}}
       $held=$false
     }
     $o=[ordered]@{
       ok=$true;version=$Version;pid=$PID;startedAt=$started;heartbeatAt=(Get-Date).ToString('o');acPower=$ac;remoteProcessPresent=$remote
-      systemRequiredHeld=$held;displayRequiredHeld=$false;mode='AC_ONLY_WHILE_REMOTE_DC_PRESENT;ALLOW_DISPLAY_OFF;PREVENT_MODERN_STANDBY_DURING_REMOTE_AUTOMATION'
+      systemRequiredHeld=$held;displayRequiredHeld=$false;executionStateCallResult=[uint64]$callResult;lastWin32Error=$lastError
+      mode='AC_ONLY_WHILE_REMOTE_DC_PRESENT;ALLOW_DISPLAY_OFF;PREVENT_MODERN_STANDBY_DURING_REMOTE_AUTOMATION'
       powercfgChanged=$false;sleepTimeoutChanged=$false;hibernateChanged=$false;lidPolicyChanged=$false;adminRequired=$false
-      batteryPolicy='ON_DC_CLEAR_ES_SYSTEM_REQUIRED';newTrigger=$false;newOAuth=$false
+      batteryPolicy='ON_DC_CLEAR_ES_SYSTEM_REQUIRED';newTrigger=$false;newOAuth=$false;ps51UInt32Fix=$true
     }
     Save $o
     Start-Sleep -Seconds $HeartbeatSeconds
