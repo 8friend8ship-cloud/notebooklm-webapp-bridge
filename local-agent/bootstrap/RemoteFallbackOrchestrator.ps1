@@ -1,49 +1,20 @@
 param([switch]$PrepareInstallers)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_FALLBACK_ORCHESTRATOR_V1_20260910'
+$Version='REMOTE_FALLBACK_ORCHESTRATOR_V2_NONBLOCKING_20260910'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Stage=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\RemoteFallback'
 $Receipt=Join-Path $Root 'REMOTE_FALLBACK_LAST.json'
 New-Item -ItemType Directory -Force -Path $Root,$Stage|Out-Null
 function Save($o){try{$j=$o|ConvertTo-Json -Depth 20;$j|Set-Content $Receipt -Encoding UTF8}catch{}}
-function Get-Control{
-  try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/control/remote-failover.json?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod $u -Headers @{'User-Agent'='HomeDesign-Remote-Failover';'Accept'='application/vnd.github+json'} -TimeoutSec 10;return ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$x.content-replace'\s','')))|ConvertFrom-Json)}catch{return $null}
-}
-function RemoteLocal{
-  try{$p=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$'-and([string]$_.CommandLine)-match'(?i)desktop-commander'-and([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'});$ids=@($p|ForEach-Object{[int]$_.ProcessId});$tcp=if($ids.Count){@(Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue|Where-Object{$ids-contains$_.OwningProcess}).Count}else{0};[pscustomobject]@{processCount=$p.Count;tcpEstablished=$tcp;localTransport=($p.Count-gt0-and$tcp-gt0)}}catch{[pscustomobject]@{processCount=0;tcpEstablished=0;localTransport=$false}}
-}
-function TailscaleState{
-  $exe=@('C:\Program Files\Tailscale\tailscale.exe',(Get-Command tailscale.exe -ErrorAction SilentlyContinue).Source)|Where-Object{$_-and(Test-Path $_)}|Select-Object -First 1
-  $svc=Get-Service Tailscale -ErrorAction SilentlyContinue
-  $backend='NOT_INSTALLED';$ip='';$loginRequired=$false
-  if($exe){try{$j=& $exe status --json 2>$null|ConvertFrom-Json;$backend=[string]$j.BackendState;$ip=(@($j.TailscaleIPs)[0]);$loginRequired=($backend-ne'Running')}catch{$backend='INSTALLED_STATUS_UNKNOWN'}}
-  [pscustomobject]@{installed=[bool]$exe;exe=[string]$exe;service=$(if($svc){[string]$svc.Status}else{'MISSING'});backend=$backend;ip=$ip;loginRequired=$loginRequired;ready=[bool]($exe-and$svc-and$svc.Status-eq'Running'-and$backend-eq'Running')}
-}
-function RustDeskState{
-  $c=@('C:\Program Files\RustDesk\rustdesk.exe',(Get-Command rustdesk.exe -ErrorAction SilentlyContinue).Source,(Join-Path $Stage 'rustdesk.exe'))|Where-Object{$_-and(Test-Path $_)}|Select-Object -First 1
-  $p=@(Get-Process rustdesk -ErrorAction SilentlyContinue)
-  [pscustomobject]@{installed=[bool]$c;exe=[string]$c;processCount=$p.Count;ready=[bool]$c}
-}
-function Prepare-Tailscale{
-  $o=[ordered]@{attempted=$false;ok=$false;result='NOT_REQUESTED'}
-  if(-not$PrepareInstallers){return [pscustomobject]$o};$o.attempted=$true
-  try{$winget=(Get-Command winget.exe -ErrorAction Stop).Source;$log=Join-Path $Stage 'tailscale-winget-prepare.log';$raw=& $winget install --id Tailscale.Tailscale --exact --silent --accept-source-agreements --accept-package-agreements 2>&1|Out-String;$raw|Set-Content $log -Encoding UTF8;$ts=TailscaleState;$o.ok=[bool]$ts.installed;$o.result=$(if($o.ok){'INSTALLED_LOGIN_MAY_BE_REQUIRED'}else{'ADMIN_OR_INSTALLER_REQUIRED'})}catch{$o.result='INSTALL_ERROR:'+($_.Exception.Message)};[pscustomobject]$o
-}
-function Prepare-RustDesk{
-  $o=[ordered]@{attempted=$false;ok=$false;result='NOT_REQUESTED';version='1.4.9';path=''}
-  if(-not$PrepareInstallers){return [pscustomobject]$o};$o.attempted=$true
-  try{$api='https://api.github.com/repos/rustdesk/rustdesk/releases/tags/1.4.9';$r=Invoke-RestMethod $api -Headers @{'User-Agent'='HomeDesign-Remote-Failover'} -TimeoutSec 15;$a=@($r.assets|Where-Object{$_.name-match'(?i)x86_64.*\.exe$'}|Select-Object -First 1);if(-not$a){throw'WINDOWS_X64_ASSET_NOT_FOUND'};$dst=Join-Path $Stage 'rustdesk.exe';Invoke-WebRequest -UseBasicParsing -Uri $a.browser_download_url -OutFile $dst -TimeoutSec 60;$sig=Get-AuthenticodeSignature $dst;$o.path=$dst;if($sig.Status-ne'Valid'){Remove-Item $dst -Force -ErrorAction SilentlyContinue;throw('AUTHENTICODE_'+$sig.Status)};$o.ok=$true;$o.result='PORTABLE_STAGED_SIGNATURE_VALID'}catch{$o.result='PREPARE_ERROR:'+($_.Exception.Message)};[pscustomobject]$o
-}
-$control=Get-Control;$remote=RemoteLocal;$ts=TailscaleState;$rd=RustDeskState;$tsPrep=Prepare-Tailscale;if($tsPrep.attempted){$ts=TailscaleState};$rdPrep=Prepare-RustDesk;if($rdPrep.attempted){$rd=RustDeskState}
-$dataState=$(if($control){[string]$control.remoteDataPlaneState}else{'UNKNOWN'})
-$active='REMOTE_DC';$decision='STAGE1_REMOTE_DC';$action='NONE'
-if($dataState-ne'DATA_PLANE_PASS'){
-  if($ts.ready){$active='TAILSCALE';$decision='STAGE2_TAILSCALE_READY';$action='ROUTE_COMMAND_FILE_FALLBACK_TO_TAILSCALE'}
-  elseif($rd.ready){$active='RUSTDESK';$decision='STAGE3_RUSTDESK_READY';$action='GUI_BREAKGLASS_HUMAN_APPROVAL_REQUIRED'}
-  else{$active='SAFE_HOLD';$decision='FALLBACK_NOT_READY';$action=$(if($ts.installed-and$ts.loginRequired){'TAILSCALE_LOGIN_REQUIRED'}elseif(-not$ts.installed){'TAILSCALE_INSTALL_OR_ADMIN_REQUIRED'}else{'RUSTDESK_PREP_REQUIRED'})}
-}
+function Get-Control{try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/control/remote-failover.json?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod $u -Headers @{'User-Agent'='HomeDesign-Remote-Failover';'Accept'='application/vnd.github+json'} -TimeoutSec 10;return ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$x.content-replace'\s','')))|ConvertFrom-Json)}catch{return $null}}
+function RemoteLocal{try{$p=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$'-and([string]$_.CommandLine)-match'(?i)desktop-commander'-and([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'});$ids=@($p|ForEach-Object{[int]$_.ProcessId});$tcp=if($ids.Count){@(Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue|Where-Object{$ids-contains$_.OwningProcess}).Count}else{0};[pscustomobject]@{processCount=$p.Count;tcpEstablished=$tcp;localTransport=($p.Count-gt0-and$tcp-gt0)}}catch{[pscustomobject]@{processCount=0;tcpEstablished=0;localTransport=$false}}}
+function TailscaleState{$exe=@('C:\Program Files\Tailscale\tailscale.exe',(Get-Command tailscale.exe -ErrorAction SilentlyContinue).Source)|Where-Object{$_-and(Test-Path $_)}|Select-Object -First 1;$svc=Get-Service Tailscale -ErrorAction SilentlyContinue;$backend='NOT_INSTALLED';$ip='';$loginRequired=$false;if($exe){try{$j=& $exe status --json 2>$null|ConvertFrom-Json;$backend=[string]$j.BackendState;$ip=(@($j.TailscaleIPs)[0]);$loginRequired=($backend-ne'Running')}catch{$backend='INSTALLED_STATUS_UNKNOWN'}};[pscustomobject]@{installed=[bool]$exe;exe=[string]$exe;service=$(if($svc){[string]$svc.Status}else{'MISSING'});backend=$backend;ip=$ip;loginRequired=$loginRequired;ready=[bool]($exe-and$svc-and$svc.Status-eq'Running'-and$backend-eq'Running')}}
+function RustDeskState{$c=@('C:\Program Files\RustDesk\rustdesk.exe',(Get-Command rustdesk.exe -ErrorAction SilentlyContinue).Source,(Join-Path $Stage 'rustdesk.exe'))|Where-Object{$_-and(Test-Path $_)}|Select-Object -First 1;$p=@(Get-Process rustdesk -ErrorAction SilentlyContinue);[pscustomobject]@{installed=[bool]$c;exe=[string]$c;processCount=$p.Count;ready=[bool]$c}}
+function Prepare-Tailscale{$o=[ordered]@{attempted=$false;ok=$false;result='NOT_REQUESTED';version='1.102.3';path=''};if(-not$PrepareInstallers){return [pscustomobject]$o};$o.attempted=$true;try{$dst=Join-Path $Stage 'tailscale-setup-1.102.3-amd64.msi';Invoke-WebRequest -UseBasicParsing -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-1.102.3-amd64.msi' -OutFile $dst -TimeoutSec 60;$sig=Get-AuthenticodeSignature $dst;$o.path=$dst;if($sig.Status-ne'Valid'){Remove-Item $dst -Force -ErrorAction SilentlyContinue;throw('AUTHENTICODE_'+$sig.Status)};$o.ok=$true;$o.result='MSI_STAGED_SIGNATURE_VALID_ADMIN_INSTALL_REQUIRED'}catch{$o.result='PREPARE_ERROR:'+($_.Exception.Message)};[pscustomobject]$o}
+function Prepare-RustDesk{$o=[ordered]@{attempted=$false;ok=$false;result='NOT_REQUESTED';version='1.4.9';path=''};if(-not$PrepareInstallers){return [pscustomobject]$o};$o.attempted=$true;try{$api='https://api.github.com/repos/rustdesk/rustdesk/releases/tags/1.4.9';$r=Invoke-RestMethod $api -Headers @{'User-Agent'='HomeDesign-Remote-Failover'} -TimeoutSec 15;$a=@($r.assets|Where-Object{$_.name-match'(?i)x86_64.*\.exe$'}|Select-Object -First 1);if(-not$a){throw'WINDOWS_X64_ASSET_NOT_FOUND'};$dst=Join-Path $Stage 'rustdesk.exe';Invoke-WebRequest -UseBasicParsing -Uri $a.browser_download_url -OutFile $dst -TimeoutSec 60;$sig=Get-AuthenticodeSignature $dst;$o.path=$dst;if($sig.Status-ne'Valid'){Remove-Item $dst -Force -ErrorAction SilentlyContinue;throw('AUTHENTICODE_'+$sig.Status)};$o.ok=$true;$o.result='PORTABLE_STAGED_SIGNATURE_VALID_HUMAN_SESSION_APPROVAL_REQUIRED'}catch{$o.result='PREPARE_ERROR:'+($_.Exception.Message)};[pscustomobject]$o}
+$control=Get-Control;$remote=RemoteLocal;$ts=TailscaleState;$rd=RustDeskState;$tsPrep=Prepare-Tailscale;$rdPrep=Prepare-RustDesk;$dataState=$(if($control){[string]$control.remoteDataPlaneState}else{'UNKNOWN'})
+$active='REMOTE_DC';$decision='STAGE1_REMOTE_DC';$action='NONE';if($dataState-ne'DATA_PLANE_PASS'){if($ts.ready){$active='TAILSCALE';$decision='STAGE2_TAILSCALE_READY';$action='ROUTE_COMMAND_FILE_FALLBACK_TO_TAILSCALE'}elseif($rd.ready-or$rdPrep.ok){$active='RUSTDESK';$decision='STAGE3_RUSTDESK_READY';$action='GUI_BREAKGLASS_HUMAN_APPROVAL_REQUIRED'}else{$active='SAFE_HOLD';$decision='FALLBACK_NOT_READY';$action=$(if($ts.installed-and$ts.loginRequired){'TAILSCALE_LOGIN_REQUIRED'}elseif($tsPrep.ok){'TAILSCALE_MSI_STAGED_ADMIN_INSTALL_REQUIRED'}else{'FALLBACK_PREP_OR_LOGIN_REQUIRED'})}}
 $out=[ordered]@{ok=$true;version=$Version;time=(Get-Date).ToString('o');device=$env:COMPUTERNAME;controlReachable=[bool]$control;remoteDataPlaneState=$dataState;remoteLocal=$remote;tailscale=$ts;rustdesk=$rd;prepareTailscale=$tsPrep;prepareRustDesk=$rdPrep;activeStage=$active;decision=$decision;nextAction=$action;stageOrder=@('REMOTE_DC','TAILSCALE','RUSTDESK');security=@{noCredentialAutoEntry=$true;noSecurityApprovalAutoClick=$true;noBroadProcessKill=$true;noAutoReboot=$true;stage3HumanApprovalRequired=$true}}
-Save $out;$out|ConvertTo-Json -Depth 20 -Compress
-exit 0
+Save $out;$out|ConvertTo-Json -Depth 20 -Compress;exit 0
