@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V5_COMMAND_PLANE_POSTCHECK_20260909'
+$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V6_RECEIPT_PATH_FIX_20260910'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $AuditRoot=Join-Path $Base 'NotebookAudit'
@@ -10,7 +10,7 @@ $DcCache=Join-Path $DcRoot 'npm-cache'
 $DcOutLog=Join-Path $DcRoot 'remote.stdout.log'
 $DcErrLog=Join-Path $DcRoot 'remote.stderr.log'
 $DcMarker=Join-Path $DcRoot 'cache-ready-0.2.48.marker'
-$Receipt=Join-Path $AuditRoot 'NOTEBOOK_AUDIT_PACK_LAST.json'
+$ReceiptPath=Join-Path $AuditRoot 'NOTEBOOK_AUDIT_PACK_LAST.json'
 $RemoteReceipt=Join-Path $AuditRoot 'REMOTE_DC_SELF_HEAL_LAST.json'
 $Package='@wonderwhy-er/desktop-commander@0.2.48'
 New-Item -ItemType Directory -Force -Path $Root,$AuditRoot,$DcRoot,$DcCache|Out-Null
@@ -253,7 +253,7 @@ $driveFs=@(Get-Process -ErrorAction SilentlyContinue|Where-Object{$_.ProcessName
 $bootstrap=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine-and([string]$_.CommandLine-match'(?i)AgentBootstrap\.ps1')}).Count
 $receipt=[ordered]@{
   ok=[bool]$remote.ok
-  action='NOTEBOOK_AUDIT_PACK_LOCAL_V5'
+  action='NOTEBOOK_AUDIT_PACK_LOCAL_V6'
   version=$Version
   startedAt=$runStart
   completedAt=(Get-Date).ToString('o')
@@ -275,5 +275,11 @@ $receipt=[ordered]@{
   localAuditOnly=$true
   remoteCloudX2Pending=$true
 }
-SaveJson $Receipt 'NOTEBOOK_AUDIT_PACK_LAST.json' $receipt
+SaveJson $ReceiptPath 'NOTEBOOK_AUDIT_PACK_LAST.json' $receipt
+$receiptPersisted=$false
+try{
+  $saved=Get-Content -LiteralPath $ReceiptPath -Raw -Encoding UTF8 -ErrorAction Stop|ConvertFrom-Json
+  $receiptPersisted=([string]$saved.version -eq $Version -and [string]$saved.completedAt -eq [string]$receipt.completedAt)
+}catch{}
+if(-not $receiptPersisted){exit 5}
 if($remote.ok){exit 0}else{exit 4}
