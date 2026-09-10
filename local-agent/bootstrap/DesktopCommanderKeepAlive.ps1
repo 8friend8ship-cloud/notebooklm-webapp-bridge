@@ -1,7 +1,7 @@
 param([switch]$ForceRestart)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_KEEPALIVE_V7_PREFLIGHT_VERIFY_PREVENTION_20260910'
+$Version='REMOTE_DC_KEEPALIVE_V8_INSTALL_GUARD_20260910'
 $Package='@wonderwhy-er/desktop-commander@0.2.48'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -18,9 +18,7 @@ $held=$false;try{$held=$Mutex.WaitOne(30000,$false)}catch [Threading.AbandonedMu
 function GitBlob([byte[]]$b){$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{(($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
 function FindCentral{$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){if(-not$d.Root){continue};foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path $c -PathType Container){return $c}}};''}
 function Save($o){try{$j=$o|ConvertTo-Json -Depth 40;$j|Set-Content $Receipt -Encoding UTF8;$c=FindCentral;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content (Join-Path $d 'REMOTE_DC_KEEPALIVE_LAST.json') -Encoding UTF8}}catch{}}
-function RefreshGuard{
- try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/bootstrap/RemoteVerifyPreventionGuard.ps1?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod $u -Headers @{'User-Agent'='HomeDesign-Remote-Preflight';'Accept'='application/vnd.github+json'} -TimeoutSec 15;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$sha=(GitBlob $b).ToLowerInvariant();if($sha-ne([string]$x.sha).ToLowerInvariant()){throw'SHA_MISMATCH'};$tmp=$Guard+'.download';[IO.File]::WriteAllBytes($tmp,$b);Move-Item $tmp $Guard -Force;return $sha}catch{return ''}
-}
+function RefreshGuard{try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/bootstrap/RemoteVerifyPreventionGuard.ps1?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod $u -Headers @{'User-Agent'='HomeDesign-Remote-Preflight';'Accept'='application/vnd.github+json'} -TimeoutSec 15;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$sha=(GitBlob $b).ToLowerInvariant();if($sha-ne([string]$x.sha).ToLowerInvariant()){throw'SHA_MISMATCH'};$tmp=$Guard+'.download';[IO.File]::WriteAllBytes($tmp,$b);Move-Item $tmp $Guard -Force;return $sha}catch{return ''}}
 function RunGuard{try{if(-not(Test-Path $Guard)){return $null};$raw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Guard 2>&1|Out-String;try{return $raw|ConvertFrom-Json}catch{$lines=@($raw-split"`r?`n"|Where-Object{$_.Trim().StartsWith('{')});if($lines.Count){return $lines[-1]|ConvertFrom-Json}}}catch{};return $null}
 function AllProc{try{@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)}catch{@()}}
 function RemoteProc([array]$p){@($p|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and ([string]$_.CommandLine)-match'(?i)desktop-commander' -and ([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'})}
@@ -29,11 +27,8 @@ function WarmCache{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache
 function StartRemote{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$p=Start-Process npx.cmd -ArgumentList @('--yes',$Package,'remote','--persist-session') -WindowStyle Hidden -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru;[pscustomobject]@{ok=$true;pid=[int]$p.Id}}catch{[pscustomobject]@{ok=$false;pid=0;error=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
 $started=(Get-Date).ToString('o');$guardSha=RefreshGuard;$pre=RunGuard;$actions=@();$errors=@();$restart=$false
 if(-not$pre){$decision='HOLD_PREFLIGHT_UNAVAILABLE';$actions+='NO_RESTART_FAIL_CLOSED'}else{$decision=[string]$pre.decision}
-if($ForceRestart-and$pre-and-not[bool]$pre.humanGate-and[bool]$pre.internet443-and[bool]$pre.clockOk){$decision='ALLOW_RESTART_ONCE';$actions+='FORCE_RESTART_ACCEPTED_AFTER_PREFLIGHT'}
-if($decision-eq'ALLOW_RESTART_ONCE'){
- $restart=$true;$stopped=StopRoots @($pre.remoteChainRoots);if($stopped.Count){$actions+=('STOP_EXACT_CHAIN_ROOTS:'+($stopped-join','));Start-Sleep -Seconds 2}
- $warm=WarmCache;if($warm.ok){$actions+='ISOLATED_CACHE_READY';$launch=StartRemote;if($launch.ok){$actions+='REMOTE_HIDDEN_START_ONCE';Start-Sleep -Seconds 7}else{$errors+=('START='+$launch.error)}}else{$errors+=('CACHE='+$warm.output)}
-}else{$actions+=('PREFLIGHT_'+$decision+'_NO_RESTART')}
+if($ForceRestart-and$pre-and([string]$pre.decision-ne'HOLD_INSTALL_CHANGE_WINDOW')-and-not[bool]$pre.humanGate-and[bool]$pre.internet443-and[bool]$pre.clockOk){$decision='ALLOW_RESTART_ONCE';$actions+='FORCE_RESTART_ACCEPTED_AFTER_PREFLIGHT'}
+if($decision-eq'ALLOW_RESTART_ONCE'){$restart=$true;$stopped=StopRoots @($pre.remoteChainRoots);if($stopped.Count){$actions+=('STOP_EXACT_CHAIN_ROOTS:'+($stopped-join','));Start-Sleep -Seconds 2};$warm=WarmCache;if($warm.ok){$actions+='ISOLATED_CACHE_READY';$launch=StartRemote;if($launch.ok){$actions+='REMOTE_HIDDEN_START_ONCE';Start-Sleep -Seconds 7}else{$errors+=('START='+$launch.error)}}else{$errors+=('CACHE='+$warm.output)}}else{$actions+=('PREFLIGHT_'+$decision+'_NO_RESTART')}
 $post=RunGuard;if(-not$post){$post=$pre}
 $ok=[bool]($post-and[string]$post.decision-eq'KEEP_SESSION'-and[int]$post.remoteChainRootCount-eq1-and[int]$post.tcpEstablished-gt0-and-not[bool]$post.humanGate)
 $human=[bool]($post-and$post.humanGate);$status=$(if($ok){'LOCAL_TRANSPORT_HEALTHY_PREFLIGHT_KEEP_SESSION'}elseif($human){'WAIT_SINGLE_VERIFY_DEVICE_NO_RESTART'}elseif($post){[string]$post.decision}else{'HOLD_PREFLIGHT_UNAVAILABLE'})
