@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_VERIFY_PREVENTION_GUARD_V2_FAILOVER_20260910'
+$Version='REMOTE_VERIFY_PREVENTION_GUARD_V3_INSTALL_GUARD_20260910'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $DcRoot=Join-Path $Base 'DesktopCommander'
@@ -10,7 +10,7 @@ $KeepReceipt=Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json'
 $OutLog=Join-Path $DcRoot 'remote.stdout.log'
 $ErrLog=Join-Path $DcRoot 'remote.stderr.log'
 $FallbackScript=Join-Path $Root 'RemoteFallbackOrchestrator.ps1'
-$FallbackBlob='92179de95174f6ca6d64cd8feb5b007cb594f423'
+$FallbackBlob='ad6198604457c5bccd483b9461f86b6d6af7db03'
 $RestartBackoffSec=1800
 $ChannelGraceSec=180
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
@@ -32,9 +32,9 @@ function NetTime{
 function LastRestartAge{try{if(Test-Path $KeepReceipt){$j=Get-Content $KeepReceipt -Raw -Encoding UTF8|ConvertFrom-Json;if([bool]$j.restartAttempted){return [int]((Get-Date)-([datetime]$j.completedAt)).TotalSeconds}}}catch{};return 999999}
 $now=Get-Date;$all=AllProc;$rp=@(RemoteProc $all);$roots=@(ChainRoots $all $rp);$tcp=TcpCount $rp;$tail=(Tail $OutLog)+"`n"+(Tail $ErrLog)
 $ready=LastIdx $tail @('Device ready','Channel subscribed');$restore=LastIdx $tail @('Session restored');$gate=LastIdx $tail @('Starting device authorization flow','Requesting device code','Verify Device','Please complete authentication');$revoked=LastIdx $tail @('Device not found','No valid session','SIGNED_OUT','revoked persisted device');$failure=LastIdx $tail @('Channel closed','socket 1006','Channel subscription timed out','Remote session expired','Cannot recreate channel','Failed to update transport capability')
-$humanGate=($gate-gt$ready);$revokedAfterReady=($revoked-gt$ready);$failureAfterReady=($failure-gt$ready);$net=NetTime;$restartAge=LastRestartAge
+$humanGate=($gate-gt$ready);$revokedAfterReady=($revoked-gt$ready);$failureAfterReady=($failure-gt$ready);$net=NetTime;$restartAge=LastRestartAge;$install=$null;try{$install=(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $Root 'InstallChangeGuard.ps1') 2>$null|Out-String|ConvertFrom-Json)}catch{}
 $decision='KEEP_SESSION';$reason='HEALTHY_SINGLE_CHAIN';$allowRestart=$false
-if($humanGate-or$revokedAfterReady){$decision='REQUIRE_HUMAN_VERIFY_ONCE';$reason='AUTH_GATE_OR_REVOKED_SESSION'}
+if($install-and[bool]$install.active){$decision='HOLD_INSTALL_CHANGE_WINDOW';$reason=[string]$install.reason}elseif($humanGate-or$revokedAfterReady){$decision='REQUIRE_HUMAN_VERIFY_ONCE';$reason='AUTH_GATE_OR_REVOKED_SESSION'}
 elseif($roots.Count-gt1){$decision='HOLD_MULTIPLE_CHAINS';$reason='MULTIPLE_PRODUCER_CHAINS'}
 elseif(-not$net.reachable){$decision='HOLD_NETWORK';$reason='REMOTE_ENDPOINT_443_UNREACHABLE'}
 elseif(-not$net.timeOk){$decision='HOLD_CLOCK_SKEW';$reason='LOCAL_SERVER_TIME_SKEW_GE_300S'}
@@ -42,5 +42,5 @@ elseif($rp.Count-gt0-and$roots.Count-eq1-and$tcp-gt0-and-not$failureAfterReady){
 elseif($rp.Count-gt0-and$roots.Count-eq1-and($tcp-eq0-or$failureAfterReady)){$decision='WAIT_CHANNEL_SELF_RECOVERY';$reason='PROCESS_PRESENT_CHANNEL_UNHEALTHY';if($restartAge-ge$RestartBackoffSec){$decision='ALLOW_RESTART_ONCE';$allowRestart=$true;$reason='CHANNEL_UNHEALTHY_BACKOFF_EXPIRED'}}
 elseif($rp.Count-eq0){if($restartAge-lt$RestartBackoffSec){$decision='HOLD_RESTART_BACKOFF';$reason='PROCESS_ABSENT_RECENT_RESTART'}else{$decision='ALLOW_RESTART_ONCE';$allowRestart=$true;$reason='PROCESS_ABSENT_PREFLIGHT_CLEAN'}}
 $fallback=RunFallback
-$out=[ordered]@{ok=$true;version=$Version;time=$now.ToString('o');decision=$decision;reason=$reason;allowRestartOnce=$allowRestart;remoteProcessCount=$rp.Count;remoteChainRootCount=$roots.Count;remoteChainRoots=$roots;tcpEstablished=$tcp;sessionRestored=[bool]($restore-ge0-and$ready-gt$restore);humanGate=$humanGate;revokedMarkerAfterReady=$revokedAfterReady;failureAfterReady=$failureAfterReady;internet443=[bool]$net.reachable;serverDate=[string]$net.serverDate;clockSkewSec=$net.skewSec;clockOk=[bool]$net.timeOk;secondsSinceLastRestartAttempt=$restartAge;restartBackoffSec=$RestartBackoffSec;channelGraceSec=$ChannelGraceSec;fallbackOrchestratorLoaded=[bool]$fallback;fallbackActiveStage=$(if($fallback){[string]$fallback.activeStage}else{'UNAVAILABLE'});fallbackDecision=$(if($fallback){[string]$fallback.decision}else{'UNAVAILABLE'});fallbackNextAction=$(if($fallback){[string]$fallback.nextAction}else{'NONE'});tailscaleReady=$(if($fallback){[bool]$fallback.tailscale.ready}else{$false});rustdeskReady=$(if($fallback){[bool]$fallback.rustdesk.ready}else{$false});policy='PRECHECK_FIRST;KEEP_HEALTHY_SESSION;NO_BROWSER_START;NO_AUTO_APPROVAL;NO_NEW_AUTH_FLOW_WHILE_GATE_PENDING;ONE_RESTART_ONLY_AFTER_BACKOFF;FAILOVER_ORDER_REMOTE_DC_THEN_TAILSCALE_THEN_RUSTDESK'}
+$out=[ordered]@{ok=$true;version=$Version;time=$now.ToString('o');decision=$decision;reason=$reason;allowRestartOnce=$allowRestart;remoteProcessCount=$rp.Count;remoteChainRootCount=$roots.Count;remoteChainRoots=$roots;tcpEstablished=$tcp;sessionRestored=[bool]($restore-ge0-and$ready-gt$restore);humanGate=$humanGate;revokedMarkerAfterReady=$revokedAfterReady;failureAfterReady=$failureAfterReady;internet443=[bool]$net.reachable;serverDate=[string]$net.serverDate;clockSkewSec=$net.skewSec;clockOk=[bool]$net.timeOk;secondsSinceLastRestartAttempt=$restartAge;restartBackoffSec=$RestartBackoffSec;channelGraceSec=$ChannelGraceSec;installChangeWindowActive=[bool]($install-and$install.active);installChangeReason=$(if($install){[string]$install.reason}else{''});latestMsiId=$(if($install){[int]$install.latestMsiId}else{0});latestMsiTime=$(if($install){[string]$install.latestMsiTime}else{''});fallbackOrchestratorLoaded=[bool]$fallback;fallbackActiveStage=$(if($fallback){[string]$fallback.activeStage}else{'UNAVAILABLE'});fallbackDecision=$(if($fallback){[string]$fallback.decision}else{'UNAVAILABLE'});fallbackNextAction=$(if($fallback){[string]$fallback.nextAction}else{'NONE'});tailscaleReady=$(if($fallback){[bool]$fallback.tailscale.ready}else{$false});rustdeskReady=$(if($fallback){[bool]$fallback.rustdesk.ready}else{$false});policy='PRECHECK_FIRST;INSTALL_CHANGE_WINDOW_BLOCKS_REMOTE_RESTART;KEEP_HEALTHY_SESSION;NO_BROWSER_START;NO_AUTO_APPROVAL;NO_NEW_AUTH_FLOW_WHILE_GATE_PENDING;ONE_RESTART_ONLY_AFTER_BACKOFF;FAILOVER_ORDER_REMOTE_DC_THEN_TAILSCALE_THEN_RUSTDESK'}
 Save $out;$out|ConvertTo-Json -Depth 40 -Compress;exit 0
