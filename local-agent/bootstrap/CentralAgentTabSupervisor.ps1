@@ -28,7 +28,7 @@ $Pins=@{
  'local-agent/bootstrap/FlowDemandGuard.ps1'=@{commit='15cf8b4a01a5d0e157289a459f1d102fafb78fe6';sha='64742526c4a32657786aa7aabae999c501c9f673';dest=$FlowDemandScript}
  'local-agent/bootstrap/WindowActivitySupervisor.ps1'=@{commit='95aacd1d1416d6e41906ff6be0b935f8e032ade8';sha='29d260473f3fdbc993b86e0900dc9833bf158609';dest=$WindowActivityScript}
  'local-agent/bootstrap/InactiveProcessGovernor.ps1'=@{commit='5d4cd5171d031c9d8252f03adb06925f5380181f';sha='5a9df27edd089d62f2eaf473a6cbdb984bd287b2';dest=$InactiveGovernorScript}
- 'local-agent/bootstrap/WorkloadAdmissionGovernor.ps1'=@{commit='8a8d3a3d1d5fdcb1ce55afb13c9a9579b3ae1b52';sha='89b5889714fcf92855db13c9a9579b3ae1b52';dest=$WorkloadGovernorScript}
+ 'local-agent/bootstrap/WorkloadAdmissionGovernor.ps1'=@{commit='8a8d3a3d1d5fdcb1ce55afb13c9a9579b3ae1b52';sha='89b5889714fcf92855dcadc5b5a573bf694055a6';dest=$WorkloadGovernorScript}
  'local-agent/bootstrap/RunOwnedUiCleanup.ps1'=@{commit='7c7631047ff322ecb8836386c6408f8651304398';sha='c45a7da297c10003850a1ef08faf779b0f5be984';dest=$CleanupScript}
 }
 function Find-Central{$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){if(-not$d.Root){continue};foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}};return ''}
