@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "device": "BOOK-1HE2THGKRA",
+  "remoteDataPlaneState": "DEGRADED_INTERMITTENT",
+  "requestedMode": "AUTO_FAILOVER",
+  "stageOrder": ["REMOTE_DC", "TAILSCALE", "RUSTDESK"],
+  "stage1RetryBeforeFailover": 2,
+  "stage1RestartBackoffSec": 1800,
+  "stage2RequiresAuthenticatedTailnet": true,
+  "stage3RequiresHumanApprovalForSession": true,
+  "allowAutomaticCredentialEntry": false,
+  "allowAutomaticSecurityApproval": false,
+  "allowBroadProcessKill": false,
+  "allowAutomaticReboot": false,
+  "updatedAt": "2026-09-10T07:05:00Z",
+  "notes": "Central Agent updates remoteDataPlaneState only from real command/file round-trip verification. Local watchdog never treats ping alone as healthy. Stage2/3 are fallbacks only."
+}
