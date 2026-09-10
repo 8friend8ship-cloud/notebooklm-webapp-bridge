@@ -1,21 +1,21 @@
 param([switch]$Apply)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WORKLOAD_ADMISSION_GOVERNOR_V1_20260910'
+$Version='WORKLOAD_ADMISSION_GOVERNOR_V2_PID_SAFE_20260910'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
-$Receipt=Join-Path $Root 'WORKLOAD_ADMISSION_GOVERNOR_LAST.json'
+$ReceiptPath=Join-Path $Root 'WORKLOAD_ADMISSION_GOVERNOR_LAST.json'
 $InactiveGovernor=Join-Path $Root 'InactiveProcessGovernor.ps1'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
 $ProtectedNames='(?i)^(googledrivefs|chrome|chatgpt|codex|explorer|dwm|taskmgr|commonagent|phoneexperiencehost|textinputhost|searchhost|startmenuexperiencehost|shellexperiencehost|msedgewebview2)$'
 $ProtectedCmd='(?i)desktop-commander|HomeDesignLocalWatchdog|CentralAgent(Tab|Power|Auto)|CentralTabAutoRecovery|AgentBootstrap|PowerContinuity|GoogleDriveFS|codex|NotebookAuditPack|HomeDesignLocalAgent|HomeDesignLocalCommandHost'
 
-function Save-Json($o){try{$o|ConvertTo-Json -Depth 40|Set-Content -LiteralPath $Receipt -Encoding UTF8}catch{}}
+function Save-Json($o){try{$o|ConvertTo-Json -Depth 40|Set-Content -LiteralPath $ReceiptPath -Encoding UTF8}catch{}}
 function Get-ProcSnapshot{
   $perf=@{};try{Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -ErrorAction SilentlyContinue|ForEach-Object{$perf[[int]$_.IDProcess]=$_}}catch{}
   $cim=@{};try{Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|ForEach-Object{$cim[[int]$_.ProcessId]=$_}}catch{}
   $rows=@();foreach($p in @(Get-Process -ErrorAction SilentlyContinue)){
-    try{$pid=[int]$p.Id;if($pid-le4){continue};$pf=$perf[$pid];$ci=$cim[$pid];$cmd=$(if($ci){[string]$ci.CommandLine}else{''});$name=[string]$p.ProcessName;$main=[int64]$p.MainWindowHandle;$protected=[bool]($name-match$ProtectedNames-or$cmd-match$ProtectedCmd);$rows+=[pscustomobject]@{pid=$pid;name=$name;cpuPct=$(if($pf){[double]$pf.PercentProcessorTime}else{0});workingSetMb=[math]::Round($p.WorkingSet64/1MB,1);ioBytesSec=$(if($pf){[double]$pf.IODataBytesPersec+[double]$pf.IOOtherBytesPersec}else{0});mainHwnd=$main;hasWindow=[bool]($main-ne0);protected=$protected;cmd=$cmd}}
+    try{$procId=[int]$p.Id;if($procId-le4){continue};$pf=$perf[$procId];$ci=$cim[$procId];$cmd=$(if($ci){[string]$ci.CommandLine}else{''});$name=[string]$p.ProcessName;$main=[int64]$p.MainWindowHandle;$protected=[bool]($name-match$ProtectedNames-or$cmd-match$ProtectedCmd);$rows+=[pscustomobject]@{pid=$procId;name=$name;cpuPct=$(if($pf){[double]$pf.PercentProcessorTime}else{0});workingSetMb=[math]::Round($p.WorkingSet64/1MB,1);ioBytesSec=$(if($pf){[double]$pf.IODataBytesPersec+[double]$pf.IOOtherBytesPersec}else{0});mainHwnd=$main;hasWindow=[bool]($main-ne0);protected=$protected;cmd=$cmd}}
     catch{}
   };return @($rows)
 }
@@ -54,4 +54,6 @@ $afterSamples=@();for($i=0;$i-lt2;$i++){$afterSamples+=Get-SystemSnapshot;if($i-
 $afterProc=Get-ProcSnapshot;$edgeAfter=Edge-State $afterProc;$afterAd=Admission $afterSamples
 $top=@($afterProc|Sort-Object @{Expression='cpuPct';Descending=$true},@{Expression='workingSetMb';Descending=$true}|Select-Object -First 20 pid,name,cpuPct,workingSetMb,ioBytesSec,mainHwnd,hasWindow,protected,cmd)
 $out=[ordered]@{ok=$true;version=$Version;time=(Get-Date).ToString('o');apply=[bool]$Apply;beforeSamples=$samples;admissionBefore=$ad;edgeBefore=$edgeBefore;edgePolicyApply=$edgeApply;cleanupInvoked=[bool]($null-ne$cleanup);cleanup=$cleanup;afterSamples=$afterSamples;admissionAfter=$afterAd;edgeAfter=$edgeAfter;topProcesses=$top;protectedRule='RemoteDC/current HomeDesign run/Drive/Chrome/ChatGPT/Codex/watchdog/PowerShell lineage protected; msedgewebview2 protected; no process-name broad kill';policy='3_SAMPLE_ADMISSION;GREEN_PARALLEL;YELLOW_LIGHT_ONLY;RED_BLOCK_NEW_PARALLEL+RUN_EXISTING_SAFE_INACTIVE_GOVERNOR;EDGE_STARTUP_BOOST_AND_BACKGROUND_MODE_DISABLED_WHEN_APPLY;NO_WEBVIEW2_BROAD_KILL'}
-Save-Json $out;$out|ConvertTo-Json -Depth 40 -Compress;exit 0
+Save-Json $out
+try{$r=Get-Content $ReceiptPath -Raw -Encoding UTF8|ConvertFrom-Json;if([string]$r.version-ne$Version){throw 'PERSISTED_RECEIPT_VERSION_MISMATCH'}}catch{Write-Error $_;exit 5}
+$out|ConvertTo-Json -Depth 40 -Compress;exit 0
