@@ -10,7 +10,7 @@ $KeepReceipt=Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json'
 $OutLog=Join-Path $DcRoot 'remote.stdout.log'
 $ErrLog=Join-Path $DcRoot 'remote.stderr.log'
 $FallbackScript=Join-Path $Root 'RemoteFallbackOrchestrator.ps1'
-$FallbackBlob='1b953465c0092b6de42c1d1e51a8b042ac24cb19'
+$FallbackBlob='92179de95174f6ca6d64cd8feb5b007cb594f423'
 $RestartBackoffSec=1800
 $ChannelGraceSec=180
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
