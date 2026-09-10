@@ -1,7 +1,7 @@
 param([switch]$ForceRestart)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_KEEPALIVE_V7_CHAIN_AWARE_AUTH_SINGLETON_20260910'
+$Version='REMOTE_DC_KEEPALIVE_V7_PREFLIGHT_VERIFY_PREVENTION_20260910'
 $Package='@wonderwhy-er/desktop-commander@0.2.48'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -10,75 +10,34 @@ $DcCache=Join-Path $DcRoot 'npm-cache'
 $OutLog=Join-Path $DcRoot 'remote.stdout.log'
 $ErrLog=Join-Path $DcRoot 'remote.stderr.log'
 $Receipt=Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json'
-$CooldownSeconds=120
-$HumanGateHoldSeconds=1800
+$Guard=Join-Path $Root 'RemoteVerifyPreventionGuard.ps1'
+$Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 New-Item -ItemType Directory -Force -Path $Root,$DcRoot,$DcCache|Out-Null
-$Mutex=New-Object System.Threading.Mutex($false,'HomeDesignDesktopCommanderKeepAliveV7')
-$MutexHeld=$false
-try{$MutexHeld=$Mutex.WaitOne(30000,$false)}catch [System.Threading.AbandonedMutexException]{$MutexHeld=$true}
-if(-not$MutexHeld){try{if(Test-Path $Receipt){Get-Content -LiteralPath $Receipt -Raw -Encoding UTF8|Write-Output}}catch{};try{$Mutex.Dispose()}catch{};exit 6}
-
-function Find-Central{
-  $n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'))
-  $m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
-  foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){if(-not$d.Root){continue};foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}};return ''
+$Mutex=New-Object Threading.Mutex($false,'HomeDesignDesktopCommanderKeepAliveV8Preflight')
+$held=$false;try{$held=$Mutex.WaitOne(30000,$false)}catch [Threading.AbandonedMutexException]{$held=$true};if(-not$held){exit 6}
+function GitBlob([byte[]]$b){$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{(($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
+function FindCentral{$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){if(-not$d.Root){continue};foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path $c -PathType Container){return $c}}};''}
+function Save($o){try{$j=$o|ConvertTo-Json -Depth 40;$j|Set-Content $Receipt -Encoding UTF8;$c=FindCentral;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content (Join-Path $d 'REMOTE_DC_KEEPALIVE_LAST.json') -Encoding UTF8}}catch{}}
+function RefreshGuard{
+ try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/bootstrap/RemoteVerifyPreventionGuard.ps1?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod $u -Headers @{'User-Agent'='HomeDesign-Remote-Preflight';'Accept'='application/vnd.github+json'} -TimeoutSec 15;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$sha=(GitBlob $b).ToLowerInvariant();if($sha-ne([string]$x.sha).ToLowerInvariant()){throw'SHA_MISMATCH'};$tmp=$Guard+'.download';[IO.File]::WriteAllBytes($tmp,$b);Move-Item $tmp $Guard -Force;return $sha}catch{return ''}
 }
-function Save-Receipt($o){try{$j=$o|ConvertTo-Json -Depth 40;$j|Set-Content -LiteralPath $Receipt -Encoding UTF8;$c=Find-Central;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content -LiteralPath (Join-Path $d 'REMOTE_DC_KEEPALIVE_LAST.json') -Encoding UTF8}}catch{}}
-function Get-AllProc{try{@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)}catch{@()}}
-function Get-RemoteProc([array]$p){@($p|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and ([string]$_.CommandLine)-match'(?i)desktop-commander' -and ([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'})}
-function Get-IsolatedRemote([array]$p){$e=[regex]::Escape($DcCache);@(Get-RemoteProc $p|Where-Object{([string]$_.CommandLine)-match$e})}
-function Get-LegacyRemote([array]$p){@(Get-RemoteProc $p|Where-Object{([string]$_.CommandLine)-match'(?i)AppData\\Local\\npm-cache\\_npx'})}
-function Get-RemoteChainRoots([array]$all,[array]$remote){
-  $map=@{};foreach($x in $all){try{$map[[int]$x.ProcessId]=$x}catch{}}
-  $roots=@();$details=@()
-  foreach($r in $remote){
-    $cur=$r;$rootId=[int]$r.ProcessId;$path=@([int]$r.ProcessId);$guard=0
-    while($cur-and$guard-lt12){$guard++;$parentId=0;try{$parentId=[int]$cur.ParentProcessId}catch{};if($parentId-le0-or-not$map.ContainsKey($parentId)){break};$par=$map[$parentId];$pcmd=[string]$par.CommandLine;$pname=[string]$par.Name;$related=[bool]($pcmd-match'(?i)(desktop-commander|@wonderwhy-er/desktop-commander|npx(?:-cli\.js|\.cmd).*remote)' -or ($pname-match'(?i)^cmd(?:\.exe)?$' -and $pcmd-match'(?i)(desktop-commander|npx\.cmd)'))
-      if(-not$related){break};$rootId=$parentId;$path+=$parentId;$cur=$par
-    }
-    $roots+=$rootId;$details+=[pscustomobject]@{remotePid=[int]$r.ProcessId;chainRootPid=$rootId;ancestry=@($path)}
-  }
-  [pscustomobject]@{rootPids=@($roots|Select-Object -Unique);rootCount=@($roots|Select-Object -Unique).Count;details=$details}
-}
-function Get-TcpCount([array]$p){try{$ids=@($p|ForEach-Object{[int]$_.ProcessId});if($ids.Count-eq0){return 0};return [int](@(Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue|Where-Object{$ids-contains$_.OwningProcess}).Count)}catch{return 0}}
-function Read-Tail([string]$Path,[int]$Lines=160){try{if(Test-Path $Path){return ((Get-Content -LiteralPath $Path -Tail $Lines -ErrorAction Stop)-join"`n")}}catch{};return ''}
-function Latest-ReadyIndex([string]$Text){if(-not$Text){return -1};return [Math]::Max($Text.LastIndexOf('Device ready',[StringComparison]::OrdinalIgnoreCase),$Text.LastIndexOf('Channel subscribed',[StringComparison]::OrdinalIgnoreCase))}
-function Latest-GateIndex([string]$Text){if(-not$Text){return -1};$gate=-1;foreach($s in @('Starting device authorization flow','Please complete authentication','Requesting device code','Verify Device')){$gate=[Math]::Max($gate,$Text.LastIndexOf($s,[StringComparison]::OrdinalIgnoreCase))};return $gate}
-function Has-NewerFailure([string]$Text){if(-not$Text){return $false};$ready=Latest-ReadyIndex $Text;$err=-1;foreach($s in @('Channel closed','socket 1006','IncreaseConnectionPool','Channel subscription timed out','Device startup failed','Failed to set session','terminated','No valid session','Tool call channel subscription timed out','Presence track failed after retries','Transport capability set to withdrawn','Remote session expired','Cannot recreate channel - missing parameters','Failed to update transport capability')){$err=[Math]::Max($err,$Text.LastIndexOf($s,[StringComparison]::OrdinalIgnoreCase))};return ($err-gt$ready)}
-function Has-NewerHumanGate([string]$Text){return ((Latest-GateIndex $Text)-gt(Latest-ReadyIndex $Text))}
-function Has-RestoredSession([string]$Text){if(-not$Text){return $false};$ready=Latest-ReadyIndex $Text;$restore=$Text.LastIndexOf('Session restored',[StringComparison]::OrdinalIgnoreCase);return ($restore-ge0-and$ready-gt$restore)}
-function Previous-HumanGateHold{try{if(-not(Test-Path $Receipt)){return $false};$j=Get-Content $Receipt -Raw -Encoding UTF8|ConvertFrom-Json;if(-not[bool]$j.humanGate){return $false};$t=[datetime]$j.completedAt;return (((Get-Date)-$t).TotalSeconds-lt$HumanGateHoldSeconds)}catch{return $false}}
-function Test-Internet443{$c=New-Object Net.Sockets.TcpClient;try{$a=$c.BeginConnect('mcp.desktopcommander.app',443,$null,$null);if(-not$a.AsyncWaitHandle.WaitOne(3500)){return $false};$c.EndConnect($a);return $true}catch{return $false}finally{try{$c.Close()}catch{}}}
-function Stop-Exact([array]$p){$ids=@();foreach($x in @($p)){try{$procId=[int]$x.ProcessId;if($procId-gt0){& taskkill.exe /PID $procId /T /F 2>$null|Out-Null;if($LASTEXITCODE-eq0){$ids+=$procId}}}catch{}};return @($ids)}
-function Warm-Cache{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$o=@(& npm.cmd exec --yes --package=$Package -- node -e "console.log('DC_CACHE_READY')" 2>&1);$rc=$LASTEXITCODE;[pscustomobject]@{ok=($rc-eq0);exitCode=$rc;output=($o-join"`n")}}catch{[pscustomobject]@{ok=$false;exitCode=1;output=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
-function Reset-IsolatedNpx([array]$all){$stopped=Stop-Exact @(Get-IsolatedRemote $all);$npx=Join-Path $DcCache '_npx';$removed=$true;if(Test-Path $npx){try{Remove-Item -LiteralPath $npx -Recurse -Force -ErrorAction Stop}catch{$removed=$false}};[pscustomobject]@{stopped=$stopped;removed=$removed}}
-function Start-Remote{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$p=Start-Process -FilePath 'npx.cmd' -ArgumentList @('--yes',$Package,'remote','--persist-session') -WindowStyle Hidden -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru;Start-Sleep -Seconds 5;[pscustomobject]@{ok=$true;launcherPid=[int]$p.Id}}catch{[pscustomobject]@{ok=$false;launcherPid=0;error=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
-function Cooldown-Active{try{if(-not(Test-Path $Receipt)){return $false};$j=Get-Content $Receipt -Raw -Encoding UTF8|ConvertFrom-Json;if(-not$j.restartAttempted){return $false};$t=[datetime]$j.completedAt;return (((Get-Date)-$t).TotalSeconds-lt$CooldownSeconds)}catch{return $false}}
-
-$started=(Get-Date).ToString('o')
-$all=Get-AllProc;$remote=@(Get-RemoteProc $all);$isolated=@(Get-IsolatedRemote $all);$legacy=@(Get-LegacyRemote $all);$chains=Get-RemoteChainRoots $all $remote
-$tcpBefore=Get-TcpCount $remote;$tail=((Read-Tail $OutLog)+"`n"+(Read-Tail $ErrLog));$logFailure=Has-NewerFailure $tail;$internet=Test-Internet443
-$humanGateBefore=Has-NewerHumanGate $tail;$restoredSession=Has-RestoredSession $tail;$previousGateHold=Previous-HumanGateHold
-$reason='HEALTHY_LOCAL_TRANSPORT'
-if($humanGateBefore-and$remote.Count-gt0){$reason='HUMAN_GATE_PENDING_SINGLETON'}elseif($remote.Count-eq0){$reason='REMOTE_PROCESS_ABSENT'}elseif([int]$chains.rootCount-gt1){$reason='REMOTE_MULTIPLE_PRODUCER_CHAINS'}elseif($tcpBefore-eq0){$reason='REMOTE_PROCESS_NO_ESTABLISHED_TCP'}elseif($logFailure){$reason='REMOTE_CHANNEL_ERROR_OR_WITHDRAWAL_AFTER_LAST_READY'}
-$restartNeeded=[bool]($ForceRestart-or$reason-ne'HEALTHY_LOCAL_TRANSPORT')
-if($humanGateBefore-and$remote.Count-gt0){$restartNeeded=$false}
-if($previousGateHold-and$remote.Count-gt0-and-not$restoredSession){$restartNeeded=$false;$reason='HUMAN_GATE_HOLD_EXISTING_PROCESS'}
-$cooldown=Cooldown-Active;$actions=@();$errors=@();$restartAttempted=$false;$humanGate=$humanGateBefore
-if($legacy.Count-gt0){$ids=Stop-Exact $legacy;$actions+=('STOP_LEGACY_GLOBAL_REMOTE:'+($ids-join','));Start-Sleep -Seconds 1}
-if($humanGateBefore-and$remote.Count-gt0){$actions+='HOLD_SINGLE_VERIFY_DEVICE_FLOW_NO_RESTART'}
-elseif($restartNeeded){
-  if(-not$internet){$actions+='HOLD_NO_INTERNET_443';$errors+='REMOTE_ENDPOINT_443_UNREACHABLE'}
-  elseif($cooldown-and-not$ForceRestart){$actions+='HOLD_RESTART_COOLDOWN'}
-  else{$restartAttempted=$true;$all=Get-AllProc;$exact=@(Get-RemoteProc $all);if($exact.Count-gt0){$ids=Stop-Exact $exact;$actions+=('STOP_EXACT_REMOTE:'+($ids-join','));Start-Sleep -Seconds 2};$warm=Warm-Cache;if(-not$warm.ok){$actions+='WARM_FAIL_RESET_ISOLATED_NPX_ONCE';$reset=Reset-IsolatedNpx (Get-AllProc);if(-not$reset.removed){$errors+='ISOLATED_NPX_REMOVE_FAILED'};$warm=Warm-Cache};if($warm.ok){$actions+='ISOLATED_CACHE_READY';$launch=Start-Remote;if($launch.ok){$actions+='REMOTE_HIDDEN_START'}else{$errors+=('REMOTE_START:'+([string]$launch.error))}}else{$errors+=('CACHE_WARM:'+([string]$warm.output))}}
-}
-Start-Sleep -Seconds 2
-$finalAll=Get-AllProc;$finalRemote=@(Get-RemoteProc $finalAll);$finalChains=Get-RemoteChainRoots $finalAll $finalRemote;$tcpAfter=Get-TcpCount $finalRemote;$finalTail=((Read-Tail $OutLog)+"`n"+(Read-Tail $ErrLog));$humanGate=Has-NewerHumanGate $finalTail;$restoredSession=Has-RestoredSession $finalTail;$finalFailure=Has-NewerFailure $finalTail
-$ok=[bool]($finalRemote.Count-gt0-and[int]$finalChains.rootCount-eq1-and$tcpAfter-gt0-and-not$humanGate-and-not$finalFailure)
-$status=if($humanGate){'WAIT_SINGLE_VERIFY_DEVICE_NO_RESTART'}elseif($ok){'LOCAL_TRANSPORT_RECOVERED_OR_HEALTHY'}elseif(-not$internet){'WAIT_NETWORK'}else{'RETRYABLE_TRANSPORT_FAILURE'}
-if($restoredSession-and$ok){$actions+='PERSISTED_SESSION_RESTORED_NO_VERIFY_REQUIRED'}
-$out=[ordered]@{ok=$ok;version=$Version;startedAt=$started;completedAt=(Get-Date).ToString('o');device=$env:COMPUTERNAME;triggerReason=$reason;diagnosticReason=$reason;forceRestart=[bool]$ForceRestart;restartNeeded=$restartNeeded;restartAttempted=$restartAttempted;restartCooldown=$cooldown;humanGateHoldSeconds=$HumanGateHoldSeconds;previousHumanGateHold=$previousGateHold;internet443=$internet;remoteProcessBefore=[int]$remote.Count;remoteChainRootCountBefore=[int]$chains.rootCount;remoteChainRootsBefore=@($chains.rootPids);remoteChainDetailsBefore=@($chains.details);isolatedBefore=[int]$isolated.Count;legacyBefore=[int]$legacy.Count;tcpEstablishedBefore=$tcpBefore;remoteProcessAfter=[int]$finalRemote.Count;remoteChainRootCountAfter=[int]$finalChains.rootCount;remoteChainRootsAfter=@($finalChains.rootPids);remoteChainDetailsAfter=@($finalChains.details);tcpEstablishedAfter=$tcpAfter;remotePids=@($finalRemote|ForEach-Object{[int]$_.ProcessId});logFailureAfterLastReady=$finalFailure;sessionRestored=$restoredSession;actions=$actions;errors=$errors;status=$status;humanGate=$humanGate;humanGatePolicy='ONE_VERIFY_FLOW_ONLY;WHILE_PENDING_KEEP_EXISTING_REMOTE_PROCESS_AND_NEVER_RESTART;DO_NOT_AUTO_APPROVE_SECURITY_GATE;AFTER_SESSION_RESTORED_SUPPRESS_NEW_VERIFY_FLOW';duplicatePolicy='COUNT_PRODUCER_CHAINS_NOT_NODE_CHILDREN;NPX_NODE_CMD_CHILD_NODE_IS_ONE_CANONICAL_CHAIN';package=$Package;isolatedCache=$DcCache;globalNpmCacheTouched=$false;broadNodeKill=$false;globalExecutionPolicyChanged=$false;newOAuthRequested=$false;cloudDataPlaneVerified=$false;cloudVerificationRequired='REMOTE_TOOL_PING+POWERSHELL+FILE_WRITE_READ_X2'}
-Save-Receipt $out
-$out|ConvertTo-Json -Depth 40 -Compress
-try{if($MutexHeld){$Mutex.ReleaseMutex()};$Mutex.Dispose()}catch{}
-if($ok){exit 0}elseif($humanGate){exit 5}else{exit 4}
+function RunGuard{try{if(-not(Test-Path $Guard)){return $null};$raw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Guard 2>&1|Out-String;try{return $raw|ConvertFrom-Json}catch{$lines=@($raw-split"`r?`n"|Where-Object{$_.Trim().StartsWith('{')});if($lines.Count){return $lines[-1]|ConvertFrom-Json}}}catch{};return $null}
+function AllProc{try{@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)}catch{@()}}
+function RemoteProc([array]$p){@($p|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and ([string]$_.CommandLine)-match'(?i)desktop-commander' -and ([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'})}
+function StopRoots([array]$ids){$out=@();foreach($id in @($ids|Select-Object -Unique)){try{$pid=[int]$id;if($pid-gt0){& taskkill.exe /PID $pid /T /F 2>$null|Out-Null;if($LASTEXITCODE-eq0){$out+=$pid}}}catch{}};@($out)}
+function WarmCache{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$o=@(& npm.cmd exec --yes --package=$Package -- node -e "console.log('DC_CACHE_READY')" 2>&1);[pscustomobject]@{ok=($LASTEXITCODE-eq0);output=$o-join"`n"}}catch{[pscustomobject]@{ok=$false;output=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
+function StartRemote{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$p=Start-Process npx.cmd -ArgumentList @('--yes',$Package,'remote','--persist-session') -WindowStyle Hidden -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru;[pscustomobject]@{ok=$true;pid=[int]$p.Id}}catch{[pscustomobject]@{ok=$false;pid=0;error=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
+$started=(Get-Date).ToString('o');$guardSha=RefreshGuard;$pre=RunGuard;$actions=@();$errors=@();$restart=$false
+if(-not$pre){$decision='HOLD_PREFLIGHT_UNAVAILABLE';$actions+='NO_RESTART_FAIL_CLOSED'}else{$decision=[string]$pre.decision}
+if($ForceRestart-and$pre-and-not[bool]$pre.humanGate-and[bool]$pre.internet443-and[bool]$pre.clockOk){$decision='ALLOW_RESTART_ONCE';$actions+='FORCE_RESTART_ACCEPTED_AFTER_PREFLIGHT'}
+if($decision-eq'ALLOW_RESTART_ONCE'){
+ $restart=$true;$stopped=StopRoots @($pre.remoteChainRoots);if($stopped.Count){$actions+=('STOP_EXACT_CHAIN_ROOTS:'+($stopped-join','));Start-Sleep -Seconds 2}
+ $warm=WarmCache;if($warm.ok){$actions+='ISOLATED_CACHE_READY';$launch=StartRemote;if($launch.ok){$actions+='REMOTE_HIDDEN_START_ONCE';Start-Sleep -Seconds 7}else{$errors+=('START='+$launch.error)}}else{$errors+=('CACHE='+$warm.output)}
+}else{$actions+=('PREFLIGHT_'+$decision+'_NO_RESTART')}
+$post=RunGuard;if(-not$post){$post=$pre}
+$ok=[bool]($post-and[string]$post.decision-eq'KEEP_SESSION'-and[int]$post.remoteChainRootCount-eq1-and[int]$post.tcpEstablished-gt0-and-not[bool]$post.humanGate)
+$human=[bool]($post-and$post.humanGate);$status=$(if($ok){'LOCAL_TRANSPORT_HEALTHY_PREFLIGHT_KEEP_SESSION'}elseif($human){'WAIT_SINGLE_VERIFY_DEVICE_NO_RESTART'}elseif($post){[string]$post.decision}else{'HOLD_PREFLIGHT_UNAVAILABLE'})
+$out=[ordered]@{ok=$ok;version=$Version;startedAt=$started;completedAt=(Get-Date).ToString('o');device=$env:COMPUTERNAME;preflightVersion=$(if($pre){[string]$pre.version}else{''});preflightGuardSha=$guardSha;preflightDecision=$(if($pre){[string]$pre.decision}else{'UNAVAILABLE'});postflightDecision=$(if($post){[string]$post.decision}else{'UNAVAILABLE'});triggerReason=$(if($pre){[string]$pre.reason}else{'PREFLIGHT_UNAVAILABLE'});restartNeeded=[bool]($decision-eq'ALLOW_RESTART_ONCE');restartAttempted=$restart;humanGate=$human;sessionRestored=$(if($post){[bool]$post.sessionRestored}else{$false});remoteProcessAfter=$(if($post){[int]$post.remoteProcessCount}else{0});remoteChainRootCountAfter=$(if($post){[int]$post.remoteChainRootCount}else{0});remoteChainRootsAfter=$(if($post){@($post.remoteChainRoots)}else{@()});tcpEstablishedAfter=$(if($post){[int]$post.tcpEstablished}else{0});internet443=$(if($post){[bool]$post.internet443}else{$false});clockOk=$(if($post){[bool]$post.clockOk}else{$false});clockSkewSec=$(if($post){$post.clockSkewSec}else{$null});actions=$actions;errors=$errors;status=$status;package=$Package;isolatedCache=$DcCache;humanGatePolicy='PREVENT_BEFORE_VERIFY;ONE_VERIFY_FLOW_ONLY;NEVER_AUTO_CLICK_SECURITY_APPROVAL;KEEP_EXISTING_SESSION_AND_CHAIN';duplicatePolicy='ONE_PRODUCER_CHAIN;NO_RAW_NODE_COUNT_RESTART';globalNpmCacheTouched=$false;broadNodeKill=$false;globalExecutionPolicyChanged=$false;newOAuthRequested=$false;cloudVerificationRequired='REMOTE_TOOL_PING+POWERSHELL+FILE_WRITE_READ_X2'}
+Save $out;$out|ConvertTo-Json -Depth 40 -Compress
+try{$Mutex.ReleaseMutex();$Mutex.Dispose()}catch{}
+if($ok){exit 0}elseif($human){exit 5}else{exit 4}
