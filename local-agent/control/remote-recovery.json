@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "requestId": "RDC_DATA_PLANE_FALSE_HEALTHY_20260910_0650Z",
+  "requestId": "RDC_OFFLINE_RECOVERY_20260910_1640KST",
   "device": "BOOK-1HE2THGKRA",
   "action": "FORCE_REMOTE_RESTART_ONCE",
-  "reason": "CONTROL_PLANE_ONLINE_PING_OK_BUT_EXECUTION_DATA_PLANE_INTERMITTENT_NOT_CONNECTED; START_PROCESS_READ_FILE_FAILURES_REPRODUCED",
-  "createdAt": "2026-09-10T06:50:00Z",
-  "expiresAt": "2026-09-10T07:20:00Z",
+  "reason": "DEVICE_OFFLINE_AUTH_TOKEN_VALID_AFTER_DUPLICATE_REMOTE_PRODUCER_AND_VERIFY_DEVICE_LOOP",
+  "createdAt": "2026-09-10T07:40:00Z",
+  "expiresAt": "2026-09-10T08:10:00Z",
   "maxExecutions": 1,
   "requiresPreflightNoHumanGate": true,
   "status": "PENDING",
   "scope": "EXACT_REMOTE_PRODUCER_CHAIN_ONLY",
-  "notes": "Out-of-band recovery for false-healthy Remote MCP state. Local supervisor may invoke DesktopCommanderKeepAlive.ps1 -ForceRestart only after preflight confirms endpoint 443 reachable, clock sane, no Verify Device/human gate, and exact single producer chain. No broad Node kill, no global npm cache clean, no auth automation. After restart require ping + start_process + file read/write/readback x2 before VERIFIED."
+  "notes": "Out-of-band recovery only. Do not auto-click Verify Device. Do not broad-kill node/chrome/pwsh. Restart exact canonical Remote producer chain once after preflight. Then require online+ping+start_process+file write/read x2 before VERIFIED."
 }
