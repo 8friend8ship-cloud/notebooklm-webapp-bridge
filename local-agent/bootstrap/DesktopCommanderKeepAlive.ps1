@@ -1,7 +1,7 @@
 param([switch]$ForceRestart)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_KEEPALIVE_V8_INSTALL_GUARD_20260910'
+$Version='REMOTE_DC_KEEPALIVE_V9_THROW_TOKEN_FIX_20260911'
 $Package='@wonderwhy-er/desktop-commander@0.2.48'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -18,7 +18,7 @@ $held=$false;try{$held=$Mutex.WaitOne(30000,$false)}catch [Threading.AbandonedMu
 function GitBlob([byte[]]$b){$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{(($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
 function FindCentral{$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){if(-not$d.Root){continue};foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path $c -PathType Container){return $c}}};''}
 function Save($o){try{$j=$o|ConvertTo-Json -Depth 40;$j|Set-Content $Receipt -Encoding UTF8;$c=FindCentral;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content (Join-Path $d 'REMOTE_DC_KEEPALIVE_LAST.json') -Encoding UTF8}}catch{}}
-function RefreshGuard{try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/bootstrap/RemoteVerifyPreventionGuard.ps1?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod $u -Headers @{'User-Agent'='HomeDesign-Remote-Preflight';'Accept'='application/vnd.github+json'} -TimeoutSec 15;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$sha=(GitBlob $b).ToLowerInvariant();if($sha-ne([string]$x.sha).ToLowerInvariant()){throw'SHA_MISMATCH'};$tmp=$Guard+'.download';[IO.File]::WriteAllBytes($tmp,$b);Move-Item $tmp $Guard -Force;return $sha}catch{return ''}}
+function RefreshGuard{try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/bootstrap/RemoteVerifyPreventionGuard.ps1?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod $u -Headers @{'User-Agent'='HomeDesign-Remote-Preflight';'Accept'='application/vnd.github+json'} -TimeoutSec 15;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$sha=(GitBlob $b).ToLowerInvariant();if($sha-ne([string]$x.sha).ToLowerInvariant()){throw 'SHA_MISMATCH'};$tmp=$Guard+'.download';[IO.File]::WriteAllBytes($tmp,$b);Move-Item $tmp $Guard -Force;return $sha}catch{return ''}}
 function RunGuard{try{if(-not(Test-Path $Guard)){return $null};$raw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Guard 2>&1|Out-String;try{return $raw|ConvertFrom-Json}catch{$lines=@($raw-split"`r?`n"|Where-Object{$_.Trim().StartsWith('{')});if($lines.Count){return $lines[-1]|ConvertFrom-Json}}}catch{};return $null}
 function AllProc{try{@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)}catch{@()}}
 function RemoteProc([array]$p){@($p|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and ([string]$_.CommandLine)-match'(?i)desktop-commander' -and ([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'})}

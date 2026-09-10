@@ -62,7 +62,7 @@ try{
     & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $AutoResumeInstaller
     $autoResumeInstallExit=$LASTEXITCODE
     if($autoResumeInstallExit-ne0){$errors+=('AUTORESUME_INSTALL_EXIT_'+$autoResumeInstallExit)}
-  }else{throw'AUTORESUME_INSTALLER_MISSING'}
+  }else{throw 'AUTORESUME_INSTALLER_MISSING'}
 }catch{$errors+=('AUTORESUME_INSTALL_RUN:'+ $_.Exception.Message)}
 
 $autoResumeReceiptFresh=FreshReceipt $AutoResumeReceipt $startedAt

@@ -25,7 +25,7 @@ try{$runnerSha=InstallVerified 'local-agent/bootstrap/HomeDesignAutoResume.ps1' 
 try{$watchdogSha=InstallVerified 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$errors+=('WATCHDOG_INSTALL:'+ $_.Exception.Message)}
 
 $runKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';$runName='HomeDesignAutomationAutoResume';$runCommand='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"'
-try{New-Item -Path $runKey -Force|Out-Null;Set-ItemProperty -Path $runKey -Name $runName -Value $runCommand -Type String;$runVerify=(Get-ItemProperty -Path $runKey -Name $runName -ErrorAction Stop).$runName;if([string]$runVerify-ne$runCommand){throw'HKCU_RUN_FALLBACK_VERIFY_FAILED'};$runKeySet=$true}catch{$errors+=('HKCU_RUN:'+ $_.Exception.Message)}
+try{New-Item -Path $runKey -Force|Out-Null;Set-ItemProperty -Path $runKey -Name $runName -Value $runCommand -Type String;$runVerify=(Get-ItemProperty -Path $runKey -Name $runName -ErrorAction Stop).$runName;if([string]$runVerify-ne$runCommand){throw 'HKCU_RUN_FALLBACK_VERIFY_FAILED'};$runKeySet=$true}catch{$errors+=('HKCU_RUN:'+ $_.Exception.Message)}
 
 $taskName='HomeDesignAutomation-AutoResume'
 $userSid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
