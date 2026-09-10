@@ -1,7 +1,7 @@
 param([switch]$ForceRestart)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_KEEPALIVE_V5_SINGLETON_DEDUP_20260910'
+$Version='REMOTE_DC_KEEPALIVE_V6_AUTH_GATE_SINGLETON_20260910'
 $Package='@wonderwhy-er/desktop-commander@0.2.48'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -11,8 +11,9 @@ $OutLog=Join-Path $DcRoot 'remote.stdout.log'
 $ErrLog=Join-Path $DcRoot 'remote.stderr.log'
 $Receipt=Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json'
 $CooldownSeconds=120
+$HumanGateHoldSeconds=1800
 New-Item -ItemType Directory -Force -Path $Root,$DcRoot,$DcCache|Out-Null
-$Mutex=New-Object System.Threading.Mutex($false,'HomeDesignDesktopCommanderKeepAliveV5')
+$Mutex=New-Object System.Threading.Mutex($false,'HomeDesignDesktopCommanderKeepAliveV6')
 $MutexHeld=$false
 try{$MutexHeld=$Mutex.WaitOne(30000,$false)}catch [System.Threading.AbandonedMutexException]{$MutexHeld=$true}
 if(-not$MutexHeld){try{if(Test-Path $Receipt){Get-Content -LiteralPath $Receipt -Raw -Encoding UTF8|Write-Output}}catch{};try{$Mutex.Dispose()}catch{};exit 6}
@@ -22,119 +23,62 @@ function Find-Central{
   $m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='))
   foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){
     if(-not$d.Root){continue}
-    foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){
-      if(Test-Path -LiteralPath $c -PathType Container){return $c}
-    }
+    foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}
   }
   return ''
 }
-function Save-Receipt($o){
-  try{
-    $j=$o|ConvertTo-Json -Depth 40
-    $j|Set-Content -LiteralPath $Receipt -Encoding UTF8
-    $c=Find-Central
-    if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content -LiteralPath (Join-Path $d 'REMOTE_DC_KEEPALIVE_LAST.json') -Encoding UTF8}
-  }catch{}
-}
+function Save-Receipt($o){try{$j=$o|ConvertTo-Json -Depth 40;$j|Set-Content -LiteralPath $Receipt -Encoding UTF8;$c=Find-Central;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content -LiteralPath (Join-Path $d 'REMOTE_DC_KEEPALIVE_LAST.json') -Encoding UTF8}}catch{}}
 function Get-AllProc{try{@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)}catch{@()}}
 function Get-RemoteProc([array]$p){@($p|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and ([string]$_.CommandLine)-match'(?i)desktop-commander' -and ([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'})}
 function Get-IsolatedRemote([array]$p){$e=[regex]::Escape($DcCache);@(Get-RemoteProc $p|Where-Object{([string]$_.CommandLine)-match$e})}
 function Get-LegacyRemote([array]$p){@(Get-RemoteProc $p|Where-Object{([string]$_.CommandLine)-match'(?i)AppData\\Local\\npm-cache\\_npx'})}
-function Get-TcpCount([array]$p){
-  try{$ids=@($p|ForEach-Object{[int]$_.ProcessId});if($ids.Count-eq0){return 0};return [int](@(Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue|Where-Object{$ids-contains$_.OwningProcess}).Count)}catch{return 0}
-}
+function Get-TcpCount([array]$p){try{$ids=@($p|ForEach-Object{[int]$_.ProcessId});if($ids.Count-eq0){return 0};return [int](@(Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue|Where-Object{$ids-contains$_.OwningProcess}).Count)}catch{return 0}}
 function Read-Tail([string]$Path,[int]$Lines=160){try{if(Test-Path $Path){return ((Get-Content -LiteralPath $Path -Tail $Lines -ErrorAction Stop)-join"`n")}}catch{};return ''}
 function Latest-ReadyIndex([string]$Text){if(-not$Text){return -1};return [Math]::Max($Text.LastIndexOf('Device ready',[StringComparison]::OrdinalIgnoreCase),$Text.LastIndexOf('Channel subscribed',[StringComparison]::OrdinalIgnoreCase))}
-function Has-NewerFailure([string]$Text){
-  if(-not$Text){return $false}
-  $ready=Latest-ReadyIndex $Text
-  $err=-1
-  foreach($s in @('Channel closed','socket 1006','IncreaseConnectionPool','Channel subscription timed out','Device startup failed','Failed to set session','terminated','No valid session','Tool call channel subscription timed out','Presence track failed after retries','Transport capability set to withdrawn','Remote session expired','Cannot recreate channel - missing parameters','Failed to update transport capability')){$err=[Math]::Max($err,$Text.LastIndexOf($s,[StringComparison]::OrdinalIgnoreCase))}
-  return ($err-gt$ready)
+function Latest-GateIndex([string]$Text){if(-not$Text){return -1};$gate=-1;foreach($s in @('Starting device authorization flow','Please complete authentication','Requesting device code','Verify Device')){$gate=[Math]::Max($gate,$Text.LastIndexOf($s,[StringComparison]::OrdinalIgnoreCase))};return $gate}
+function Has-NewerFailure([string]$Text){if(-not$Text){return $false};$ready=Latest-ReadyIndex $Text;$err=-1;foreach($s in @('Channel closed','socket 1006','IncreaseConnectionPool','Channel subscription timed out','Device startup failed','Failed to set session','terminated','No valid session','Tool call channel subscription timed out','Presence track failed after retries','Transport capability set to withdrawn','Remote session expired','Cannot recreate channel - missing parameters','Failed to update transport capability')){$err=[Math]::Max($err,$Text.LastIndexOf($s,[StringComparison]::OrdinalIgnoreCase))};return ($err-gt$ready)}
+function Has-NewerHumanGate([string]$Text){return ((Latest-GateIndex $Text)-gt(Latest-ReadyIndex $Text))}
+function Has-RestoredSession([string]$Text){if(-not$Text){return $false};$ready=Latest-ReadyIndex $Text;$restore=$Text.LastIndexOf('Session restored',[StringComparison]::OrdinalIgnoreCase);return ($restore-ge0-and$ready-gt$restore)}
+function Previous-HumanGateHold{
+  try{if(-not(Test-Path $Receipt)){return $false};$j=Get-Content $Receipt -Raw -Encoding UTF8|ConvertFrom-Json;if(-not[bool]$j.humanGate){return $false};$t=[datetime]$j.completedAt;return (((Get-Date)-$t).TotalSeconds-lt$HumanGateHoldSeconds)}catch{return $false}
 }
-function Has-NewerHumanGate([string]$Text){
-  if(-not$Text){return $false}
-  $ready=Latest-ReadyIndex $Text;$gate=-1
-  foreach($s in @('Starting device authorization flow','Please complete authentication','Requesting device code')){$gate=[Math]::Max($gate,$Text.LastIndexOf($s,[StringComparison]::OrdinalIgnoreCase))}
-  return ($gate-gt$ready)
-}
-function Test-Internet443{
-  $c=New-Object Net.Sockets.TcpClient
-  try{$a=$c.BeginConnect('mcp.desktopcommander.app',443,$null,$null);if(-not$a.AsyncWaitHandle.WaitOne(3500)){return $false};$c.EndConnect($a);return $true}catch{return $false}finally{try{$c.Close()}catch{}}
-}
-function Stop-Exact([array]$p){$ids=@();foreach($x in @($p)){try{$id=[int]$x.ProcessId;if($id-gt0){& taskkill.exe /PID $id /T /F 2>$null|Out-Null;if($LASTEXITCODE-eq0){$ids+=$id}}}catch{}};return @($ids)}
-function Warm-Cache{
-  $old=$env:npm_config_cache
-  try{$env:npm_config_cache=$DcCache;$o=@(& npm.cmd exec --yes --package=$Package -- node -e "console.log('DC_CACHE_READY')" 2>&1);$rc=$LASTEXITCODE;[pscustomobject]@{ok=($rc-eq0);exitCode=$rc;output=($o-join"`n")}}
-  catch{[pscustomobject]@{ok=$false;exitCode=1;output=$_.Exception.Message}}
-  finally{$env:npm_config_cache=$old}
-}
-function Reset-IsolatedNpx([array]$all){
-  $stopped=Stop-Exact @(Get-IsolatedRemote $all)
-  $npx=Join-Path $DcCache '_npx';$removed=$true
-  if(Test-Path $npx){try{Remove-Item -LiteralPath $npx -Recurse -Force -ErrorAction Stop}catch{$removed=$false}}
-  [pscustomobject]@{stopped=$stopped;removed=$removed}
-}
-function Start-Remote{
-  $old=$env:npm_config_cache
-  try{
-    $env:npm_config_cache=$DcCache
-    $p=Start-Process -FilePath 'npx.cmd' -ArgumentList @('--yes',$Package,'remote','--persist-session') -WindowStyle Hidden -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru
-    Start-Sleep -Seconds 5
-    [pscustomobject]@{ok=$true;launcherPid=[int]$p.Id}
-  }catch{[pscustomobject]@{ok=$false;launcherPid=0;error=$_.Exception.Message}}
-  finally{$env:npm_config_cache=$old}
-}
-function Cooldown-Active{
-  try{if(-not(Test-Path $Receipt)){return $false};$j=Get-Content $Receipt -Raw -Encoding UTF8|ConvertFrom-Json;if(-not$j.restartAttempted){return $false};$t=[datetime]$j.completedAt;return (((Get-Date)-$t).TotalSeconds-lt$CooldownSeconds)}catch{return $false}
-}
+function Test-Internet443{$c=New-Object Net.Sockets.TcpClient;try{$a=$c.BeginConnect('mcp.desktopcommander.app',443,$null,$null);if(-not$a.AsyncWaitHandle.WaitOne(3500)){return $false};$c.EndConnect($a);return $true}catch{return $false}finally{try{$c.Close()}catch{}}}
+function Stop-Exact([array]$p){$ids=@();foreach($x in @($p)){try{$procId=[int]$x.ProcessId;if($procId-gt0){& taskkill.exe /PID $procId /T /F 2>$null|Out-Null;if($LASTEXITCODE-eq0){$ids+=$procId}}}catch{}};return @($ids)}
+function Warm-Cache{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$o=@(& npm.cmd exec --yes --package=$Package -- node -e "console.log('DC_CACHE_READY')" 2>&1);$rc=$LASTEXITCODE;[pscustomobject]@{ok=($rc-eq0);exitCode=$rc;output=($o-join"`n")}}catch{[pscustomobject]@{ok=$false;exitCode=1;output=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
+function Reset-IsolatedNpx([array]$all){$stopped=Stop-Exact @(Get-IsolatedRemote $all);$npx=Join-Path $DcCache '_npx';$removed=$true;if(Test-Path $npx){try{Remove-Item -LiteralPath $npx -Recurse -Force -ErrorAction Stop}catch{$removed=$false}};[pscustomobject]@{stopped=$stopped;removed=$removed}}
+function Start-Remote{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$p=Start-Process -FilePath 'npx.cmd' -ArgumentList @('--yes',$Package,'remote','--persist-session') -WindowStyle Hidden -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru;Start-Sleep -Seconds 5;[pscustomobject]@{ok=$true;launcherPid=[int]$p.Id}}catch{[pscustomobject]@{ok=$false;launcherPid=0;error=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
+function Cooldown-Active{try{if(-not(Test-Path $Receipt)){return $false};$j=Get-Content $Receipt -Raw -Encoding UTF8|ConvertFrom-Json;if(-not$j.restartAttempted){return $false};$t=[datetime]$j.completedAt;return (((Get-Date)-$t).TotalSeconds-lt$CooldownSeconds)}catch{return $false}}
 
 $started=(Get-Date).ToString('o')
 $all=Get-AllProc;$remote=@(Get-RemoteProc $all);$isolated=@(Get-IsolatedRemote $all);$legacy=@(Get-LegacyRemote $all)
-$tcpBefore=Get-TcpCount $remote
-$tail=((Read-Tail $OutLog)+"`n"+(Read-Tail $ErrLog))
-$logFailure=Has-NewerFailure $tail
-$internet=Test-Internet443
+$tcpBefore=Get-TcpCount $remote;$tail=((Read-Tail $OutLog)+"`n"+(Read-Tail $ErrLog));$logFailure=Has-NewerFailure $tail;$internet=Test-Internet443
+$humanGateBefore=Has-NewerHumanGate $tail;$restoredSession=Has-RestoredSession $tail;$previousGateHold=Previous-HumanGateHold
 $reason='HEALTHY_LOCAL_TRANSPORT'
-if($remote.Count-eq0){$reason='REMOTE_PROCESS_ABSENT'}elseif($isolated.Count-gt1){$reason='REMOTE_PROCESS_DUPLICATE_CHAINS'}elseif($tcpBefore-eq0){$reason='REMOTE_PROCESS_NO_ESTABLISHED_TCP'}elseif($logFailure){$reason='REMOTE_CHANNEL_ERROR_OR_WITHDRAWAL_AFTER_LAST_READY'}
+if($humanGateBefore-and$remote.Count-gt0){$reason='HUMAN_GATE_PENDING_SINGLETON'}elseif($remote.Count-eq0){$reason='REMOTE_PROCESS_ABSENT'}elseif($isolated.Count-gt1){$reason='REMOTE_PROCESS_DUPLICATE_CHAINS'}elseif($tcpBefore-eq0){$reason='REMOTE_PROCESS_NO_ESTABLISHED_TCP'}elseif($logFailure){$reason='REMOTE_CHANNEL_ERROR_OR_WITHDRAWAL_AFTER_LAST_READY'}
 $restartNeeded=[bool]($ForceRestart-or$reason-ne'HEALTHY_LOCAL_TRANSPORT')
-$cooldown=Cooldown-Active
-$actions=@();$errors=@();$restartAttempted=$false;$humanGate=$false
+if($humanGateBefore-and$remote.Count-gt0){$restartNeeded=$false}
+if($previousGateHold-and$remote.Count-gt0-and-not$restoredSession){$restartNeeded=$false;$reason='HUMAN_GATE_HOLD_EXISTING_PROCESS'}
+$cooldown=Cooldown-Active;$actions=@();$errors=@();$restartAttempted=$false;$humanGate=$humanGateBefore
 
 if($legacy.Count-gt0){$ids=Stop-Exact $legacy;$actions+=('STOP_LEGACY_GLOBAL_REMOTE:'+($ids-join','));Start-Sleep -Seconds 1}
-if($restartNeeded){
+if($humanGateBefore-and$remote.Count-gt0){$actions+='HOLD_SINGLE_VERIFY_DEVICE_FLOW_NO_RESTART'}
+elseif($restartNeeded){
   if(-not$internet){$actions+='HOLD_NO_INTERNET_443';$errors+='REMOTE_ENDPOINT_443_UNREACHABLE'}
   elseif($cooldown-and-not$ForceRestart){$actions+='HOLD_RESTART_COOLDOWN'}
   else{
-    $restartAttempted=$true
-    $all=Get-AllProc;$exact=@(Get-RemoteProc $all)
+    $restartAttempted=$true;$all=Get-AllProc;$exact=@(Get-RemoteProc $all)
     if($exact.Count-gt0){$ids=Stop-Exact $exact;$actions+=('STOP_EXACT_REMOTE:'+($ids-join','));Start-Sleep -Seconds 2}
     $warm=Warm-Cache
-    if(-not$warm.ok){
-      $actions+='WARM_FAIL_RESET_ISOLATED_NPX_ONCE'
-      $reset=Reset-IsolatedNpx (Get-AllProc)
-      if(-not$reset.removed){$errors+='ISOLATED_NPX_REMOVE_FAILED'}
-      $warm=Warm-Cache
-    }
-    if($warm.ok){$actions+='ISOLATED_CACHE_READY';$launch=Start-Remote;if($launch.ok){$actions+='REMOTE_HIDDEN_START'}else{$errors+=('REMOTE_START:'+([string]$launch.error))}}
-    else{$errors+=('CACHE_WARM:'+([string]$warm.output))}
+    if(-not$warm.ok){$actions+='WARM_FAIL_RESET_ISOLATED_NPX_ONCE';$reset=Reset-IsolatedNpx (Get-AllProc);if(-not$reset.removed){$errors+='ISOLATED_NPX_REMOVE_FAILED'};$warm=Warm-Cache}
+    if($warm.ok){$actions+='ISOLATED_CACHE_READY';$launch=Start-Remote;if($launch.ok){$actions+='REMOTE_HIDDEN_START'}else{$errors+=('REMOTE_START:'+([string]$launch.error))}}else{$errors+=('CACHE_WARM:'+([string]$warm.output))}
   }
 }
 Start-Sleep -Seconds 2
-$finalAll=Get-AllProc;$finalRemote=@(Get-RemoteProc $finalAll);$tcpAfter=Get-TcpCount $finalRemote
-$finalTail=((Read-Tail $OutLog)+"`n"+(Read-Tail $ErrLog))
-$humanGate=Has-NewerHumanGate $finalTail
-$ok=[bool]($finalRemote.Count-gt0-and$tcpAfter-gt0-and-not$humanGate-and-not(Has-NewerFailure $finalTail))
-$status=if($humanGate){'HUMAN_GATE_REMOTE_DEVICE_AUTH'}elseif($ok){'LOCAL_TRANSPORT_RECOVERED_OR_HEALTHY'}elseif(-not$internet){'WAIT_NETWORK'}else{'RETRYABLE_TRANSPORT_FAILURE'}
-$out=[ordered]@{
-  ok=$ok;version=$Version;startedAt=$started;completedAt=(Get-Date).ToString('o');device=$env:COMPUTERNAME
-  triggerReason=$Reason;diagnosticReason=$reason;forceRestart=[bool]$ForceRestart;restartNeeded=$restartNeeded;restartAttempted=$restartAttempted;restartCooldown=$cooldown
-  internet443=$internet;remoteProcessBefore=[int]$remote.Count;isolatedBefore=[int]$isolated.Count;legacyBefore=[int]$legacy.Count;tcpEstablishedBefore=$tcpBefore
-  remoteProcessAfter=[int]$finalRemote.Count;tcpEstablishedAfter=$tcpAfter;remotePids=@($finalRemote|ForEach-Object{[int]$_.ProcessId})
-  logFailureAfterLastReady=$logFailure;actions=$actions;errors=$errors;status=$status;humanGate=$humanGate
-  package=$Package;isolatedCache=$DcCache;globalNpmCacheTouched=$false;broadNodeKill=$false;globalExecutionPolicyChanged=$false;newOAuthRequested=$false
-  cloudDataPlaneVerified=$false;cloudVerificationRequired='REMOTE_TOOL_PING+POWERSHELL+FILE_WRITE_READ_X2'
-}
+$finalAll=Get-AllProc;$finalRemote=@(Get-RemoteProc $finalAll);$tcpAfter=Get-TcpCount $finalRemote;$finalTail=((Read-Tail $OutLog)+"`n"+(Read-Tail $ErrLog));$humanGate=Has-NewerHumanGate $finalTail;$restoredSession=Has-RestoredSession $finalTail;$finalFailure=Has-NewerFailure $finalTail
+$ok=[bool]($finalRemote.Count-gt0-and$tcpAfter-gt0-and-not$humanGate-and-not$finalFailure)
+$status=if($humanGate){'WAIT_SINGLE_VERIFY_DEVICE_NO_RESTART'}elseif($ok){'LOCAL_TRANSPORT_RECOVERED_OR_HEALTHY'}elseif(-not$internet){'WAIT_NETWORK'}else{'RETRYABLE_TRANSPORT_FAILURE'}
+if($restoredSession-and$ok){$actions+='PERSISTED_SESSION_RESTORED_NO_VERIFY_REQUIRED'}
+$out=[ordered]@{ok=$ok;version=$Version;startedAt=$started;completedAt=(Get-Date).ToString('o');device=$env:COMPUTERNAME;triggerReason=$reason;diagnosticReason=$reason;forceRestart=[bool]$ForceRestart;restartNeeded=$restartNeeded;restartAttempted=$restartAttempted;restartCooldown=$cooldown;humanGateHoldSeconds=$HumanGateHoldSeconds;previousHumanGateHold=$previousGateHold;internet443=$internet;remoteProcessBefore=[int]$remote.Count;isolatedBefore=[int]$isolated.Count;legacyBefore=[int]$legacy.Count;tcpEstablishedBefore=$tcpBefore;remoteProcessAfter=[int]$finalRemote.Count;tcpEstablishedAfter=$tcpAfter;remotePids=@($finalRemote|ForEach-Object{[int]$_.ProcessId});logFailureAfterLastReady=$finalFailure;sessionRestored=$restoredSession;actions=$actions;errors=$errors;status=$status;humanGate=$humanGate;humanGatePolicy='ONE_VERIFY_FLOW_ONLY;WHILE_PENDING_KEEP_EXISTING_REMOTE_PROCESS_AND_NEVER_RESTART;DO_NOT_AUTO_APPROVE_SECURITY_GATE;AFTER_SESSION_RESTORED_SUPPRESS_NEW_VERIFY_FLOW';package=$Package;isolatedCache=$DcCache;globalNpmCacheTouched=$false;broadNodeKill=$false;globalExecutionPolicyChanged=$false;newOAuthRequested=$false;cloudDataPlaneVerified=$false;cloudVerificationRequired='REMOTE_TOOL_PING+POWERSHELL+FILE_WRITE_READ_X2'}
 Save-Receipt $out
 $out|ConvertTo-Json -Depth 40 -Compress
 try{if($MutexHeld){$Mutex.ReleaseMutex()};$Mutex.Dispose()}catch{}
