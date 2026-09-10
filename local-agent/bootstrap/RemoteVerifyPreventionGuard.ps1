@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_VERIFY_PREVENTION_GUARD_V5_THROW_TOKEN_FIX_20260911'
+$Version='REMOTE_VERIFY_PREVENTION_GUARD_V6_FALLBACK_SHA_SYNC_20260911'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $DcRoot=Join-Path $Base 'DesktopCommander'
@@ -10,7 +10,7 @@ $KeepReceipt=Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json'
 $OutLog=Join-Path $DcRoot 'remote.stdout.log'
 $ErrLog=Join-Path $DcRoot 'remote.stderr.log'
 $FallbackScript=Join-Path $Root 'RemoteFallbackOrchestrator.ps1'
-$FallbackBlob='ad6198604457c5bccd483b9461f86b6d6af7db03'
+$FallbackBlob='60275bd01078de6f293a18452d7dceda6b4cfc03'
 $RestartBackoffSec=1800
 $ChannelGraceSec=180
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
