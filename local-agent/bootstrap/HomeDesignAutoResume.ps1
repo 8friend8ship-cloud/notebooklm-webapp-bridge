@@ -2,11 +2,13 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
+$Version='HOME_DESIGN_AUTO_RESUME_V7_OPENAI_WEB_SYNC_20260910'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Log=Join-Path $Root 'auto-resume.log'
 $ResumeLocal=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1'
 $BootstrapLocal=Join-Path $Root 'AgentBootstrap.ps1'
 $WatchdogLocal=Join-Path $Root 'HomeDesignLocalWatchdog.ps1'
+$OpenAISyncLocal=Join-Path $Root 'OpenAIWebSyncGuard.ps1'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 function Log([string]$m){Add-Content -LiteralPath $Log -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $m" -Encoding UTF8}
 function HostHealthy{try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3;return [bool]$h.ok}catch{return $false}}
@@ -31,10 +33,14 @@ function RefreshFile([string]$RepoPath,[string]$Dest,[string]$Label){
 }
 function BootstrapLoopPresent{try{return @((Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name -match 'powershell|pwsh' -and $_.CommandLine -and $_.CommandLine -like '*AgentBootstrap.ps1*' -and $_.CommandLine -match '(?i)(?:^|\s)-Loop(?:\s|$)'})).Count -gt 0}catch{return $false}}
 
-Log 'AUTO_RESUME_START_V6_WATCHDOG_SELF_REFRESH'
+Log ('AUTO_RESUME_START '+$Version)
 try{[void](RefreshFile 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $WatchdogLocal 'WATCHDOG')}catch{Log ('WATCHDOG_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $WatchdogLocal)){exit 2}}
 try{[void](RefreshFile 'local-agent/bootstrap/AgentBootstrap.ps1' $BootstrapLocal 'BOOTSTRAP')}catch{Log ('BOOTSTRAP_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $BootstrapLocal)){exit 2}}
 try{[void](RefreshFile 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' $ResumeLocal 'RESUME_SCRIPT')}catch{Log ('RESUME_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $ResumeLocal)){exit 2}}
+try{[void](RefreshFile 'local-agent/bootstrap/OpenAIWebSyncGuard.ps1' $OpenAISyncLocal 'OPENAI_WEB_SYNC')}catch{Log ('OPENAI_WEB_SYNC_REFRESH_FAILED '+$_.Exception.Message)}
+if(Test-Path -LiteralPath $OpenAISyncLocal){
+  try{$syncRaw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $OpenAISyncLocal -Apply 2>&1|Out-String;$syncRc=$LASTEXITCODE;Log ('OPENAI_WEB_SYNC_EXIT='+$syncRc+' '+($syncRaw.Trim()))}catch{Log ('OPENAI_WEB_SYNC_EXCEPTION '+$_.Exception.Message)}
+}
 if(-not(BootstrapLoopPresent)){
   try{Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$BootstrapLocal`"",'-Loop') -WindowStyle Hidden|Out-Null;Start-Sleep -Seconds 2;Log ('BOOTSTRAP_LOOP_DIRECT_START='+(BootstrapLoopPresent))}catch{Log ('BOOTSTRAP_LOOP_START_FAILED '+$_.Exception.Message)}
 }else{Log 'BOOTSTRAP_LOOP_ALREADY_PRESENT'}
