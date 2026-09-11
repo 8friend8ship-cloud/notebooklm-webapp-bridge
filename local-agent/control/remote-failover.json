@@ -1,17 +1,19 @@
 {
   "schemaVersion": 1,
   "device": "BOOK-1HE2THGKRA",
-  "remoteDataPlaneState": "DEGRADED_INTERMITTENT",
+  "remoteDataPlaneState": "OFFLINE_RECOVERY_0250_PENDING",
   "requestedMode": "AUTO_FAILOVER",
   "stageOrder": ["REMOTE_DC", "TAILSCALE", "RUSTDESK"],
-  "stage1RetryBeforeFailover": 2,
-  "stage1RestartBackoffSec": 1800,
+  "stage1RetryBeforeFailover": 1,
+  "stage1RestartBackoffSec": 0,
   "stage2RequiresAuthenticatedTailnet": true,
   "stage3RequiresHumanApprovalForSession": true,
   "allowAutomaticCredentialEntry": false,
   "allowAutomaticSecurityApproval": false,
   "allowBroadProcessKill": false,
   "allowAutomaticReboot": false,
-  "updatedAt": "2026-09-10T07:05:00Z",
-  "notes": "Central Agent updates remoteDataPlaneState only from real command/file round-trip verification. Local watchdog never treats ping alone as healthy. Stage2/3 are fallbacks only."
+  "targetRemotePackage": "@wonderwhy-er/desktop-commander@0.2.50",
+  "requiredReadback": "list_devices+ping+real command+file RW x2",
+  "updatedAt": "2026-09-11T08:08:00Z",
+  "notes": "RDC server state is offline after false-healthy 0.2.48 incident. Prefer one-shot 0.2.50 recovery. If primary remains unavailable, route to authenticated Tailscale; RustDesk remains human-approved break-glass only. Ping alone never passes health."
 }
