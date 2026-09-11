@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='POWER_CONTINUITY_GUARD_V8_FAILSAFE_NO_TRUE_SLEEP_20260910'
+$Version='POWER_CONTINUITY_GUARD_V9_SCREEN_OFF_CANONICAL_20260912'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $Receipt=Join-Path $Root 'POWER_CONTINUITY_GUARD_LAST.json'
@@ -47,11 +47,10 @@ function Remote-Present{
   try{return (@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and [string]$_.CommandLine-match'(?i)desktop-commander' -and [string]$_.CommandLine-match'(?i)(?:^|\s)remote(?:\s|$)'}).Count-gt0)}catch{return $false}
 }
 
-$mutex=New-Object Threading.Mutex($false,'HomeDesignPowerContinuityGuardV8')
+$mutex=New-Object Threading.Mutex($false,'HomeDesignPowerContinuityGuardV9')
 if(-not$mutex.WaitOne(0,$false)){exit 0}
 $ES_CONTINUOUS=[Convert]::ToUInt32('80000000',16)
 $ES_SYSTEM_REQUIRED=[uint32]1
-$ES_DISPLAY_REQUIRED=[uint32]2
 $started=(Get-Date).ToString('o')
 $remoteLeaseUntil=[datetime]::MinValue
 try{
@@ -60,21 +59,20 @@ try{
     if($remote){$remoteLeaseUntil=$now.AddSeconds($RemoteGraceSeconds)}
     $remoteLease=[bool]($remote-or$now-lt$remoteLeaseUntil)
     [uint32]$flags=$ES_CONTINUOUS-bor$ES_SYSTEM_REQUIRED
-    if($remoteLease){$flags=$flags-bor$ES_DISPLAY_REQUIRED}
     [uint32]$callResult=0;$lastError=0
     try{$callResult=[HDPowerGuard]::SetThreadExecutionState($flags);if($callResult-eq0){$lastError=[Runtime.InteropServices.Marshal]::GetLastWin32Error()}}catch{$lastError=-1}
-    $systemHeld=($callResult-ne0);$displayHeld=[bool]($remoteLease-and$systemHeld)
+    $systemHeld=($callResult-ne0);$displayHeld=$false
     $remoteRemain=$(if($remoteLeaseUntil-gt$now){[Math]::Max(0,[int][Math]::Ceiling(($remoteLeaseUntil-$now).TotalSeconds))}else{0})
     $o=[ordered]@{
-      ok=[bool]($systemHeld-and((-not$remoteLease)-or$displayHeld));version=$Version;pid=$PID;startedAt=$started;heartbeatAt=$now.ToString('o')
+      ok=[bool]$systemHeld;version=$Version;pid=$PID;startedAt=$started;heartbeatAt=$now.ToString('o')
       acPower=[bool]$power.ac;batteryPercent=$power.batteryPercent;remoteProcessPresent=$remote;remoteLeaseActive=$remoteLease;remoteGraceSeconds=$RemoteGraceSeconds;remoteLeaseRemainingSeconds=$remoteRemain
-      systemRequiredHeld=$systemHeld;displayRequiredHeld=$displayHeld;screenOffAllowed=[bool](-not$displayHeld);trueSleepAllowed=$false
+      systemRequiredHeld=$systemHeld;displayRequiredHeld=$false;screenOffAllowed=$true;trueSleepAllowed=$false
       executionStateCallResult=[uint64]$callResult;lastWin32Error=$lastError
-      mode=$(if($remoteLease){'FAILSAFE_NO_TRUE_SLEEP+REMOTE_DISPLAY_AWAKE'}else{'FAILSAFE_NO_TRUE_SLEEP+DISPLAY_MAY_OFF'})
-      policy='CENTRAL_GUARD_RUNNING=>TRUE_SLEEP_DISABLED_ALWAYS;REMOTE=>DISPLAY_OFF_DISABLED;NON_REMOTE=>DISPLAY_MAY_OFF'
+      mode='FAILSAFE_NO_TRUE_SLEEP+DISPLAY_MAY_OFF_ALWAYS'
+      policy='CENTRAL_GUARD_RUNNING=>TRUE_SLEEP_DISABLED_ALWAYS;DISPLAY_MAY_OFF_ALWAYS;REMOTE_LEASE_DIAGNOSTIC_ONLY'
       powercfgChanged=$false;sleepTimeoutChanged=$false;monitorTimeoutChanged=$false;hibernateChanged=$false;lidPolicyChanged=$false;adminRequired=$false
       batteryDrainRisk=[bool](-not[bool]$power.ac);newTrigger=$false;newOAuth=$false
-      canonicalInstruction='REPEATED_REMOTE_OFFLINE_FAILSAFE: NEVER_TRUE_SLEEP_WHILE_CENTRAL_GUARD_RUNNING'
+      canonicalInstruction='NIGHT_DISPLAY_ONLY_V1: KEEP_SYSTEM_NETWORK_AUTOMATION_RUNNING;ALLOW_DISPLAY_OFF_ALWAYS'
     }
     Save $o
     Start-Sleep -Seconds $HeartbeatSeconds
