@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_VERIFY_PREVENTION_GUARD_V6_FALLBACK_SHA_SYNC_20260911'
+$Version='REMOTE_VERIFY_PREVENTION_GUARD_V7_RAW_FALLBACK_20260911'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $DcRoot=Join-Path $Base 'DesktopCommander'
@@ -10,13 +10,13 @@ $KeepReceipt=Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json'
 $OutLog=Join-Path $DcRoot 'remote.stdout.log'
 $ErrLog=Join-Path $DcRoot 'remote.stderr.log'
 $FallbackScript=Join-Path $Root 'RemoteFallbackOrchestrator.ps1'
-$FallbackBlob='60275bd01078de6f293a18452d7dceda6b4cfc03'
+$FallbackBlob='ddc8d27e60404508f2d7b0abb4503ea0bb061593'
 $RestartBackoffSec=1800
 $ChannelGraceSec=180
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 function Save($o){try{$o|ConvertTo-Json -Depth 40|Set-Content -LiteralPath $Receipt -Encoding UTF8}catch{}}
 function GitBlob([byte[]]$b){$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{(($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
-function RefreshFallback{try{$u='https://api.github.com/repos/8friend8ship-cloud/notebooklm-webapp-bridge/contents/local-agent/bootstrap/RemoteFallbackOrchestrator.ps1?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod $u -Headers @{'User-Agent'='HomeDesign-Remote-Failover-V2';'Accept'='application/vnd.github+json'} -TimeoutSec 10;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$sha=(GitBlob $b).ToLowerInvariant();if($sha-ne$FallbackBlob){throw 'FALLBACK_SHA_MISMATCH'};$tmp=$FallbackScript+'.download';[IO.File]::WriteAllBytes($tmp,$b);Move-Item $tmp $FallbackScript -Force;return $true}catch{return $false}}
+function RefreshFallback{try{$u='https://raw.githubusercontent.com/8friend8ship-cloud/notebooklm-webapp-bridge/main/local-agent/bootstrap/RemoteFallbackOrchestrator.ps1?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Remote-Failover-V7';$b=$wc.DownloadData($u)}finally{$wc.Dispose()};$sha=(GitBlob $b).ToLowerInvariant();if($sha-ne$FallbackBlob){throw 'FALLBACK_SHA_MISMATCH'};$tmp=$FallbackScript+'.download';[IO.File]::WriteAllBytes($tmp,$b);Move-Item $tmp $FallbackScript -Force;return $true}catch{return $false}}
 function RunFallback{try{if(-not(RefreshFallback)){return $null};$raw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $FallbackScript 2>&1|Out-String;try{return $raw|ConvertFrom-Json}catch{$lines=@($raw-split"`r?`n"|Where-Object{$_.Trim().StartsWith('{')});if($lines.Count){return $lines[-1]|ConvertFrom-Json}}}catch{};return $null}
 function AllProc{try{@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)}catch{@()}}
 function RemoteProc([array]$p){@($p|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and ([string]$_.CommandLine)-match'(?i)desktop-commander' -and ([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'})}

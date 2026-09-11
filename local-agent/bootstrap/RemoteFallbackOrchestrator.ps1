@@ -1,14 +1,14 @@
 param([switch]$PrepareInstallers)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_FALLBACK_ORCHESTRATOR_V3_FAIL_CLOSED_20260910'
+$Version='REMOTE_FALLBACK_ORCHESTRATOR_V4_RAW_CONTROL_20260911'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Stage=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\RemoteFallback'
 $Receipt=Join-Path $Root 'REMOTE_FALLBACK_LAST.json'
 New-Item -ItemType Directory -Force -Path $Root,$Stage|Out-Null
 function Save($o){try{$j=$o|ConvertTo-Json -Depth 20;$j|Set-Content $Receipt -Encoding UTF8}catch{}}
-function Get-Control{try{$u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/control/remote-failover.json?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$x=Invoke-RestMethod $u -Headers @{'User-Agent'='HomeDesign-Remote-Failover';'Accept'='application/vnd.github+json'} -TimeoutSec 10;return ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$x.content-replace'\s','')))|ConvertFrom-Json)}catch{return $null}}
+function Get-Control{try{$u='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/control/remote-failover.json?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$t=(Invoke-WebRequest -UseBasicParsing -Uri $u -Headers @{'User-Agent'='HomeDesign-Remote-Failover-V4'} -TimeoutSec 10).Content;return ($t|ConvertFrom-Json)}catch{return $null}}
 function RemoteLocal{try{$p=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$'-and([string]$_.CommandLine)-match'(?i)desktop-commander'-and([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'});$ids=@($p|ForEach-Object{[int]$_.ProcessId});$tcp=if($ids.Count){@(Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue|Where-Object{$ids-contains$_.OwningProcess}).Count}else{0};[pscustomobject]@{processCount=$p.Count;tcpEstablished=$tcp;localTransport=($p.Count-gt0-and$tcp-gt0)}}catch{[pscustomobject]@{processCount=0;tcpEstablished=0;localTransport=$false}}}
 function TailscaleState{$exe=@('C:\Program Files\Tailscale\tailscale.exe',(Get-Command tailscale.exe -ErrorAction SilentlyContinue).Source)|Where-Object{$_-and(Test-Path $_)}|Select-Object -First 1;$svc=Get-Service Tailscale -ErrorAction SilentlyContinue;$backend='NOT_INSTALLED';$ip='';$loginRequired=$false;if($exe){try{$j=& $exe status --json 2>$null|ConvertFrom-Json;$backend=[string]$j.BackendState;$ip=(@($j.TailscaleIPs)[0]);$loginRequired=($backend-ne'Running')}catch{$backend='INSTALLED_STATUS_UNKNOWN'}};[pscustomobject]@{installed=[bool]$exe;exe=[string]$exe;service=$(if($svc){[string]$svc.Status}else{'MISSING'});backend=$backend;ip=$ip;loginRequired=$loginRequired;ready=[bool]($exe-and$svc-and$svc.Status-eq'Running'-and$backend-eq'Running')}}
 function RustDeskState{$c=@('C:\Program Files\RustDesk\rustdesk.exe',(Get-Command rustdesk.exe -ErrorAction SilentlyContinue).Source,(Join-Path $Stage 'rustdesk.exe'))|Where-Object{$_-and(Test-Path $_)}|Select-Object -First 1;$p=@(Get-Process rustdesk -ErrorAction SilentlyContinue);[pscustomobject]@{installed=[bool]$c;exe=[string]$c;processCount=$p.Count;ready=[bool]$c}}

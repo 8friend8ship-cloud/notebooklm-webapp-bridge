@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V15_FLOW_DEMAND_GATED_20260910'
+$Version='WATCHDOG_V16_RAW_FIRST_20260911'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $LegacyBlob='ecd3a75d2ad8314a44772d91df1905632eeec94d'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
@@ -41,18 +41,8 @@ function DedicatedNotebookProcesses{try{return @(Get-CimInstance Win32_Process -
 function StopDedicatedNotebookLM{$before=@(DedicatedNotebookProcesses);foreach($p in $before){try{Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction SilentlyContinue}catch{}};if($before.Count-gt0){Start-Sleep -Seconds 2};$after=@(DedicatedNotebookProcesses);[pscustomobject]@{before=[int]$before.Count;after=[int]$after.Count;stopped=[int]([Math]::Max(0,$before.Count-$after.Count));ok=([int]$after.Count-eq0)}}
 function FetchRepoBytes([string]$Path,[int]$TimeoutSec=20){
   $o=[ordered]@{ok=$false;mode='';bytes=$null;sha='';error=''}
-  try{
-    $u='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-    $x=Invoke-RestMethod -Uri $u -Headers @{'User-Agent'='HomeDesign-Watchdog-V15';'Accept'='application/vnd.github+json'} -TimeoutSec $TimeoutSec
-    $b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$actual=(GitBlobSha1Bytes $b).ToLowerInvariant();$expected=([string]$x.sha).ToLowerInvariant();if(-not$expected-or$actual-ne$expected){throw 'API_GIT_BLOB_SHA_MISMATCH'}
-    $o.ok=$true;$o.mode='API';$o.bytes=$b;$o.sha=$actual;return [pscustomobject]$o
-  }catch{$o.error='API='+$_.Exception.Message}
-  try{
-    $raw='https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-    $wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Watchdog-V15';$b=$wc.DownloadData($raw)}finally{$wc.Dispose()}
-    if(-not$b-or$b.Length-eq0){throw 'RAW_EMPTY'}
-    $o.ok=$true;$o.mode='RAW';$o.bytes=$b;$o.sha=(GitBlobSha1Bytes $b).ToLowerInvariant();$o.error='';return [pscustomobject]$o
-  }catch{$o.error+=';RAW='+$_.Exception.Message}
+  try{$raw='https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Watchdog-V16';$b=$wc.DownloadData($raw)}finally{$wc.Dispose()};if(-not$b-or$b.Length-eq0){throw 'RAW_EMPTY'};$o.ok=$true;$o.mode='RAW';$o.bytes=$b;$o.sha=(GitBlobSha1Bytes $b).ToLowerInvariant();return [pscustomobject]$o}catch{$o.error='RAW='+$_.Exception.Message}
+  try{$headers=@{'User-Agent'='HomeDesign-Watchdog-V16';'Accept'='application/vnd.github+json'};$url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main';$x=Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec $TimeoutSec;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$actual=(GitBlobSha1Bytes $b).ToLowerInvariant();$expected=([string]$x.sha).ToLowerInvariant();if(-not$expected-or$actual-ne$expected){throw 'API_GIT_BLOB_SHA_MISMATCH'};$o.ok=$true;$o.mode='API_FALLBACK';$o.bytes=$b;$o.sha=$actual;$o.error='';return [pscustomobject]$o}catch{$o.error+=';API='+$_.Exception.Message}
   return [pscustomobject]$o
 }
 function StableMeta{

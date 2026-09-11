@@ -2,7 +2,7 @@ param([switch]$Loop)
 
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$BootstrapVersion='BOOTSTRAP_V8_TASK203_APPSCRIPT_FIRST_20260903'
+$BootstrapVersion='BOOTSTRAP_V9_RAW_FIRST_20260911'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $AgentFile=Join-Path $Root 'HomeDesignLocalAgent.ps1'
@@ -21,19 +21,8 @@ function GitBlobSha1Bytes([byte[]]$Bytes){$h=[Text.Encoding]::ASCII.GetBytes(('b
 function GitBlobSha1([string]$Path){return GitBlobSha1Bytes ([IO.File]::ReadAllBytes($Path))}
 function FetchContent([string]$Path){
   $o=[ordered]@{ok=$false;mode='';bytes=$null;sha='';error=''}
-  try{
-    $headers=@{'User-Agent'='HomeDesign-Local-Agent-Bootstrap-V2';'Accept'='application/vnd.github+json'}
-    $url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-    $x=Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec 20
-    $b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$actual=(GitBlobSha1Bytes $b).ToLowerInvariant();$expected=([string]$x.sha).ToLowerInvariant();if(-not$expected-or$actual-ne$expected){throw 'API_GIT_BLOB_SHA_MISMATCH'}
-    $o.ok=$true;$o.mode='API';$o.bytes=$b;$o.sha=$actual;return [pscustomobject]$o
-  }catch{$o.error='API='+$_.Exception.Message}
-  try{
-    $raw='https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-    $wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Local-Agent-Bootstrap-V2';$b=$wc.DownloadData($raw)}finally{$wc.Dispose()}
-    if(-not$b-or$b.Length-eq0){throw 'RAW_EMPTY'}
-    $o.ok=$true;$o.mode='RAW';$o.bytes=$b;$o.sha=(GitBlobSha1Bytes $b).ToLowerInvariant();$o.error='';return [pscustomobject]$o
-  }catch{$o.error+=';RAW='+$_.Exception.Message}
+  try{$raw='https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Local-Agent-Bootstrap-V9';$b=$wc.DownloadData($raw)}finally{$wc.Dispose()};if(-not$b-or$b.Length-eq0){throw 'RAW_EMPTY'};$o.ok=$true;$o.mode='RAW';$o.bytes=$b;$o.sha=(GitBlobSha1Bytes $b).ToLowerInvariant();return [pscustomobject]$o}catch{$o.error='RAW='+$_.Exception.Message}
+  try{$headers=@{'User-Agent'='HomeDesign-Local-Agent-Bootstrap-V9';'Accept'='application/vnd.github+json'};$url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main';$x=Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec 20;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$actual=(GitBlobSha1Bytes $b).ToLowerInvariant();$expected=([string]$x.sha).ToLowerInvariant();if(-not$expected-or$actual-ne$expected){throw 'API_GIT_BLOB_SHA_MISMATCH'};$o.ok=$true;$o.mode='API_FALLBACK';$o.bytes=$b;$o.sha=$actual;$o.error='';return [pscustomobject]$o}catch{$o.error+=';API='+$_.Exception.Message}
   return [pscustomobject]$o
 }
 function ReadJsonResource([string]$Path){$r=FetchContent $Path;if(-not$r.ok){throw ($Path+':'+$r.error)};$j=[Text.Encoding]::UTF8.GetString([byte[]]$r.bytes)|ConvertFrom-Json;return [pscustomobject]@{json=$j;mode=$r.mode;sha=$r.sha}}

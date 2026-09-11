@@ -2,7 +2,7 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$Version='HOME_DESIGN_AUTO_RESUME_V7_OPENAI_WEB_SYNC_20260910'
+$Version='HOME_DESIGN_AUTO_RESUME_V8_RAW_FIRST_20260911'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Log=Join-Path $Root 'auto-resume.log'
 $ResumeLocal=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1'
@@ -17,19 +17,9 @@ function ApiContent([string]$Path){$headers=@{'User-Agent'='HomeDesign-AutoResum
 function RawUrl([string]$Path){'https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
 function RefreshFile([string]$RepoPath,[string]$Dest,[string]$Label){
   $tmp=$Dest+'.download';$mode='';$expected=''
-  try{
-    $r=ApiContent $RepoPath
-    [IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$r.content-replace'\s','')))
-    $expected=([string]$r.sha).ToLowerInvariant();$mode='API'
-  }catch{
-    Invoke-WebRequest -UseBasicParsing -Uri (RawUrl $RepoPath) -Headers @{'User-Agent'='HomeDesign-AutoResume'} -OutFile $tmp -TimeoutSec 30
-    $mode='RAW'
-  }
-  $actual=(GitBlobSha1 $tmp).ToLowerInvariant()
-  if($expected -and $actual-ne$expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw("${Label}_SHA_MISMATCH actual=$actual expected=$expected")}
-  Move-Item -LiteralPath $tmp -Destination $Dest -Force
-  Log ($Label+'_REFRESHED_'+$mode+' sha='+$actual)
-  return $actual
+  try{Invoke-WebRequest -UseBasicParsing -Uri (RawUrl $RepoPath) -Headers @{'User-Agent'='HomeDesign-AutoResume-V8'} -OutFile $tmp -TimeoutSec 30;$mode='RAW'}catch{$r=ApiContent $RepoPath;[IO.File]::WriteAllBytes($tmp,[Convert]::FromBase64String(([string]$r.content-replace'\s','')));$expected=([string]$r.sha).ToLowerInvariant();$mode='API_FALLBACK'}
+  $actual=(GitBlobSha1 $tmp).ToLowerInvariant();if($expected -and $actual-ne$expected){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw("${Label}_SHA_MISMATCH actual=$actual expected=$expected")}
+  Move-Item -LiteralPath $tmp -Destination $Dest -Force;Log ($Label+'_REFRESHED_'+$mode+' sha='+$actual);return $actual
 }
 function BootstrapLoopPresent{try{return @((Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name -match 'powershell|pwsh' -and $_.CommandLine -and $_.CommandLine -like '*AgentBootstrap.ps1*' -and $_.CommandLine -match '(?i)(?:^|\s)-Loop(?:\s|$)'})).Count -gt 0}catch{return $false}}
 
