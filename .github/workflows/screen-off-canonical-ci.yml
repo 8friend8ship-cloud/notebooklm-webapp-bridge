@@ -24,11 +24,11 @@ jobs:
           $supervisorPath='local-agent/bootstrap/CentralAgentTabSupervisor.ps1'
           $guard=Get-Content $guardPath -Raw
           $supervisor=Get-Content $supervisorPath -Raw
-          if($guard -notmatch 'POWER_CONTINUITY_GUARD_V6_AC_SYSTEM_AWAKE_SCREEN_OFF_20260909'){ throw 'GUARD_V6_VERSION_MISSING' }
+          if($guard -notmatch 'POWER_CONTINUITY_GUARD_V9_SCREEN_OFF_CANONICAL_20260912'){ throw 'GUARD_V9_VERSION_MISSING' }
           if($guard -match '\$ES_DISPLAY_REQUIRED'){ throw 'DISPLAY_REQUIRED_REGRESSION' }
           if($guard -notmatch 'screenOffAllowed=\$true'){ throw 'SCREEN_OFF_NOT_ALLOWED' }
           if($guard -notmatch 'ES_CONTINUOUS-bor\$ES_SYSTEM_REQUIRED'){ throw 'SYSTEM_REQUIRED_MISSING' }
-          if($supervisor -notmatch "RequiredPowerGuardVersion='POWER_CONTINUITY_GUARD_V6_AC_SYSTEM_AWAKE_SCREEN_OFF_20260909'"){ throw 'SUPERVISOR_V6_REQUIREMENT_MISSING' }
-          if($supervisor -notmatch 'SCREEN_CAN_OFF'){ throw 'SUPERVISOR_SCREEN_OFF_POLICY_MISSING' }
+          if($supervisor -notmatch "RequiredPowerGuardVersion='POWER_CONTINUITY_GUARD_V9_SCREEN_OFF_CANONICAL_20260912'"){ throw 'SUPERVISOR_V9_REQUIREMENT_MISSING' }
+          if($supervisor -notmatch 'SCREEN_CAN_OFF_ALWAYS'){ throw 'SUPERVISOR_SCREEN_OFF_POLICY_MISSING' }
           if($supervisor -match 'REMOTE_DISPLAY_AWAKE'){ throw 'SUPERVISOR_DISPLAY_AWAKE_REGRESSION' }
           Write-Host 'SCREEN_OFF_CANONICAL_PASS'
