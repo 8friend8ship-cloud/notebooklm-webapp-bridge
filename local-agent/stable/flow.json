@@ -2,16 +2,16 @@
   "schemaVersion": 1,
   "channel": "flow",
   "enabled": true,
-  "version": "1.1.158-flow-oob-rdc-recovery-once-20260911",
-  "gitBlobSha1": "093882f3d24a80d469b66e7e11faab4d421be43d",
+  "version": "1.1.159-flow-oob-rdc-dataplane-v0250-20260911",
+  "gitBlobSha1": "9e96c5807a8d3a82ef0ed83f59a865b2b774dd93",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
   "maxCycleSeconds": 300,
-  "purpose": "EMERGENCY OOB RECOVERY ONLY: existing AgentBootstrap independent FLOW lane fetches this one-shot recovery script while Remote DC is absent. Script refreshes the canonical pinned DesktopCommanderKeepAlive and invokes it once. No new trigger, OAuth, browser approval, broad Node kill, global ExecutionPolicy change, Flow Generate, credit use, or project mutation. Restore previous FLOW settle metadata after receipt/readback.",
+  "purpose": "EMERGENCY OOB RECOVERY ONLY: existing AgentBootstrap independent FLOW lane runs RemoteDcDataPlaneGuard V2. It prewarms isolated Desktop Commander 0.2.50 before exact Remote replacement and consumes a one-shot requestId. No new trigger, OAuth, broad Node kill, reboot, global npm cache or ExecutionPolicy change, Flow Generate, credit use, or project mutation. Restore normal FLOW metadata after remote data-plane X2 receipt.",
   "normalChromeTouched": false,
   "generateClicked": false,
   "creditSpend": false,
   "oauthChanged": false,
   "extensionMutated": false,
-  "resultReceipt": "FLOW_OOB_RDC_RECOVERY_1.1.158.json"
+  "resultReceipt": "FLOW_OOB_RDC_DATAPLANE_1.1.159.json"
 }
