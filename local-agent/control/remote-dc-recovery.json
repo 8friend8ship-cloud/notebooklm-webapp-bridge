@@ -1,9 +1,9 @@
 {
   "enabled": true,
-  "requestId": "RDC_FALSE_HEALTHY_20260911_1645",
+  "requestId": "RDC_FALSE_HEALTHY_20260911_1658_V0250",
   "target": "BOOK-1HE2THGKRA",
-  "reason": "control-plane ping/list_devices pass while get_config/list_processes/start_process/file tools timeout",
-  "package": "@wonderwhy-er/desktop-commander@0.2.48",
-  "policy": "exact isolated Remote process only; no broad Node kill; no laptop reboot; no global npm cache or ExecutionPolicy change",
-  "requiredReadback": "get_config/list_processes plus file write/read x2 before COMPLETE"
+  "reason": "0.2.48 control-plane/data-plane divergence; 0.2.50 contains verified stdio child ensureReady recovery and persisted-device reauth fixes",
+  "package": "@wonderwhy-er/desktop-commander@0.2.50",
+  "policy": "prewarm isolated cache first; exact isolated Remote process only; no broad Node kill; no laptop reboot; no global npm cache or ExecutionPolicy change",
+  "requiredReadback": "device online + get_config/list_processes + file write/read x2 before COMPLETE"
 }
