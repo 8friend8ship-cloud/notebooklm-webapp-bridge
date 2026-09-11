@@ -2,16 +2,16 @@
   "schemaVersion": 1,
   "channel": "flow",
   "enabled": true,
-  "version": "1.1.157-flow-transport-settle-after-v10-bootstrap-v2",
-  "gitBlobSha1": "d242870ecf916838e7a3d441019328614082e3e1",
+  "version": "1.1.158-flow-oob-rdc-recovery-once-20260911",
+  "gitBlobSha1": "093882f3d24a80d469b66e7e11faab4d421be43d",
   "file": "HomeDesignLocalAgent.ps1",
   "pollSeconds": 300,
-  "maxCycleSeconds": 180,
-  "purpose": "ONE-SHOT SETTLE AFTER PHYSICAL WATCHDOG V10 + BOOTSTRAP V2 READBACK. Verify the already-installed Watchdog V10 and Bootstrap V2 Git blob SHAs plus one live Bootstrap -Loop process, write a receipt, and exit 0. Do not kill/restart the parent Bootstrap from its child lane. This allows Bootstrap V2 to persist FLOW success state and continue immediately to IMAGE/APPSCRIPT independent lanes. No normal Chrome, Flow Generate, Host, OAuth, scope, project, deployment, trigger or credit mutation.",
+  "maxCycleSeconds": 300,
+  "purpose": "EMERGENCY OOB RECOVERY ONLY: existing AgentBootstrap independent FLOW lane fetches this one-shot recovery script while Remote DC is absent. Script refreshes the canonical pinned DesktopCommanderKeepAlive and invokes it once. No new trigger, OAuth, browser approval, broad Node kill, global ExecutionPolicy change, Flow Generate, credit use, or project mutation. Restore previous FLOW settle metadata after receipt/readback.",
   "normalChromeTouched": false,
   "generateClicked": false,
   "creditSpend": false,
   "oauthChanged": false,
   "extensionMutated": false,
-  "resultReceipt": "FLOW_TRANSPORT_SETTLE_V10_BOOTSTRAP_V2_1.1.157.json"
+  "resultReceipt": "FLOW_OOB_RDC_RECOVERY_1.1.158.json"
 }
