@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "drive",
+  "enabled": true,
+  "version": "drive-mirror-0.1.0",
+  "releasedAt": "2026-09-11T16:01:00+09:00",
+  "gitBlobSha1": "971b2f334dbd116c7bbc77bcdec71c36fabc9cd9",
+  "file": "HomeDesignLocalAgent.ps1",
+  "pollSeconds": 300,
+  "maxCycleSeconds": 1800,
+  "executionMode": "one_shot_retry_until_zero",
+  "resultReceipt": "DRIVE_MIRROR_EXACT_DIFF_FINALIZE_LAST.json",
+  "notes": "Independent DRIVE lane. Read-only exact diff first; no delete/purge; quarantine only confirmed destination-only files; require exact-diff X2 + Finalizer PASS + Runtime_Reconcile PASS before exit 0. Reuses existing Bootstrap loop, no new trigger/OAuth/project."
+}
