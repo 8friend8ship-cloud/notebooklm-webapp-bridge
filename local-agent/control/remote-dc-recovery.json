@@ -1,9 +1,9 @@
 {
-  "enabled": true,
-  "requestId": "RDC_FALSE_HEALTHY_20260911_1658_V0250",
+  "enabled": false,
+  "requestId": "RDC_STABLE_HOLD_20260911_1708",
   "target": "BOOK-1HE2THGKRA",
-  "reason": "0.2.48 control-plane/data-plane divergence; 0.2.50 contains verified stdio child ensureReady recovery and persisted-device reauth fixes",
-  "package": "@wonderwhy-er/desktop-commander@0.2.50",
-  "policy": "prewarm isolated cache first; exact isolated Remote process only; no broad Node kill; no laptop reboot; no global npm cache or ExecutionPolicy change",
-  "requiredReadback": "device online + get_config/list_processes + file write/read x2 before COMPLETE"
+  "reason": "User directive: current 0.2.48 is the stabilization baseline; defer version upgrade. Continue validation and recovery without version mutation.",
+  "package": "@wonderwhy-er/desktop-commander@0.2.48",
+  "policy": "STABLE_HOLD; no automatic upgrade/canary/promotion; keep current session; exact-process self-heal only; no broad Node kill; no reboot; no global npm cache or ExecutionPolicy change",
+  "requiredReadback": "get_config + process/PowerShell + file write/read x2 + Drive receipt before COMPLETE"
 }
