@@ -2,7 +2,7 @@ param([switch]$Loop)
 
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$BootstrapVersion='BOOTSTRAP_V10_DRIVE_LANE_20260911'
+$BootstrapVersion='BOOTSTRAP_V11_DRIVE_P0_FIRST_20260911'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $AgentFile=Join-Path $Root 'HomeDesignLocalAgent.ps1'
@@ -19,12 +19,12 @@ $BootstrapLog=Join-Path $Root 'bootstrap.log'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 
 function BLog([string]$m){Add-Content -LiteralPath $BootstrapLog -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [$BootstrapVersion] $m" -Encoding UTF8}
-function GitBlobSha1Bytes([byte[]]$Bytes){$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$Bytes.Length+[char]0));$a=New-Object byte[]($h.Length+$Bytes.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($Bytes,0,$a,$h.Length,$bytes.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
+function GitBlobSha1Bytes([byte[]]$Bytes){$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$Bytes.Length+[char]0));$a=New-Object byte[]($h.Length+$Bytes.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($Bytes,0,$a,$h.Length,$Bytes.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
 function GitBlobSha1([string]$Path){return GitBlobSha1Bytes ([IO.File]::ReadAllBytes($Path))}
 function FetchContent([string]$Path){
   $o=[ordered]@{ok=$false;mode='';bytes=$null;sha='';error=''}
-  try{$raw='https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Local-Agent-Bootstrap-V10';$b=$wc.DownloadData($raw)}finally{$wc.Dispose()};if(-not$b-or$b.Length-eq0){throw 'RAW_EMPTY'};$o.ok=$true;$o.mode='RAW';$o.bytes=$b;$o.sha=(GitBlobSha1Bytes $b).ToLowerInvariant();return [pscustomobject]$o}catch{$o.error='RAW='+$_.Exception.Message}
-  try{$headers=@{'User-Agent'='HomeDesign-Local-Agent-Bootstrap-V10';'Accept'='application/vnd.github+json'};$url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main';$x=Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec 20;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$actual=(GitBlobSha1Bytes $b).ToLowerInvariant();$expected=([string]$x.sha).ToLowerInvariant();if(-not$expected-or$actual-ne$expected){throw 'API_GIT_BLOB_SHA_MISMATCH'};$o.ok=$true;$o.mode='API_FALLBACK';$o.bytes=$b;$o.sha=$actual;$o.error='';return [pscustomobject]$o}catch{$o.error+=';API='+$_.Exception.Message}
+  try{$raw='https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Local-Agent-Bootstrap-V11';$b=$wc.DownloadData($raw)}finally{$wc.Dispose()};if(-not$b-or$b.Length-eq0){throw 'RAW_EMPTY'};$o.ok=$true;$o.mode='RAW';$o.bytes=$b;$o.sha=(GitBlobSha1Bytes $b).ToLowerInvariant();return [pscustomobject]$o}catch{$o.error='RAW='+$_.Exception.Message}
+  try{$headers=@{'User-Agent'='HomeDesign-Local-Agent-Bootstrap-V11';'Accept'='application/vnd.github+json'};$url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main';$x=Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec 20;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$actual=(GitBlobSha1Bytes $b).ToLowerInvariant();$expected=([string]$x.sha).ToLowerInvariant();if(-not$expected-or$actual-ne$expected){throw "API_GIT_BLOB_SHA_MISMATCH"};$o.ok=$true;$o.mode='API_FALLBACK';$o.bytes=$b;$o.sha=$actual;$o.error='';return [pscustomobject]$o}catch{$o.error+=';API='+$_.Exception.Message}
   return [pscustomobject]$o
 }
 function ReadJsonResource([string]$Path){$r=FetchContent $Path;if(-not$r.ok){throw ($Path+':'+$r.error)};$j=[Text.Encoding]::UTF8.GetString([byte[]]$r.bytes)|ConvertFrom-Json;return [pscustomobject]@{json=$j;mode=$r.mode;sha=$r.sha}}
@@ -54,15 +54,15 @@ try{
     try{
       $mr=ReadJsonResource 'local-agent/stable/agent.json';$meta=$mr.json;if($meta.pollSeconds){$pollSeconds=[Math]::Max(60,[int]$meta.pollSeconds)};if($meta.maxCycleSeconds){$maxCycleSeconds=[Math]::Max(180,[Math]::Min(1800,[int]$meta.maxCycleSeconds))}
       if($meta.enabled){
-        $expected=([string]$meta.gitBlobSha1).ToLowerInvariant();$releasePath='local-agent/releases/'+[string]$meta.version+'/HomeDesignLocalAgent.ps1';$r=FetchContent $releasePath;if(-not$r.ok){throw $r.error};if(([string]$r.sha).ToLowerInvariant()-ne$expected){throw "Agent blob mismatch"}
+        $expected=([string]$meta.gitBlobSha1).ToLowerInvariant();$releasePath='local-agent/releases/'+[string]$meta.version+'/HomeDesignLocalAgent.ps1';$r=FetchContent $releasePath;if(-not$r.ok){throw "Agent blob fetch failed"};if(([string]$r.sha).ToLowerInvariant()-ne$expected){throw "Agent blob mismatch"}
         $needsFile=-not(Test-Path -LiteralPath $AgentFile);if(-not$needsFile){$needsFile=((GitBlobSha1 $AgentFile).ToLowerInvariant()-ne$expected)};if($needsFile){[void](WriteVerifiedResource $r $AgentFile $expected);BLog "Agent updated to $($meta.version) transport=$($r.mode) sha=$expected."}
         $stateVersion=CurrentStateVersion;$needsApply=$needsFile-or($stateVersion-ne[string]$meta.version);[void](StopStaleAgentProcesses ([Math]::Max(1800,$maxCycleSeconds+300)));if($needsApply){$rc=RunAgentBounded $AgentFile $maxCycleSeconds;if($rc-ne0){BLog "Agent cycle exit=$rc maxCycleSeconds=$maxCycleSeconds."}else{BLog "Agent apply complete version=$($meta.version)."}}else{BLog "Stable unchanged; skip one-shot Agent reapply version=$($meta.version)."}
       }else{BLog "Agent stable channel disabled transport=$($mr.mode)."}
     }catch{BLog("Bootstrap cycle error: "+$_.Exception.Message)}
+    ApplyIndependentLane 'local-agent/stable/drive.json' 'DRIVE' $DriveAgentFile $DriveLaneStateFile
     ApplyIndependentLane 'local-agent/stable/appscript.json' 'APPSCRIPT' $AppScriptAgentFile $AppScriptLaneStateFile
     ApplyIndependentLane 'local-agent/stable/flow.json' 'FLOW' $FlowAgentFile $FlowLaneStateFile
     ApplyIndependentLane 'local-agent/stable/image.json' 'IMAGE' $ImageAgentFile $ImageLaneStateFile
-    ApplyIndependentLane 'local-agent/stable/drive.json' 'DRIVE' $DriveAgentFile $DriveLaneStateFile
     if($Loop){Start-Sleep -Seconds $pollSeconds}
   }while($Loop)
 }finally{try{$mutex.ReleaseMutex()}catch{};$mutex.Dispose()}
