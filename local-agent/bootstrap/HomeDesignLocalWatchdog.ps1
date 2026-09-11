@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V17_REMOTE_DATA_PLANE_RECOVERY_20260911'
+$Version='WATCHDOG_V18_SINGLETON_REMOTE_DATA_PLANE_RECOVERY_20260912'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $LegacyBlob='ecd3a75d2ad8314a44772d91df1905632eeec94d'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
@@ -13,6 +13,11 @@ $BootstrapLocal=Join-Path $Root 'AgentBootstrap.ps1'
 $FlowGuardLocal=Join-Path $Root 'FlowDemandGuard.ps1'
 $RemoteDataPlaneGuardLocal=Join-Path $Root 'RemoteDcDataPlaneGuard.ps1'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
+$MutexName='Local\HomeDesignAutomationV7.HomeDesignLocalWatchdog'
+$WatchdogMutex=$null
+$WatchdogMutexAcquired=$false
+try{$WatchdogMutex=New-Object System.Threading.Mutex($false,$MutexName);$WatchdogMutexAcquired=$WatchdogMutex.WaitOne(0)}catch{}
+if(-not$WatchdogMutexAcquired){try{$dup=[ordered]@{ok=$true;action='WATCHDOG_DUPLICATE_SKIPPED';version=$Version;pid=$PID;timestamp=(Get-Date).ToString('o')};$dup|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $Root 'WATCHDOG_DEDUP_LAST.json') -Encoding UTF8}catch{};exit 0}
 
 function GitBlobSha1Bytes([byte[]]$Bytes){$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$Bytes.Length+[char]0));$a=New-Object byte[]($h.Length+$Bytes.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($Bytes,0,$a,$h.Length,$Bytes.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
 function GitBlobSha1([string]$Path){return GitBlobSha1Bytes ([IO.File]::ReadAllBytes($Path))}
