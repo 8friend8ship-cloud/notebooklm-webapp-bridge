@@ -12,6 +12,12 @@ FINALIZER=CTRL/'finalize_mirror.py'
 FINAL_STATUS=CTRL/'mirror_final_status.json'
 RECON_STATUS=CTRL/'reconcile_status.json'
 EX={'.gsheet','.gdoc','.gslides','.gform','.gscript','.gprj'}
+VOLATILE_PREFIXES=(
+    '00_중앙에이전트\\Runtime_Readback\\',
+)
+VOLATILE_BASENAMES={
+    'run_log.jsonl',
+}
 
 
 def save(o):
@@ -27,26 +33,37 @@ def save(o):
         pass
 
 
+def is_volatile(rel):
+    norm=rel.replace('/','\\')
+    folded=norm.casefold()
+    if any(folded.startswith(p.casefold()) for p in VOLATILE_PREFIXES):
+        return True
+    return Path(norm).name.casefold() in VOLATILE_BASENAMES
+
+
 def inventory(root):
-    out={}; originals={}; total=0
+    out={}; originals={}; total=0; volatile_skipped=0
     for dp, ds, fs in os.walk(root):
         for f in fs:
             p=Path(dp)/f
             if p.suffix.lower() in EX: continue
+            rel=str(p.relative_to(root)).replace('/','\\')
+            if is_volatile(rel):
+                volatile_skipped += 1
+                continue
             try: sz=p.stat().st_size
             except OSError: continue
-            rel=str(p.relative_to(root)).replace('/','\\')
             key=rel.casefold()
             out[key]=sz; originals[key]=rel; total+=sz
-    return out, originals, total
+    return out, originals, total, volatile_skipped
 
 
 def diff():
-    s,so,sb=inventory(SRC); m,mo,mb=inventory(MIRROR)
+    s,so,sb,sv=inventory(SRC); m,mo,mb,mv=inventory(MIRROR)
     missing=sorted([so[k] for k in s.keys()-m.keys()])
     extra=sorted([mo[k] for k in m.keys()-s.keys()])
     mismatch=sorted([so[k] for k in s.keys()&m.keys() if s[k]!=m[k]])
-    return {'src_count':len(s),'mirror_count':len(m),'src_bytes':sb,'mirror_bytes':mb,'missing':missing,'extra':extra,'size_mismatch':mismatch}
+    return {'src_count':len(s),'mirror_count':len(m),'src_bytes':sb,'mirror_bytes':mb,'src_volatile_skipped':sv,'mirror_volatile_skipped':mv,'missing':missing,'extra':extra,'size_mismatch':mismatch}
 
 
 def safe_sync_once():
@@ -67,7 +84,7 @@ def quarantine(extras):
         shutil.move(str(src),str(dst)); moved.append(rel)
     return str(qroot), moved
 
-state={'version':'DRIVE_MIRROR_EXACT_DIFF_FINALIZE_V1_20260911','status':'STARTED','destructive_delete':False,'quarantine_only':True}
+state={'version':'DRIVE_MIRROR_EXACT_DIFF_FINALIZE_V2_VOLATILE_FILTER_20260911','status':'STARTED','destructive_delete':False,'quarantine_only':True,'volatile_policy':'Runtime_Readback/* + RUN_LOG.jsonl excluded from static equality; verified separately by runtime receipts'}
 save(state)
 if not SRC.exists() or not MIRROR.exists():
     state.update(status='FAIL_MOUNT_MISSING',src_exists=SRC.exists(),mirror_exists=MIRROR.exists()); save(state); raise SystemExit(2)
