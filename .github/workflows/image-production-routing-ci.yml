@@ -9,8 +9,10 @@ on:
       - 'local-agent/governor/Resolve-ImageGenerationRouteV1.ps1'
       - 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
       - 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1'
+      - 'local-agent/governor/chatgpt-image-auto-exact-adapter-v1.mjs'
       - 'tests/image-production-routing.test.ps1'
       - 'tests/chatgpt-image-queue-prep.test.ps1'
+      - 'tests/chatgpt-image-exact-adapter.test.mjs'
       - '.github/workflows/image-production-routing-ci.yml'
   pull_request:
     paths:
@@ -19,8 +21,10 @@ on:
       - 'local-agent/governor/Resolve-ImageGenerationRouteV1.ps1'
       - 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
       - 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1'
+      - 'local-agent/governor/chatgpt-image-auto-exact-adapter-v1.mjs'
       - 'tests/image-production-routing.test.ps1'
       - 'tests/chatgpt-image-queue-prep.test.ps1'
+      - 'tests/chatgpt-image-exact-adapter.test.mjs'
       - '.github/workflows/image-production-routing-ci.yml'
   workflow_dispatch:
 
@@ -32,7 +36,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Parse policy and PowerShell
+      - name: Parse policy and runtime code
         shell: pwsh
         run: |
           $policy=Get-Content 'config/image-production-routing-policy-v1.json' -Raw|ConvertFrom-Json
@@ -51,6 +55,8 @@ jobs:
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
             if($errors.Count){$errors|%{Write-Error $_.Message};throw "POWERSHELL_PARSE_FAIL:$f"}
           }
+          node --check local-agent/governor/chatgpt-image-auto-exact-adapter-v1.mjs
+          node --check tests/chatgpt-image-exact-adapter.test.mjs
       - name: Validate fallback binding contract
         shell: pwsh
         run: |
@@ -77,9 +83,16 @@ jobs:
           foreach($token in @('READY_FOR_EXACT_INTERFACE_BINDING','READY_FOR_EXACT_INTERFACE_CONFIRMATION','NO_BLIND_UI_CLICK')){
             if(-not $queuePrep.Contains($token)){throw "QUEUE_PREP_CONTRACT_TOKEN_MISSING:$token"}
           }
+          $adapter=Get-Content 'local-agent/governor/chatgpt-image-auto-exact-adapter-v1.mjs' -Raw
+          foreach($token in @('#prompt-input','#add-to-queue-button','#start-button','#auto-download-input','#download-folder-input','data-aspect-value','EXTENSION_QUEUE_NOT_EMPTY','CHATGPT_AUTH_NOT_READY')){
+            if(-not $adapter.Contains($token)){throw "EXACT_ADAPTER_TOKEN_MISSING:$token"}
+          }
       - name: Run image production route fixtures
         shell: pwsh
         run: pwsh -NoProfile -File tests/image-production-routing.test.ps1
       - name: Run ChatGPT Image queue prep fixtures
         shell: pwsh
         run: pwsh -NoProfile -File tests/chatgpt-image-queue-prep.test.ps1
+      - name: Run ChatGPT Image exact adapter contract tests
+        shell: pwsh
+        run: node tests/chatgpt-image-exact-adapter.test.mjs
