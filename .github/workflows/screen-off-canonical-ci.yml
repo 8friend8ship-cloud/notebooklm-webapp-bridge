@@ -17,18 +17,36 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify screen-off canonical contract
+      - name: Verify screen-off canonical contract and PowerRequest runtime
         shell: pwsh
         run: |
           $guardPath='local-agent/bootstrap/CentralAgentPowerContinuityGuard.ps1'
           $supervisorPath='local-agent/bootstrap/CentralAgentTabSupervisor.ps1'
           $guard=Get-Content $guardPath -Raw
           $supervisor=Get-Content $supervisorPath -Raw
-          if($guard -notmatch 'POWER_CONTINUITY_GUARD_V9_SCREEN_OFF_CANONICAL_20260912'){ throw 'GUARD_V9_VERSION_MISSING' }
+          if($guard -notmatch 'POWER_CONTINUITY_GUARD_V10_MODERN_STANDBY_EXECUTION_REQUIRED_20260912'){ throw 'GUARD_V10_VERSION_MISSING' }
           if($guard -match '\$ES_DISPLAY_REQUIRED'){ throw 'DISPLAY_REQUIRED_REGRESSION' }
+          if($guard -notmatch 'PowerCreateRequest'){ throw 'POWER_CREATE_REQUEST_MISSING' }
+          if($guard -notmatch 'PowerSetRequest\(\$h,1\)'){ throw 'POWER_SYSTEM_REQUEST_MISSING' }
+          if($guard -notmatch 'PowerSetRequest\(\$h,3\)'){ throw 'POWER_EXECUTION_REQUEST_MISSING' }
           if($guard -notmatch 'screenOffAllowed=\$true'){ throw 'SCREEN_OFF_NOT_ALLOWED' }
-          if($guard -notmatch 'ES_CONTINUOUS-bor\$ES_SYSTEM_REQUIRED'){ throw 'SYSTEM_REQUIRED_MISSING' }
-          if($supervisor -notmatch "RequiredPowerGuardVersion='POWER_CONTINUITY_GUARD_V9_SCREEN_OFF_CANONICAL_20260912'"){ throw 'SUPERVISOR_V9_REQUIREMENT_MISSING' }
+          if($supervisor -notmatch "RequiredPowerGuardVersion='POWER_CONTINUITY_GUARD_V10_MODERN_STANDBY_EXECUTION_REQUIRED_20260912'"){ throw 'SUPERVISOR_V10_REQUIREMENT_MISSING' }
+          if($supervisor -notmatch 'executionRequiredHeld'){ throw 'SUPERVISOR_EXECUTION_REQUIRED_GATE_MISSING' }
           if($supervisor -notmatch 'SCREEN_CAN_OFF_ALWAYS'){ throw 'SUPERVISOR_SCREEN_OFF_POLICY_MISSING' }
           if($supervisor -match 'REMOTE_DISPLAY_AWAKE'){ throw 'SUPERVISOR_DISPLAY_AWAKE_REGRESSION' }
-          Write-Host 'SCREEN_OFF_CANONICAL_PASS'
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $guardPath -SelfTest
+          if($LASTEXITCODE -ne 0){ throw "GUARD_V10_SELFTEST_EXIT_$LASTEXITCODE" }
+          $receipt=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent\POWER_CONTINUITY_GUARD_LAST.json'
+          if(-not(Test-Path $receipt)){ throw 'GUARD_V10_RECEIPT_MISSING' }
+          $r=Get-Content $receipt -Raw | ConvertFrom-Json
+          if(-not[bool]$r.ok){ throw 'GUARD_V10_RECEIPT_NOT_OK' }
+          if(-not[bool]$r.selfTest){ throw 'GUARD_V10_SELFTEST_FLAG_FALSE' }
+          if(-not[bool]$r.explicitPowerRequestCreated){ throw 'POWER_REQUEST_NOT_CREATED' }
+          if(-not[bool]$r.powerRequestSystemHeld){ throw 'POWER_SYSTEM_NOT_HELD' }
+          if(-not[bool]$r.powerRequestExecutionHeld){ throw 'POWER_EXECUTION_NOT_HELD' }
+          if(-not[bool]$r.systemRequiredHeld){ throw 'SYSTEM_REQUIRED_NOT_HELD' }
+          if(-not[bool]$r.executionRequiredHeld){ throw 'EXECUTION_REQUIRED_NOT_HELD' }
+          if([bool]$r.displayRequiredHeld){ throw 'DISPLAY_REQUIRED_HELD_REGRESSION' }
+          if(-not[bool]$r.screenOffAllowed){ throw 'SCREEN_OFF_NOT_ALLOWED_RUNTIME' }
+          if([bool]$r.trueSleepAllowed){ throw 'TRUE_SLEEP_ALLOWED_REGRESSION' }
+          Write-Host 'SCREEN_OFF_CANONICAL_V10_RUNTIME_PASS'
