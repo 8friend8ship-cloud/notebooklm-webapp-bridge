@@ -32,7 +32,9 @@ if(-not $flowBlocked -and [string]::IsNullOrWhiteSpace($flowFailure)){
 if($gptBlocked){Write-Receipt @{ok=$true;status='WAIT_GPT_QUOTA';route='QUEUE_WAIT';taskId=[string]$t.taskId;flowQuotaState=$flowQuota;chatGptQuotaState=$gptQuota;automaticBrowserAction=$false} 0}
 if(-not(Test-Path -LiteralPath $binding -PathType Leaf)){Write-Receipt @{ok=$false;status='HOLD_BINDING_RECEIPT_MISSING';route='CHATGPT_IMAGE_AUTO_FALLBACK';taskId=[string]$t.taskId;automaticBrowserAction=$false} 6}
 $b=Get-Content -LiteralPath $binding -Raw -Encoding UTF8|ConvertFrom-Json
-if(-not $b.ok -or $b.status -ne 'READY_FOR_ADAPTER_BINDING'){Write-Receipt @{ok=$false;status='HOLD_BINDING_NOT_READY';route='CHATGPT_IMAGE_AUTO_FALLBACK';taskId=[string]$t.taskId;bindingStatus=[string]$b.status;automaticBrowserAction=$false} 7}
+$bindingStatus=[string]$b.status
+$bindingReadyStatuses=@('READY_FOR_EXACT_INTERFACE_BINDING','READY_FOR_ADAPTER_BINDING')
+if(-not $b.ok -or $bindingStatus -notin $bindingReadyStatuses){Write-Receipt @{ok=$false;status='HOLD_BINDING_NOT_READY';route='CHATGPT_IMAGE_AUTO_FALLBACK';taskId=[string]$t.taskId;bindingStatus=$bindingStatus;automaticBrowserAction=$false} 7}
 if(-not(Test-Path -LiteralPath $contract -PathType Leaf)){Write-Receipt @{ok=$false;status='HOLD_EXTENSION_CONTRACT_MISSING';route='CHATGPT_IMAGE_AUTO_FALLBACK';taskId=[string]$t.taskId;automaticBrowserAction=$false} 8}
 $c=Get-Content -LiteralPath $contract -Raw -Encoding UTF8|ConvertFrom-Json
 if(-not $c.ok -or $c.status -ne 'CONTRACT_CANDIDATES_FOUND'){Write-Receipt @{ok=$false;status='HOLD_EXTENSION_CONTRACT_NOT_READY';route='CHATGPT_IMAGE_AUTO_FALLBACK';taskId=[string]$t.taskId;contractStatus=[string]$c.status;automaticBrowserAction=$false} 9}
