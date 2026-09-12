@@ -1,12 +1,14 @@
 param(
   [ValidateSet('Preflight','Execute')][string]$Mode='Preflight',
   [string]$TaskFile='',
-  [string]$CentralRootOverride='G:\내 드라이브\00_중앙에이전트',
+  [string]$CentralRootOverride='',
   [int]$CdpPort=9224,
   [int]$TimeoutMs=360000
 )
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
+if(-not $CentralRootOverride){$CentralRootOverride=[string]$env:CENTRAL_AGENT_ROOT}
+if(-not $CentralRootOverride){throw 'CENTRAL_ROOT_REQUIRED'}
 $adapter=Join-Path $PSScriptRoot '..\governor\chatgpt-image-auto-exact-adapter-v1.mjs'
 if(-not(Test-Path -LiteralPath $adapter -PathType Leaf)){throw 'EXACT_ADAPTER_SCRIPT_MISSING'}
 if($Mode -eq 'Execute' -and -not(Test-Path -LiteralPath $TaskFile -PathType Leaf)){throw 'EXECUTE_TASK_FILE_MISSING'}
