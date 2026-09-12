@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "requestId": "RDC_OFFLINE_RECOVERY_20260910_1640KST",
+  "requestId": "RDC_SCREENOFF_FALSE_HEALTHY_20260912_0913KST",
   "device": "BOOK-1HE2THGKRA",
   "action": "FORCE_REMOTE_RESTART_ONCE",
-  "reason": "DEVICE_OFFLINE_AUTH_TOKEN_VALID_AFTER_DUPLICATE_REMOTE_PRODUCER_AND_VERIFY_DEVICE_LOOP",
-  "createdAt": "2026-09-10T07:40:00Z",
-  "expiresAt": "2026-09-10T08:10:00Z",
+  "reason": "SCREEN_OFF_CYCLE_X2_REPRODUCED_FALSE_HEALTHY_COMMAND_PLANE_TIMEOUT_WITH_AUTH_TOKEN_VALID",
+  "createdAt": "2026-09-12T00:12:59Z",
+  "expiresAt": "2026-09-12T00:42:59Z",
   "maxExecutions": 1,
   "requiresPreflightNoHumanGate": true,
   "status": "PENDING",
   "scope": "EXACT_REMOTE_PRODUCER_CHAIN_ONLY",
-  "notes": "Out-of-band recovery only. Do not auto-click Verify Device. Do not broad-kill node/chrome/pwsh. Restart exact canonical Remote producer chain once after preflight. Then require online+ping+start_process+file write/read x2 before VERIFIED."
+  "notes": "Approved recovery reuse. Do not auto-click Verify Device. Do not broad-kill node/chrome/pwsh. Restart exact canonical Remote producer chain once after preflight. Then require online+ping+PowerShell+file write/read x2 before verified. After recovery, run notebook Python timeline correlation for screen-off transport failure."
 }
