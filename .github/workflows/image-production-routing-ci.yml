@@ -10,6 +10,7 @@ on:
       - 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
       - 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1'
       - 'local-agent/governor/chatgpt-image-auto-exact-adapter-v1.mjs'
+      - 'local-agent/jobs/Run-ChatGPTImageExactAdapterV1.ps1'
       - 'tests/image-production-routing.test.ps1'
       - 'tests/chatgpt-image-queue-prep.test.ps1'
       - 'tests/chatgpt-image-exact-adapter.test.mjs'
@@ -22,6 +23,7 @@ on:
       - 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
       - 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1'
       - 'local-agent/governor/chatgpt-image-auto-exact-adapter-v1.mjs'
+      - 'local-agent/jobs/Run-ChatGPTImageExactAdapterV1.ps1'
       - 'tests/image-production-routing.test.ps1'
       - 'tests/chatgpt-image-queue-prep.test.ps1'
       - 'tests/chatgpt-image-exact-adapter.test.mjs'
@@ -48,6 +50,7 @@ jobs:
             'local-agent/governor/Resolve-ImageGenerationRouteV1.ps1',
             'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1',
             'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1',
+            'local-agent/jobs/Run-ChatGPTImageExactAdapterV1.ps1',
             'tests/image-production-routing.test.ps1',
             'tests/chatgpt-image-queue-prep.test.ps1'
           )){
@@ -86,6 +89,10 @@ jobs:
           $adapter=Get-Content 'local-agent/governor/chatgpt-image-auto-exact-adapter-v1.mjs' -Raw
           foreach($token in @('#prompt-input','#add-to-queue-button','#start-button','#auto-download-input','#download-folder-input','data-aspect-value','EXTENSION_QUEUE_NOT_EMPTY','CHATGPT_AUTH_NOT_READY')){
             if(-not $adapter.Contains($token)){throw "EXACT_ADAPTER_TOKEN_MISSING:$token"}
+          }
+          $wrapper=Get-Content 'local-agent/jobs/Run-ChatGPTImageExactAdapterV1.ps1' -Raw
+          foreach($token in @('genericDownloadsScan=$false','Get-FileHash','IMAGE_EXECUTOR_OUTPUT','CENTRAL_DRIVE_COPY_READBACK_MISMATCH')){
+            if(-not $wrapper.Contains($token)){throw "EXACT_WRAPPER_TOKEN_MISSING:$token"}
           }
       - name: Run image production route fixtures
         shell: pwsh
