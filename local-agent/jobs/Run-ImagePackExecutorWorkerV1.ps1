@@ -1,11 +1,13 @@
 param(
-  [string]$CentralRootOverride='G:\내 드라이브\00_중앙에이전트',
+  [string]$CentralRootOverride='',
   [int]$CdpPort=9224,
   [int]$TimeoutMs=360000,
   [switch]$Once
 )
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
+if(-not $CentralRootOverride){$CentralRootOverride=[string]$env:CENTRAL_AGENT_ROOT}
+if(-not $CentralRootOverride){throw 'CENTRAL_ROOT_REQUIRED'}
 $root=Join-Path $CentralRootOverride 'ImageExecutor'
 $queue=Join-Path $root 'Queue';$running=Join-Path $root 'Running';$done=Join-Path $root 'Done';$failed=Join-Path $root 'Failed';$results=Join-Path $root 'Results'
 foreach($d in @($queue,$running,$done,$failed,$results)){New-Item -ItemType Directory -Force -Path $d|Out-Null}
