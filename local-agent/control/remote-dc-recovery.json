@@ -4,6 +4,7 @@
   "target": "BOOK-1HE2THGKRA",
   "reason": "Remote command plane went offline with auth_token valid after a verified X2 pass. Recover the existing 0.2.48 stable baseline without any version mutation.",
   "package": "@wonderwhy-er/desktop-commander@0.2.48",
+  "expiresAt": "2026-09-12T02:30:00Z",
   "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; STABLE_HOLD_0.2.48; no automatic upgrade/canary/promotion; no broad Node kill; no reboot; no global npm cache clean; no global ExecutionPolicy change; no new OAuth or Verify Device while auth remains valid",
   "requiredReadback": "list_devices + ping + real PowerShell command + file write/read x2 + central Drive receipt before COMPLETE"
 }
