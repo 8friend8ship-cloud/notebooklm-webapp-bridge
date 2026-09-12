@@ -11,9 +11,11 @@ on:
       - 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1'
       - 'local-agent/governor/chatgpt-image-auto-exact-adapter-v1.mjs'
       - 'local-agent/jobs/Run-ChatGPTImageExactAdapterV1.ps1'
+      - 'local-agent/jobs/Run-ImagePackExecutorWorkerV1.ps1'
       - 'tests/image-production-routing.test.ps1'
       - 'tests/chatgpt-image-queue-prep.test.ps1'
       - 'tests/chatgpt-image-exact-adapter.test.mjs'
+      - 'tests/image-pack-executor-worker.test.ps1'
       - '.github/workflows/image-production-routing-ci.yml'
   pull_request:
     paths:
@@ -24,9 +26,11 @@ on:
       - 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1'
       - 'local-agent/governor/chatgpt-image-auto-exact-adapter-v1.mjs'
       - 'local-agent/jobs/Run-ChatGPTImageExactAdapterV1.ps1'
+      - 'local-agent/jobs/Run-ImagePackExecutorWorkerV1.ps1'
       - 'tests/image-production-routing.test.ps1'
       - 'tests/chatgpt-image-queue-prep.test.ps1'
       - 'tests/chatgpt-image-exact-adapter.test.mjs'
+      - 'tests/image-pack-executor-worker.test.ps1'
       - '.github/workflows/image-production-routing-ci.yml'
   workflow_dispatch:
 
@@ -51,8 +55,10 @@ jobs:
             'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1',
             'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1',
             'local-agent/jobs/Run-ChatGPTImageExactAdapterV1.ps1',
+            'local-agent/jobs/Run-ImagePackExecutorWorkerV1.ps1',
             'tests/image-production-routing.test.ps1',
-            'tests/chatgpt-image-queue-prep.test.ps1'
+            'tests/chatgpt-image-queue-prep.test.ps1',
+            'tests/image-pack-executor-worker.test.ps1'
           )){
             $tokens=$null;$errors=$null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
@@ -74,7 +80,7 @@ jobs:
             'AUTOMATIC_QUEUE_CLAIM',
             'AUTOMATIC_CHATGPT_SUBMIT',
             'GENERATION_COMPLETE_DETECTED',
-            'ORIGINAL_IMAGE_DIRECT_DOWNLOAD_TO_DRIVE_SYNC_FOLDER',
+            'ORIGINAL_IMAGE_DIRECT_DOWNLOAD_TO_DRIVE_SYNC_PROJECT_FOLDER',
             'DRIVE_FILE_ID_AND_NONZERO_READBACK',
             'QUEENS_ASSET_REGISTRATION',
             'RESULT_ACK_X2',
@@ -94,6 +100,10 @@ jobs:
           foreach($token in @('genericDownloadsScan=$false','Get-FileHash','IMAGE_EXECUTOR_OUTPUT','CENTRAL_DRIVE_COPY_READBACK_MISMATCH')){
             if(-not $wrapper.Contains($token)){throw "EXACT_WRAPPER_TOKEN_MISSING:$token"}
           }
+          $worker=Get-Content 'local-agent/jobs/Run-ImagePackExecutorWorkerV1.ps1' -Raw
+          foreach($token in @('HOLD_PRODUCTION_DISABLED_V1_CANARY_ONLY','CreateNew','DEDUP_RESULT_EXISTS','duplicateGenerationAllowed=$false')){
+            if(-not $worker.Contains($token)){throw "EXECUTOR_WORKER_TOKEN_MISSING:$token"}
+          }
       - name: Run image production route fixtures
         shell: pwsh
         run: pwsh -NoProfile -File tests/image-production-routing.test.ps1
@@ -103,3 +113,6 @@ jobs:
       - name: Run ChatGPT Image exact adapter contract tests
         shell: pwsh
         run: node tests/chatgpt-image-exact-adapter.test.mjs
+      - name: Run ImagePack executor worker fail-close tests
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/image-pack-executor-worker.test.ps1
