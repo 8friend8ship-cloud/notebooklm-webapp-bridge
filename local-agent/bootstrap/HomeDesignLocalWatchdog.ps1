@@ -1,8 +1,10 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V18_SINGLETON_REMOTE_DATA_PLANE_RECOVERY_20260912'
+$Version='WATCHDOG_V19_PINNED_SUPERVISOR_V31_20260912'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
+$SupervisorCommit='e368274f18a424af49a3c896fdd06e2a229d1de8'
+$SupervisorBlob='46eee0e6d92fa3003e40f34f084984a766827556'
 $LegacyBlob='ecd3a75d2ad8314a44772d91df1905632eeec94d'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -18,7 +20,6 @@ $WatchdogMutex=$null
 $WatchdogMutexAcquired=$false
 try{$WatchdogMutex=New-Object System.Threading.Mutex($false,$MutexName);$WatchdogMutexAcquired=$WatchdogMutex.WaitOne(0)}catch{}
 if(-not$WatchdogMutexAcquired){try{$dup=[ordered]@{ok=$true;action='WATCHDOG_DUPLICATE_SKIPPED';version=$Version;pid=$PID;timestamp=(Get-Date).ToString('o')};$dup|ConvertTo-Json -Depth 10|Set-Content -LiteralPath (Join-Path $Root 'WATCHDOG_DEDUP_LAST.json') -Encoding UTF8}catch{};exit 0}
-
 function GitBlobSha1Bytes([byte[]]$Bytes){$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$Bytes.Length+[char]0));$a=New-Object byte[]($h.Length+$Bytes.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($Bytes,0,$a,$h.Length,$Bytes.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
 function GitBlobSha1([string]$Path){return GitBlobSha1Bytes ([IO.File]::ReadAllBytes($Path))}
 function FindCentral{$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}};''}
@@ -47,10 +48,11 @@ function DedicatedNotebookProcesses{try{return @(Get-CimInstance Win32_Process -
 function StopDedicatedNotebookLM{$before=@(DedicatedNotebookProcesses);foreach($p in $before){try{Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction SilentlyContinue}catch{}};if($before.Count-gt0){Start-Sleep -Seconds 2};$after=@(DedicatedNotebookProcesses);[pscustomobject]@{before=[int]$before.Count;after=[int]$after.Count;stopped=[int]([Math]::Max(0,$before.Count-$after.Count));ok=([int]$after.Count-eq0)}}
 function FetchRepoBytes([string]$Path,[int]$TimeoutSec=20){
   $o=[ordered]@{ok=$false;mode='';bytes=$null;sha='';error=''}
-  try{$raw='https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Watchdog-V17';$b=$wc.DownloadData($raw)}finally{$wc.Dispose()};if(-not$b-or$b.Length-eq0){throw 'RAW_EMPTY'};$o.ok=$true;$o.mode='RAW';$o.bytes=$b;$o.sha=(GitBlobSha1Bytes $b).ToLowerInvariant();return [pscustomobject]$o}catch{$o.error='RAW='+$_.Exception.Message}
-  try{$headers=@{'User-Agent'='HomeDesign-Watchdog-V17';'Accept'='application/vnd.github+json'};$url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main';$x=Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec $TimeoutSec;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$actual=(GitBlobSha1Bytes $b).ToLowerInvariant();$expected=([string]$x.sha).ToLowerInvariant();if(-not$expected-or$actual-ne$expected){throw 'API_GIT_BLOB_SHA_MISMATCH'};$o.ok=$true;$o.mode='API_FALLBACK';$o.bytes=$b;$o.sha=$actual;$o.error='';return [pscustomobject]$o}catch{$o.error+=';API='+$_.Exception.Message}
+  try{$raw='https://raw.githubusercontent.com/'+$Repo+'/main/'+$Path+'?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Watchdog-V19';$b=$wc.DownloadData($raw)}finally{$wc.Dispose()};if(-not$b-or$b.Length-eq0){throw 'RAW_EMPTY'};$o.ok=$true;$o.mode='RAW';$o.bytes=$b;$o.sha=(GitBlobSha1Bytes $b).ToLowerInvariant();return [pscustomobject]$o}catch{$o.error='RAW='+$_.Exception.Message}
+  try{$headers=@{'User-Agent'='HomeDesign-Watchdog-V19';'Accept'='application/vnd.github+json'};$url='https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main';$x=Invoke-RestMethod -Uri $url -Headers $headers -Method Get -TimeoutSec $TimeoutSec;$b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''));$actual=(GitBlobSha1Bytes $b).ToLowerInvariant();$expected=([string]$x.sha).ToLowerInvariant();if(-not$expected-or$actual-ne$expected){throw 'API_GIT_BLOB_SHA_MISMATCH'};$o.ok=$true;$o.mode='API_FALLBACK';$o.bytes=$b;$o.sha=$actual;$o.error='';return [pscustomobject]$o}catch{$o.error+=';API='+$_.Exception.Message}
   return [pscustomobject]$o
 }
+function FetchPinnedBytes([string]$Commit,[string]$Path,[string]$ExpectedSha,[int]$TimeoutSec=15){$o=[ordered]@{ok=$false;mode='PINNED';bytes=$null;sha='';error=''};try{$raw='https://raw.githubusercontent.com/'+$Repo+'/'+$Commit+'/'+$Path;$wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Watchdog-V19-Pinned';$b=$wc.DownloadData($raw)}finally{$wc.Dispose()};if(-not$b-or$b.Length-eq0){throw 'PINNED_RAW_EMPTY'};$actual=(GitBlobSha1Bytes $b).ToLowerInvariant();if($actual-ne$ExpectedSha.ToLowerInvariant()){throw 'PINNED_BLOB_MISMATCH'};$o.ok=$true;$o.bytes=$b;$o.sha=$actual;return [pscustomobject]$o}catch{$o.error=$_.Exception.Message;return [pscustomobject]$o}}
 function StableMeta{
   $o=[ordered]@{ok=$false;enabled=$true;version='';notes='';sha='';transport='';error=''}
   $f=FetchRepoBytes 'local-agent/stable/agent.json' 12
@@ -66,7 +68,7 @@ function EnsureBootstrapLatest{
     $needs= -not(Test-Path -LiteralPath $BootstrapLocal -PathType Leaf)
     if(-not$needs){$needs=((GitBlobSha1 $BootstrapLocal).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())}
     if($needs){
-      $tmp=$BootstrapLocal+'.watchdog-v17';[IO.File]::WriteAllBytes($tmp,[byte[]]$f.bytes);if((GitBlobSha1 $tmp).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant()){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw 'BOOTSTRAP_SHA_MISMATCH'}
+      $tmp=$BootstrapLocal+'.watchdog-v19';[IO.File]::WriteAllBytes($tmp,[byte[]]$f.bytes);if((GitBlobSha1 $tmp).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant()){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw 'BOOTSTRAP_SHA_MISMATCH'}
       Move-Item $tmp $BootstrapLocal -Force;$o.refreshed=$true
       foreach($p in @(BootstrapProcesses)){try{& taskkill.exe /PID ([int]$p.ProcessId) /T /F 2>$null|Out-Null}catch{}}
       Start-Sleep -Milliseconds 500
@@ -76,8 +78,7 @@ function EnsureBootstrapLatest{
   }catch{$o.error=$_.Exception.Message}
   [pscustomobject]$o
 }
-
-$start=(Get-Date).ToString('o');Save $Entry 'WATCHDOG_ENTRY_LATEST.json' ([ordered]@{ok=$true;action='WATCHDOG_ENTRY_V17_REMOTE_DATA_PLANE_RECOVERY';version=$Version;pid=$PID;startedAt=$start;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false})
+$start=(Get-Date).ToString('o');Save $Entry 'WATCHDOG_ENTRY_LATEST.json' ([ordered]@{ok=$true;action='WATCHDOG_ENTRY_V19_PINNED_SUPERVISOR';version=$Version;pid=$PID;startedAt=$start;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false})
 Save (Join-Path $Root 'CENTRAL_INTERNAL_HEARTBEAT.json') 'CENTRAL_INTERNAL_HEARTBEAT.json' ([ordered]@{ok=$true;status='ACTIVE_INTERNAL_ALIVE';timestamp=(Get-Date).ToString('o');displayOffSeconds=1800;sleepTimeoutAc=0;sleepTimeoutDc=0;hibernateTimeoutAc=0;hibernateTimeoutDc=0;source='HomeDesignAutomation-AutoResume';normalChromeTouched=$false})
 try{& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $Root 'HeavyAppRunOwnedWatchdog.ps1')|Out-Null}catch{}
 try{
@@ -86,7 +87,8 @@ $cf=FetchRepoBytes 'local-agent/bootstrap/RunOwnedUiCleanup.ps1' 15
 if($cf.ok){$needs=(-not(Test-Path $cleanupLocal));$fetchedText=[Text.Encoding]::UTF8.GetString([byte[]]$cf.bytes);$localArrayFix=$false;if(Test-Path $cleanupLocal){try{$localArrayFix=[bool](Select-String -LiteralPath $cleanupLocal -Pattern '\$parsed=Get-Content' -Quiet)}catch{}};if($localArrayFix-and$fetchedText-notmatch '\$parsed=Get-Content'){$needs=$false}elseif(-not$needs){$needs=((GitBlobSha1 $cleanupLocal).ToLowerInvariant()-ne([string]$cf.sha).ToLowerInvariant())};if($needs){[IO.File]::WriteAllBytes(($cleanupLocal+'.download'),[byte[]]$cf.bytes);Move-Item ($cleanupLocal+'.download') $cleanupLocal -Force}}
 $supervisorLocal=Join-Path $Root 'CentralAgentTabSupervisor.ps1'
 $recoveryLocal=Join-Path $Root 'CentralTabAutoRecovery.ps1'
-foreach($spec in @(@('local-agent/bootstrap/CentralAgentTabSupervisor.ps1',$supervisorLocal),@('local-agent/bootstrap/CentralTabAutoRecovery.ps1',$recoveryLocal))){try{$f=FetchRepoBytes $spec[0] 12;if($f.ok){$need=(-not(Test-Path $spec[1]));if(-not$need){$need=((GitBlobSha1 $spec[1]).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())};if($need){[IO.File]::WriteAllBytes(($spec[1]+'.download'),[byte[]]$f.bytes);Move-Item ($spec[1]+'.download') $spec[1] -Force}}}catch{}}
+try{$f=FetchPinnedBytes $SupervisorCommit 'local-agent/bootstrap/CentralAgentTabSupervisor.ps1' $SupervisorBlob 12;if($f.ok){$need=(-not(Test-Path $supervisorLocal));if(-not$need){$need=((GitBlobSha1 $supervisorLocal).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())};if($need){[IO.File]::WriteAllBytes(($supervisorLocal+'.download'),[byte[]]$f.bytes);Move-Item ($supervisorLocal+'.download') $supervisorLocal -Force}}}catch{}
+try{$f=FetchRepoBytes 'local-agent/bootstrap/CentralTabAutoRecovery.ps1' 12;if($f.ok){$need=(-not(Test-Path $recoveryLocal));if(-not$need){$need=((GitBlobSha1 $recoveryLocal).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())};if($need){[IO.File]::WriteAllBytes(($recoveryLocal+'.download'),[byte[]]$f.bytes);Move-Item ($recoveryLocal+'.download') $recoveryLocal -Force}}}catch{}
 if(Test-Path $supervisorLocal){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $supervisorLocal|Out-Null}elseif(Test-Path $cleanupLocal){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $cleanupLocal|Out-Null}
 }catch{}
 try{
@@ -100,13 +102,14 @@ $s=StableMeta
 $hold=[bool]($s.ok-and-not$s.enabled-and([string]$s.notes-match'TABLET_PRIMARY_HOLD|TABLET_OWNER_LOCK_ACTIVE'))
 if($hold){
   $shutdown=StopDedicatedNotebookLM;$hostRestore=EnsureHost129;$flowRestore=EnsureFlowCdp;$bootstrap=EnsureBootstrapLatest;$ok=[bool]($shutdown.ok-and$hostRestore.ok-and$flowRestore.ok-and$bootstrap.ok)
-  Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$ok;action='WATCHDOG_TABLET_PRIMARY_HOLD_V17_REMOTE_DATA_PLANE_RECOVERY';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');hostHealthy=(HostHealthy);hostRestoreBefore=[bool]$hostRestore.before;hostRestoreRestarted=[bool]$hostRestore.restarted;hostRestoreOk=[bool]$hostRestore.ok;hostRestoreError=[string]$hostRestore.error;flowCdp9224Before=[bool]$flowRestore.before;flowCdp9224Started=[bool]$flowRestore.started;flowCdp9224Ok=[bool]$flowRestore.ok;flowCdp9224Error=[string]$flowRestore.error;flowDemandGuard=[string]$flowRestore.demandGuard;flowAutoOpenAllowed=[bool]$flowRestore.allowOpen;tabletPrimaryOwner=$true;notebookLaptopHeld=$true;flowLaptopFallbackEnabled=[bool]$flowRestore.allowOpen;stableMetaReachable=$true;stableMetaTransport=[string]$s.transport;stableEnabled=$false;stableNotes=[string]$s.notes;bootstrapBefore=[bool]$bootstrap.beforePresent;bootstrapRefreshed=[bool]$bootstrap.refreshed;bootstrapRestarted=[bool]$bootstrap.restarted;bootstrapOk=[bool]$bootstrap.ok;bootstrapSha=[string]$bootstrap.sha;bootstrapTransport=[string]$bootstrap.transport;bootstrapError=[string]$bootstrap.error;currentVersion=(CurrentVersion);notebooklmRuntimeChecked=$true;dedicatedNotebookChromeBefore=[int]$shutdown.before;dedicatedNotebookChromeStopped=[int]$shutdown.stopped;dedicatedNotebookChromeAfter=[int]$shutdown.after;autoResumeInvoked=$false;independentLanesExpected='FLOW,IMAGE,APPSCRIPT';normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;exitCode=($(if($ok){0}else{4}))})
+  Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$ok;action='WATCHDOG_TABLET_PRIMARY_HOLD_V19_PINNED_SUPERVISOR';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');hostHealthy=(HostHealthy);hostRestoreBefore=[bool]$hostRestore.before;hostRestoreRestarted=[bool]$hostRestore.restarted;hostRestoreOk=[bool]$hostRestore.ok;hostRestoreError=[string]$hostRestore.error;flowCdp9224Before=[bool]$flowRestore.before;flowCdp9224Started=[bool]$flowRestore.started;flowCdp9224Ok=[bool]$flowRestore.ok;flowCdp9224Error=[string]$flowRestore.error;flowDemandGuard=[string]$flowRestore.demandGuard;flowAutoOpenAllowed=[bool]$flowRestore.allowOpen;tabletPrimaryOwner=$true;notebookLaptopHeld=$true;flowLaptopFallbackEnabled=[bool]$flowRestore.allowOpen;stableMetaReachable=$true;stableMetaTransport=[string]$s.transport;stableEnabled=$false;stableNotes=[string]$s.notes;bootstrapBefore=[bool]$bootstrap.beforePresent;bootstrapRefreshed=[bool]$bootstrap.refreshed;bootstrapRestarted=[bool]$bootstrap.restarted;bootstrapOk=[bool]$bootstrap.ok;bootstrapSha=[string]$bootstrap.sha;bootstrapTransport=[string]$bootstrap.transport;bootstrapError=[string]$bootstrap.error;currentVersion=(CurrentVersion);notebooklmRuntimeChecked=$true;dedicatedNotebookChromeBefore=[int]$shutdown.before;dedicatedNotebookChromeStopped=[int]$shutdown.stopped;dedicatedNotebookChromeAfter=[int]$shutdown.after;autoResumeInvoked=$false;independentLanesExpected='FLOW,IMAGE,APPSCRIPT';normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;exitCode=($(if($ok){0}else{4}))})
+  try{$WatchdogMutex.ReleaseMutex();$WatchdogMutex.Dispose()}catch{}
   if($ok){exit 0}else{exit 4}
 }
-if(-not$s.ok){Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$true;action='WATCHDOG_STABLE_API_AND_RAW_UNREACHABLE_FAIL_CLOSED_V17';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');hostHealthy=(HostHealthy);bootstrapLoopPresent=(BootstrapPresent);currentVersion=(CurrentVersion);stableMetaReachable=$false;autoResumeInvoked=$false;normalChromeTouched=$false;error=[string]$s.error;exitCode=0});exit 0}
+if(-not$s.ok){Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$true;action='WATCHDOG_STABLE_API_AND_RAW_UNREACHABLE_FAIL_CLOSED_V19';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');hostHealthy=(HostHealthy);bootstrapLoopPresent=(BootstrapPresent);currentVersion=(CurrentVersion);stableMetaReachable=$false;autoResumeInvoked=$false;normalChromeTouched=$false;error=[string]$s.error;exitCode=0});try{$WatchdogMutex.ReleaseMutex();$WatchdogMutex.Dispose()}catch{};exit 0}
 try{
   $raw='https://raw.githubusercontent.com/'+$Repo+'/'+$LegacyBlob+'/local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
-  $wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Watchdog-V17';$legacy=$wc.DownloadData($raw)}finally{$wc.Dispose()}
+  $wc=New-Object Net.WebClient;try{$wc.Headers['User-Agent']='HomeDesign-Watchdog-V19';$legacy=$wc.DownloadData($raw)}finally{$wc.Dispose()}
   if(-not$legacy-or$legacy.Length-eq0){throw 'LEGACY_WATCHDOG_RAW_EMPTY'}
-  $p=Join-Path $Root 'HomeDesignLocalWatchdog-V6-delegate.ps1';[IO.File]::WriteAllBytes($p,$legacy);& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $p;exit $LASTEXITCODE
-}catch{Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$false;action='WATCHDOG_V17_DELEGATE_ERROR';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');autoResumeInvoked=$false;error=$_.Exception.Message;exitCode=3});exit 3}
+  $p=Join-Path $Root 'HomeDesignLocalWatchdog-V6-delegate.ps1';[IO.File]::WriteAllBytes($p,$legacy);try{$WatchdogMutex.ReleaseMutex();$WatchdogMutex.Dispose()}catch{};& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $p;exit $LASTEXITCODE
+}catch{Save $Receipt 'WATCHDOG_LAST.json' ([ordered]@{ok=$false;action='WATCHDOG_V19_DELEGATE_ERROR';version=$Version;startedAt=$start;completedAt=(Get-Date).ToString('o');autoResumeInvoked=$false;error=$_.Exception.Message;exitCode=3});try{$WatchdogMutex.ReleaseMutex();$WatchdogMutex.Dispose()}catch{};exit 3}
