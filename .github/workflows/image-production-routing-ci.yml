@@ -8,7 +8,19 @@ on:
       - 'central-agent/templates/GPT_IMAGE_AUTO_FALLBACK_BRIDGE_V1.json'
       - 'local-agent/governor/Resolve-ImageGenerationRouteV1.ps1'
       - 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
+      - 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1'
       - 'tests/image-production-routing.test.ps1'
+      - 'tests/chatgpt-image-queue-prep.test.ps1'
+      - '.github/workflows/image-production-routing-ci.yml'
+  pull_request:
+    paths:
+      - 'config/image-production-routing-policy-v1.json'
+      - 'central-agent/templates/GPT_IMAGE_AUTO_FALLBACK_BRIDGE_V1.json'
+      - 'local-agent/governor/Resolve-ImageGenerationRouteV1.ps1'
+      - 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1'
+      - 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1'
+      - 'tests/image-production-routing.test.ps1'
+      - 'tests/chatgpt-image-queue-prep.test.ps1'
       - '.github/workflows/image-production-routing-ci.yml'
   workflow_dispatch:
 
@@ -28,7 +40,13 @@ jobs:
           if($policy.routePriority[0] -ne 'FLOW_AGENT_BRIDGE'){throw 'FLOW_NOT_PRIMARY'}
           if($policy.routePriority[-1] -ne 'CHATGPT_IMAGE_AUTO_FALLBACK'){throw 'GPT_NOT_FALLBACK'}
           if($policy.verification.requiredSameFixturePasses -ne 2){throw 'X2_GATE_MISSING'}
-          foreach($f in @('local-agent/governor/Resolve-ImageGenerationRouteV1.ps1','tests/image-production-routing.test.ps1')){
+          foreach($f in @(
+            'local-agent/governor/Resolve-ImageGenerationRouteV1.ps1',
+            'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1',
+            'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1',
+            'tests/image-production-routing.test.ps1',
+            'tests/chatgpt-image-queue-prep.test.ps1'
+          )){
             $tokens=$null;$errors=$null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
             if($errors.Count){$errors|%{Write-Error $_.Message};throw "POWERSHELL_PARSE_FAIL:$f"}
@@ -41,9 +59,27 @@ jobs:
           if($fallback.priority.fallback -notmatch 'ChatGPT Image Auto'){throw 'FALLBACK_TEMPLATE_ROUTE_MISSING'}
           if($fallback.verification.requiredFunctionalRuns -ne 2){throw 'FALLBACK_X2_MISSING'}
           $prep=Get-Content 'local-agent/governor/Prepare-ChatGPTImageAdapterBindingV1.ps1' -Raw
-          foreach($token in @('READY_FOR_ADAPTER_BINDING','NONZERO_IMAGE','EXACT_DOWNLOAD_PATH','DRIVE_ASSET_READBACK','RESULT_ACK_X2','NO_FLOW_SUBSTITUTION')){
+          foreach($token in @(
+            'READY_FOR_EXACT_INTERFACE_BINDING',
+            'EXACT_MESSAGE_OR_STORAGE_INTERFACE_CONFIRMATION',
+            'AUTOMATIC_QUEUE_CLAIM',
+            'AUTOMATIC_CHATGPT_SUBMIT',
+            'GENERATION_COMPLETE_DETECTED',
+            'ORIGINAL_IMAGE_DIRECT_DOWNLOAD_TO_DRIVE_SYNC_FOLDER',
+            'DRIVE_FILE_ID_AND_NONZERO_READBACK',
+            'QUEENS_ASSET_REGISTRATION',
+            'RESULT_ACK_X2',
+            'NO_PARALLEL_DUPLICATE_GENERATION'
+          )){
             if(-not $prep.Contains($token)){throw "ADAPTER_CONTRACT_TOKEN_MISSING:$token"}
+          }
+          $queuePrep=Get-Content 'local-agent/governor/Prepare-ChatGPTImageQueueTaskV1.ps1' -Raw
+          foreach($token in @('READY_FOR_EXACT_INTERFACE_BINDING','READY_FOR_EXACT_INTERFACE_CONFIRMATION','NO_BLIND_UI_CLICK')){
+            if(-not $queuePrep.Contains($token)){throw "QUEUE_PREP_CONTRACT_TOKEN_MISSING:$token"}
           }
       - name: Run image production route fixtures
         shell: pwsh
         run: pwsh -NoProfile -File tests/image-production-routing.test.ps1
+      - name: Run ChatGPT Image queue prep fixtures
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/chatgpt-image-queue-prep.test.ps1
