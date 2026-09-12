@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "device": "BOOK-1HE2THGKRA",
-  "remoteDataPlaneState": "OFFLINE_RECOVERY_0250_PENDING",
+  "remoteDataPlaneState": "OFFLINE_RECOVERY_0248_PENDING",
   "requestedMode": "AUTO_FAILOVER",
   "stageOrder": ["REMOTE_DC", "TAILSCALE", "RUSTDESK"],
   "stage1RetryBeforeFailover": 1,
@@ -12,8 +12,8 @@
   "allowAutomaticSecurityApproval": false,
   "allowBroadProcessKill": false,
   "allowAutomaticReboot": false,
-  "targetRemotePackage": "@wonderwhy-er/desktop-commander@0.2.50",
-  "requiredReadback": "list_devices+ping+real command+file RW x2",
-  "updatedAt": "2026-09-11T08:08:00Z",
-  "notes": "RDC server state is offline after false-healthy 0.2.48 incident. Prefer one-shot 0.2.50 recovery. If primary remains unavailable, route to authenticated Tailscale; RustDesk remains human-approved break-glass only. Ping alone never passes health."
+  "targetRemotePackage": "@wonderwhy-er/desktop-commander@0.2.48",
+  "requiredReadback": "list_devices + ping + real PowerShell command + file write/read x2 + central receipt",
+  "updatedAt": "2026-09-12T00:10:00Z",
+  "notes": "0.2.48 is the user-approved stabilization baseline. Exact-process one-shot recovery is pending because the device command plane is offline while auth remains valid. Do not upgrade, reboot, broad-kill Node, auto-enter credentials, or auto-approve security. RustDesk remains human-approved break-glass only. Ping alone never passes health."
 }
