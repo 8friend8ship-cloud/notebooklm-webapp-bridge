@@ -1,9 +1,9 @@
 {
-  "enabled": false,
-  "requestId": "RDC_STABLE_HOLD_20260911_1708",
+  "enabled": true,
+  "requestId": "RDC_STABLE_0248_RECOVERY_20260912_0910KST",
   "target": "BOOK-1HE2THGKRA",
-  "reason": "User directive: current 0.2.48 is the stabilization baseline; defer version upgrade. Continue validation and recovery without version mutation.",
+  "reason": "Remote command plane went offline with auth_token valid after a verified X2 pass. Recover the existing 0.2.48 stable baseline without any version mutation.",
   "package": "@wonderwhy-er/desktop-commander@0.2.48",
-  "policy": "STABLE_HOLD; no automatic upgrade/canary/promotion; keep current session; exact-process self-heal only; no broad Node kill; no reboot; no global npm cache or ExecutionPolicy change",
-  "requiredReadback": "get_config + process/PowerShell + file write/read x2 + Drive receipt before COMPLETE"
+  "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; STABLE_HOLD_0.2.48; no automatic upgrade/canary/promotion; no broad Node kill; no reboot; no global npm cache clean; no global ExecutionPolicy change; no new OAuth or Verify Device while auth remains valid",
+  "requiredReadback": "list_devices + ping + real PowerShell command + file write/read x2 + central Drive receipt before COMPLETE"
 }
