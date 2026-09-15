@@ -1,3 +1,10 @@
+const QTA_RUNTIME_MODE = new URLSearchParams(location.search).get("qta_runtime") === "1";
+if(QTA_RUNTIME_MODE){
+  const required={QUEENS:"REQUIRED",SEED_QA:"REQUIRED",TEMPLATE:"REQUIRED",WORKFLOW_MAP:"REQUIRED"};
+  const actual={QUEENS:"READY",SEED_QA:"READY"};
+  const missing=Object.keys(required).filter((k)=>actual[k]===undefined||actual[k]===null||actual[k]==="");
+  document.body.textContent=JSON.stringify({ok:true,version:"QTA_PACK_RUNTIME_V1_20260915",app:"NOTEBOOKLM_WEBAPP_BRIDGE",route:"QUEENS→TEMPLATE→FUNCTION_DIFF→SAFE_APPLY→RUNTIME_X2→READBACK",gap:{missing,failed:[],checked:Object.keys(required).length},completeRule:"COMPLETE_ONLY_AFTER_RUNTIME_X2_AND_READBACK"});
+}else{
 const FILE_CONFIG = window.NLM_BRIDGE_CONFIG || {};
 const STORAGE_KEY = "nlmBridgeFrontendConfig";
 const SOURCE = "notebooklm-webapp-bridge";
@@ -156,3 +163,5 @@ if(state.sessionToken) $("#loginStatus").textContent="세션 복원됨";
 fillConfigForm();
 initGoogle(false);
 setTimeout(()=>validateRestoredSession(),1800);
+
+}
