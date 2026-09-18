@@ -1,0 +1,47 @@
+name: Central Shopping Research Bridge CI
+
+on:
+  push:
+    branches:
+      - feat/central-shopping-research-bridge-20260829
+    paths:
+      - 'extensions/central-shopping-research-bridge/**'
+      - 'central-agent/front-shopping-needs.template.json'
+      - 'central-agent/shopping-bridge.contract.json'
+      - 'central-agent/platform-shopping-ppl.policy.json'
+      - 'apps-script/CentralShoppingContentOrchestrator.gs'
+      - 'tests/central-shopping-research-bridge.test.mjs'
+      - '.github/workflows/central-shopping-research-bridge-ci.yml'
+  pull_request:
+    paths:
+      - 'extensions/central-shopping-research-bridge/**'
+      - 'central-agent/front-shopping-needs.template.json'
+      - 'central-agent/shopping-bridge.contract.json'
+      - 'central-agent/platform-shopping-ppl.policy.json'
+      - 'apps-script/CentralShoppingContentOrchestrator.gs'
+      - 'tests/central-shopping-research-bridge.test.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  contract-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate JSON contracts
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('extensions/central-shopping-research-bridge/manifest.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('central-agent/front-shopping-needs.template.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('central-agent/shopping-bridge.contract.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('central-agent/platform-shopping-ppl.policy.json','utf8'))"
+      - name: Validate extension JavaScript syntax
+        run: |
+          node --check extensions/central-shopping-research-bridge/background.js
+          node --check extensions/central-shopping-research-bridge/content.js
+      - name: Run central shopping bridge contract tests
+        run: node --test tests/central-shopping-research-bridge.test.mjs
