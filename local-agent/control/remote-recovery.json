@@ -1,14 +1,16 @@
 {
   "schemaVersion": 1,
-  "requestId": "RDC_SCREENOFF_FALSE_HEALTHY_20260912_0913KST",
+  "requestId": "RDC_SLEEP_BRIDGE_BYPASS_RECOVERY_20260918_1112KST",
   "device": "BOOK-1HE2THGKRA",
   "action": "FORCE_REMOTE_RESTART_ONCE",
-  "reason": "SCREEN_OFF_CYCLE_X2_REPRODUCED_FALSE_HEALTHY_COMMAND_PLANE_TIMEOUT_WITH_AUTH_TOKEN_VALID",
-  "createdAt": "2026-09-12T00:12:59Z",
-  "expiresAt": "2026-09-12T02:30:00Z",
+  "reason": "INC_SLEEP_SEMANTIC_BRIDGE_BYPASS_20260918_OPENAI_DIRECT_SYSTEM_SLEEP_BYPASSED_NOTEBOOK_POWER_POLICY",
+  "createdAt": "2026-09-18T02:12:00Z",
+  "expiresAt": "2026-09-18T04:30:00Z",
   "maxExecutions": 1,
   "requiresPreflightNoHumanGate": true,
   "status": "PENDING",
   "scope": "EXACT_REMOTE_PRODUCER_CHAIN_ONLY",
-  "notes": "Approved recovery reuse. Do not auto-click Verify Device. Do not broad-kill node/chrome/pwsh. Restart exact canonical Remote producer chain once after preflight. Then require online+ping+PowerShell+file write/read x2 before verified. After recovery, apply V10/V32 source, run notebook Python timeline correlation for screen-off transport failure, then repeat screen-off validation."
+  "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
+  "incidentId": "INC_SLEEP_SEMANTIC_BRIDGE_BYPASS_20260918",
+  "notes": "Reuse canonical recovery lineage only. On the next local wake/AutoResume edge, CentralAgentTabSupervisor must consume this one-shot request and restart the exact canonical RemoteDC producer chain once. Do not auto-click Verify Device. Do not create a new OAuth/trigger/task. Do not broad-kill node/chrome/pwsh. After restart require online + ping + PowerShell real command + file write/readback x2. Then re-assert NotebookPack canonical power policy DISPLAY_OFF_ONLY; SLEEP=0; HIBERNATE=0 and record receipt/readback."
 }
