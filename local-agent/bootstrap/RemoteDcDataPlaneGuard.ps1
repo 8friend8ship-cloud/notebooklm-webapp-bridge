@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_DATA_PLANE_GUARD_V4_STABLE_HOLD_EXPIRY_20260912'
+$Version='REMOTE_DC_DATA_PLANE_GUARD_V5_MACHINE_NAME_FALLBACK_20260918'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -24,7 +24,7 @@ function StartRemote([string]$Package){$old=$env:npm_config_cache;try{$env:npm_c
 function FetchControl{try{$u='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/control/remote-dc-recovery.json?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();Invoke-RestMethod -Uri $u -TimeoutSec 15}catch{$null}}
 $control=FetchControl
 $state=$null;try{if(Test-Path $StatePath){$state=Get-Content $StatePath -Raw -Encoding UTF8|ConvertFrom-Json}}catch{}
-$requestId=if($control){[string]$control.requestId}else{''};$enabled=[bool]($control-and$control.enabled);$target=if($control){[string]$control.target}else{''};$targetOk=[bool]((-not$target)-or($target-eq$env:COMPUTERNAME));$Package=if($control-and[string]$control.package){[string]$control.package}else{$AllowedPackage};$packageOk=($Package-eq$AllowedPackage);$expiresAt=if($control){[string]$control.expiresAt}else{''};$expired=$false;if($expiresAt){try{$expired=([DateTimeOffset]::Parse($expiresAt).UtcDateTime-lt[DateTime]::UtcNow)}catch{$expired=$true}}
+$requestId=if($control){[string]$control.requestId}else{''};$enabled=[bool]($control-and$control.enabled);$target=if($control){[string]$control.target}else{''};$localComputerName=if([string]$env:COMPUTERNAME){[string]$env:COMPUTERNAME}else{[Environment]::MachineName};$targetOk=[bool]((-not$target)-or($target.Trim()-eq([string]$localComputerName).Trim()));$Package=if($control-and[string]$control.package){[string]$control.package}else{$AllowedPackage};$packageOk=($Package-eq$AllowedPackage);$expiresAt=if($control){[string]$control.expiresAt}else{''};$expired=$false;if($expiresAt){try{$expired=([DateTimeOffset]::Parse($expiresAt).UtcDateTime-lt[DateTime]::UtcNow)}catch{$expired=$true}}
 $already=([string]$state.completedRequestId-eq$requestId-and$requestId)
 $before=GetRemote (GetAll);$tcpBefore=TcpCount $before
 $o=[ordered]@{ok=$true;action='REMOTE_DC_DATA_PLANE_ONE_SHOT_RECOVERY';version=$Version;package=$Package;allowedPackage=$AllowedPackage;requestId=$requestId;enabled=$enabled;target=$target;targetOk=$targetOk;packageOk=$packageOk;expiresAt=$expiresAt;expired=$expired;alreadyCompleted=[bool]$already;prewarmOk=$false;prewarmExit=$null;remoteBefore=[int]$before.Count;tcpBefore=[int]$tcpBefore;stopped=@();started=$false;remoteAfter=0;tcpAfter=0;cloudDataPlaneVerified=$false;cloudVerificationRequired='LIST_DEVICES+PING+REAL_COMMAND+FILE_RW_X2';broadNodeKill=$false;globalNpmCacheTouched=$false;globalExecutionPolicyChanged=$false;versionMutationAllowed=$false;startedAt=(Get-Date).ToString('o');completedAt='';error=''}
