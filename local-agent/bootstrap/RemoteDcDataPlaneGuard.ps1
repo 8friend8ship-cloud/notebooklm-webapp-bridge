@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_DATA_PLANE_GUARD_V7_CONTROL_API_FRESH_20260918'
+$Version='REMOTE_DC_DATA_PLANE_GUARD_V8_ONE_ATTEMPT_PER_REQUEST_20260919'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -35,8 +35,37 @@ $control=FetchControl
 $state=$null;try{if(Test-Path $StatePath){$state=Get-Content $StatePath -Raw -Encoding UTF8|ConvertFrom-Json}}catch{}
 $requestId=if($control){[string]$control.requestId}else{''};$enabled=[bool]($control-and$control.enabled);$target=if($control){[string]$control.target}else{''};$localComputerName=if([string]$env:COMPUTERNAME){[string]$env:COMPUTERNAME}else{[Environment]::MachineName};$targetOk=[bool]((-not$target)-or($target.Trim()-eq([string]$localComputerName).Trim()));$Package=if($control-and[string]$control.package){[string]$control.package}else{$AllowedPackage};$packageOk=($Package-eq$AllowedPackage);$expiresAt=if($control){[string]$control.expiresAt}else{''};$expired=$false;if($expiresAt){try{$expired=([DateTimeOffset]::Parse($expiresAt).UtcDateTime-lt[DateTime]::UtcNow)}catch{$expired=$true}}
 $already=([string]$state.completedRequestId-eq$requestId-and$requestId)
+$attempted=([string]$state.attemptedRequestId-eq$requestId-and$requestId)
 $before=GetRemote (GetAll);$tcpBefore=TcpCount $before
-$o=[ordered]@{ok=$true;action='REMOTE_DC_DATA_PLANE_ONE_SHOT_RECOVERY';version=$Version;package=$Package;allowedPackage=$AllowedPackage;requestId=$requestId;enabled=$enabled;target=$target;targetOk=$targetOk;packageOk=$packageOk;expiresAt=$expiresAt;expired=$expired;alreadyCompleted=[bool]$already;prewarmOk=$false;prewarmExit=$null;remoteBefore=[int]$before.Count;tcpBefore=[int]$tcpBefore;stopped=@();started=$false;remoteAfter=0;tcpAfter=0;cloudDataPlaneVerified=$false;cloudVerificationRequired='LIST_DEVICES+PING+REAL_COMMAND+FILE_RW_X2';broadNodeKill=$false;globalNpmCacheTouched=$false;globalExecutionPolicyChanged=$false;versionMutationAllowed=$false;startedAt=(Get-Date).ToString('o');completedAt='';error=''}
-if($enabled-and$requestId-and-not$already-and-not$expired){try{if(-not$targetOk){throw 'TARGET_MISMATCH'};if(-not$packageOk){throw 'PACKAGE_MUTATION_BLOCKED_STABLE_HOLD'};$warm=WarmCache $Package;$o.prewarmOk=[bool]$warm.ok;$o.prewarmExit=[int]$warm.exitCode;if(-not$warm.ok){throw ('PREWARM_FAILED:'+([string]$warm.output))};$o.stopped=@(StopExact $before);Start-Sleep -Seconds 2;$launch=StartRemote $Package;$o.started=[bool]$launch.ok;if(-not$launch.ok){throw [string]$launch.error};$after=GetRemote (GetAll);$o.remoteAfter=[int]$after.Count;$o.tcpAfter=[int](TcpCount $after);$o.ok=($o.remoteAfter-gt0-and$o.tcpAfter-gt0);if($o.ok){[ordered]@{completedRequestId=$requestId;completedAt=(Get-Date).ToString('o');version=$Version;package=$Package}|ConvertTo-Json|Set-Content -LiteralPath $StatePath -Encoding UTF8}}catch{$o.ok=$false;$o.error=$_.Exception.Message}}elseif($enabled-and$expired){$o.ok=$false;$o.error='CONTROL_EXPIRED_FAIL_CLOSED'}
+$o=[ordered]@{ok=$true;action='REMOTE_DC_DATA_PLANE_ONE_SHOT_RECOVERY';version=$Version;package=$Package;allowedPackage=$AllowedPackage;requestId=$requestId;enabled=$enabled;target=$target;targetOk=$targetOk;packageOk=$packageOk;expiresAt=$expiresAt;expired=$expired;alreadyCompleted=[bool]$already;alreadyAttempted=[bool]$attempted;prewarmOk=$false;prewarmExit=$null;remoteBefore=[int]$before.Count;tcpBefore=[int]$tcpBefore;stopped=@();started=$false;remoteAfter=0;tcpAfter=0;cloudDataPlaneVerified=$false;cloudVerificationRequired='LIST_DEVICES+PING+REAL_COMMAND+FILE_RW_X2';broadNodeKill=$false;globalNpmCacheTouched=$false;globalExecutionPolicyChanged=$false;versionMutationAllowed=$false;startedAt=(Get-Date).ToString('o');completedAt='';error=''}
+if($enabled-and$requestId-and-not$already-and-not$attempted-and-not$expired){
+  try{
+    if(-not$targetOk){throw 'TARGET_MISMATCH'}
+    if(-not$packageOk){throw 'PACKAGE_MUTATION_BLOCKED_STABLE_HOLD'}
+    $warm=WarmCache $Package;$o.prewarmOk=[bool]$warm.ok;$o.prewarmExit=[int]$warm.exitCode
+    if(-not$warm.ok){throw ('PREWARM_FAILED:'+([string]$warm.output))}
+    $o.stopped=@(StopExact $before);Start-Sleep -Seconds 2
+    $launch=StartRemote $Package;$o.started=[bool]$launch.ok
+    if(-not$launch.ok){throw [string]$launch.error}
+    $after=GetRemote (GetAll);$o.remoteAfter=[int]$after.Count;$o.tcpAfter=[int](TcpCount $after)
+    $o.ok=($o.remoteAfter-gt0-and$o.tcpAfter-gt0)
+  }catch{$o.ok=$false;$o.error=$_.Exception.Message}
+  finally{
+    try{
+      $st=[ordered]@{
+        attemptedRequestId=$requestId
+        attemptedAt=(Get-Date).ToString('o')
+        attemptOk=[bool]$o.ok
+        completedRequestId=$(if($o.ok){$requestId}else{if($state){[string]$state.completedRequestId}else{''}})
+        completedAt=$(if($o.ok){(Get-Date).ToString('o')}else{if($state){[string]$state.completedAt}else{''}})
+        version=$Version
+        package=$Package
+      }
+      $st|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $StatePath -Encoding UTF8
+    }catch{}
+  }
+}elseif($enabled-and$attempted-and-not$already){
+  $o.ok=$false;$o.error='REQUEST_ALREADY_ATTEMPTED_NEW_REQUEST_ID_REQUIRED'
+}elseif($enabled-and$expired){$o.ok=$false;$o.error='CONTROL_EXPIRED_FAIL_CLOSED'}
 $o.completedAt=(Get-Date).ToString('o');SaveReceipt $o;$o|ConvertTo-Json -Depth 20
 if($o.ok){exit 0}else{exit 4}
