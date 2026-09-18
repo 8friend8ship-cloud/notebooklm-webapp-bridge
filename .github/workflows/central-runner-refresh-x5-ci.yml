@@ -1,0 +1,59 @@
+name: Central Runner Refresh X5 CI
+on:
+  pull_request:
+    paths:
+      - 'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/**'
+      - '.github/workflows/central-runner-refresh-x5-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-refresh-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell files
+        shell: pwsh
+        run: |
+          $files=@(
+            'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1',
+            'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/ContentOSAppsScriptSync.ps1',
+            'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/RecoverExistingBoundAppsScript.ps1'
+          )
+          foreach($f in $files){$t=$null;$e=$null;[Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$t,[ref]$e)|Out-Null;if($e.Count){$e|%{Write-Error $_};exit 1}}
+      - name: Refresh special mode safety
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/ContentOSAppsScriptSync.ps1')
+          t=p.read_text(encoding='utf-8')
+          assert "CENTRAL_RUNNER_REFRESH_X5_READONLY" in t
+          special=t.split("if ($TargetTitle -eq 'CENTRAL_RUNNER_REFRESH_X5_READONLY')",1)[1].split("if ($TargetTitle -ne 'WEBAPP_TEMPLATE_05')",1)[0].lower()
+          for bad in ['clasp.source','git.source',' push ',' deploy ','login','register-scheduledtask']:
+              assert bad not in special, bad
+          assert 'centralappsscriptrunner.ps1' in special
+          assert 'bound_apps_script_readonly_recovery' in special
+          assert 'x5tasksenabled=$false' in special.replace(' ','')
+      - name: Manifest sequencing guard
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          d=json.loads(Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/tasks.json').read_text(encoding='utf-8'))
+          refresh=[x for x in d['tasks'] if x['taskId']=='TASK_20260831_CENTRAL_RUNNER_REFRESH_X5_READONLY_001']
+          assert len(refresh)==1 and refresh[0]['enabled'] is True
+          assert refresh[0]['action']=='CONTENTOS_APPS_SCRIPT_SYNC'
+          assert refresh[0]['targetTitle']=='CENTRAL_RUNNER_REFRESH_X5_READONLY'
+          assert refresh[0]['maxAttempts']==1
+          x5=[x for x in d['tasks'] if x.get('action')=='BOUND_APPS_SCRIPT_READONLY_RECOVERY']
+          assert len(x5)==0, 'X5 recovery tasks must not be enabled/published before refresh receipt'
+      - name: New dispatcher and helper contract
+        shell: python
+        run: |
+          from pathlib import Path
+          r=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1').read_text(encoding='utf-8')
+          h=Path('notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/RecoverExistingBoundAppsScript.ps1').read_text(encoding='utf-8')
+          assert 'CENTRAL_APPS_SCRIPT_RUNNER_V2_X5_READONLY_20260831' in r
+          assert "'BOUND_APPS_SCRIPT_READONLY_RECOVERY'" in r
+          assert "mode='READ_ONLY'" in h or "mode = 'READ_ONLY'" in h
+          assert 'mutationPerformed=$false' in h or 'mutationPerformed = $false' in h
+          for n in range(5,10): assert f"'WEBAPP_TEMPLATE_0{n}'" in h
