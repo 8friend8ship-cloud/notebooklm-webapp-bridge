@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='RECOVERY_COORDINATOR_V2_20260911'
+$Version='RECOVERY_COORDINATOR_V3_ALWAYS_WATCHDOG_20260919'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -17,6 +17,6 @@ function Refresh([string]$RepoPath,[string]$Dest){$url='https://api.github.com/r
 function RunHidden([string]$Path,[int]$TimeoutSeconds){if(-not(Test-Path -LiteralPath $Path)){return 127};$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "'+$Path+'"';$p=[Diagnostics.Process]::Start($psi);if(-not$p.WaitForExit($TimeoutSeconds*1000)){try{& taskkill.exe /PID ([int]$p.Id) /T /F 2>$null|Out-Null}catch{};return 124};try{return [int]$p.ExitCode}catch{return 1}}
 $mutex=New-Object System.Threading.Mutex($false,'HomeDesignRecoveryCoordinatorV2');if(-not$mutex.WaitOne(0,$false)){exit 0}
 $r=[ordered]@{ok=$false;action='NOTEBOOK_AUDIT_THREE_STAGE_FAILOVER_WATCHDOG';version=$Version;startedAt=(Get-Date).ToString('o');completedAt='';auditSha='';watchdogSha='';failoverSha='';auditExit=$null;failoverExit=$null;watchdogExit=$null;errors=@();newTrigger=$false;newOAuth=$false;normalChromeTouched=$false;receiptChain=@('RECOVERY_COORDINATOR_LAST.json','THREE_STAGE_FAILOVER_LAST.json','REMOTE_DC_KEEPALIVE_LAST.json','WATCHDOG_LAST.json')}
-try{try{$r.auditSha=Refresh 'local-agent/bootstrap/NotebookAuditPack.ps1' $Audit}catch{$r.errors+=('AUDIT_REFRESH:'+ $_.Exception.Message)};try{$r.watchdogSha=Refresh 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$r.errors+=('WATCHDOG_REFRESH:'+ $_.Exception.Message)};try{$r.failoverSha=Refresh 'local-agent/bootstrap/HomeDesignThreeStageFailover.ps1' $Failover}catch{$r.errors+=('FAILOVER_REFRESH:'+ $_.Exception.Message)};$r.auditExit=RunHidden $Audit 360;$r.failoverExit=RunHidden $Failover 540;if([int]$r.failoverExit-ne0){$r.watchdogExit=RunHidden $Watchdog 420}else{$r.watchdogExit=0};$r.ok=([int]$r.auditExit-eq0 -and [int]$r.failoverExit-eq0)}catch{$r.errors+=('COORDINATOR:'+ $_.Exception.Message)}finally{$r.completedAt=(Get-Date).ToString('o');Save $r;try{$mutex.ReleaseMutex()}catch{};$mutex.Dispose()}
+try{try{$r.auditSha=Refresh 'local-agent/bootstrap/NotebookAuditPack.ps1' $Audit}catch{$r.errors+=('AUDIT_REFRESH:'+ $_.Exception.Message)};try{$r.watchdogSha=Refresh 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$r.errors+=('WATCHDOG_REFRESH:'+ $_.Exception.Message)};try{$r.failoverSha=Refresh 'local-agent/bootstrap/HomeDesignThreeStageFailover.ps1' $Failover}catch{$r.errors+=('FAILOVER_REFRESH:'+ $_.Exception.Message)};$r.auditExit=RunHidden $Audit 360;$r.failoverExit=RunHidden $Failover 540;$r.watchdogExit=RunHidden $Watchdog 420;$r.ok=([int]$r.auditExit-eq0 -and [int]$r.failoverExit-eq0 -and [int]$r.watchdogExit-eq0)}catch{$r.errors+=('COORDINATOR:'+ $_.Exception.Message)}finally{$r.completedAt=(Get-Date).ToString('o');Save $r;try{$mutex.ReleaseMutex()}catch{};$mutex.Dispose()}
 $r|ConvertTo-Json -Depth 50 -Compress
 if($r.ok){exit 0}else{exit 2}
