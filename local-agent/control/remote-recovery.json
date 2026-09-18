@@ -8,9 +8,15 @@
   "expiresAt": "2026-09-18T04:30:00Z",
   "maxExecutions": 1,
   "requiresPreflightNoHumanGate": true,
-  "status": "PENDING",
+  "status": "RECOVERED_BEFORE_OOB_CONSUME",
   "scope": "EXACT_REMOTE_PRODUCER_CHAIN_ONLY",
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "incidentId": "INC_SLEEP_SEMANTIC_BRIDGE_BYPASS_20260918",
-  "notes": "Reuse canonical recovery lineage only. On the next local wake/AutoResume edge, CentralAgentTabSupervisor must consume this one-shot request and restart the exact canonical RemoteDC producer chain once. Do not auto-click Verify Device. Do not create a new OAuth/trigger/task. Do not broad-kill node/chrome/pwsh. After restart require online + ping + PowerShell real command + file write/readback x2. Then re-assert NotebookPack canonical power policy DISPLAY_OFF_ONLY; SLEEP=0; HIBERNATE=0 and record receipt/readback."
+  "recoveryReadback": {
+    "deviceOnline": true,
+    "ping": "PASS",
+    "fileWriteReadbackX2": "PASS",
+    "oobRestartExecuted": false
+  },
+  "notes": "Notebook returned online before the one-shot OOB request needed to restart RemoteDC. Request is closed to prevent a late unnecessary restart. Preserve canonical recovery lineage. Next: central remote manager splits R1 RemoteDC, R2 notebook-local remote, R3 OpenAI/cloud remote so no single lane can block all recovery."
 }
