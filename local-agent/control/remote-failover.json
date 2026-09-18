@@ -1,19 +1,29 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "device": "BOOK-1HE2THGKRA",
-  "remoteDataPlaneState": "OFFLINE_RECOVERY_0248_PENDING",
-  "requestedMode": "AUTO_FAILOVER",
-  "stageOrder": ["REMOTE_DC", "TAILSCALE", "RUSTDESK"],
+  "remoteDataPlaneState": "OFFLINE_FALSE_HEALTHY_RECOVERY_V7_PENDING",
+  "requestedMode": "CENTRAL_3_LANE_FAILOVER",
+  "centralStageOrder": [
+    "R3_OPENAI_CLOUD_REMOTE",
+    "R2_NOTEBOOK_LOCAL_REMOTE",
+    "R1_REMOTE_DC"
+  ],
+  "legacyFallbackStageOrder": [
+    "REMOTE_DC",
+    "TAILSCALE",
+    "RUSTDESK"
+  ],
   "stage1RetryBeforeFailover": 1,
-  "stage1RestartBackoffSec": 0,
-  "stage2RequiresAuthenticatedTailnet": true,
-  "stage3RequiresHumanApprovalForSession": true,
   "allowAutomaticCredentialEntry": false,
   "allowAutomaticSecurityApproval": false,
   "allowBroadProcessKill": false,
   "allowAutomaticReboot": false,
   "targetRemotePackage": "@wonderwhy-er/desktop-commander@0.2.48",
-  "requiredReadback": "list_devices + ping + real PowerShell command + file write/read x2 + central receipt",
-  "updatedAt": "2026-09-12T00:10:00Z",
-  "notes": "0.2.48 is the user-approved stabilization baseline. Exact-process one-shot recovery is pending because the device command plane is offline while auth remains valid. Do not upgrade, reboot, broad-kill Node, auto-enter credentials, or auto-approve security. RustDesk remains human-approved break-glass only. Ping alone never passes health."
+  "requiredReadback": "R2 Guard V7 receipt + list_devices + ping + real PowerShell command + file write/read x2 + central receipt",
+  "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
+  "resumeId": "R20260909_001",
+  "lastGood": "REMOTE_DC_ONLINE_PING_FILE_RW_X2_20260918",
+  "firstUnfinished": "R2_WATCHDOG_CONSUME_V7_AND_WRITE_RECEIPT",
+  "updatedAt": "2026-09-18T14:02:00Z",
+  "notes": "Central manager owns routing. RemoteDC is worker only. R1 currently offline after DISPLAY_OFF_ONLY regression. Correct control path is local-agent/control/remote-dc-recovery.json. Guard V7 uses GitHub Contents API freshness and MachineName fallback. No reauth/version change/reboot."
 }
