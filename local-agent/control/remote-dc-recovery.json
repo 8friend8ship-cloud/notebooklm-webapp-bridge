@@ -1,10 +1,10 @@
 {
   "enabled": true,
-  "requestId": "RDC_DISPLAY_OFF_FLAP_RECOVERY_20260918_2022KST",
+  "requestId": "RDC_DISPLAY_OFF_FLAP_RECOVERY_20260918_2303KST",
   "target": "BOOK-1HE2THGKRA",
-  "reason": "INC_DISPLAY_OFF_ONLY_REMOTE_COMMAND_PLANE_FLAP_20260918. Retry exact pinned 0.2.48 one-shot after target-compare fix; prior request expired before V5 rerun.",
+  "reason": "INC_DISPLAY_OFF_ONLY_REMOTE_COMMAND_PLANE_FLAP_20260918. Refresh existing one-shot exact pinned 0.2.48 recovery request after prior request expired before V7 watchdog consumption.",
   "package": "@wonderwhy-er/desktop-commander@0.2.48",
-  "expiresAt": "2026-09-18T13:30:00Z",
+  "expiresAt": "2026-09-18T14:30:00Z",
   "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; STABLE_HOLD_0.2.48; no automatic upgrade/canary/promotion; no broad Node kill; no reboot; no global npm cache clean; no global ExecutionPolicy change; no new OAuth or Verify Device while auth remains valid; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001 and LAST_GOOD lineage",
   "requiredReadback": "list_devices + ping + real PowerShell command + file write/read x2 + central Drive receipt before COMPLETE"
 }
