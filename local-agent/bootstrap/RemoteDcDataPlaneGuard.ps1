@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_DATA_PLANE_GUARD_V6_EXPIRED_FAIL_CLOSED_20260918'
+$Version='REMOTE_DC_DATA_PLANE_GUARD_V7_CONTROL_API_FRESH_20260918'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -21,7 +21,16 @@ function TcpCount([array]$p){$ids=@($p|ForEach-Object{[int]$_.ProcessId});if($id
 function StopExact([array]$p){$ids=@();foreach($x in $p){try{$id=[int]$x.ProcessId;if($id-gt0){& taskkill.exe /PID $id /T /F 2>$null|Out-Null;if($LASTEXITCODE-eq0){$ids+=$id}}}catch{}};@($ids)}
 function WarmCache([string]$Package){$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$out=@(& npm.cmd exec --yes --package=$Package -- node -e "console.log('DC_CACHE_READY_STABLE_HOLD')" 2>&1);$rc=$LASTEXITCODE;[pscustomobject]@{ok=($rc-eq0);exitCode=[int]$rc;output=($out-join"`n")}}catch{[pscustomobject]@{ok=$false;exitCode=1;output=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
 function StartRemote([string]$Package){$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$args=@('--yes',$Package,'remote','--persist-session');$p=Start-Process -FilePath 'npx.cmd' -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru;Start-Sleep -Seconds 7;[pscustomobject]@{ok=$true;launcherPid=[int]$p.Id}}catch{[pscustomobject]@{ok=$false;launcherPid=0;error=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
-function FetchControl{try{$u='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/control/remote-dc-recovery.json?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();Invoke-RestMethod -Uri $u -TimeoutSec 15}catch{$null}}
+function FetchControl{
+  try{
+    $headers=@{'User-Agent'='HomeDesign-RemoteGuard-V7';'Accept'='application/vnd.github+json';'Cache-Control'='no-cache'}
+    $u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/control/remote-dc-recovery.json?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $x=Invoke-RestMethod -Uri $u -Headers $headers -Method Get -TimeoutSec 15
+    if(-not$x.content){throw 'CONTROL_API_EMPTY'}
+    $json=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$x.content-replace'\s','')))
+    return ($json|ConvertFrom-Json)
+  }catch{return $null}
+}
 $control=FetchControl
 $state=$null;try{if(Test-Path $StatePath){$state=Get-Content $StatePath -Raw -Encoding UTF8|ConvertFrom-Json}}catch{}
 $requestId=if($control){[string]$control.requestId}else{''};$enabled=[bool]($control-and$control.enabled);$target=if($control){[string]$control.target}else{''};$localComputerName=if([string]$env:COMPUTERNAME){[string]$env:COMPUTERNAME}else{[Environment]::MachineName};$targetOk=[bool]((-not$target)-or($target.Trim()-eq([string]$localComputerName).Trim()));$Package=if($control-and[string]$control.package){[string]$control.package}else{$AllowedPackage};$packageOk=($Package-eq$AllowedPackage);$expiresAt=if($control){[string]$control.expiresAt}else{''};$expired=$false;if($expiresAt){try{$expired=([DateTimeOffset]::Parse($expiresAt).UtcDateTime-lt[DateTime]::UtcNow)}catch{$expired=$true}}
