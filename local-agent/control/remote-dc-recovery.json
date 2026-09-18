@@ -1,10 +1,11 @@
 {
-  "enabled": true,
+  "enabled": false,
   "requestId": "RDC_DISPLAY_OFF_FLAP_RECOVERY_20260919_0041KST",
   "target": "BOOK-1HE2THGKRA",
-  "reason": "INC_DISPLAY_OFF_ONLY_REMOTE_COMMAND_PLANE_FLAP_20260918. Consumer path corrected: Coordinator V3 always-watchdog and Failover V2 control-aware false-health forcing.",
+  "reason": "Closed after external R3 verification: list_devices online + ping PASS + real PowerShell PASS + file RW X2 PASS. Guard local matcher returned false and must not repeat-restart same request.",
   "package": "@wonderwhy-er/desktop-commander@0.2.48",
   "expiresAt": "2026-09-18T18:30:00Z",
-  "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; STABLE_HOLD_0.2.48; no automatic upgrade/canary/promotion; no broad Node kill; no reboot; no global npm cache clean; no global ExecutionPolicy change; no new OAuth or Verify Device while auth remains valid; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001 and LAST_GOOD lineage",
-  "requiredReadback": "R2 Guard receipt + list_devices + ping + real PowerShell command + file write/read x2 + central receipt before COMPLETE"
+  "status": "CLOSED_EXTERNAL_COMMAND_PLANE_X2_PASS",
+  "policy": "ONE_SHOT_CLOSED; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001; no repeat restart for same requestId",
+  "requiredReadback": "External R3 verification completed for this request; future retry requires NEW requestId."
 }
