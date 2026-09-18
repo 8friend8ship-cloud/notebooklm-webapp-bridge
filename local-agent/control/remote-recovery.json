@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "requestId": "RDC_SLEEP_BRIDGE_BYPASS_RECOVERY_20260918_1112KST",
+  "requestId": "RDC_DISPLAY_OFF_FLAP_RECOVERY_20260918_1513KST",
   "device": "BOOK-1HE2THGKRA",
   "action": "FORCE_REMOTE_RESTART_ONCE",
-  "reason": "INC_SLEEP_SEMANTIC_BRIDGE_BYPASS_20260918_OPENAI_DIRECT_SYSTEM_SLEEP_BYPASSED_NOTEBOOK_POWER_POLICY",
-  "createdAt": "2026-09-18T02:12:00Z",
-  "expiresAt": "2026-09-18T04:30:00Z",
+  "reason": "INC_DISPLAY_OFF_ONLY_REMOTE_COMMAND_PLANE_FLAP_20260918",
+  "createdAt": "2026-09-18T06:13:00Z",
+  "expiresAt": "2026-09-18T08:00:00Z",
   "maxExecutions": 1,
   "requiresPreflightNoHumanGate": true,
-  "status": "RECOVERED_BEFORE_OOB_CONSUME",
+  "status": "PENDING",
   "scope": "EXACT_REMOTE_PRODUCER_CHAIN_ONLY",
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
-  "incidentId": "INC_SLEEP_SEMANTIC_BRIDGE_BYPASS_20260918",
+  "incidentId": "INC_DISPLAY_OFF_ONLY_REMOTE_COMMAND_PLANE_FLAP_20260918",
   "recoveryReadback": {
-    "deviceOnline": true,
-    "ping": "PASS",
-    "fileWriteReadbackX2": "PASS",
+    "deviceOnline": "INTERMITTENT",
+    "ping": "TIMEOUT_INTERMITTENT",
+    "fileWriteReadbackX2": "PENDING",
     "oobRestartExecuted": false
   },
-  "notes": "Notebook returned online before the one-shot OOB request needed to restart RemoteDC. Request is closed to prevent a late unnecessary restart. Preserve canonical recovery lineage. Next: central remote manager splits R1 RemoteDC, R2 notebook-local remote, R3 OpenAI/cloud remote so no single lane can block all recovery."
+  "notes": "DISPLAY_OFF_ONLY regression used monitor-power off only; no system sleep/hibernate call. R1 list_devices returned online but real command/file readback remained intermittent. Reuse exact RemoteDC producer-chain one-shot recovery only; preserve same task/last-good; no broad process kill, no reauth, no version change."
 }
