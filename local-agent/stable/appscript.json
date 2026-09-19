@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "channel": "appscript-readonly",
   "enabled": true,
-  "version": "appscript-0.3.16-task203-ps51-authproof-direct",
-  "releasedAt": "2026-09-09T21:33:00+09:00",
-  "gitBlobSha1": "47ee2e3f67b27f93f902409e6e45498523a5cf00",
+  "version": "appscript-recovery-0.3.17",
+  "releasedAt": "2026-09-19T10:52:00+09:00",
+  "gitBlobSha1": "3f1697e16deec9b4775609ede11e46841d87adc2",
   "file": "HomeDesignLocalAgent.ps1",
-  "maxCycleSeconds": 600,
-  "executionMode": "one_shot",
-  "resultReceipt": "APPSCRIPT_TASK203_PS51_DIRECT_0.3.16.json",
-  "notes": "Direct PS5.1-safe Task203 read-only lane. Verifies existing clasp auth via exact Web/Factory clone files, validates source 0.3.9 blob, patches only empty ComSpec cmd fallback and the single show-authorized-user check after clone proof, then runs the preserved 0.3.9 analyzer. No push, new OAuth, project, deployment, trigger, scope, normal Chrome, global ExecutionPolicy, or broad process changes. COMPLETE requires child analyzer PASS plus bootstrap/readback verification."
+  "maxCycleSeconds": 1800,
+  "executionMode": "one_shot_retry_until_zero",
+  "resultReceipt": "APPSCRIPT_RECOVERY_LANE_0.3.17.json",
+  "notes": "TEMPORARY_REMOTE_INDEPENDENT_RECOVERY_LANE. AgentBootstrap polls this lane every 300s without RemoteDC. Runs exact INSTALL_AUTO_RESUME_TASK.ps1 then HomeDesignRecoveryCoordinator.ps1. No OAuth, reauth, reboot, broad kill, normal Chrome mutation, or new trigger. Restore previous appscript stable after verified recovery."
 }
