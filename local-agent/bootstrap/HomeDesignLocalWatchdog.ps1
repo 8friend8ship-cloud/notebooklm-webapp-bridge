@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V19_PINNED_SUPERVISOR_V31_20260912'
+$Version='WATCHDOG_V20_PY_CONTROL_WORKER_20260919'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $SupervisorCommit='e368274f18a424af49a3c896fdd06e2a229d1de8'
 $SupervisorBlob='46eee0e6d92fa3003e40f34f084984a766827556'
@@ -96,6 +96,20 @@ try{
   foreach($spec in @(@('local-agent/bootstrap/RemoteDcDataPlaneGuard.ps1',$RemoteDataPlaneGuardLocal),@('local-agent/bootstrap/NotebookAuditPack.ps1',$auditLocal))){try{$f=FetchRepoBytes $spec[0] 15;if($f.ok){$need=(-not(Test-Path $spec[1]));if(-not$need){$need=((GitBlobSha1 $spec[1]).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())};if($need){[IO.File]::WriteAllBytes(($spec[1]+'.download'),[byte[]]$f.bytes);Move-Item ($spec[1]+'.download') $spec[1] -Force}}}catch{}}
   if(Test-Path -LiteralPath $RemoteDataPlaneGuardLocal -PathType Leaf){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $RemoteDataPlaneGuardLocal | Out-Null}
   if(Test-Path -LiteralPath $auditLocal -PathType Leaf){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $auditLocal | Out-Null}
+}catch{}
+try{
+  $pyWorkerLocal=Join-Path $Root 'central_control_worker_v1.py'
+  $pf=FetchRepoBytes 'local-agent/python/central_control_worker_v1.py' 15
+  if($pf.ok){
+    $need=(-not(Test-Path $pyWorkerLocal))
+    if(-not$need){$need=((GitBlobSha1 $pyWorkerLocal).ToLowerInvariant()-ne([string]$pf.sha).ToLowerInvariant())}
+    if($need){[IO.File]::WriteAllBytes(($pyWorkerLocal+'.download'),[byte[]]$pf.bytes);Move-Item ($pyWorkerLocal+'.download') $pyWorkerLocal -Force}
+  }
+  if(Test-Path -LiteralPath $pyWorkerLocal -PathType Leaf){
+    $py=(Get-Command python.exe -ErrorAction SilentlyContinue)
+    if(-not$py){$py=Get-Command python -ErrorAction SilentlyContinue}
+    if($py){& $py.Source $pyWorkerLocal | Out-Null}
+  }
 }catch{}
 $chatgptAutoOpenDisabled=$true
 $s=StableMeta
