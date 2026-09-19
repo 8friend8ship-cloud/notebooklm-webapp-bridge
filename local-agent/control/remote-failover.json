@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "device": "BOOK-1HE2THGKRA",
-  "remoteDataPlaneState": "OFFLINE_FALSE_HEALTHY_RECOVERY_V7_PENDING",
+  "remoteDataPlaneState": "OFFLINE_R3_R2_RECOVERY_REQUESTED",
   "requestedMode": "CENTRAL_3_LANE_FAILOVER",
   "centralStageOrder": [
     "R3_OPENAI_CLOUD_REMOTE",
@@ -23,7 +23,8 @@
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "resumeId": "R20260909_001",
   "lastGood": "REMOTE_DC_ONLINE_PING_FILE_RW_X2_20260918",
-  "firstUnfinished": "R2_WATCHDOG_CONSUME_V7_AND_WRITE_RECEIPT",
-  "updatedAt": "2026-09-18T14:02:00Z",
-  "notes": "Central manager owns routing. RemoteDC is worker only. R1 currently offline after DISPLAY_OFF_ONLY regression. Correct control path is local-agent/control/remote-dc-recovery.json. Guard V7 uses GitHub Contents API freshness and MachineName fallback. No reauth/version change/reboot."
+  "firstUnfinished": "R2_NOTEBOOK_PACK_POWERSHELL_PYTHON_MONITOR_KEYBOARD_CONSUME_RECOVERY",
+  "updatedAt": "2026-09-19T01:24:00Z",
+  "notes": "RemoteDC offline while user is away. Route through R3 OpenAI/Cloud to R2 NotebookPack + Notebook PowerShell/Python + MonitorPack + KeyboardPack. R1 RemoteDC is target, not control dependency. No reboot/reauth/broad kill.",
+  "activeRecoveryRequestId": "RDC_R3_R2_PACK_BRIDGE_20260919_1021KST"
 }
