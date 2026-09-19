@@ -1,0 +1,26 @@
+{
+  "blueprint_id": "REMOTE_RECOVERY_BLUEPRINT_V1_20260919",
+  "priority": "P0_FIRST_CHECK",
+  "node_order": [
+    "N00_LOAD_LAST_GOOD",
+    "N10_POWER_GUARD",
+    "N20_TASK_TOPOLOGY",
+    "N30_LOOP_SERIALIZATION",
+    "N40_REMOTE_LOCAL_CHAIN",
+    "N50_AUTH_GATE",
+    "N60_REMOTE_MCP_X2",
+    "N70_DATA_PLANE_X2",
+    "N80_TASK_RESTORE",
+    "N90_CONSISTENCY_RECEIPT"
+  ],
+  "resume_rule": "Read state first and resume at first failed/unfinished node; skip unchanged PASS nodes.",
+  "invariants": [
+    "NO_VISIBLE_SCHEDULED_POWERSHELL",
+    "PYTHONW_NO_WINDOW",
+    "ONE_TASK_ONE_LOCK",
+    "GLOBAL_AUTOMATION_SERIALIZATION",
+    "ONE_REMOTE_PRODUCER_CHAIN",
+    "HUMAN_APPROVAL_ONLY",
+    "READBACK_X2_BEFORE_PASS"
+  ]
+}
