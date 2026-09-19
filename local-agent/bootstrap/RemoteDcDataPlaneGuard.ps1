@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_DATA_PLANE_GUARD_V8_ONE_ATTEMPT_PER_REQUEST_20260919'
+$Version='REMOTE_DC_DATA_PLANE_GUARD_V9_PY_CONTROL_BRIDGE_20260919'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -31,13 +31,32 @@ function FetchControl{
     return ($json|ConvertFrom-Json)
   }catch{return $null}
 }
+function RunPythonControlWorker{
+  $o=[ordered]@{ok=$false;fetched=$false;ran=$false;exitCode=$null;error=''}
+  try{
+    $h=@{'User-Agent'='HomeDesign-RdcGuard-V9';'Accept'='application/vnd.github+json';'Cache-Control'='no-cache'}
+    $u='https://api.github.com/repos/'+$Repo+'/contents/local-agent/python/central_control_worker_v1.py?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $x=Invoke-RestMethod -Uri $u -Headers $h -Method Get -TimeoutSec 15
+    if(-not$x.content){throw 'PY_WORKER_API_EMPTY'}
+    $b=[Convert]::FromBase64String(([string]$x.content-replace'\s',''))
+    $p=Join-Path $Root 'central_control_worker_v1.py'
+    [IO.File]::WriteAllBytes(($p+'.download'),$b);Move-Item ($p+'.download') $p -Force
+    $o.fetched=$true
+    $py=(Get-Command python.exe -ErrorAction SilentlyContinue);if(-not$py){$py=Get-Command python -ErrorAction SilentlyContinue}
+    if(-not$py){throw 'PYTHON_NOT_FOUND'}
+    & $py.Source $p | Out-Null
+    $o.exitCode=$LASTEXITCODE;$o.ran=$true;$o.ok=([int]$o.exitCode-eq0)
+  }catch{$o.error=$_.Exception.Message}
+  return [pscustomobject]$o
+}
+$pyControl=RunPythonControlWorker
 $control=FetchControl
 $state=$null;try{if(Test-Path $StatePath){$state=Get-Content $StatePath -Raw -Encoding UTF8|ConvertFrom-Json}}catch{}
 $requestId=if($control){[string]$control.requestId}else{''};$enabled=[bool]($control-and$control.enabled);$target=if($control){[string]$control.target}else{''};$localComputerName=if([string]$env:COMPUTERNAME){[string]$env:COMPUTERNAME}else{[Environment]::MachineName};$targetOk=[bool]((-not$target)-or($target.Trim()-eq([string]$localComputerName).Trim()));$Package=if($control-and[string]$control.package){[string]$control.package}else{$AllowedPackage};$packageOk=($Package-eq$AllowedPackage);$expiresAt=if($control){[string]$control.expiresAt}else{''};$expired=$false;if($expiresAt){try{$expired=([DateTimeOffset]::Parse($expiresAt).UtcDateTime-lt[DateTime]::UtcNow)}catch{$expired=$true}}
 $already=([string]$state.completedRequestId-eq$requestId-and$requestId)
 $attempted=([string]$state.attemptedRequestId-eq$requestId-and$requestId)
 $before=GetRemote (GetAll);$tcpBefore=TcpCount $before
-$o=[ordered]@{ok=$true;action='REMOTE_DC_DATA_PLANE_ONE_SHOT_RECOVERY';version=$Version;package=$Package;allowedPackage=$AllowedPackage;requestId=$requestId;enabled=$enabled;target=$target;targetOk=$targetOk;packageOk=$packageOk;expiresAt=$expiresAt;expired=$expired;alreadyCompleted=[bool]$already;alreadyAttempted=[bool]$attempted;prewarmOk=$false;prewarmExit=$null;remoteBefore=[int]$before.Count;tcpBefore=[int]$tcpBefore;stopped=@();started=$false;remoteAfter=0;tcpAfter=0;cloudDataPlaneVerified=$false;cloudVerificationRequired='LIST_DEVICES+PING+REAL_COMMAND+FILE_RW_X2';broadNodeKill=$false;globalNpmCacheTouched=$false;globalExecutionPolicyChanged=$false;versionMutationAllowed=$false;startedAt=(Get-Date).ToString('o');completedAt='';error=''}
+$o=[ordered]@{ok=$true;action='REMOTE_DC_DATA_PLANE_ONE_SHOT_RECOVERY';version=$Version;package=$Package;allowedPackage=$AllowedPackage;pythonControlOk=[bool]$pyControl.ok;pythonControlFetched=[bool]$pyControl.fetched;pythonControlRan=[bool]$pyControl.ran;pythonControlExit=$pyControl.exitCode;pythonControlError=[string]$pyControl.error;requestId=$requestId;enabled=$enabled;target=$target;targetOk=$targetOk;packageOk=$packageOk;expiresAt=$expiresAt;expired=$expired;alreadyCompleted=[bool]$already;alreadyAttempted=[bool]$attempted;prewarmOk=$false;prewarmExit=$null;remoteBefore=[int]$before.Count;tcpBefore=[int]$tcpBefore;stopped=@();started=$false;remoteAfter=0;tcpAfter=0;cloudDataPlaneVerified=$false;cloudVerificationRequired='LIST_DEVICES+PING+REAL_COMMAND+FILE_RW_X2';broadNodeKill=$false;globalNpmCacheTouched=$false;globalExecutionPolicyChanged=$false;versionMutationAllowed=$false;startedAt=(Get-Date).ToString('o');completedAt='';error=''}
 if($enabled-and$requestId-and-not$already-and-not$attempted-and-not$expired){
   try{
     if(-not$targetOk){throw 'TARGET_MISMATCH'}
