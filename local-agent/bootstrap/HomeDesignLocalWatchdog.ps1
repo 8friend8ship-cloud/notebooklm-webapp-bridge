@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V20_PY_CONTROL_WORKER_20260919'
+$Version='WATCHDOG_V21_REMOTE_INDEPENDENT_HOST_REFRESH_20260919'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $SupervisorCommit='e368274f18a424af49a3c896fdd06e2a229d1de8'
 $SupervisorBlob='46eee0e6d92fa3003e40f34f084984a766827556'
@@ -25,7 +25,28 @@ function GitBlobSha1([string]$Path){return GitBlobSha1Bytes ([IO.File]::ReadAllB
 function FindCentral{$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}};''}
 function Save([string]$Local,[string]$Name,$o){try{$j=$o|ConvertTo-Json -Depth 50;$j|Set-Content -LiteralPath $Local -Encoding UTF8;$c=FindCentral;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content -LiteralPath (Join-Path $d $Name) -Encoding UTF8}}catch{}}
 function HostHealthy{try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -TimeoutSec 3;[bool]$h.ok}catch{$false}}
-function EnsureHost129{$o=[ordered]@{before=(HostHealthy);restarted=$false;ok=$false;error=''};if($o.before){$o.ok=$true;return [pscustomobject]$o};try{$apply=Join-Path $Root 'Apply-EmbeddedHost129.ps1';$host129=Join-Path $Root 'HomeDesignLocalCommandHost-1.2.9.ps1';$rec=Join-Path $Root 'EMBEDDED_HOST129_WATCHDOG_AUTORESTORE.json';if(-not(Test-Path $apply)){throw 'APPLY_HOST129_MISSING'};if(-not(Test-Path $host129)){throw 'HOST129_MISSING'};& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $apply -HostPath $host129 -ReceiptPath $rec|Out-Null;$o.restarted=$true;$o.ok=(HostHealthy)}catch{$o.error=$_.Exception.Message};[pscustomobject]$o}
+function EnsureHost129{
+  $o=[ordered]@{before=(HostHealthy);refreshed=$false;restarted=$false;ok=$false;error=''}
+  try{
+    $apply=Join-Path $Root 'Apply-EmbeddedHost129.ps1'
+    $host129=Join-Path $Root 'HomeDesignLocalCommandHost-1.2.9.ps1'
+    $rec=Join-Path $Root 'EMBEDDED_HOST129_WATCHDOG_AUTORESTORE.json'
+    $hf=FetchRepoBytes 'local-agent/releases/1.2.9/HomeDesignLocalCommandHost.final.ps1' 15
+    if($hf.ok){
+      $need=(-not(Test-Path $host129))
+      if(-not$need){$need=((GitBlobSha1 $host129).ToLowerInvariant()-ne([string]$hf.sha).ToLowerInvariant())}
+      if($need){[IO.File]::WriteAllBytes(($host129+'.download'),[byte[]]$hf.bytes);Move-Item ($host129+'.download') $host129 -Force;$o.refreshed=$true}
+    }
+    if($o.before-and-not$o.refreshed){$o.ok=$true;return [pscustomobject]$o}
+    if(-not(Test-Path $apply)){throw 'APPLY_HOST129_MISSING'}
+    if(-not(Test-Path $host129)){throw 'HOST129_MISSING'}
+    & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $apply -HostPath $host129 -ReceiptPath $rec|Out-Null
+    $o.restarted=$true
+    Start-Sleep -Seconds 2
+    $o.ok=(HostHealthy)
+  }catch{$o.error=$_.Exception.Message}
+  [pscustomobject]$o
+}
 function FlowCdpHealthy{try{$v=Invoke-RestMethod -Uri 'http://127.0.0.1:9224/json/version' -TimeoutSec 3;[bool]$v.Browser}catch{$false}}
 function EnsureFlowCdp{
   $before=FlowCdpHealthy
