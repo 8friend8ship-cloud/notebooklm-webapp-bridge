@@ -1,0 +1,66 @@
+name: Remote independent dual bootstrap CI
+
+on:
+  push:
+    paths:
+      - 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1'
+      - 'local-agent/bootstrap/HomeDesignAutoResume.ps1'
+      - 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+      - 'local-agent/python/central_control_worker_v1.py'
+      - '.github/workflows/remote-independent-dual-bootstrap-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: powershell
+        run: |
+          $files=@(
+            'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1',
+            'local-agent/bootstrap/HomeDesignAutoResume.ps1',
+            'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'
+          )
+          foreach($f in $files){
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f),[ref]$tokens,[ref]$errors)
+            if($errors.Count){$errors|Format-List|Out-String|Write-Error;exit 1}
+          }
+      - name: Validate dual independent starters
+        shell: powershell
+        run: |
+          $i=Get-Content 'local-agent/bootstrap/INSTALL_AUTO_RESUME_TASK.ps1' -Raw
+          foreach($x in @(
+            "HomeDesignAutomation-AutoResume",
+            "HomeDesignAutomation-PythonControl",
+            "HomeDesignAutomationAutoResume",
+            "HomeDesignPythonControl",
+            "local-agent/python/central_control_worker_v1.py",
+            "pythonTaskCreated",
+            "pythonRunKeySet",
+            "persistenceReady"
+          )){if(-not$i.Contains($x)){throw "MISSING_DUAL_BOOTSTRAP:$x"}}
+          if($i -match 'shutdown.exe|Restart-Computer|Stop-Computer'){throw 'DISRUPTIVE_POWER_ACTION_FORBIDDEN'}
+      - name: Validate Python exact recovery allowlist
+        shell: powershell
+        run: |
+          python -m py_compile local-agent/python/central_control_worker_v1.py
+          python local-agent/python/central_control_worker_v1.py --self-test
+          $p=Get-Content 'local-agent/python/central_control_worker_v1.py' -Raw
+          foreach($x in @('REMOTE_DC_RECOVER_EXACT','EXACT_RECOVERY_SCRIPT_MISSING','shell=False','ACTION_NOT_WHITELISTED')){
+            if(-not$p.Contains($x)){throw "MISSING_PY_GUARD:$x"}
+          }
+          foreach($x in @('shell=True','os.system','password','Cookies')){
+            if($p.Contains($x)){throw "FORBIDDEN_PY_TOKEN:$x"}
+          }
+      - name: Validate RemoteDC is not control dependency
+        shell: powershell
+        run: |
+          $a=Get-Content 'local-agent/bootstrap/HomeDesignAutoResume.ps1' -Raw
+          $w=Get-Content 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' -Raw
+          if(-not$a.Contains('central_control_worker_v1.py')){throw 'AUTOREUME_NO_PY_CONTROL'}
+          if(-not$w.Contains('RemoteDcDataPlaneGuard.ps1')){throw 'WATCHDOG_NO_RDC_GUARD'}
+          if($a -match 'list_devices|Remote_Desktop_Commander'){throw 'AUTOREUME_MUST_NOT_DEPEND_ON_REMOTE_DC_API'}
+          Write-Host 'REMOTE_INDEPENDENT_DUAL_BOOTSTRAP_PASS'
