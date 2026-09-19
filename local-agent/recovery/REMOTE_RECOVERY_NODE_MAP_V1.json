@@ -1,0 +1,52 @@
+{
+  "map_id": "NODEMAP_REMOTE_RECOVERY_P0_V1",
+  "edges": [
+    [
+      "N00",
+      "N10"
+    ],
+    [
+      "N10",
+      "N20"
+    ],
+    [
+      "N20",
+      "N30"
+    ],
+    [
+      "N30",
+      "N40"
+    ],
+    [
+      "N40",
+      "N50"
+    ],
+    [
+      "N50",
+      "N60"
+    ],
+    [
+      "N60",
+      "N70"
+    ],
+    [
+      "N70",
+      "N80"
+    ],
+    [
+      "N80",
+      "N90"
+    ]
+  ],
+  "failure_routing": {
+    "N10": "power first",
+    "N20": "disable unsafe overlaps",
+    "N30": "restore locks",
+    "N40": "preserve one chain",
+    "N50": "human verify once",
+    "N60": "return N40/N50",
+    "N70": "hold restore",
+    "N80": "restore one-by-one",
+    "N90": "all-store consistency"
+  }
+}
