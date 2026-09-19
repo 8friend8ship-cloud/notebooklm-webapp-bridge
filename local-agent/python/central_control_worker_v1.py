@@ -21,12 +21,23 @@ ALLOWED={"CANARY_ECHO","PYTHON_RUNTIME_INFO","REMOTE_DC_RECOVER_EXACT","LOCAL_CO
 def now(): return datetime.now(timezone.utc).isoformat()
 
 def fetch_control():
-    u=f"https://api.github.com/repos/{REPO}/contents/{CONTROL_PATH}?ref=main&cb={int(datetime.now().timestamp()*1000)}"
-    req=urllib.request.Request(u,headers={"User-Agent":"HomeDesign-Python-Control-V2","Accept":"application/vnd.github+json","Cache-Control":"no-cache"})
-    with urllib.request.urlopen(req,timeout=15) as r:
-        j=json.load(r)
-    raw=base64.b64decode(j["content"]).decode("utf-8")
-    return json.loads(raw),j.get("sha","")
+    cb=int(datetime.now().timestamp()*1000)
+    u=f"https://api.github.com/repos/{REPO}/contents/{CONTROL_PATH}?ref=main&cb={cb}"
+    req=urllib.request.Request(u,headers={"User-Agent":"HomeDesign-Python-Control-V3","Accept":"application/vnd.github+json","Cache-Control":"no-cache"})
+    try:
+        with urllib.request.urlopen(req,timeout=15) as r:
+            j=json.load(r)
+        raw=base64.b64decode(j["content"]).decode("utf-8")
+        return json.loads(raw),j.get("sha","")
+    except Exception as api_error:
+        raw_url=f"https://raw.githubusercontent.com/{REPO}/main/{CONTROL_PATH}?cb={cb}"
+        raw_req=urllib.request.Request(raw_url,headers={"User-Agent":"HomeDesign-Python-Control-V3","Cache-Control":"no-cache"})
+        try:
+            with urllib.request.urlopen(raw_req,timeout=15) as r:
+                raw=r.read().decode("utf-8")
+            return json.loads(raw),"RAW_FALLBACK"
+        except Exception as raw_error:
+            raise RuntimeError(f"CONTROL_FETCH_FAILED api={api_error} raw={raw_error}")
 
 def find_central():
     for letter in "DEFGHIJKLMNOPQRSTUVWXYZ":
