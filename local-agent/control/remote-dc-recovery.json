@@ -1,10 +1,22 @@
 {
   "enabled": true,
-  "requestId": "RDC_CAP010_REAL_X2_20260919_0958KST",
+  "requestId": "RDC_R3_R2_PACK_BRIDGE_20260919_1021KST",
   "target": "BOOK-1HE2THGKRA",
-  "reason": "CAP010 second real failover proof after Coordinator V3 + ThreeStage V2 + Guard V8 fixes.",
+  "reason": "User is away. RemoteDC is offline and the local recovery file UI does not appear. Use central OpenAI remote management plus NotebookPack, Notebook PowerShell/Python pack, MonitorPack and KeyboardPack as R2 recovery consumers.",
   "package": "@wonderwhy-er/desktop-commander@0.2.48",
+  "action": "FORCE_REMOTE_RESTART_ONCE",
+  "preferredConsumers": [
+    "NOTEBOOK_PACK",
+    "NOTEBOOK_POWERSHELL_PYTHON_PACK",
+    "MONITOR_PACK",
+    "KEYBOARD_PACK"
+  ],
+  "stageOrder": [
+    "R3_OPENAI_CLOUD_REMOTE",
+    "R2_NOTEBOOK_LOCAL_REMOTE",
+    "R1_REMOTE_DC"
+  ],
   "expiresAt": "2026-09-19T03:30:00Z",
   "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; ONE_ATTEMPT_PER_REQUEST_ID; no reboot; no broad Node kill; no reauth; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
-  "requiredReadback": "R2 Guard V8 receipt + R1 list_devices + ping + real command + file RW X2"
+  "requiredReadback": "R2 Guard receipt + R1 list_devices + ping + real PowerShell command + file RW X2 + central receipt"
 }
