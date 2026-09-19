@@ -1,9 +1,9 @@
 {
   "enabled": true,
-  "requestId": "PY_REMOTE_RECOVERY_WATCHDOG_V21_20260919_1038KST",
+  "requestId": "PY_REMOTE_RECOVERY_CHATPACK_TEST_INCIDENT_20260919_2226KST",
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "action": "REMOTE_DC_RECOVER_EXACT",
-  "payload": "Use Watchdog V21 refreshed local command host and exact recovery allowlist",
+  "payload": "Recover RemoteDC after CHATPACK Watchdog runtime test incident; exact allowlisted recovery only",
   "policy": "REMOTE_INDEPENDENT; SAFE_WHITELIST_ONLY; ONE_ATTEMPT_PER_REQUEST_ID; NO_ARBITRARY_SHELL; NO_BROWSER; NO_OAUTH; NO_REBOOT; NO_BROAD_PROCESS_KILL",
   "expectedReceipt": "Runtime_Readback/PYTHON/PYTHON_CONTROL_WORKER_LAST.json"
 }
