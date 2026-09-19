@@ -23,8 +23,8 @@
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "resumeId": "R20260909_001",
   "lastGood": "REMOTE_DC_ONLINE_PING_FILE_RW_X2_20260918",
-  "firstUnfinished": "TASK_20260919_LOCAL_CONSUMER_PERSISTENCE_REPAIR_001",
-  "updatedAt": "2026-09-19T01:46:00Z",
+  "firstUnfinished": "LOCAL_APPLY_INSTALL_AUTO_RESUME_V4_AND_CLAIM_EXISTING_PYTHON_RECOVERY_TASK",
+  "updatedAt": "2026-09-19T01:47:00Z",
   "notes": "RemoteDC offline while user is away. Route through R3 OpenAI/Cloud to R2 NotebookPack + Notebook PowerShell/Python + MonitorPack + KeyboardPack. R1 RemoteDC is target, not control dependency. No reboot/reauth/broad kill.",
   "activeRecoveryRequestId": "PY_REMOTE_RECOVERY_WATCHDOG_V21_20260919_1038KST",
   "controlPlaneIndependentOfRemoteDc": true,
@@ -41,5 +41,15 @@
     "HKCU_RUN_AUTORESUME",
     "SCHEDULED_TASK_AUTORESUME_5MIN",
     "SCHEDULED_TASK_PYTHONCONTROL_5MIN"
-  ]
+  ],
+  "bootstrapPolicy": "RUNNER_FIRST",
+  "bootstrapEntry": "HomeDesignAutoResume.ps1",
+  "persistenceLanes": [
+    "ScheduledTask_5m_to_AutoResume",
+    "HKCU_Run_to_AutoResume",
+    "CentralCloudQueue_to_LocalConsumer"
+  ],
+  "staleWatchdogDirectExecutionForbidden": true,
+  "failureSignature": "LOCAL_CONSUMER_NOT_CLAIMING_DUE_STALE_WATCHDOG_DIRECT_BOOTSTRAP",
+  "fixSignature": "INSTALL_AUTO_RESUME_V4_RUNNER_FIRST_20260919"
 }
