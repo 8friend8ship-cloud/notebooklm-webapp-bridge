@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V22_SUPERVISOR_PIN_SYNC_20260919'
+$Version='WATCHDOG_V23_BOUNDED_SUPERVISOR_20260919'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $SupervisorCommit='1209931039a475dd3f4ad89d7df7b54c228bc2ac'
 $SupervisorBlob='e30261a1a4fe0d96803aacd2041237c613d18333'
@@ -64,6 +64,21 @@ function EnsureFlowCdp{
 }
 function BootstrapProcesses{try{return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name-match'(?i)powershell|pwsh'-and[string]$_.CommandLine-match'(?i)AgentBootstrap\.ps1'-and[string]$_.CommandLine-match'(?i)(?:^|\s)-Loop(?:\s|$)'})}catch{return @()}}
 function BootstrapPresent{return (@(BootstrapProcesses).Count-gt0)}
+function RunBoundedPowerShell([string]$Path,[int]$TimeoutSeconds=120){
+  try{
+    $psi=New-Object Diagnostics.ProcessStartInfo
+    $psi.FileName='powershell.exe'
+    $psi.UseShellExecute=$false
+    $psi.CreateNoWindow=$true
+    $psi.Arguments="-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$Path`""
+    $p=[Diagnostics.Process]::Start($psi)
+    if(-not$p.WaitForExit($TimeoutSeconds*1000)){
+      try{& taskkill.exe /PID ([int]$p.Id) /T /F 2>$null|Out-Null}catch{}
+      return 124
+    }
+    return [int]$p.ExitCode
+  }catch{return 125}
+}
 function CurrentVersion{try{if(Test-Path (Join-Path $Root 'state.json')){[string]((Get-Content (Join-Path $Root 'state.json') -Raw -Encoding UTF8|ConvertFrom-Json).agentVersion)}else{''}}catch{''}}
 function DedicatedNotebookProcesses{try{return @(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine-and([string]$_.CommandLine-like('*'+$DedicatedUserData+'*'))-and(([string]$_.CommandLine-match'(?i)notebooklm\.google\.com')-or([string]$_.CommandLine-match'(?i)--remote-debugging-port=9223'))})}catch{return @()}}
 function StopDedicatedNotebookLM{$before=@(DedicatedNotebookProcesses);foreach($p in $before){try{Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction SilentlyContinue}catch{}};if($before.Count-gt0){Start-Sleep -Seconds 2};$after=@(DedicatedNotebookProcesses);[pscustomobject]@{before=[int]$before.Count;after=[int]$after.Count;stopped=[int]([Math]::Max(0,$before.Count-$after.Count));ok=([int]$after.Count-eq0)}}
@@ -110,7 +125,7 @@ $supervisorLocal=Join-Path $Root 'CentralAgentTabSupervisor.ps1'
 $recoveryLocal=Join-Path $Root 'CentralTabAutoRecovery.ps1'
 try{$f=FetchPinnedBytes $SupervisorCommit 'local-agent/bootstrap/CentralAgentTabSupervisor.ps1' $SupervisorBlob 12;if($f.ok){$need=(-not(Test-Path $supervisorLocal));if(-not$need){$need=((GitBlobSha1 $supervisorLocal).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())};if($need){[IO.File]::WriteAllBytes(($supervisorLocal+'.download'),[byte[]]$f.bytes);Move-Item ($supervisorLocal+'.download') $supervisorLocal -Force}}}catch{}
 try{$f=FetchRepoBytes 'local-agent/bootstrap/CentralTabAutoRecovery.ps1' 12;if($f.ok){$need=(-not(Test-Path $recoveryLocal));if(-not$need){$need=((GitBlobSha1 $recoveryLocal).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())};if($need){[IO.File]::WriteAllBytes(($recoveryLocal+'.download'),[byte[]]$f.bytes);Move-Item ($recoveryLocal+'.download') $recoveryLocal -Force}}}catch{}
-if(Test-Path $supervisorLocal){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $supervisorLocal|Out-Null}elseif(Test-Path $cleanupLocal){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $cleanupLocal|Out-Null}
+if(Test-Path $supervisorLocal){$supervisorRc=RunBoundedPowerShell $supervisorLocal 120;if($supervisorRc-eq124){Save (Join-Path $Root 'SUPERVISOR_TIMEOUT_LAST.json') 'SUPERVISOR_TIMEOUT_LAST.json' ([ordered]@{ok=$false;status='SUPERVISOR_TIMEOUT';version=$Version;timeoutSeconds=120;timestamp=(Get-Date).ToString('o')})}}elseif(Test-Path $cleanupLocal){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $cleanupLocal|Out-Null}
 }catch{}
 try{
   $auditLocal=Join-Path $Root 'NotebookAuditPack.ps1'
