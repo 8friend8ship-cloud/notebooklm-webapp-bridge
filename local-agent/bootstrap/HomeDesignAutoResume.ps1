@@ -2,7 +2,7 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$Version='HOME_DESIGN_AUTO_RESUME_V9_DRIVE_MIRROR_FAILOVER_20260911'
+$Version='HOME_DESIGN_AUTO_RESUME_V10_REMOTE_INDEPENDENT_PY_CONTROL_20260919'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Log=Join-Path $Root 'auto-resume.log'
 $ResumeLocal=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1'
@@ -10,6 +10,7 @@ $BootstrapLocal=Join-Path $Root 'AgentBootstrap.ps1'
 $WatchdogLocal=Join-Path $Root 'HomeDesignLocalWatchdog.ps1'
 $OpenAISyncLocal=Join-Path $Root 'OpenAIWebSyncGuard.ps1'
 $DriveMirrorFixLocal=Join-Path $Root 'DriveMirrorExactDiffFinalize.py'
+$PythonControlLocal=Join-Path $Root 'central_control_worker_v1.py'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 function Log([string]$m){Add-Content -LiteralPath $Log -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $m" -Encoding UTF8}
 function HostHealthy{try{$h=Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get -TimeoutSec 3;return [bool]$h.ok}catch{return $false}}
@@ -32,6 +33,18 @@ try{[void](RefreshFile 'local-agent/bootstrap/AgentBootstrap.ps1' $BootstrapLoca
 try{[void](RefreshFile 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' $ResumeLocal 'RESUME_SCRIPT')}catch{Log ('RESUME_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $ResumeLocal)){exit 2}}
 try{[void](RefreshFile 'local-agent/bootstrap/OpenAIWebSyncGuard.ps1' $OpenAISyncLocal 'OPENAI_WEB_SYNC')}catch{Log ('OPENAI_WEB_SYNC_REFRESH_FAILED '+$_.Exception.Message)}
 try{[void](RefreshFile 'local-agent/bootstrap/DriveMirrorExactDiffFinalize.py' $DriveMirrorFixLocal 'DRIVE_MIRROR_EXACT_DIFF')}catch{Log ('DRIVE_MIRROR_FIX_REFRESH_FAILED '+$_.Exception.Message)}
+try{[void](RefreshFile 'local-agent/python/central_control_worker_v1.py' $PythonControlLocal 'PYTHON_CONTROL')}catch{Log ('PYTHON_CONTROL_REFRESH_FAILED '+$_.Exception.Message)}
+if(Test-Path -LiteralPath $PythonControlLocal){
+  try{
+    $pyc=(Get-Command python.exe -ErrorAction SilentlyContinue).Source
+    if(-not$pyc){$pyc=(Get-Command python -ErrorAction SilentlyContinue).Source}
+    if($pyc){
+      $pyRaw=& $pyc $PythonControlLocal 2>&1|Out-String
+      $pyRc=$LASTEXITCODE
+      Log ('PYTHON_CONTROL_EXIT='+$pyRc+' '+($pyRaw.Trim()))
+    }else{Log 'PYTHON_CONTROL_PYTHON_MISSING'}
+  }catch{Log ('PYTHON_CONTROL_EXCEPTION '+$_.Exception.Message)}
+}
 if(Test-Path -LiteralPath $OpenAISyncLocal){
   try{$syncRaw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $OpenAISyncLocal -Apply 2>&1|Out-String;$syncRc=$LASTEXITCODE;Log ('OPENAI_WEB_SYNC_EXIT='+$syncRc+' '+($syncRaw.Trim()))}catch{Log ('OPENAI_WEB_SYNC_EXCEPTION '+$_.Exception.Message)}
 }
