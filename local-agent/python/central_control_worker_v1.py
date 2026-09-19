@@ -15,6 +15,7 @@ from pathlib import Path
 VERSION="PY_CENTRAL_CONTROL_WORKER_V3_DRIVE_QUEUE_CLAIM_20260919"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
+QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
 ALLOWED={"CANARY_ECHO","PYTHON_RUNTIME_INFO","REMOTE_DC_RECOVER_EXACT","LOCAL_CONSUMER_PERSISTENCE_REPAIR"}
 
 def now(): return datetime.now(timezone.utc).isoformat()
@@ -54,12 +55,26 @@ def run_fixed_ps(root:Path, names:list[str], timeout:int=600):
     tail=(cp.stdout or "")[-4000:]
     return script,cp.returncode,tail
 
+def fetch_queue_control():
+    u=f"https://api.github.com/repos/{REPO}/contents/{QUEUE_CONTROL_PATH}?ref=main&cb={int(datetime.now().timestamp()*1000)}"
+    req=urllib.request.Request(u,headers={"User-Agent":"HomeDesign-Python-Queue-V3","Accept":"application/vnd.github+json","Cache-Control":"no-cache"})
+    try:
+        with urllib.request.urlopen(req,timeout=15) as r:
+            j=json.load(r)
+        return json.loads(base64.b64decode(j["content"]).decode("utf-8")),"GITHUB"
+    except Exception:
+        return None,"NONE"
+
 def claim_drive_queue(central:Path|None, root:Path):
-    if not central: return None
-    q=central/"Runtime_Readback"/"QUEUE"/"NOTEBOOK_LOCAL_QUEUE.json"
-    if not q.exists(): return None
-    try: doc=json.loads(q.read_text(encoding="utf-8-sig"))
-    except Exception as e: raise RuntimeError("QUEUE_PARSE_ERROR:"+str(e))
+    q=None;doc=None;source="NONE"
+    if central:
+        q=central/"Runtime_Readback"/"QUEUE"/"NOTEBOOK_LOCAL_QUEUE.json"
+        if q.exists():
+            try: doc=json.loads(q.read_text(encoding="utf-8-sig"));source="DRIVE_SYNC"
+            except Exception as e: raise RuntimeError("QUEUE_PARSE_ERROR:"+str(e))
+    if doc is None:
+        doc,source=fetch_queue_control()
+    if doc is None: return None
     if str(doc.get("status","")).upper()!="READY": return None
     if str(doc.get("target","")).upper() not in ("BOOK-1HE2THGKRA",""):
         raise RuntimeError("QUEUE_TARGET_NOT_ALLOWED")
@@ -68,12 +83,12 @@ def claim_drive_queue(central:Path|None, root:Path):
     task_id=str(doc.get("taskId",""))
     if task_id!="TASK_20260919_LOCAL_CONSUMER_PERSISTENCE_REPAIR_001":
         raise RuntimeError("QUEUE_TASK_ID_NOT_ALLOWED")
-    claimed=dict(doc);claimed["status"]="CLAIMED";claimed["claimedAt"]=now();claimed["claimedBy"]=VERSION
-    save_json(q,claimed)
+    claimed=dict(doc);claimed["status"]="CLAIMED";claimed["claimedAt"]=now();claimed["claimedBy"]=VERSION;claimed["queueSource"]=source
+    if q is not None: save_json(q,claimed)
     script,rc,tail=run_fixed_ps(root,["INSTALL_AUTO_RESUME_TASK.ps1"],900)
     result={"taskId":task_id,"script":str(script),"exitCode":rc,"outputTail":tail}
     done=dict(claimed);done["completedAt"]=now();done["result"]=result;done["status"]="DONE" if rc==0 else "ERROR"
-    save_json(q,done)
+    if q is not None: save_json(q,done)
     return done
 
 def exact_recovery(root:Path):
