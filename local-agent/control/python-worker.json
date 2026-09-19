@@ -1,9 +1,9 @@
 {
   "enabled": true,
-  "requestId": "PY_REMOTE_RECOVERY_20260919_1026KST",
+  "requestId": "PY_REMOTE_RECOVERY_AUTORESUME_V10_20260919_1032KST",
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "action": "REMOTE_DC_RECOVER_EXACT",
-  "payload": "Use fixed local recovery script only",
+  "payload": "AutoResume V10 independent Python control lane",
   "policy": "REMOTE_INDEPENDENT; SAFE_WHITELIST_ONLY; ONE_ATTEMPT_PER_REQUEST_ID; NO_ARBITRARY_SHELL; NO_BROWSER; NO_OAUTH; NO_REBOOT; NO_BROAD_PROCESS_KILL",
   "expectedReceipt": "Runtime_Readback/PYTHON/PYTHON_CONTROL_WORKER_LAST.json"
 }
