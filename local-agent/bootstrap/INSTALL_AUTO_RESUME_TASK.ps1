@@ -18,13 +18,13 @@ function InstallVerified([string]$RepoPath,[string]$Dest){$r=Api $RepoPath;$tmp=
 function FindCentral{$name=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$myDriveKo=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){if(-not$d.Root){continue};foreach($c in @((Join-Path $d.Root $name),(Join-Path $d.Root ('My Drive\'+$name)),(Join-Path $d.Root ($myDriveKo+'\'+$name)),(Join-Path $d.Root ('Google Drive\'+$name)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}};return ''}
 function SaveReceipt($o){$json=$o|ConvertTo-Json -Depth 30;$json|Set-Content -LiteralPath (Join-Path $Root 'AUTO_RESUME_INSTALL_V3.json') -Encoding UTF8;$central=FindCentral;if($central){$dir=Join-Path $central 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $dir|Out-Null;$json|Set-Content -LiteralPath (Join-Path $dir 'AUTO_RESUME_INSTALL_V3.json') -Encoding UTF8}}
 function FreshReceipt([string]$Path,[datetime]$Since){try{return ((Test-Path -LiteralPath $Path -PathType Leaf) -and ((Get-Item -LiteralPath $Path).LastWriteTime -ge $Since.AddSeconds(-2)))}catch{return $false}}
-function RunDirectWatchdog([int]$TimeoutSeconds=$DirectWatchdogTimeoutSeconds){$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Watchdog+'"';$p=New-Object Diagnostics.Process;$p.StartInfo=$psi;[void]$p.Start();if(-not $p.WaitForExit($TimeoutSeconds*1000)){try{& taskkill.exe /PID $p.Id /T /F 2>$null|Out-Null}catch{};return 124};return [int]$p.ExitCode}
+function RunDirectWatchdog([int]$TimeoutSeconds=$DirectWatchdogTimeoutSeconds){$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Runner+'"';$p=New-Object Diagnostics.Process;$p.StartInfo=$psi;[void]$p.Start();if(-not $p.WaitForExit($TimeoutSeconds*1000)){try{& taskkill.exe /PID $p.Id /T /F 2>$null|Out-Null}catch{};return 124};return [int]$p.ExitCode}
 
 $startedAt=Get-Date;$started=$startedAt.ToString('o');$errors=@();$runnerSha='';$watchdogSha='';$taskCreated=$false;$runKeySet=$false;$scheduledRunExit=$null;$immediateExit=$null;$immediateMode='';$triggerContract='NONE';$scheduledEntryObserved=$false;$directWatchdogLaunched=$false;$multipleInstancesPolicy='IgnoreNew';$taskMode='NONE';$periodicTriggerReady=$false;$fullTriggerContractReady=$false
 try{$runnerSha=InstallVerified 'local-agent/bootstrap/HomeDesignAutoResume.ps1' $Runner}catch{$errors+=('RUNNER_INSTALL:'+ $_.Exception.Message)}
 try{$watchdogSha=InstallVerified 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$errors+=('WATCHDOG_INSTALL:'+ $_.Exception.Message)}
 
-$runKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';$runName='HomeDesignAutomationAutoResume';$runCommand='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"'
+$runKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';$runName='HomeDesignAutomationAutoResume';$runCommand='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Runner+'"'
 try{New-Item -Path $runKey -Force|Out-Null;Set-ItemProperty -Path $runKey -Name $runName -Value $runCommand -Type String;$runVerify=(Get-ItemProperty -Path $runKey -Name $runName -ErrorAction Stop).$runName;if([string]$runVerify-ne$runCommand){throw 'HKCU_RUN_FALLBACK_VERIFY_FAILED'};$runKeySet=$true}catch{$errors+=('HKCU_RUN:'+ $_.Exception.Message)}
 
 $taskName='HomeDesignAutomation-AutoResume'
@@ -41,7 +41,7 @@ $xml=@"
   </Triggers>
   <Principals><Principal id="Author"><UserId>$userSid</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>true</StartWhenAvailable><RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable><IdleSettings><StopOnIdleEnd>false</StopOnIdleEnd><RestartOnIdle>false</RestartOnIdle></IdleSettings><AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><Hidden>true</Hidden><WakeToRun>false</WakeToRun><ExecutionTimeLimit>PT10M</ExecutionTimeLimit><Priority>7</Priority></Settings>
-  <Actions Context="Author"><Exec><Command>powershell.exe</Command><Arguments>-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$Watchdog&quot;</Arguments></Exec></Actions>
+  <Actions Context="Author"><Exec><Command>powershell.exe</Command><Arguments>-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$Runner&quot;</Arguments></Exec></Actions>
 </Task>
 "@
 $tmpXml=Join-Path $env:TEMP 'HomeDesignAutomation-AutoResume-v3.xml'
@@ -52,7 +52,7 @@ try{$xml|Set-Content -LiteralPath $tmpXml -Encoding Unicode;& schtasks.exe /Crea
 # is approximated by the next <=5 minute periodic run after resume. Do not claim full contract.
 if(-not$taskCreated){
   try{
-    $tr='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Watchdog+'"'
+    $tr='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Runner+'"'
     & schtasks.exe /Create /F /SC MINUTE /MO 5 /TN $taskName /TR $tr | Out-Null
     if($LASTEXITCODE-ne0){throw('SCHTASKS_FALLBACK_CREATE_'+$LASTEXITCODE)}
     $taskCreated=$true;$taskMode='FALLBACK_5MIN';$periodicTriggerReady=$true;$fullTriggerContractReady=$false;$triggerContract='HKCU_LOGON+5MIN_FALLBACK'
@@ -76,7 +76,7 @@ $persistenceReady=[bool]($periodicTriggerReady -and ($taskCreated-or$runKeySet))
 $immediateStarted=[bool]($immediateExit-ne$null)
 $immediateVerified=[bool]($immediateExit-eq0)
 $ok=[bool]($runnerSha-and$watchdogSha-and$periodicTriggerReady-and$persistenceReady-and$immediateStarted-and$immediateVerified)
-$rec=[ordered]@{ok=$ok;action='INSTALL_AUTO_RESUME_V3';installerRevision='V3.5_PERIODIC_REQUIRED_IGNORE_NEW_SINGLE_EXECUTOR';startedAt=$started;completedAt=(Get-Date).ToString('o');runnerSha=$runnerSha;watchdogSha=$watchdogSha;scheduledTaskCreated=$taskCreated;taskMode=$taskMode;scheduledRunExit=$scheduledRunExit;scheduledEntryObserved=$scheduledEntryObserved;scheduledEntryWaitSeconds=$ScheduledEntryWaitSeconds;scheduledExecutionLimitMinutes=$ScheduledExecutionLimitMinutes;multipleInstancesPolicy=$multipleInstancesPolicy;triggerContract=$triggerContract;fullTriggerContractReady=$fullTriggerContractReady;periodicTriggerReady=$periodicTriggerReady;triggerIntervalMinutes=5;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;immediateMode=$immediateMode;directWatchdogLaunched=$directWatchdogLaunched;directWatchdogTimeoutSeconds=$DirectWatchdogTimeoutSeconds;directWatchdogExit=$immediateExit;immediateExecutionVerified=$immediateVerified;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;errors=$errors}
+$rec=[ordered]@{ok=$ok;action='INSTALL_AUTO_RESUME_V4';installerRevision='V4_REMOTE_INDEPENDENT_BOOTSTRAP_RUNNER_FIRST';startedAt=$started;completedAt=(Get-Date).ToString('o');runnerSha=$runnerSha;watchdogSha=$watchdogSha;scheduledTaskCreated=$taskCreated;taskMode=$taskMode;scheduledRunExit=$scheduledRunExit;scheduledEntryObserved=$scheduledEntryObserved;scheduledEntryWaitSeconds=$ScheduledEntryWaitSeconds;scheduledExecutionLimitMinutes=$ScheduledExecutionLimitMinutes;multipleInstancesPolicy=$multipleInstancesPolicy;triggerContract=$triggerContract;fullTriggerContractReady=$fullTriggerContractReady;periodicTriggerReady=$periodicTriggerReady;triggerIntervalMinutes=5;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;immediateMode=$immediateMode;directWatchdogLaunched=$directWatchdogLaunched;directWatchdogTimeoutSeconds=$DirectWatchdogTimeoutSeconds;directWatchdogExit=$immediateExit;immediateExecutionVerified=$immediateVerified;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;errors=$errors}
 SaveReceipt $rec
 $rec|ConvertTo-Json -Depth 30 -Compress
 if($ok){exit 0}else{exit 2}
