@@ -35,8 +35,8 @@ jobs:
             if(-not $s.Contains($x)){ throw "missing required guard: $x" }
           }
           $s2=Get-Content -LiteralPath 'local-agent/python/central_control_worker_v1.py' -Raw
-          foreach($x in @('ALLOWED={"CANARY_ECHO","PYTHON_RUNTIME_INFO"}','ACTION_NOT_WHITELISTED','DEDUPED_ALREADY_ATTEMPTED')){ if(-not $s2.Contains($x)){ throw "missing central-worker guard: $x" } }
-          foreach($x in @('subprocess','os.system','shell=True','chrome.exe','Secure Preferences','Cookies','password')){ if($s2 -match [regex]::Escape($x)){ throw "forbidden central-worker token: $x" } }
+          foreach($x in @('ALLOWED={"CANARY_ECHO","PYTHON_RUNTIME_INFO","REMOTE_DC_RECOVER_EXACT"}','ACTION_NOT_WHITELISTED','DEDUPED_ALREADY_ATTEMPTED','EXACT_RECOVERY_SCRIPT_MISSING','shell=False')){ if(-not $s2.Contains($x)){ throw "missing central-worker guard: $x" } }
+          foreach($x in @('os.system','shell=True','chrome.exe','Secure Preferences','Cookies','password')){ if($s2 -match [regex]::Escape($x)){ throw "forbidden central-worker token: $x" } }
           foreach($x in @('chrome.exe','Secure Preferences','Cookies','password')){
             if($s -match [regex]::Escape($x)){ throw "forbidden direct-browser-data token: $x" }
           }
