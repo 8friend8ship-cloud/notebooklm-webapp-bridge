@@ -5,6 +5,7 @@ $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Runner=Join-Path $Root 'HomeDesignAutoResume.ps1'
 $Watchdog=Join-Path $Root 'HomeDesignLocalWatchdog.ps1'
+$PythonControl=Join-Path $Root 'central_control_worker_v1.py'
 $WatchdogEntry=Join-Path $Root 'WATCHDOG_ENTRY_LATEST.json'
 $WatchdogReceipt=Join-Path $Root 'WATCHDOG_LAST.json'
 $DirectWatchdogTimeoutSeconds=420
@@ -20,12 +21,15 @@ function SaveReceipt($o){$json=$o|ConvertTo-Json -Depth 30;$json|Set-Content -Li
 function FreshReceipt([string]$Path,[datetime]$Since){try{return ((Test-Path -LiteralPath $Path -PathType Leaf) -and ((Get-Item -LiteralPath $Path).LastWriteTime -ge $Since.AddSeconds(-2)))}catch{return $false}}
 function RunDirectWatchdog([int]$TimeoutSeconds=$DirectWatchdogTimeoutSeconds){$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Runner+'"';$p=New-Object Diagnostics.Process;$p.StartInfo=$psi;[void]$p.Start();if(-not $p.WaitForExit($TimeoutSeconds*1000)){try{& taskkill.exe /PID $p.Id /T /F 2>$null|Out-Null}catch{};return 124};return [int]$p.ExitCode}
 
-$startedAt=Get-Date;$started=$startedAt.ToString('o');$errors=@();$runnerSha='';$watchdogSha='';$taskCreated=$false;$runKeySet=$false;$scheduledRunExit=$null;$immediateExit=$null;$immediateMode='';$triggerContract='NONE';$scheduledEntryObserved=$false;$directWatchdogLaunched=$false;$multipleInstancesPolicy='IgnoreNew';$taskMode='NONE';$periodicTriggerReady=$false;$fullTriggerContractReady=$false
+$startedAt=Get-Date;$started=$startedAt.ToString('o');$errors=@();$runnerSha='';$watchdogSha='';$pythonControlSha='';$taskCreated=$false;$runKeySet=$false;$pythonRunKeySet=$false;$pythonTaskCreated=$false;$scheduledRunExit=$null;$immediateExit=$null;$immediateMode='';$triggerContract='NONE';$scheduledEntryObserved=$false;$directWatchdogLaunched=$false;$multipleInstancesPolicy='IgnoreNew';$taskMode='NONE';$periodicTriggerReady=$false;$fullTriggerContractReady=$false
 try{$runnerSha=InstallVerified 'local-agent/bootstrap/HomeDesignAutoResume.ps1' $Runner}catch{$errors+=('RUNNER_INSTALL:'+ $_.Exception.Message)}
 try{$watchdogSha=InstallVerified 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$errors+=('WATCHDOG_INSTALL:'+ $_.Exception.Message)}
+try{$pythonControlSha=InstallVerified 'local-agent/python/central_control_worker_v1.py' $PythonControl}catch{$errors+=('PYTHON_CONTROL_INSTALL:'+ $_.Exception.Message)}
 
 $runKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';$runName='HomeDesignAutomationAutoResume';$runCommand='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Runner+'"'
 try{New-Item -Path $runKey -Force|Out-Null;Set-ItemProperty -Path $runKey -Name $runName -Value $runCommand -Type String;$runVerify=(Get-ItemProperty -Path $runKey -Name $runName -ErrorAction Stop).$runName;if([string]$runVerify-ne$runCommand){throw 'HKCU_RUN_FALLBACK_VERIFY_FAILED'};$runKeySet=$true}catch{$errors+=('HKCU_RUN:'+ $_.Exception.Message)}
+$pyCmd='python.exe "'+$PythonControl+'"'
+try{Set-ItemProperty -Path $runKey -Name 'HomeDesignPythonControl' -Value $pyCmd -Type String;$pyVerify=(Get-ItemProperty -Path $runKey -Name 'HomeDesignPythonControl' -ErrorAction Stop).HomeDesignPythonControl;if([string]$pyVerify-ne$pyCmd){throw 'HKCU_PY_RUN_VERIFY_FAILED'};$pythonRunKeySet=$true}catch{$errors+=('HKCU_PY_RUN:'+ $_.Exception.Message)}
 
 $taskName='HomeDesignAutomation-AutoResume'
 $userSid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -46,6 +50,18 @@ $xml=@"
 "@
 $tmpXml=Join-Path $env:TEMP 'HomeDesignAutomation-AutoResume-v3.xml'
 try{$xml|Set-Content -LiteralPath $tmpXml -Encoding Unicode;& schtasks.exe /Create /TN $taskName /XML $tmpXml /F | Out-Null;if($LASTEXITCODE-ne0){throw('SCHTASKS_CREATE_'+$LASTEXITCODE)};$taskCreated=$true;$taskMode='FULL_XML';$periodicTriggerReady=$true;$fullTriggerContractReady=$true;$triggerContract='LOGON+RESUME+5MIN'}catch{$errors+=('SCHEDULED_TASK_FULL_CREATE:'+ $_.Exception.Message)}finally{Remove-Item $tmpXml -Force -ErrorAction SilentlyContinue}
+
+
+$pythonTaskName='HomeDesignAutomation-PythonControl'
+try{
+  $pyExe=(Get-Command python.exe -ErrorAction SilentlyContinue).Source
+  if(-not$pyExe){$pyExe=(Get-Command python -ErrorAction SilentlyContinue).Source}
+  if(-not$pyExe){throw 'PYTHON_EXE_MISSING'}
+  $pyTr='"'+$pyExe+'" "'+$PythonControl+'"'
+  & schtasks.exe /Create /F /SC MINUTE /MO 5 /TN $pythonTaskName /TR $pyTr | Out-Null
+  if($LASTEXITCODE-ne0){throw('PY_SCHTASKS_CREATE_'+$LASTEXITCODE)}
+  $pythonTaskCreated=$true
+}catch{$errors+=('PYTHON_SCHEDULED_TASK:'+ $_.Exception.Message)}
 
 # If the EventTrigger XML is blocked by local policy, preserve the same task name and
 # fall back to a 5-minute task. HKCU already provides logon recovery; StartWhenAvailable
@@ -72,11 +88,11 @@ if($scheduledEntryObserved){
   $directWatchdogLaunched=$true;$immediateMode='DIRECT_WATCHDOG_FALLBACK_ONLY';try{$immediateExit=RunDirectWatchdog $DirectWatchdogTimeoutSeconds;if($immediateExit-ne0){$errors+=('DIRECT_WATCHDOG_EXIT_'+$immediateExit)}}catch{$errors+=('DIRECT_WATCHDOG:'+ $_.Exception.Message);$immediateExit=3}
 }else{$errors+='WATCHDOG_FILE_MISSING_AFTER_INSTALL'}
 
-$persistenceReady=[bool]($periodicTriggerReady -and ($taskCreated-or$runKeySet))
+$persistenceReady=[bool]($periodicTriggerReady -and ($taskCreated-or$runKeySet) -and ($pythonTaskCreated-or$pythonRunKeySet))
 $immediateStarted=[bool]($immediateExit-ne$null)
 $immediateVerified=[bool]($immediateExit-eq0)
 $ok=[bool]($runnerSha-and$watchdogSha-and$periodicTriggerReady-and$persistenceReady-and$immediateStarted-and$immediateVerified)
-$rec=[ordered]@{ok=$ok;action='INSTALL_AUTO_RESUME_V4';installerRevision='V4_REMOTE_INDEPENDENT_BOOTSTRAP_RUNNER_FIRST';startedAt=$started;completedAt=(Get-Date).ToString('o');runnerSha=$runnerSha;watchdogSha=$watchdogSha;scheduledTaskCreated=$taskCreated;taskMode=$taskMode;scheduledRunExit=$scheduledRunExit;scheduledEntryObserved=$scheduledEntryObserved;scheduledEntryWaitSeconds=$ScheduledEntryWaitSeconds;scheduledExecutionLimitMinutes=$ScheduledExecutionLimitMinutes;multipleInstancesPolicy=$multipleInstancesPolicy;triggerContract=$triggerContract;fullTriggerContractReady=$fullTriggerContractReady;periodicTriggerReady=$periodicTriggerReady;triggerIntervalMinutes=5;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;immediateMode=$immediateMode;directWatchdogLaunched=$directWatchdogLaunched;directWatchdogTimeoutSeconds=$DirectWatchdogTimeoutSeconds;directWatchdogExit=$immediateExit;immediateExecutionVerified=$immediateVerified;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;errors=$errors}
+$rec=[ordered]@{ok=$ok;action='INSTALL_AUTO_RESUME_V4';installerRevision='V4_REMOTE_INDEPENDENT_BOOTSTRAP_RUNNER_FIRST';startedAt=$started;completedAt=(Get-Date).ToString('o');runnerSha=$runnerSha;watchdogSha=$watchdogSha;pythonControlSha=$pythonControlSha;scheduledTaskCreated=$taskCreated;pythonTaskCreated=$pythonTaskCreated;pythonRunKeyRegistered=$pythonRunKeySet;taskMode=$taskMode;scheduledRunExit=$scheduledRunExit;scheduledEntryObserved=$scheduledEntryObserved;scheduledEntryWaitSeconds=$ScheduledEntryWaitSeconds;scheduledExecutionLimitMinutes=$ScheduledExecutionLimitMinutes;multipleInstancesPolicy=$multipleInstancesPolicy;triggerContract=$triggerContract;fullTriggerContractReady=$fullTriggerContractReady;periodicTriggerReady=$periodicTriggerReady;triggerIntervalMinutes=5;hkcuRunRegistered=$runKeySet;persistenceReady=$persistenceReady;immediateMode=$immediateMode;directWatchdogLaunched=$directWatchdogLaunched;directWatchdogTimeoutSeconds=$DirectWatchdogTimeoutSeconds;directWatchdogExit=$immediateExit;immediateExecutionVerified=$immediateVerified;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false;errors=$errors}
 SaveReceipt $rec
 $rec|ConvertTo-Json -Depth 30 -Compress
 if($ok){exit 0}else{exit 2}
