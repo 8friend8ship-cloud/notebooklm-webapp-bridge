@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "device": "BOOK-1HE2THGKRA",
   "remoteDataPlaneState": "OFFLINE_R3_R2_RECOVERY_REQUESTED",
   "requestedMode": "CENTRAL_3_LANE_FAILOVER",
@@ -23,8 +23,17 @@
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "resumeId": "R20260909_001",
   "lastGood": "REMOTE_DC_ONLINE_PING_FILE_RW_X2_20260918",
-  "firstUnfinished": "R2_NOTEBOOK_PACK_POWERSHELL_PYTHON_MONITOR_KEYBOARD_CONSUME_RECOVERY",
-  "updatedAt": "2026-09-19T01:24:00Z",
+  "firstUnfinished": "PY_REMOTE_RECOVERY_20260919_1026KST_RECEIPT_AND_R1_READBACK",
+  "updatedAt": "2026-09-19T01:26:00Z",
   "notes": "RemoteDC offline while user is away. Route through R3 OpenAI/Cloud to R2 NotebookPack + Notebook PowerShell/Python + MonitorPack + KeyboardPack. R1 RemoteDC is target, not control dependency. No reboot/reauth/broad kill.",
-  "activeRecoveryRequestId": "RDC_R3_R2_PACK_BRIDGE_20260919_1021KST"
+  "activeRecoveryRequestId": "RDC_R3_R2_PACK_BRIDGE_20260919_1021KST",
+  "controlPlaneIndependentOfRemoteDc": true,
+  "independentControlLanes": [
+    "OPENAI_CLOUD_CONTROL",
+    "NOTEBOOK_LOCAL_WATCHDOG",
+    "NOTEBOOK_POWERSHELL_PYTHON_CONTROL",
+    "MONITOR_KEYBOARD_LOCAL_CONTROL"
+  ],
+  "remoteDcRole": "WORKER_ONLY_NOT_SINGLE_POINT_OF_FAILURE",
+  "failurePolicy": "IF_REMOTE_DC_OFFLINE_KEEP_R3_R2_CONTROL_ALIVE_AND_RECOVER_R1; DO_NOT_BLOCK_NOTEBOOK_PACKS"
 }
