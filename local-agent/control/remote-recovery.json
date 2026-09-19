@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "requestId": "RDC_DISPLAY_OFF_FLAP_RECOVERY_20260918_1513KST",
+  "requestId": "RDC_CHATPACK_TEST_RECOVERY_20260919_2226KST",
   "device": "BOOK-1HE2THGKRA",
   "action": "FORCE_REMOTE_RESTART_ONCE",
-  "reason": "INC_DISPLAY_OFF_ONLY_REMOTE_COMMAND_PLANE_FLAP_20260918",
-  "createdAt": "2026-09-18T06:13:00Z",
-  "expiresAt": "2026-09-18T08:00:00Z",
+  "reason": "INC_CHATPACK_WATCHDOG_RUNTIME_TEST_REMOTE_OFFLINE_20260919",
+  "createdAt": "2026-09-19T13:26:00Z",
+  "expiresAt": "2026-09-19T15:30:00Z",
   "maxExecutions": 1,
   "requiresPreflightNoHumanGate": true,
   "status": "PENDING",
   "scope": "EXACT_REMOTE_PRODUCER_CHAIN_ONLY",
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
-  "incidentId": "INC_DISPLAY_OFF_ONLY_REMOTE_COMMAND_PLANE_FLAP_20260918",
+  "incidentId": "INC_CHATPACK_WATCHDOG_RUNTIME_TEST_REMOTE_OFFLINE_20260919",
   "recoveryReadback": {
-    "deviceOnline": "INTERMITTENT",
-    "ping": "TIMEOUT_INTERMITTENT",
+    "deviceOnline": "OFFLINE",
+    "ping": "PENDING",
     "fileWriteReadbackX2": "PENDING",
     "oobRestartExecuted": false
   },
-  "notes": "DISPLAY_OFF_ONLY regression used monitor-power off only; no system sleep/hibernate call. R1 list_devices returned online but real command/file readback remained intermittent. Reuse exact RemoteDC producer-chain one-shot recovery only; preserve same task/last-good; no broad process kill, no reauth, no version change."
+  "notes": "Recovery after ChatPack Watchdog runtime test. Preserve same task/last-good; exact RemoteDC producer-chain restart only; no broad kill, no reauth, no reboot, no version rollback."
 }
