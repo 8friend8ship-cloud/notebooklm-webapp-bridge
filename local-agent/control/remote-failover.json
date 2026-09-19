@@ -23,10 +23,10 @@
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "resumeId": "R20260909_001",
   "lastGood": "REMOTE_DC_ONLINE_PING_FILE_RW_X2_20260918",
-  "firstUnfinished": "PY_REMOTE_RECOVERY_20260919_1026KST_RECEIPT_AND_R1_READBACK",
-  "updatedAt": "2026-09-19T01:26:00Z",
+  "firstUnfinished": "TASK_20260919_LOCAL_CONSUMER_PERSISTENCE_REPAIR_001",
+  "updatedAt": "2026-09-19T01:46:00Z",
   "notes": "RemoteDC offline while user is away. Route through R3 OpenAI/Cloud to R2 NotebookPack + Notebook PowerShell/Python + MonitorPack + KeyboardPack. R1 RemoteDC is target, not control dependency. No reboot/reauth/broad kill.",
-  "activeRecoveryRequestId": "RDC_R3_R2_PACK_BRIDGE_20260919_1021KST",
+  "activeRecoveryRequestId": "PY_REMOTE_RECOVERY_WATCHDOG_V21_20260919_1038KST",
   "controlPlaneIndependentOfRemoteDc": true,
   "independentControlLanes": [
     "OPENAI_CLOUD_CONTROL",
@@ -35,5 +35,11 @@
     "MONITOR_KEYBOARD_LOCAL_CONTROL"
   ],
   "remoteDcRole": "WORKER_ONLY_NOT_SINGLE_POINT_OF_FAILURE",
-  "failurePolicy": "IF_REMOTE_DC_OFFLINE_KEEP_R3_R2_CONTROL_ALIVE_AND_RECOVER_R1; DO_NOT_BLOCK_NOTEBOOK_PACKS"
+  "failurePolicy": "IF_REMOTE_DC_OFFLINE_KEEP_R3_R2_CONTROL_ALIVE_AND_RECOVER_R1; DO_NOT_BLOCK_NOTEBOOK_PACKS",
+  "localConsumerRepairTask": "TASK_20260919_LOCAL_CONSUMER_PERSISTENCE_REPAIR_001",
+  "requiredPersistence": [
+    "HKCU_RUN_AUTORESUME",
+    "SCHEDULED_TASK_AUTORESUME_5MIN",
+    "SCHEDULED_TASK_PYTHONCONTROL_5MIN"
+  ]
 }
