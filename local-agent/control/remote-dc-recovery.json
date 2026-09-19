@@ -1,11 +1,10 @@
 {
-  "enabled": false,
-  "requestId": "RDC_DISPLAY_OFF_FLAP_RECOVERY_20260919_0041KST",
+  "enabled": true,
+  "requestId": "RDC_CAP010_REAL_X2_20260919_0958KST",
   "target": "BOOK-1HE2THGKRA",
-  "reason": "Closed after external R3 verification: list_devices online + ping PASS + real PowerShell PASS + file RW X2 PASS. Guard local matcher returned false and must not repeat-restart same request.",
+  "reason": "CAP010 second real failover proof after Coordinator V3 + ThreeStage V2 + Guard V8 fixes.",
   "package": "@wonderwhy-er/desktop-commander@0.2.48",
-  "expiresAt": "2026-09-18T18:30:00Z",
-  "status": "CLOSED_EXTERNAL_COMMAND_PLANE_X2_PASS",
-  "policy": "ONE_SHOT_CLOSED; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001; no repeat restart for same requestId",
-  "requiredReadback": "External R3 verification completed for this request; future retry requires NEW requestId."
+  "expiresAt": "2026-09-19T03:30:00Z",
+  "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; ONE_ATTEMPT_PER_REQUEST_ID; no reboot; no broad Node kill; no reauth; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
+  "requiredReadback": "R2 Guard V8 receipt + R1 list_devices + ping + real command + file RW X2"
 }
