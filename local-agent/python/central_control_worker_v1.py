@@ -54,7 +54,7 @@ def exact_recovery(root:Path):
     ps=os.path.join(os.environ.get("SystemRoot",r"C:\Windows"),"System32","WindowsPowerShell","v1.0","powershell.exe")
     if not os.path.exists(ps): ps="powershell.exe"
     cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",str(script)],
-                      stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=300,check=False)
+                      stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=300,check=False,shell=False)
     tail=(cp.stdout or "")[-4000:]
     if cp.returncode not in (0,4):
         raise RuntimeError(f"RECOVERY_SCRIPT_EXIT_{cp.returncode}:{tail}")
