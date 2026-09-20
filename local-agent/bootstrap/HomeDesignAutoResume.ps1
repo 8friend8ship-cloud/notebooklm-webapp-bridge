@@ -2,7 +2,7 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$Version='HOME_DESIGN_AUTO_RESUME_V10_REMOTE_INDEPENDENT_PY_CONTROL_20260919'
+$Version='HOME_DESIGN_AUTO_RESUME_V11_NO_PERSISTENT_BOOTSTRAP_LOOP_20260921'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Log=Join-Path $Root 'auto-resume.log'
 $ResumeLocal=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1'
