@@ -1,7 +1,7 @@
 param([switch]$SelfTestRecovery)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='CENTRAL_AGENT_TAB_SUPERVISOR_V33_EXECUTION_REQUIRED_PINNED_WATCHDOG_V19_20260912'
+$Version='CENTRAL_AGENT_TAB_SUPERVISOR_V34_ONEWAY_RDC_CHAIN_20260921'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $CleanupScript=Join-Path $Root 'RunOwnedUiCleanup.ps1'
@@ -22,7 +22,6 @@ $RequiredRemoteGuardPattern='^REMOTE_DC_KEEPALIVE_V13_'
 $RequiredWorkloadPattern='^WORKLOAD_ADMISSION_GOVERNOR_V3_'
 $RequiredFlowPattern='^FLOW_DEMAND_GUARD_V1_'
 $Pins=@{
- 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1'=@{commit='9decd6b63270ca27076b0c01b2cd90cf8dd422b9';sha='deeb3949deba8d0c3b4e4f1d8e2576d50f548da1';dest=$WatchdogScript}
  'local-agent/bootstrap/CentralAgentPowerContinuityGuard.ps1'=@{commit='32f4f0ed313ed9bd1e3f232d26ef067f4c63f470';sha='faa31c429ebebc7f29139ddc7e3f51991bc12a28';dest=$PowerGuardScript}
  'local-agent/bootstrap/DesktopCommanderKeepAlive.ps1'=@{commit='6d09a1583a6c09b331ed73866f02592bebb4af06';sha='5f2926ca031ac4726535d2655c51b394d8869ab1';dest=$RemoteGuardScript}
  'local-agent/bootstrap/FlowDemandGuard.ps1'=@{commit='15cf8b4a01a5d0e157289a459f1d102fafb78fe6';sha='64742526c4a32657786aa7aabae999c501c9f673';dest=$FlowDemandScript}
@@ -58,7 +57,7 @@ function Get-CloudControl{
   [pscustomobject]$o
 }
 $started=(Get-Date).ToString('o');$issues=New-Object System.Collections.Generic.List[string]
-$watchdogSha=Refresh-Pinned 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1';if(-not$watchdogSha){$issues.Add('WATCHDOG_V19_SELF_ROLLOUT_FAILED')}
+$watchdogSha='';try{if(Test-Path -LiteralPath $WatchdogScript){$watchdogSha=(GitBlob ([IO.File]::ReadAllBytes($WatchdogScript))).ToLowerInvariant()}}catch{};if(-not$watchdogSha){$issues.Add('WATCHDOG_EXECUTION_OWNER_MISSING')}
 $pg=Ensure-PowerGuard;if(-not$pg.ok){$issues.Add('POWER_GUARD_EXECUTION_REQUIRED_NOT_HELD')}
 $remoteSha=Refresh-Pinned 'local-agent/bootstrap/DesktopCommanderKeepAlive.ps1';$flowSha=Refresh-Pinned 'local-agent/bootstrap/FlowDemandGuard.ps1';$waSha=Refresh-Pinned 'local-agent/bootstrap/WindowActivitySupervisor.ps1';$igSha=Refresh-Pinned 'local-agent/bootstrap/InactiveProcessGovernor.ps1';$wgSha=Refresh-Pinned 'local-agent/bootstrap/WorkloadAdmissionGovernor.ps1';$clSha=Refresh-Pinned 'local-agent/bootstrap/RunOwnedUiCleanup.ps1'
 if(-not$remoteSha){$issues.Add('REMOTE_GUARD_REFRESH_FAILED')};if(-not$flowSha){$issues.Add('FLOW_DEMAND_GUARD_REFRESH_FAILED')};if(-not$waSha){$issues.Add('WINDOW_UIA_REFRESH_FAILED')};if(-not$igSha){$issues.Add('INACTIVE_R2_REFRESH_FAILED')};if(-not$wgSha){$issues.Add('WORKLOAD_GOVERNOR_REFRESH_FAILED')};if(-not$clSha){$issues.Add('CLEANUP_V7_REFRESH_FAILED')}
