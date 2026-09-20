@@ -1,10 +1,10 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V23_BOUNDED_SUPERVISOR_20260919'
+$Version='WATCHDOG_V24_RDC_V13_PIN_CHAIN_20260921'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$SupervisorCommit='1209931039a475dd3f4ad89d7df7b54c228bc2ac'
-$SupervisorBlob='e30261a1a4fe0d96803aacd2041237c613d18333'
+$SupervisorCommit='e93a97548d0d42de55f2e09967af128b464f5be8'
+$SupervisorBlob='ce7469164fa27298079e8d159ee710526ba748ff'
 $LegacyBlob='ecd3a75d2ad8314a44772d91df1905632eeec94d'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
