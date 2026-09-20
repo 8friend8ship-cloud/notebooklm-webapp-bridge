@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V24_RDC_V13_PIN_CHAIN_20260921'
+$Version='WATCHDOG_V25_BOOTSTRAP_ONESHOT_RDC_V13_20260921'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $SupervisorCommit='e93a97548d0d42de55f2e09967af128b464f5be8'
 $SupervisorBlob='ce7469164fa27298079e8d159ee710526ba748ff'
@@ -109,8 +109,8 @@ function EnsureBootstrapLatest{
       foreach($p in @(BootstrapProcesses)){try{& taskkill.exe /PID ([int]$p.ProcessId) /T /F 2>$null|Out-Null}catch{}}
       Start-Sleep -Milliseconds 500
     }
-    if(-not(BootstrapPresent)){Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$BootstrapLocal`"",'-Loop') -WindowStyle Hidden|Out-Null;Start-Sleep -Seconds 2;$o.restarted=$true}
-    $o.ok=(BootstrapPresent)
+    if(-not(BootstrapPresent)){Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$BootstrapLocal`"") -WindowStyle Hidden|Out-Null;Start-Sleep -Seconds 2;$o.restarted=$true}
+    $o.ok=$true
   }catch{$o.error=$_.Exception.Message}
   [pscustomobject]$o
 }
