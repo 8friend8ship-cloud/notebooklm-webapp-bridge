@@ -2,7 +2,7 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$Version='HOME_DESIGN_AUTO_RESUME_V14_LOCAL_RDC_SELFHEAL_20260921'
+$Version='HOME_DESIGN_AUTO_RESUME_V15_BOUNDED_RDC_SELFHEAL_20260921'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Log=Join-Path $Root 'auto-resume.log'
 $ResumeLocal=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1'
@@ -60,7 +60,14 @@ if(Test-Path -LiteralPath $PythonControlLocal){
   }catch{Log ('PYTHON_CONTROL_EXCEPTION '+$_.Exception.Message)}
 }
 if(Test-Path -LiteralPath $KeepAliveLocal){
-  try{$kaRaw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $KeepAliveLocal 2>&1|Out-String;$kaRc=$LASTEXITCODE;Log ('KEEPALIVE_EXIT='+$kaRc+' '+($kaRaw.Trim()))}catch{Log ('KEEPALIVE_EXCEPTION '+$_.Exception.Message)}
+  try{
+    $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true
+    $psi.Arguments="-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$KeepAliveLocal`""
+    $kp=[Diagnostics.Process]::Start($psi);$done=$kp.WaitForExit(45000)
+    if(-not$done){try{& taskkill.exe /PID ([int]$kp.Id) /T /F 2>$null|Out-Null}catch{};$kaRc=124}else{$kaRc=[int]$kp.ExitCode}
+    $kaStatus='';try{if(Test-Path (Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json')){$kj=Get-Content (Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json') -Raw -Encoding UTF8|ConvertFrom-Json;$kaStatus=[string]$kj.status}}catch{}
+    Log ('KEEPALIVE_EXIT='+$kaRc+' status='+$kaStatus)
+  }catch{Log ('KEEPALIVE_EXCEPTION '+$_.Exception.Message)}
 }
 if(Test-Path -LiteralPath $OpenAISyncLocal){
   try{$syncRaw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $OpenAISyncLocal -Apply 2>&1|Out-String;$syncRc=$LASTEXITCODE;Log ('OPENAI_WEB_SYNC_EXIT='+$syncRc+' '+($syncRaw.Trim()))}catch{Log ('OPENAI_WEB_SYNC_EXCEPTION '+$_.Exception.Message)}
