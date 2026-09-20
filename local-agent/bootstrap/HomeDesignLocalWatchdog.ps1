@@ -1,10 +1,10 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V25_BOOTSTRAP_ONESHOT_RDC_V13_20260921'
+$Version='WATCHDOG_V26_ONEWAY_PIN_CHAIN_20260921'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$SupervisorCommit='e93a97548d0d42de55f2e09967af128b464f5be8'
-$SupervisorBlob='ce7469164fa27298079e8d159ee710526ba748ff'
+$SupervisorCommit='a329971bdfd4bd9c7f2a84fc36c9ae768091d457'
+$SupervisorBlob='934e37d58c6fa139131054a3ce4db1830e7f49da'
 $LegacyBlob='ecd3a75d2ad8314a44772d91df1905632eeec94d'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -14,6 +14,10 @@ $Entry=Join-Path $Root 'WATCHDOG_ENTRY_LATEST.json'
 $BootstrapLocal=Join-Path $Root 'AgentBootstrap.ps1'
 $FlowGuardLocal=Join-Path $Root 'FlowDemandGuard.ps1'
 $RemoteDataPlaneGuardLocal=Join-Path $Root 'RemoteDcDataPlaneGuard.ps1'
+$DataPlaneCommit='9c6fe28acd1245fbe7a9b7ba13c856b0ff54e6c0'
+$DataPlaneBlob='d76a6f4f101287ea0651eb139f52fc62ce511660'
+$AuditCommit='c622685d3e13ae987bd9cf19defd60c395de20b3'
+$AuditBlob='a2b85ddbc338c524c5542f7ea58dd240e2bffa9c'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 $MutexName='Local\HomeDesignAutomationV7.HomeDesignLocalWatchdog'
 $WatchdogMutex=$null
@@ -129,7 +133,7 @@ if(Test-Path $supervisorLocal){$supervisorRc=RunBoundedPowerShell $supervisorLoc
 }catch{}
 try{
   $auditLocal=Join-Path $Root 'NotebookAuditPack.ps1'
-  foreach($spec in @(@('local-agent/bootstrap/RemoteDcDataPlaneGuard.ps1',$RemoteDataPlaneGuardLocal),@('local-agent/bootstrap/NotebookAuditPack.ps1',$auditLocal))){try{$f=FetchRepoBytes $spec[0] 15;if($f.ok){$need=(-not(Test-Path $spec[1]));if(-not$need){$need=((GitBlobSha1 $spec[1]).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())};if($need){[IO.File]::WriteAllBytes(($spec[1]+'.download'),[byte[]]$f.bytes);Move-Item ($spec[1]+'.download') $spec[1] -Force}}}catch{}}
+  foreach($spec in @(@('local-agent/bootstrap/RemoteDcDataPlaneGuard.ps1',$RemoteDataPlaneGuardLocal,$DataPlaneCommit,$DataPlaneBlob),@('local-agent/bootstrap/NotebookAuditPack.ps1',$auditLocal,$AuditCommit,$AuditBlob))){try{$f=FetchPinnedBytes $spec[2] $spec[0] $spec[3] 15;if($f.ok){$need=(-not(Test-Path $spec[1]));if(-not$need){$need=((GitBlobSha1 $spec[1]).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())};if($need){[IO.File]::WriteAllBytes(($spec[1]+'.download'),[byte[]]$f.bytes);Move-Item ($spec[1]+'.download') $spec[1] -Force}}}catch{}}
   if(Test-Path -LiteralPath $RemoteDataPlaneGuardLocal -PathType Leaf){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $RemoteDataPlaneGuardLocal | Out-Null}
   if(Test-Path -LiteralPath $auditLocal -PathType Leaf){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $auditLocal | Out-Null}
 }catch{}
