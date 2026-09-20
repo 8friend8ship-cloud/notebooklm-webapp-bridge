@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='NOTEBOOK_AUDIT_PACK_LOCAL_V6_RECEIPT_PATH_FIX_20260910'
+$Version='NOTEBOOK_AUDIT_PACK_V8_RDC_0251_20260921'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
 $AuditRoot=Join-Path $Base 'NotebookAudit'
@@ -9,10 +9,10 @@ $DcRoot=Join-Path $Base 'DesktopCommander'
 $DcCache=Join-Path $DcRoot 'npm-cache'
 $DcOutLog=Join-Path $DcRoot 'remote.stdout.log'
 $DcErrLog=Join-Path $DcRoot 'remote.stderr.log'
-$DcMarker=Join-Path $DcRoot 'cache-ready-0.2.48.marker'
+$DcMarker=Join-Path $DcRoot 'cache-ready-0.2.51.marker'
 $ReceiptPath=Join-Path $AuditRoot 'NOTEBOOK_AUDIT_PACK_LAST.json'
 $RemoteReceipt=Join-Path $AuditRoot 'REMOTE_DC_SELF_HEAL_LAST.json'
-$Package='@wonderwhy-er/desktop-commander@0.2.48'
+$Package='@wonderwhy-er/desktop-commander@0.2.51'
 New-Item -ItemType Directory -Force -Path $Root,$AuditRoot,$DcRoot,$DcCache|Out-Null
 
 function FindCentral{
@@ -133,7 +133,7 @@ function EnsureRemoteDc{
       $warm=WarmIsolatedCache
     }
     if($warm.ok){
-      try{[ordered]@{version='0.2.48';readyAt=(Get-Date).ToString('o');cache=$DcCache}|ConvertTo-Json|Set-Content -LiteralPath $DcMarker -Encoding UTF8}catch{}
+      try{[ordered]@{version='0.2.51';readyAt=(Get-Date).ToString('o');cache=$DcCache}|ConvertTo-Json|Set-Content -LiteralPath $DcMarker -Encoding UTF8}catch{}
       $actions+='ISOLATED_CACHE_READY'
       $launch=StartRemoteHidden
       if($launch.started){$actions+='REMOTE_HIDDEN_START'}else{$errors+=('REMOTE_START:'+[string]$launch.error)}
