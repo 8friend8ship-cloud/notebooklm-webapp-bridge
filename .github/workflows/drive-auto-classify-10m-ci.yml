@@ -1,0 +1,22 @@
+name: Drive Auto Classify 10m CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps-script/DriveAutoClassifySeedWriteback10m.gs'
+      - 'tests/drive-auto-classify-10m.test.mjs'
+      - '.github/workflows/drive-auto-classify-10m-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run logical 10m contract tests twice
+        run: |
+          node --test tests/drive-auto-classify-10m.test.mjs
+          node --test tests/drive-auto-classify-10m.test.mjs
