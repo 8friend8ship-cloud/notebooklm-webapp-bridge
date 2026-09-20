@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='RESUME_V11_REQUEST_ID_RDC_GUARD_20260918'
+$Version='RESUME_V12_PINNED_RDC_0251_20260921'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $OriginalBlob='bc5fd70c2609f30fc8e9d46027665f1f6444066a'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
@@ -9,6 +9,8 @@ $Receipt='RESUME_TABLET_PRIMARY_HOLD_GUARD_LATEST.json'
 $RepairReceipt='RDC_DATAPLANE_RECYCLE_V1_20260911.json'
 $KeepAliveLocal=Join-Path $Root 'DesktopCommanderKeepAlive.ps1'
 $DataPlaneGuardLocal=Join-Path $Root 'RemoteDcDataPlaneGuard.ps1'
+$DataPlaneCommit='9c6fe28acd1245fbe7a9b7ba13c856b0ff54e6c0'
+$DataPlaneBlob='d76a6f4f101287ea0651eb139f52fc62ce511660'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
 function GitBlobSha1([string]$Path){$b=[IO.File]::ReadAllBytes($Path);$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
 function FindCentral{$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}};''}
@@ -20,9 +22,10 @@ function RunRdcDataPlaneGuard{
   $r=[ordered]@{ok=$true;action='RDC_REQUEST_ID_GUARD';version=$Version;startedAt=(Get-Date).ToString('o');source='AUTORESUME_EXISTING_LANE';guardFetched=$false;guardSha='';guardExit=$null;errors=@();newTrigger=$false;newOAuth=$false;broadNodeKill=$false;globalExecutionPolicyChanged=$false}
   try{
     $tmp=$DataPlaneGuardLocal+'.download'
-    $u='https://raw.githubusercontent.com/'+$Repo+'/main/local-agent/bootstrap/RemoteDcDataPlaneGuard.ps1?cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-    Invoke-WebRequest -UseBasicParsing -Uri $u -Headers @{'User-Agent'='HomeDesign-RdcGuard-V11'} -OutFile $tmp -TimeoutSec 30
+    $u='https://raw.githubusercontent.com/'+$Repo+'/'+$DataPlaneCommit+'/local-agent/bootstrap/RemoteDcDataPlaneGuard.ps1'
+    Invoke-WebRequest -UseBasicParsing -Uri $u -Headers @{'User-Agent'='HomeDesign-RdcGuard-V12-Pinned'} -OutFile $tmp -TimeoutSec 30
     $r.guardSha=(GitBlobSha1 $tmp).ToLowerInvariant()
+    if($r.guardSha-ne$DataPlaneBlob){Remove-Item $tmp -Force -ErrorAction SilentlyContinue;throw ('DATAPLANE_PIN_SHA_MISMATCH actual='+$r.guardSha)}
     Move-Item -LiteralPath $tmp -Destination $DataPlaneGuardLocal -Force
     $r.guardFetched=$true
     $raw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $DataPlaneGuardLocal 2>&1|Out-String
