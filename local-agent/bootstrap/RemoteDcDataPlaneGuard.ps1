@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_DATA_PLANE_GUARD_V9_PY_CONTROL_BRIDGE_20260919'
+$Version='REMOTE_DC_DATA_PLANE_GUARD_V10_0251_20260921'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -11,7 +11,7 @@ $StatePath=Join-Path $DcRoot 'data-plane-guard-state.json'
 $ReceiptPath=Join-Path $DcRoot 'REMOTE_DC_DATA_PLANE_GUARD_LAST.json'
 $OutLog=Join-Path $DcRoot 'remote.stdout.log'
 $ErrLog=Join-Path $DcRoot 'remote.stderr.log'
-$AllowedPackage='@wonderwhy-er/desktop-commander@0.2.48'
+$AllowedPackage='@wonderwhy-er/desktop-commander@0.2.51'
 New-Item -ItemType Directory -Force -Path $Root,$DcRoot,$DcCache|Out-Null
 function FindCentral{$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('MDBf7KSR7JWZ7JeQ7J207KCE7Yq4'));$m=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('64K0IOuTnOudvOydtOu4jA=='));foreach($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)){foreach($c in @((Join-Path $d.Root $n),(Join-Path $d.Root ($m+'\'+$n)),(Join-Path $d.Root ('My Drive\'+$n)),(Join-Path $d.Root ('Google Drive\'+$n)))){if(Test-Path -LiteralPath $c -PathType Container){return $c}}};''}
 function SaveReceipt($o){try{$j=$o|ConvertTo-Json -Depth 20;$j|Set-Content -LiteralPath $ReceiptPath -Encoding UTF8;$c=FindCentral;if($c){$d=Join-Path $c 'Runtime_Readback';New-Item -ItemType Directory -Force -Path $d|Out-Null;$j|Set-Content -LiteralPath (Join-Path $d 'REMOTE_DC_DATA_PLANE_GUARD_LAST.json') -Encoding UTF8}}catch{}}
