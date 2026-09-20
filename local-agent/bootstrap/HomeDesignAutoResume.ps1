@@ -2,7 +2,7 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$Version='HOME_DESIGN_AUTO_RESUME_V11_NO_PERSISTENT_BOOTSTRAP_LOOP_20260921'
+$Version='HOME_DESIGN_AUTO_RESUME_V12_BOOTSTRAP_ONESHOT_20260921'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Log=Join-Path $Root 'auto-resume.log'
 $ResumeLocal=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1'
@@ -51,7 +51,11 @@ if(Test-Path -LiteralPath $OpenAISyncLocal){
 if((Test-Path -LiteralPath $DriveMirrorFixLocal) -and -not(DriveMirrorAlreadyVerified) -and -not(DriveMirrorFixRunning)){
   try{$py=(Get-Command python.exe -ErrorAction SilentlyContinue).Source;if(-not$py){$py=(Get-Command python -ErrorAction SilentlyContinue).Source};if($py){Start-Process -FilePath $py -ArgumentList @("`"$DriveMirrorFixLocal`"") -WindowStyle Hidden|Out-Null;Log 'DRIVE_MIRROR_EXACT_DIFF_STARTED'}else{Log 'DRIVE_MIRROR_EXACT_DIFF_PYTHON_MISSING'}}catch{Log ('DRIVE_MIRROR_EXACT_DIFF_START_FAILED '+$_.Exception.Message)}
 }else{Log ('DRIVE_MIRROR_EXACT_DIFF_SKIP verified='+(DriveMirrorAlreadyVerified)+' running='+(DriveMirrorFixRunning))}
-if(-not(BootstrapLoopPresent)){
-  try{Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',"`"$BootstrapLocal`"",'-Loop') -WindowStyle Hidden|Out-Null;Start-Sleep -Seconds 2;Log ('BOOTSTRAP_LOOP_DIRECT_START='+(BootstrapLoopPresent))}catch{Log ('BOOTSTRAP_LOOP_START_FAILED '+$_.Exception.Message)}
-}else{Log 'BOOTSTRAP_LOOP_ALREADY_PRESENT'}
+try{
+  $psi=New-Object Diagnostics.ProcessStartInfo
+  $psi.FileName='powershell.exe';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true
+  $psi.Arguments="-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$BootstrapLocal`""
+  $bp=[Diagnostics.Process]::Start($psi)
+  Log ('BOOTSTRAP_ONESHOT_STARTED pid='+$bp.Id)
+}catch{Log ('BOOTSTRAP_ONESHOT_START_FAILED '+$_.Exception.Message)}
 try{& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ResumeLocal;$rc=$LASTEXITCODE;Log ("RESUME_EXIT=$rc HOST_HEALTH="+(HostHealthy)+" BOOTSTRAP_LOOP="+(BootstrapLoopPresent));exit $rc}catch{Log ('RESUME_EXCEPTION '+$_.Exception.Message);exit 3}
