@@ -12,8 +12,8 @@ $ErrLog=Join-Path $DcRoot 'remote.stderr.log'
 $Receipt=Join-Path $Root 'REMOTE_DC_KEEPALIVE_LAST.json'
 $Guard=Join-Path $Root 'RemoteVerifyPreventionGuard.ps1'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$GuardCommit='1a8365b79b6a2a3f85eec68cf88978bd1224c76b'
-$GuardBlob='99147e45158e6c506a93318264a72a94db3b8dfe'
+$GuardCommit='dc04dd1483d8eb167d328cb197412e93a564a703'
+$GuardBlob='faf700cbd1a32bb46b3317b9b868fc709a3d3c36'
 New-Item -ItemType Directory -Force -Path $Root,$DcRoot,$DcCache|Out-Null
 $Mutex=New-Object Threading.Mutex($false,'HomeDesignDesktopCommanderKeepAliveV13Preflight')
 $held=$false;try{$held=$Mutex.WaitOne(30000,$false)}catch [Threading.AbandonedMutexException]{$held=$true};if(-not$held){exit 6}
