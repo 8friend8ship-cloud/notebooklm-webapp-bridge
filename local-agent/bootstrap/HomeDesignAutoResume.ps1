@@ -2,16 +2,19 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$Version='HOME_DESIGN_AUTO_RESUME_V13_PINNED_RDC_CHAIN_20260921'
+$Version='HOME_DESIGN_AUTO_RESUME_V14_LOCAL_RDC_SELFHEAL_20260921'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Log=Join-Path $Root 'auto-resume.log'
 $ResumeLocal=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1'
 $BootstrapLocal=Join-Path $Root 'AgentBootstrap.ps1'
 $WatchdogLocal=Join-Path $Root 'HomeDesignLocalWatchdog.ps1'
+$KeepAliveLocal=Join-Path $Root 'DesktopCommanderKeepAlive.ps1'
 $OpenAISyncLocal=Join-Path $Root 'OpenAIWebSyncGuard.ps1'
 $DriveMirrorFixLocal=Join-Path $Root 'DriveMirrorExactDiffFinalize.py'
 $PythonControlLocal=Join-Path $Root 'central_control_worker_v1.py'
 $WatchdogCommit='cc5fd27f5d53344a79a82662fc5cec5029326246'
+$KeepAliveCommit='6d09a1583a6c09b331ed73866f02592bebb4af06'
+$KeepAliveBlob='5f2926ca031ac4726535d2655c51b394d8869ab1'
 $WatchdogBlob='8bf8038fe4a9fc13c553da4c68c2da40df8ba443'
 $ResumeCommit='5d4a789fb9744598f1f3c211b1d970a42297f793'
 $ResumeBlob='62f3153a9e746ad1c83ebea294cd1e6c952d90d5'
@@ -39,6 +42,7 @@ function DriveMirrorAlreadyVerified{try{$p='F:\CENTRAL_AGENT_DATA\00_CONTROL\DRI
 
 Log ('AUTO_RESUME_START '+$Version)
 try{[void](RefreshPinnedFile $WatchdogCommit $WatchdogBlob 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $WatchdogLocal 'WATCHDOG')}catch{Log ('WATCHDOG_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $WatchdogLocal)){exit 2}}
+try{[void](RefreshPinnedFile $KeepAliveCommit $KeepAliveBlob 'local-agent/bootstrap/DesktopCommanderKeepAlive.ps1' $KeepAliveLocal 'KEEPALIVE')}catch{Log ('KEEPALIVE_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $KeepAliveLocal)){exit 2}}
 try{[void](RefreshFile 'local-agent/bootstrap/AgentBootstrap.ps1' $BootstrapLocal 'BOOTSTRAP')}catch{Log ('BOOTSTRAP_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $BootstrapLocal)){exit 2}}
 try{[void](RefreshPinnedFile $ResumeCommit $ResumeBlob 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' $ResumeLocal 'RESUME_SCRIPT')}catch{Log ('RESUME_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $ResumeLocal)){exit 2}}
 try{[void](RefreshFile 'local-agent/bootstrap/OpenAIWebSyncGuard.ps1' $OpenAISyncLocal 'OPENAI_WEB_SYNC')}catch{Log ('OPENAI_WEB_SYNC_REFRESH_FAILED '+$_.Exception.Message)}
@@ -54,6 +58,9 @@ if(Test-Path -LiteralPath $PythonControlLocal){
       Log ('PYTHON_CONTROL_EXIT='+$pyRc+' '+($pyRaw.Trim()))
     }else{Log 'PYTHON_CONTROL_PYTHON_MISSING'}
   }catch{Log ('PYTHON_CONTROL_EXCEPTION '+$_.Exception.Message)}
+}
+if(Test-Path -LiteralPath $KeepAliveLocal){
+  try{$kaRaw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $KeepAliveLocal 2>&1|Out-String;$kaRc=$LASTEXITCODE;Log ('KEEPALIVE_EXIT='+$kaRc+' '+($kaRaw.Trim()))}catch{Log ('KEEPALIVE_EXCEPTION '+$_.Exception.Message)}
 }
 if(Test-Path -LiteralPath $OpenAISyncLocal){
   try{$syncRaw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $OpenAISyncLocal -Apply 2>&1|Out-String;$syncRc=$LASTEXITCODE;Log ('OPENAI_WEB_SYNC_EXIT='+$syncRc+' '+($syncRaw.Trim()))}catch{Log ('OPENAI_WEB_SYNC_EXCEPTION '+$_.Exception.Message)}
