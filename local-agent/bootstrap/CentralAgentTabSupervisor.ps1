@@ -26,7 +26,7 @@ $Pins=@{
  'local-agent/bootstrap/CentralAgentPowerContinuityGuard.ps1'=@{commit='32f4f0ed313ed9bd1e3f232d26ef067f4c63f470';sha='faa31c429ebebc7f29139ddc7e3f51991bc12a28';dest=$PowerGuardScript}
  'local-agent/bootstrap/DesktopCommanderKeepAlive.ps1'=@{commit='65ee7d3b7efde00590caa3b62809669586616a75';sha='78cbec08a42a981993186e7d63471eff2868e3c6';dest=$RemoteGuardScript}
  'local-agent/bootstrap/FlowDemandGuard.ps1'=@{commit='15cf8b4a01a5d0e157289a459f1d102fafb78fe6';sha='64742526c4a32657786aa7aabae999c501c9f673';dest=$FlowDemandScript}
- 'local-agent/bootstrap/WindowActivitySupervisor.ps1'=@{commit='95aacd1d1416d6e41906ff6be0b935f8e032ade8';sha='29d260473f3fdbc993b86e0900dc9833bf158609';dest=$WindowActivityScript}
+ 'local-agent/bootstrap/WindowActivitySupervisor.ps1'=@{commit='fc9fdc8bdd93a0698f62256b4d85d8e4d0d81a9e';sha='cac5bf7baf46058c15443d0c28714dbbed22ad69';dest=$WindowActivityScript}
  'local-agent/bootstrap/InactiveProcessGovernor.ps1'=@{commit='5d4cd5171d031c9d8252f03adb06925f5380181f';sha='5a9df27edd089d62f2eaf473a6cbdb984bd287b2';dest=$InactiveGovernorScript}
  'local-agent/bootstrap/WorkloadAdmissionGovernor.ps1'=@{commit='8a8d3a3d1d5fdcb1ce55afb13c9a9579b3ae1b52';sha='89b5889714fcf92855dcadc5b5a573bf694055a6';dest=$WorkloadGovernorScript}
  'local-agent/bootstrap/RunOwnedUiCleanup.ps1'=@{commit='7c7631047ff322ecb8836386c6408f8651304398';sha='c45a7da297c10003850a1ef08faf779b0f5be984';dest=$CleanupScript}
