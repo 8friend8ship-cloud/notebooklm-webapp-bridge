@@ -35,7 +35,7 @@ try{[void](RefreshFile 'local-agent/bootstrap/RESUME_LOCAL_AGENT_ONCE.ps1' $Resu
 try{[void](RefreshFile 'local-agent/bootstrap/OpenAIWebSyncGuard.ps1' $OpenAISyncLocal 'OPENAI_WEB_SYNC')}catch{Log ('OPENAI_WEB_SYNC_REFRESH_FAILED '+$_.Exception.Message)}
 try{[void](RefreshFile 'local-agent/bootstrap/DriveMirrorExactDiffFinalize.py' $DriveMirrorFixLocal 'DRIVE_MIRROR_EXACT_DIFF')}catch{Log ('DRIVE_MIRROR_FIX_REFRESH_FAILED '+$_.Exception.Message)}
 try{[void](RefreshFile 'local-agent/python/central_control_worker_v1.py' $PythonControlLocal 'PYTHON_CONTROL')}catch{Log ('PYTHON_CONTROL_REFRESH_FAILED '+$_.Exception.Message)}
-try{[void](RefreshFile 'local-agent/bootstrap/CentralAgentPowerShellBridge.ps1' $PowerShellBridgeLocal 'POWERSHELL_BRIDGE')}catch{Log ('POWERSHELL_BRIDGE_REFRESH_FAILED '+$_.Exception.Message)}
+if(-not(Test-Path -LiteralPath $PowerShellBridgeLocal)){Log 'POWERSHELL_BRIDGE_LOCAL_MISSING_FAIL_CLOSED'}
 if(Test-Path -LiteralPath $PythonControlLocal){
   try{
     $pyc=(Get-Command python.exe -ErrorAction SilentlyContinue).Source
