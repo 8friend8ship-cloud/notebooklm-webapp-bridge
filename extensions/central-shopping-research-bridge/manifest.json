@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Central Shopping Research Bridge",
+  "version": "0.1.0",
+  "description": "Collects public shopping evidence for Queens/Seed research across Coupang, AliExpress and Amazon with bounded scrolling and no login automation.",
+  "permissions": ["downloads", "storage"],
+  "host_permissions": [
+    "https://www.coupang.com/*",
+    "https://*.aliexpress.com/*",
+    "https://www.amazon.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.coupang.com/*",
+        "https://*.aliexpress.com/*",
+        "https://www.amazon.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
