@@ -6,12 +6,22 @@ $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Runner=Join-Path $Root 'HomeDesignAutoResume.ps1'
 $Watchdog=Join-Path $Root 'HomeDesignLocalWatchdog.ps1'
 $PythonControl=Join-Path $Root 'central_control_worker_v1.py'
+$HiddenLauncher=Join-Path $Root 'AutoResumeHiddenLauncher.vbs'
 $WatchdogEntry=Join-Path $Root 'WATCHDOG_ENTRY_LATEST.json'
 $WatchdogReceipt=Join-Path $Root 'WATCHDOG_LAST.json'
 $DirectWatchdogTimeoutSeconds=420
 $ScheduledEntryWaitSeconds=15
 $ScheduledExecutionLimitMinutes=10
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
+$launcher=@'
+Option Explicit
+Dim ws, cmd, rc
+Set ws = CreateObject("WScript.Shell")
+cmd = "powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File ""C:\Users\User\AppData\Local\HomeDesignAutomationV7\LocalAgent\HomeDesignAutoResume.ps1"""
+rc = ws.Run(cmd, 0, True)
+WScript.Quit rc
+'@
+$launcher|Set-Content -LiteralPath $HiddenLauncher -Encoding ASCII
 
 function Api([string]$Path){Invoke-RestMethod -Uri ('https://api.github.com/repos/'+$Repo+'/contents/'+$Path+'?ref=main&cb='+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers @{'User-Agent'='HomeDesign-AutoResume-Installer';'Accept'='application/vnd.github+json'} -TimeoutSec 30}
 function Blob([string]$Path){$b=[IO.File]::ReadAllBytes($Path);$h=[Text.Encoding]::ASCII.GetBytes(('blob '+$b.Length+[char]0));$a=New-Object byte[]($h.Length+$b.Length);[Buffer]::BlockCopy($h,0,$a,0,$h.Length);[Buffer]::BlockCopy($b,0,$a,$h.Length,$b.Length);$s=[Security.Cryptography.SHA1]::Create();try{return (($s.ComputeHash($a)|ForEach-Object{$_.ToString('x2')})-join '')}finally{$s.Dispose()}}
@@ -26,9 +36,10 @@ try{$runnerSha=InstallVerified 'local-agent/bootstrap/HomeDesignAutoResume.ps1' 
 try{$watchdogSha=InstallVerified 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $Watchdog}catch{$errors+=('WATCHDOG_INSTALL:'+ $_.Exception.Message)}
 try{$pythonControlSha=InstallVerified 'local-agent/python/central_control_worker_v1.py' $PythonControl}catch{$errors+=('PYTHON_CONTROL_INSTALL:'+ $_.Exception.Message)}
 
-$runKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';$runName='HomeDesignAutomationAutoResume';$runCommand='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Runner+'"'
+$runKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';$runName='HomeDesignAutomationAutoResume';$runCommand='wscript.exe "'+$HiddenLauncher+'"'
 try{New-Item -Path $runKey -Force|Out-Null;Set-ItemProperty -Path $runKey -Name $runName -Value $runCommand -Type String;$runVerify=(Get-ItemProperty -Path $runKey -Name $runName -ErrorAction Stop).$runName;if([string]$runVerify-ne$runCommand){throw 'HKCU_RUN_FALLBACK_VERIFY_FAILED'};$runKeySet=$true}catch{$errors+=('HKCU_RUN:'+ $_.Exception.Message)}
-$pyCmd='python.exe "'+$PythonControl+'"'
+$pyw=(Get-Command pythonw.exe -ErrorAction SilentlyContinue).Source;if(-not$pyw){$candidate=Join-Path $env:LOCALAPPDATA 'Python\pythoncore-3.14-64\pythonw.exe';if(Test-Path $candidate){$pyw=$candidate}};if(-not$pyw){throw 'PYTHONW_EXE_MISSING'}
+$pyCmd='"'+$pyw+'" "'+$PythonControl+'"'
 try{Set-ItemProperty -Path $runKey -Name 'HomeDesignPythonControl' -Value $pyCmd -Type String;$pyVerify=(Get-ItemProperty -Path $runKey -Name 'HomeDesignPythonControl' -ErrorAction Stop).HomeDesignPythonControl;if([string]$pyVerify-ne$pyCmd){throw 'HKCU_PY_RUN_VERIFY_FAILED'};$pythonRunKeySet=$true}catch{$errors+=('HKCU_PY_RUN:'+ $_.Exception.Message)}
 
 $taskName='HomeDesignAutomation-AutoResume'
@@ -45,7 +56,7 @@ $xml=@"
   </Triggers>
   <Principals><Principal id="Author"><UserId>$userSid</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>true</StartWhenAvailable><RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable><IdleSettings><StopOnIdleEnd>false</StopOnIdleEnd><RestartOnIdle>false</RestartOnIdle></IdleSettings><AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><Hidden>true</Hidden><WakeToRun>false</WakeToRun><ExecutionTimeLimit>PT10M</ExecutionTimeLimit><Priority>7</Priority></Settings>
-  <Actions Context="Author"><Exec><Command>powershell.exe</Command><Arguments>-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$Runner&quot;</Arguments></Exec></Actions>
+  <Actions Context="Author"><Exec><Command>C:\Windows\System32\wscript.exe</Command><Arguments>&quot;$HiddenLauncher&quot;</Arguments></Exec></Actions>
 </Task>
 "@
 $tmpXml=Join-Path $env:TEMP 'HomeDesignAutomation-AutoResume-v3.xml'
@@ -54,9 +65,9 @@ try{$xml|Set-Content -LiteralPath $tmpXml -Encoding Unicode;& schtasks.exe /Crea
 
 $pythonTaskName='HomeDesignAutomation-PythonControl'
 try{
-  $pyExe=(Get-Command python.exe -ErrorAction SilentlyContinue).Source
-  if(-not$pyExe){$pyExe=(Get-Command python -ErrorAction SilentlyContinue).Source}
-  if(-not$pyExe){throw 'PYTHON_EXE_MISSING'}
+  $pyExe=(Get-Command pythonw.exe -ErrorAction SilentlyContinue).Source
+  if(-not$pyExe){$candidate=Join-Path $env:LOCALAPPDATA 'Python\pythoncore-3.14-64\pythonw.exe';if(Test-Path $candidate){$pyExe=$candidate}}
+  if(-not$pyExe){throw 'PYTHONW_EXE_MISSING'}
   $pyTr='"'+$pyExe+'" "'+$PythonControl+'"'
   & schtasks.exe /Create /F /SC MINUTE /MO 5 /TN $pythonTaskName /TR $pyTr | Out-Null
   if($LASTEXITCODE-ne0){throw('PY_SCHTASKS_CREATE_'+$LASTEXITCODE)}
@@ -68,7 +79,7 @@ try{
 # is approximated by the next <=5 minute periodic run after resume. Do not claim full contract.
 if(-not$taskCreated){
   try{
-    $tr='powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$Runner+'"'
+    $tr='wscript.exe "'+$HiddenLauncher+'"'
     & schtasks.exe /Create /F /SC MINUTE /MO 5 /TN $taskName /TR $tr | Out-Null
     if($LASTEXITCODE-ne0){throw('SCHTASKS_FALLBACK_CREATE_'+$LASTEXITCODE)}
     $taskCreated=$true;$taskMode='FALLBACK_5MIN';$periodicTriggerReady=$true;$fullTriggerContractReady=$false;$triggerContract='HKCU_LOGON+5MIN_FALLBACK'
