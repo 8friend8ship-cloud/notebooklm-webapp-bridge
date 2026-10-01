@@ -61,8 +61,9 @@ def run_fixed_ps(root:Path, names:list[str], timeout:int=600):
     if not script: raise RuntimeError("FIXED_SCRIPT_MISSING:"+",".join(names))
     ps=os.path.join(os.environ.get("SystemRoot",r"C:\\Windows"),"System32","WindowsPowerShell","v1.0","powershell.exe")
     if not os.path.exists(ps): ps="powershell.exe"
-    cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",str(script)],
-                      stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=timeout,check=False,shell=False)
+    flags=getattr(subprocess,"CREATE_NO_WINDOW",0x08000000)
+    cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-WindowStyle","Hidden","-ExecutionPolicy","Bypass","-File",str(script)],
+                      stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=timeout,check=False,shell=False,creationflags=flags)
     tail=(cp.stdout or "")[-4000:]
     return script,cp.returncode,tail
 
@@ -111,8 +112,9 @@ def exact_recovery(root:Path):
     if not script: raise RuntimeError("EXACT_RECOVERY_SCRIPT_MISSING")
     ps=os.path.join(os.environ.get("SystemRoot",r"C:\Windows"),"System32","WindowsPowerShell","v1.0","powershell.exe")
     if not os.path.exists(ps): ps="powershell.exe"
-    cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",str(script)],
-                      stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=300,check=False,shell=False)
+    flags=getattr(subprocess,"CREATE_NO_WINDOW",0x08000000)
+    cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-WindowStyle","Hidden","-ExecutionPolicy","Bypass","-File",str(script)],
+                      stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=300,check=False,shell=False,creationflags=flags)
     tail=(cp.stdout or "")[-4000:]
     if cp.returncode not in (0,4):
         raise RuntimeError(f"RECOVERY_SCRIPT_EXIT_{cp.returncode}:{tail}")
@@ -134,6 +136,20 @@ def execute(c,root:Path):
         return {"script":str(script),"exitCode":rc,"outputTail":tail}
     return exact_recovery(root)
 
+def audit_scheduled_tasks(root:Path):
+    try:
+        exe=os.path.join(os.environ.get("SystemRoot",r"C:\\Windows"),"System32","schtasks.exe")
+        flags=getattr(subprocess,"CREATE_NO_WINDOW",0x08000000)
+        cp=subprocess.run([exe,"/Query","/FO","LIST","/V"],
+                          stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                          text=True,encoding="mbcs",errors="replace",
+                          timeout=120,check=False,shell=False,creationflags=flags)
+        p=root/"SCHEDULED_TASKS_FULL_AUDIT.txt"
+        p.write_text(cp.stdout or "",encoding="utf-8",errors="replace")
+        return {"ok":cp.returncode==0,"exitCode":cp.returncode,"path":str(p)}
+    except Exception as e:
+        return {"ok":False,"error":repr(e)}
+
 def run_once(root:Path):
     state_path=root/"python-control-state.json"
     receipt_path=root/"PYTHON_CONTROL_WORKER_LAST.json"
@@ -143,13 +159,14 @@ def run_once(root:Path):
         queue_result=claim_drive_queue(central,root)
     except Exception as qe:
         queue_result={"status":"ERROR","error":str(qe)}
+    task_audit=audit_scheduled_tasks(root)
     c,sha=fetch_control()
     rid=str(c.get("requestId",""))
     enabled=bool(c.get("enabled",False))
     st=load_state(state_path)
     out={"ok":True,"version":VERSION,"requestId":rid,"enabled":enabled,"controlSha":sha,
          "taskId":c.get("taskId"),"action":c.get("action"),"executed":False,"deduped":False,
-         "remoteDcDependency":False,"driveQueueClaim":queue_result,"startedAt":now(),"completedAt":"","error":""}
+         "remoteDcDependency":False,"driveQueueClaim":queue_result,"taskAudit":task_audit,"startedAt":now(),"completedAt":"","error":""}
     if not enabled or not rid:
         out["status"]="NO_ACTIVE_REQUEST"
     elif st.get("attemptedRequestId")==rid:
