@@ -53,9 +53,19 @@ if(Test-Path -LiteralPath $PythonControlLocal){
     $pyc=(Get-Command python.exe -ErrorAction SilentlyContinue).Source
     if(-not$pyc){$pyc=(Get-Command python -ErrorAction SilentlyContinue).Source}
     if($pyc){
-      $pyRaw=& $pyc $PythonControlLocal 2>&1|Out-String
-      $pyRc=$LASTEXITCODE
-      Log ('PYTHON_CONTROL_EXIT='+$pyRc+' '+($pyRaw.Trim()))
+      $psiPy=New-Object Diagnostics.ProcessStartInfo
+      $psiPy.FileName=$pyc
+      $psiPy.UseShellExecute=$false
+      $psiPy.CreateNoWindow=$true
+      $psiPy.RedirectStandardOutput=$true
+      $psiPy.RedirectStandardError=$true
+      $psiPy.Arguments='"'+$PythonControlLocal+'"'
+      $pp=[Diagnostics.Process]::Start($psiPy)
+      $pyOut=$pp.StandardOutput.ReadToEnd()
+      $pyErr=$pp.StandardError.ReadToEnd()
+      $pp.WaitForExit()
+      $pyRc=[int]$pp.ExitCode
+      Log ('PYTHON_CONTROL_EXIT='+$pyRc+' '+(($pyOut+' '+$pyErr).Trim()))
     }else{Log 'PYTHON_CONTROL_PYTHON_MISSING'}
   }catch{Log ('PYTHON_CONTROL_EXCEPTION '+$_.Exception.Message)}
 }
@@ -70,7 +80,7 @@ if(Test-Path -LiteralPath $KeepAliveLocal){
   }catch{Log ('KEEPALIVE_EXCEPTION '+$_.Exception.Message)}
 }
 if(Test-Path -LiteralPath $OpenAISyncLocal){
-  try{$syncRaw=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $OpenAISyncLocal -Apply 2>&1|Out-String;$syncRc=$LASTEXITCODE;Log ('OPENAI_WEB_SYNC_EXIT='+$syncRc+' '+($syncRaw.Trim()))}catch{Log ('OPENAI_WEB_SYNC_EXCEPTION '+$_.Exception.Message)}
+  try{$syncRaw=& powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $OpenAISyncLocal -Apply 2>&1|Out-String;$syncRc=$LASTEXITCODE;Log ('OPENAI_WEB_SYNC_EXIT='+$syncRc+' '+($syncRaw.Trim()))}catch{Log ('OPENAI_WEB_SYNC_EXCEPTION '+$_.Exception.Message)}
 }
 if((Test-Path -LiteralPath $DriveMirrorFixLocal) -and -not(DriveMirrorAlreadyVerified) -and -not(DriveMirrorFixRunning)){
   try{$py=(Get-Command python.exe -ErrorAction SilentlyContinue).Source;if(-not$py){$py=(Get-Command python -ErrorAction SilentlyContinue).Source};if($py){Start-Process -FilePath $py -ArgumentList @("`"$DriveMirrorFixLocal`"") -WindowStyle Hidden|Out-Null;Log 'DRIVE_MIRROR_EXACT_DIFF_STARTED'}else{Log 'DRIVE_MIRROR_EXACT_DIFF_PYTHON_MISSING'}}catch{Log ('DRIVE_MIRROR_EXACT_DIFF_START_FAILED '+$_.Exception.Message)}
@@ -82,4 +92,4 @@ try{
   $bp=[Diagnostics.Process]::Start($psi)
   Log ('BOOTSTRAP_ONESHOT_STARTED pid='+$bp.Id)
 }catch{Log ('BOOTSTRAP_ONESHOT_START_FAILED '+$_.Exception.Message)}
-try{& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ResumeLocal;$rc=$LASTEXITCODE;Log ("RESUME_EXIT=$rc HOST_HEALTH="+(HostHealthy)+" BOOTSTRAP_LOOP="+(BootstrapLoopPresent));exit $rc}catch{Log ('RESUME_EXCEPTION '+$_.Exception.Message);exit 3}
+try{& powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $ResumeLocal;$rc=$LASTEXITCODE;Log ("RESUME_EXIT=$rc HOST_HEALTH="+(HostHealthy)+" BOOTSTRAP_LOOP="+(BootstrapLoopPresent));exit $rc}catch{Log ('RESUME_EXCEPTION '+$_.Exception.Message);exit 3}
