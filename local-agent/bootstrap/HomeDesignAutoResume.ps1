@@ -39,8 +39,44 @@ function RefreshPinnedFile([string]$Commit,[string]$Blob,[string]$RepoPath,[stri
 function BootstrapLoopPresent{try{return @((Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.Name -match 'powershell|pwsh' -and $_.CommandLine -and $_.CommandLine -like '*AgentBootstrap.ps1*' -and $_.CommandLine -match '(?i)(?:^|\s)-Loop(?:\s|$)'})).Count -gt 0}catch{return $false}}
 function DriveMirrorFixRunning{try{return @((Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -and $_.CommandLine -like '*DriveMirrorExactDiffFinalize.py*'})).Count -gt 0}catch{return $false}}
 function DriveMirrorAlreadyVerified{try{$p='F:\CENTRAL_AGENT_DATA\00_CONTROL\DRIVE_MIRROR_EXACT_DIFF_FINALIZE_LAST.json';if(Test-Path -LiteralPath $p){$j=Get-Content -LiteralPath $p -Raw -Encoding UTF8|ConvertFrom-Json;return ([string]$j.status -eq 'VERIFIED_COMPLETE_X2')}else{return $false}}catch{return $false}}
+function RepairVisibleScheduledActions{
+  $receipt=Join-Path $Root 'HIDDEN_TASK_ACTION_REPAIR_LAST.json'
+  $rows=@()
+  try{
+    foreach($t in @(Get-ScheduledTask -ErrorAction SilentlyContinue)){
+      try{
+        $a=$t.Actions[0];if(-not$a){continue}
+        $exec=[string]$a.Execute;$args=[string]$a.Arguments;$hay=($exec+' '+$args)
+        $newAction=$null;$mode=''
+        if($hay -like '*Run-LumiRealDialogueBridgeV1.ps1*'){
+          $pyw='C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe'
+          $script='C:\Users\User\HomeDesignAutomationV7\NotebookPowerShellPythonPack\lumi_real_dialogue_bridge_v1.py'
+          $newAction=New-ScheduledTaskAction -Execute $pyw -Argument ('"'+$script+'"');$mode='REAL_DIALOGUE_PYTHONW'
+        }elseif($hay -like '*Run-LumiFeedWatchdogV1.cmd*'){
+          $pyw='C:\Users\User\AppData\Local\Programs\Python\Python310\pythonw.exe'
+          $script='C:\Users\User\HomeDesignAutomationV7\NotebookPowerShellPythonPack\lumi_feed_watchdog_v1.py'
+          $newAction=New-ScheduledTaskAction -Execute $pyw -Argument ('"'+$script+'"');$mode='FEED_WATCHDOG_PYTHONW'
+        }elseif($hay -like '*CentralCharacterCollector*run_collector.cmd*'){
+          $wscript='C:\Windows\System32\wscript.exe'
+          $launcher='C:\Users\User\Documents\CentralCharacterCollector\run_collector_hidden.vbs'
+          $newAction=New-ScheduledTaskAction -Execute $wscript -Argument ('"'+$launcher+'"');$mode='CHARACTER_COLLECTOR_WSCRIPT'
+        }
+        if($newAction){
+          Set-ScheduledTask -TaskName $t.TaskName -TaskPath $t.TaskPath -Action $newAction -ErrorAction Stop|Out-Null
+          $fresh=Get-ScheduledTask -TaskName $t.TaskName -TaskPath $t.TaskPath
+          if(-not[bool]$fresh.Settings.Hidden){$s=$fresh.Settings;$s.Hidden=$true;Set-ScheduledTask -TaskName $t.TaskName -TaskPath $t.TaskPath -Settings $s -ErrorAction Stop|Out-Null}
+          $verify=Get-ScheduledTask -TaskName $t.TaskName -TaskPath $t.TaskPath
+          $rows+=[pscustomobject]@{task=$t.TaskName;ok=$true;mode=$mode;exec=[string]$verify.Actions[0].Execute;args=[string]$verify.Actions[0].Arguments;hidden=[bool]$verify.Settings.Hidden}
+        }
+      }catch{$rows+=[pscustomobject]@{task=$t.TaskName;ok=$false;error=$_.Exception.Message}}
+    }
+  }catch{$rows+=[pscustomobject]@{task='ENUM';ok=$false;error=$_.Exception.Message}}
+  try{[pscustomobject]@{time=(Get-Date).ToString('o');count=$rows.Count;rows=$rows}|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $receipt -Encoding UTF8}catch{}
+  return @($rows)
+}
 
 Log ('AUTO_RESUME_START '+$Version)
+try{$taskRepair=RepairVisibleScheduledActions;Log ('HIDDEN_TASK_REPAIR count='+@($taskRepair).Count)}catch{Log ('HIDDEN_TASK_REPAIR_FAILED '+$_.Exception.Message)}
 try{[void](RefreshPinnedFile $WatchdogCommit $WatchdogBlob 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $WatchdogLocal 'WATCHDOG')}catch{Log ('WATCHDOG_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $WatchdogLocal)){exit 2}}
 try{[void](RefreshPinnedFile $KeepAliveCommit $KeepAliveBlob 'local-agent/bootstrap/DesktopCommanderKeepAlive.ps1' $KeepAliveLocal 'KEEPALIVE')}catch{Log ('KEEPALIVE_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $KeepAliveLocal)){exit 2}}
 try{[void](RefreshFile 'local-agent/bootstrap/AgentBootstrap.ps1' $BootstrapLocal 'BOOTSTRAP')}catch{Log ('BOOTSTRAP_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $BootstrapLocal)){exit 2}}
