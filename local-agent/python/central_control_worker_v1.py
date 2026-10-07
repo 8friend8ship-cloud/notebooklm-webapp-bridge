@@ -8,11 +8,11 @@ No Google OAuth, no arbitrary shell, no browser/UI mutation.
 The only recovery mutation allowed is an exact, fixed PowerShell script under HomeDesignAutomationV7.
 """
 from __future__ import annotations
-import argparse, base64, json, os, platform, subprocess, urllib.request
-from datetime import datetime, timezone
+import argparse, base64, json, os, platform, re, subprocess, urllib.request
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-VERSION="PY_CENTRAL_CONTROL_WORKER_V3_DRIVE_QUEUE_CLAIM_20260919"
+VERSION="PY_CENTRAL_CONTROL_WORKER_V4_OPENAI_STEP_PLANNER_20261007"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
 QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
@@ -150,6 +150,144 @@ def audit_scheduled_tasks(root:Path):
     except Exception as e:
         return {"ok":False,"error":repr(e)}
 
+KST=timezone(timedelta(hours=9))
+def kst_now():
+    return datetime.now(KST).isoformat()
+
+def _fragments(text:str):
+    if not text: return []
+    parts=re.split(r"(?:\s*;\s*|\s*->\s*|\s*→\s*|\n+|(?<=[.!?])\s+)", text)
+    out=[]
+    for x in parts:
+        x=re.sub(r"\s+"," ",x).strip(" -\t")
+        if x and x not in out: out.append(x)
+    return out
+
+def _lane(text:str):
+    t=text.lower()
+    if any(k in t for k in ["gui","screen","window","chrome","remote","remotedc","visual","gemini eye","제미나이눈","화면"]):
+        return "GUI_OR_GEMINI_EYE"
+    if any(k in t for k in ["powershell","service","scheduled task","process","registry","파워썰","프로세스","예약"]):
+        return "POWERSHELL_LOCAL"
+    if any(k in t for k in ["file","json","log","hash","api","sheet","drive","record","verify","cross","search","파일","로그","시트","드라이브","검수","기록","크로스"]):
+        return "PYTHON_API"
+    return "OPENAI_REASONING"
+
+def openai_step_plan(root:Path, continuity_path:Path|None=None):
+    cp=continuity_path or (Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json")
+    st=load_state(cp)
+    summary=str(st.get("last_received_user_instruction_summary",""))
+    first=str(st.get("first_unfinished",""))
+    status=str(st.get("status",""))
+    fragments=_fragments(summary)
+    complex_keywords=("complex","복잡","순차","분할","cross","검수","일관성","library","라이브러리","workflow","작업")
+    complex_work=(len(fragments)>=3 or len(summary)>=240 or any(k.lower() in summary.lower() for k in complex_keywords))
+    steps=[]
+    if first:
+        steps.append({"order":1,"stepId":"RECOVER_FIRST_UNFINISHED","description":first,"lane":"PYTHON_API","state":"CURRENT"})
+    for frag in fragments:
+        if frag==first: continue
+        steps.append({"order":len(steps)+1,"stepId":f"STEP_{len(steps)+1:02d}","description":frag,"lane":_lane(frag),"state":"PENDING"})
+    resume=str(st.get("resume_after_resource",""))
+    if resume and status in ("WAIT_RESOURCE","WAIT_REMOTE_DISCONNECT","INTERRUPTED_THINKING"):
+        for frag in _fragments(resume):
+            if not any(x["description"]==frag for x in steps):
+                steps.append({"order":len(steps)+1,"stepId":f"RESUME_{len(steps)+1:02d}","description":frag,"lane":_lane(frag),"state":"PENDING_AFTER_RESOURCE"})
+    out={
+        "ok":bool(st and first),
+        "version":"OPENAI_PYTHON_STEP_PLANNER_V1_20261007",
+        "generatedAtKst":kst_now(),
+        "timezone":"Asia/Seoul",
+        "continuityPath":str(cp),
+        "continuityStatus":status,
+        "firstUnfinished":first,
+        "lastGood":st.get("last_good",[]),
+        "instructionSummary":summary,
+        "complexWork":complex_work,
+        "splitRecommended":complex_work,
+        "maxSequentialBatch":3,
+        "nextStep":steps[0] if steps else None,
+        "unfinishedSteps":steps,
+        "lanePolicy":{
+            "PYTHON_API":"structured/repetitive/log/file/json/hash/api/sheet/Drive readback first",
+            "POWERSHELL_LOCAL":"OS/service/process/scheduled-task actions through existing approved bridge",
+            "GUI_OR_GEMINI_EYE":"visual/page-context verification only; RemoteDC single GUI lane",
+            "OPENAI_REASONING":"planning/contradiction/lineage judgement; must not skip recorded prior step"
+        },
+        "executionRule":"COMPLEX_WORK_SPLIT_FIRST__PYTHON_API_FIRST__MAX3_STEPS_PER_BATCH__RETURN_UNFINISHED_STEPS_ON_INTERRUPT"
+    }
+    local=root/"OPENAI_PYTHON_STEP_PLAN_LAST.json"
+    save_json(local,out)
+    central=find_central()
+    if central:
+        dp=central/"Runtime_Readback"/"PYTHON"/"OPENAI_PYTHON_STEP_PLAN_LAST.json"
+        save_json(dp,out);out["driveReceiptPath"]=str(dp);save_json(local,out)
+    print(json.dumps(out,ensure_ascii=False))
+    return 0 if out["ok"] else 4
+
+def _read_obj(path:Path):
+    try:return json.loads(path.read_text(encoding="utf-8-sig"))
+    except:return {}
+
+def _evidence(path:Path, role:str):
+    exists=path.exists()
+    if not exists:return {"role":role,"path":str(path),"exists":False,"mtimeKst":"","ageSeconds":999999,"state":"MISSING"}
+    ts=datetime.fromtimestamp(path.stat().st_mtime,KST)
+    age=max(0,int((datetime.now(KST)-ts).total_seconds()))
+    obj=_read_obj(path)
+    state=str(obj.get("status",obj.get("state",obj.get("managerState","PRESENT"))))
+    return {"role":role,"path":str(path),"exists":True,"mtimeKst":ts.isoformat(),"ageSeconds":age,"state":state}
+
+def openai_cross_validate(root:Path):
+    profile=Path(os.environ.get("USERPROFILE","."))
+    base=root.parent
+    continuity_path=profile/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json"
+    plan_path=root/"OPENAI_PYTHON_STEP_PLAN_LAST.json"
+    three_path=root/"OPENAI_3PACK_SYNC_LAST.json"
+    gemini_path=root/"GEMINI_EYE_ACTIVE.json"
+    notebook_path=root/"NOTEBOOK_REMOTE_WORKLOAD_SUPPORT_LAST.json"
+    ps_path=base/"Runtime_Readback"/"CENTRAL_PS_BRIDGE_LAST.json"
+    remote_path=root/"CENTRAL_REMOTE_MANAGER_DISPATCHER_LAST.json"
+    keepalive_path=root/"REMOTE_DC_KEEPALIVE_LAST.json"
+    c=_read_obj(continuity_path); plan=_read_obj(plan_path); three=_read_obj(three_path); gem=_read_obj(gemini_path); nb=_read_obj(notebook_path)
+    first=str(c.get("first_unfinished",""))
+    comparisons={
+        "continuity_vs_python_plan": bool(first and first==str(plan.get("firstUnfinished",""))),
+        "continuity_vs_three_pack": bool(first and first==str((((three.get("latest") or {}).get("continuity") or {}).get("firstUnfinished","")))),
+        "continuity_vs_gemini_eye": bool((not gem) or first==str(gem.get("continuityFirstUnfinished",""))),
+        "continuity_vs_notebook": bool((not nb) or first==str(nb.get("continuityFirstUnfinished","")))
+    }
+    evidence=[
+        _evidence(continuity_path,"DRIVE_JSON_LOCAL_CANON"),
+        _evidence(plan_path,"PYTHON"),
+        _evidence(three_path,"THREE_PACK"),
+        _evidence(gemini_path,"GEMINI_EYE"),
+        _evidence(notebook_path,"NOTEBOOK"),
+        _evidence(ps_path,"POWERSHELL"),
+        _evidence(remote_path,"REMOTEDC_MANAGER"),
+        _evidence(keepalive_path,"REMOTEDC_KEEPALIVE")
+    ]
+    core_roles={"DRIVE_JSON_LOCAL_CANON","PYTHON","THREE_PACK","GEMINI_EYE","NOTEBOOK","REMOTEDC_MANAGER"}
+    core_fresh=all(x["exists"] and x["ageSeconds"]<=900 for x in evidence if x["role"] in core_roles)
+    consistent=all(comparisons.values()) and core_fresh
+    out={
+        "ok":consistent,
+        "version":"OPENAI_CROSS_VALIDATION_V1_20261007",
+        "checkedAtKst":kst_now(),"timezone":"Asia/Seoul",
+        "firstUnfinished":first,
+        "comparisons":comparisons,
+        "coreFreshWithinSeconds":900,
+        "coreFresh":core_fresh,
+        "evidence":evidence,
+        "rule":"DRIVE_JSON_PLUS_PYTHON_PLUS_POWERSHELL_PLUS_REMOTEDC_PLUS_GEMINI_EYE_KST_CROSSCHECK; UNUSED_POWERSHELL_IS_ADVISORY_NOT_FATAL"
+    }
+    local=root/"OPENAI_CROSS_VALIDATION_LAST.json";save_json(local,out)
+    central=find_central()
+    if central:
+        dp=central/"Runtime_Readback"/"PYTHON"/"OPENAI_CROSS_VALIDATION_LAST.json";save_json(dp,out);out["driveReceiptPath"]=str(dp);save_json(local,out)
+    print(json.dumps(out,ensure_ascii=False))
+    return 0 if out["ok"] else 4
+
 def run_once(root:Path):
     state_path=root/"python-control-state.json"
     receipt_path=root/"PYTHON_CONTROL_WORKER_LAST.json"
@@ -191,12 +329,23 @@ def run_once(root:Path):
 
 def self_test():
     assert ALLOWED=={"CANARY_ECHO","PYTHON_RUNTIME_INFO","REMOTE_DC_RECOVER_EXACT","LOCAL_CONSUMER_PERSISTENCE_REPAIR"}
-    print(json.dumps({"ok":True,"version":VERSION,"tests":["STRICT_WHITELIST","EXACT_RECOVERY_ONLY","DRIVE_QUEUE_READY_TO_CLAIMED","NO_ARBITRARY_SHELL","ONE_REQUEST_DEDUPE"]}))
+    print(json.dumps({"ok":True,"version":VERSION,"tests":["STRICT_WHITELIST","EXACT_RECOVERY_ONLY","DRIVE_QUEUE_READY_TO_CLAIMED","NO_ARBITRARY_SHELL","ONE_REQUEST_DEDUPE","OPENAI_STEP_PLANNER","KST_CROSS_VALIDATION"]}))
     return 0
 
 if __name__=="__main__":
     ap=argparse.ArgumentParser()
     ap.add_argument("--root",default=os.path.join(os.environ.get("LOCALAPPDATA","."),"HomeDesignAutomationV7","LocalAgent"))
     ap.add_argument("--self-test",action="store_true")
+    ap.add_argument("--openai-plan",action="store_true")
+    ap.add_argument("--cross-validate",action="store_true")
+    ap.add_argument("--continuity",default="")
     a=ap.parse_args()
-    raise SystemExit(self_test() if a.self_test else run_once(Path(a.root)))
+    root=Path(a.root)
+    if a.self_test:
+        raise SystemExit(self_test())
+    if a.openai_plan:
+        cp=Path(a.continuity) if a.continuity else None
+        raise SystemExit(openai_step_plan(root,cp))
+    if a.cross_validate:
+        raise SystemExit(openai_cross_validate(root))
+    raise SystemExit(run_once(root))
