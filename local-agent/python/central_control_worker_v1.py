@@ -181,7 +181,7 @@ def openai_step_plan(root:Path, continuity_path:Path|None=None):
     status=str(st.get("status",""))
     fragments=_fragments(summary)
     complex_keywords=("complex","복잡","순차","분할","cross","검수","일관성","library","라이브러리","workflow","작업","대량","반복","분석","배포")
-    complex_work=(len(fragments)>MAX_OPENAI_SIMPLE_REASONING_STEPS or len(summary)>=240 or any(k.lower() in summary.lower() for k in complex_keywords))
+    complex_work=(len(fragments)>3 or len(summary)>=240 or any(k.lower() in summary.lower() for k in complex_keywords))
     steps=[]
     openai_reasoning_used=0
     if first:
@@ -190,7 +190,7 @@ def openai_step_plan(root:Path, continuity_path:Path|None=None):
         if frag==first: continue
         lane=_lane(frag)
         if lane=="OPENAI_REASONING":
-            if complex_work or openai_reasoning_used>=MAX_OPENAI_SIMPLE_REASONING_STEPS:
+            if complex_work or openai_reasoning_used>=3:
                 lane="PYTHON_API"
             else:
                 openai_reasoning_used+=1
@@ -203,10 +203,10 @@ def openai_step_plan(root:Path, continuity_path:Path|None=None):
                 if lane=="OPENAI_REASONING":
                     lane="PYTHON_API"
                 steps.append({"order":len(steps)+1,"stepId":f"RESUME_{len(steps)+1:02d}","description":frag,"lane":lane,"state":"PENDING_AFTER_RESOURCE"})
-    handoff_required=bool(complex_work or len(fragments)>MAX_OPENAI_SIMPLE_REASONING_STEPS or any(x["lane"]!="OPENAI_REASONING" for x in steps))
+    handoff_required=bool(complex_work or len(fragments)>3 or any(x["lane"]!="OPENAI_REASONING" for x in steps))
     out={
         "ok":bool(st and first),
-        "version":PLANNER_VERSION,
+        "version":"OPENAI_PYTHON_STEP_PLANNER_V2_NOTEBOOK_BRAIN_20261007",
         "workerVersion":VERSION,
         "generatedAtKst":kst_now(),
         "timezone":"Asia/Seoul",
@@ -218,9 +218,9 @@ def openai_step_plan(root:Path, continuity_path:Path|None=None):
         "complexWork":complex_work,
         "splitRecommended":handoff_required,
         "handoffRequired":handoff_required,
-        "maxSequentialBatch":MAX_OPENAI_SIMPLE_REASONING_STEPS,
+        "maxSequentialBatch":3,
         "openAiReasoningBudget":{
-            "maxSimpleReasoningSteps":MAX_OPENAI_SIMPLE_REASONING_STEPS,
+            "maxSimpleReasoningSteps":3,
             "allowed":["USER_COMMUNICATION","USER_APPROVAL","MAX3_SIMPLE_REASONING","CONTRADICTION_ALERT","REFERENCE_ADVICE"],
             "forbiddenBeyondBudget":"OPENAI_DIRECT_COMPLEX_EXECUTION",
             "beyondBudgetRoute":"NOTEBOOK_PYTHON_GEMINI_BRAIN",
