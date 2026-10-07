@@ -180,22 +180,34 @@ def openai_step_plan(root:Path, continuity_path:Path|None=None):
     first=str(st.get("first_unfinished",""))
     status=str(st.get("status",""))
     fragments=_fragments(summary)
-    complex_keywords=("complex","복잡","순차","분할","cross","검수","일관성","library","라이브러리","workflow","작업")
-    complex_work=(len(fragments)>=3 or len(summary)>=240 or any(k.lower() in summary.lower() for k in complex_keywords))
+    complex_keywords=("complex","복잡","순차","분할","cross","검수","일관성","library","라이브러리","workflow","작업","대량","반복","분석","배포")
+    complex_work=(len(fragments)>MAX_OPENAI_SIMPLE_REASONING_STEPS or len(summary)>=240 or any(k.lower() in summary.lower() for k in complex_keywords))
     steps=[]
+    openai_reasoning_used=0
     if first:
         steps.append({"order":1,"stepId":"RECOVER_FIRST_UNFINISHED","description":first,"lane":"PYTHON_API","state":"CURRENT"})
     for frag in fragments:
         if frag==first: continue
-        steps.append({"order":len(steps)+1,"stepId":f"STEP_{len(steps)+1:02d}","description":frag,"lane":_lane(frag),"state":"PENDING"})
+        lane=_lane(frag)
+        if lane=="OPENAI_REASONING":
+            if complex_work or openai_reasoning_used>=MAX_OPENAI_SIMPLE_REASONING_STEPS:
+                lane="PYTHON_API"
+            else:
+                openai_reasoning_used+=1
+        steps.append({"order":len(steps)+1,"stepId":f"STEP_{len(steps)+1:02d}","description":frag,"lane":lane,"state":"PENDING"})
     resume=str(st.get("resume_after_resource",""))
     if resume and status in ("WAIT_RESOURCE","WAIT_REMOTE_DISCONNECT","INTERRUPTED_THINKING"):
         for frag in _fragments(resume):
             if not any(x["description"]==frag for x in steps):
-                steps.append({"order":len(steps)+1,"stepId":f"RESUME_{len(steps)+1:02d}","description":frag,"lane":_lane(frag),"state":"PENDING_AFTER_RESOURCE"})
+                lane=_lane(frag)
+                if lane=="OPENAI_REASONING":
+                    lane="PYTHON_API"
+                steps.append({"order":len(steps)+1,"stepId":f"RESUME_{len(steps)+1:02d}","description":frag,"lane":lane,"state":"PENDING_AFTER_RESOURCE"})
+    handoff_required=bool(complex_work or len(fragments)>MAX_OPENAI_SIMPLE_REASONING_STEPS or any(x["lane"]!="OPENAI_REASONING" for x in steps))
     out={
         "ok":bool(st and first),
-        "version":"OPENAI_PYTHON_STEP_PLANNER_V1_20261007",
+        "version":PLANNER_VERSION,
+        "workerVersion":VERSION,
         "generatedAtKst":kst_now(),
         "timezone":"Asia/Seoul",
         "continuityPath":str(cp),
@@ -204,17 +216,39 @@ def openai_step_plan(root:Path, continuity_path:Path|None=None):
         "lastGood":st.get("last_good",[]),
         "instructionSummary":summary,
         "complexWork":complex_work,
-        "splitRecommended":complex_work,
-        "maxSequentialBatch":3,
+        "splitRecommended":handoff_required,
+        "handoffRequired":handoff_required,
+        "maxSequentialBatch":MAX_OPENAI_SIMPLE_REASONING_STEPS,
+        "openAiReasoningBudget":{
+            "maxSimpleReasoningSteps":MAX_OPENAI_SIMPLE_REASONING_STEPS,
+            "allowed":["USER_COMMUNICATION","USER_APPROVAL","MAX3_SIMPLE_REASONING","CONTRADICTION_ALERT","REFERENCE_ADVICE"],
+            "forbiddenBeyondBudget":"OPENAI_DIRECT_COMPLEX_EXECUTION",
+            "beyondBudgetRoute":"NOTEBOOK_PYTHON_GEMINI_BRAIN",
+            "openAiIsAdvisoryByDefault":True
+        },
+        "brainArchitecture":{
+            "1_USER":"work instruction / approval / correction",
+            "2_OPENAI_FRONT_BRAIN":"communication + approval + max3 simple reasoning + advisory only",
+            "3_NOTEBOOK_BRAIN":"Python planner/API + Gemini Eye brain/visual QA + AutoResume + Watchdog + PowerShell + Notebook Eye",
+            "4_REMOTE_HAND":"RemoteDC GUI exception only, single lane",
+            "5_STORAGE_BRAIN":"Drive JSON + Sheets + owner-source runtime receipts",
+            "6_DEPLOYED_APP_BRAIN":"after MVP deploy: Vercel AI runtime brain + Firestore state/event brain + Drive call/readback brain; chat is not runtime authority"
+        },
+        "learningMigration":{
+            "goal":"move routine reasoning/execution continuity away from OpenAI chat into notebook and deployed runtime",
+            "existingPacks":["PYTHON_PACK","AUTORESUME_PACK","WATCHDOG_PACK","POWERSHELL_PACK","NOTEBOOK_EYE_PACK","GEMINI_EYE"],
+            "eachNodeMustRecord":["INPUT","DECISION","ACTION","BEFORE","AFTER","DELTA","EVIDENCE","FAIL_OR_WAIT","FIRST_UNFINISHED","OUTPUT"],
+            "promotionRule":"only promote learned behavior after X1/X2 runtime readback; no duplicate pack/node/trigger"
+        },
         "nextStep":steps[0] if steps else None,
         "unfinishedSteps":steps,
         "lanePolicy":{
-            "PYTHON_API":"structured/repetitive/log/file/json/hash/api/sheet/Drive readback first",
+            "PYTHON_API":"default brain for structured/repetitive/complex/log/file/json/hash/api/sheet/Drive analysis and execution planning",
             "POWERSHELL_LOCAL":"OS/service/process/scheduled-task actions through existing approved bridge",
-            "GUI_OR_GEMINI_EYE":"visual/page-context verification only; RemoteDC single GUI lane",
-            "OPENAI_REASONING":"planning/contradiction/lineage judgement; must not skip recorded prior step"
+            "GUI_OR_GEMINI_EYE":"Gemini Eye brain/visual/page-context verification; RemoteDC is hand only",
+            "OPENAI_REASONING":"only user communication/approval/contradiction and at most 3 simple reasoning steps; advisory by default"
         },
-        "executionRule":"COMPLEX_WORK_SPLIT_FIRST__PYTHON_API_FIRST__MAX3_STEPS_PER_BATCH__RETURN_UNFINISHED_STEPS_ON_INTERRUPT"
+        "executionRule":"USER_TO_OPENAI_MAX3_SIMPLE__BEYOND3_OR_COMPLEX_TO_NOTEBOOK_PYTHON_GEMINI__REMOTE_DC_HAND_ONLY__DRIVE_STATE__VERCELAI_FIRESTORE_DRIVE_AFTER_DEPLOY"
     }
     local=root/"OPENAI_PYTHON_STEP_PLAN_LAST.json"
     save_json(local,out)
@@ -329,7 +363,7 @@ def run_once(root:Path):
 
 def self_test():
     assert ALLOWED=={"CANARY_ECHO","PYTHON_RUNTIME_INFO","REMOTE_DC_RECOVER_EXACT","LOCAL_CONSUMER_PERSISTENCE_REPAIR"}
-    print(json.dumps({"ok":True,"version":VERSION,"tests":["STRICT_WHITELIST","EXACT_RECOVERY_ONLY","DRIVE_QUEUE_READY_TO_CLAIMED","NO_ARBITRARY_SHELL","ONE_REQUEST_DEDUPE","OPENAI_STEP_PLANNER","KST_CROSS_VALIDATION"]}))
+    print(json.dumps({"ok":True,"version":VERSION,"tests":["STRICT_WHITELIST","EXACT_RECOVERY_ONLY","DRIVE_QUEUE_READY_TO_CLAIMED","NO_ARBITRARY_SHELL","ONE_REQUEST_DEDUPE","OPENAI_STEP_PLANNER","NOTEBOOK_BRAIN_HANDOFF_MAX3","KST_CROSS_VALIDATION"]}))
     return 0
 
 if __name__=="__main__":
