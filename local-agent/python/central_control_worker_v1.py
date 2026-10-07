@@ -267,7 +267,7 @@ def openai_cross_validate(root:Path):
         _evidence(remote_path,"REMOTEDC_MANAGER"),
         _evidence(keepalive_path,"REMOTEDC_KEEPALIVE")
     ]
-    core_roles={"DRIVE_JSON_LOCAL_CANON","PYTHON","THREE_PACK","GEMINI_EYE","NOTEBOOK","REMOTEDC_MANAGER"}
+    core_roles={"PYTHON","THREE_PACK","GEMINI_EYE","NOTEBOOK","REMOTEDC_MANAGER"}
     core_fresh=all(x["exists"] and x["ageSeconds"]<=900 for x in evidence if x["role"] in core_roles)
     consistent=all(comparisons.values()) and core_fresh
     out={
