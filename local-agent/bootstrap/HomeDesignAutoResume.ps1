@@ -48,7 +48,13 @@ function RepairVisibleScheduledActions{
         $a=$t.Actions[0];if(-not$a){continue}
         $exec=[string]$a.Execute;$args=[string]$a.Arguments;$hay=($exec+' '+$args)
         $newAction=$null;$mode=''
-        if($hay -like '*Run-LumiRealDialogueBridgeV1.ps1*'){
+        if([string]$t.TaskName -eq 'HomeDesignAutomation-PythonControl'){
+          $pyw='C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe'
+          $script=Join-Path $Root 'central_control_worker_v1.py'
+          if((Test-Path -LiteralPath $pyw) -and (($exec -ne $pyw) -or ($args -notlike ('*'+$script+'*')))){
+            $newAction=New-ScheduledTaskAction -Execute $pyw -Argument ('"'+$script+'"');$mode='PYTHON_CONTROL_CANONICAL_PYTHONW'
+          }
+        }elseif($hay -like '*Run-LumiRealDialogueBridgeV1.ps1*'){
           $pyw='C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe'
           $script='C:\Users\User\HomeDesignAutomationV7\NotebookPowerShellPythonPack\lumi_real_dialogue_bridge_v1.py'
           $newAction=New-ScheduledTaskAction -Execute $pyw -Argument ('"'+$script+'"');$mode='REAL_DIALOGUE_PYTHONW'
@@ -76,6 +82,18 @@ function RepairVisibleScheduledActions{
 }
 
 Log ('AUTO_RESUME_START '+$Version)
+try{
+  $morningPending=Join-Path $Root 'MORNING_INTERACTIVE_PENDING.json'
+  $morningScript=Join-Path $Root 'MorningStartup0600.ps1'
+  if((Test-Path -LiteralPath $morningPending) -and (Test-Path -LiteralPath $morningScript)){
+    $sid=(Get-Process -Id $PID).SessionId
+    if($sid -gt 0){
+      $morningRaw=& powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $morningScript -InteractiveResume 2>&1|Out-String
+      $morningRc=$LASTEXITCODE
+      Log ('MORNING_INTERACTIVE_RESUME_EXIT='+$morningRc+' '+$morningRaw.Trim())
+    }
+  }
+}catch{Log ('MORNING_INTERACTIVE_RESUME_EXCEPTION '+$_.Exception.Message)}
 try{$taskRepair=RepairVisibleScheduledActions;Log ('HIDDEN_TASK_REPAIR count='+@($taskRepair).Count)}catch{Log ('HIDDEN_TASK_REPAIR_FAILED '+$_.Exception.Message)}
 try{[void](RefreshPinnedFile $WatchdogCommit $WatchdogBlob 'local-agent/bootstrap/HomeDesignLocalWatchdog.ps1' $WatchdogLocal 'WATCHDOG')}catch{Log ('WATCHDOG_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $WatchdogLocal)){exit 2}}
 try{[void](RefreshPinnedFile $KeepAliveCommit $KeepAliveBlob 'local-agent/bootstrap/DesktopCommanderKeepAlive.ps1' $KeepAliveLocal 'KEEPALIVE')}catch{Log ('KEEPALIVE_REFRESH_FAILED '+$_.Exception.Message);if(-not(Test-Path -LiteralPath $KeepAliveLocal)){exit 2}}
@@ -86,7 +104,9 @@ try{[void](RefreshFile 'local-agent/bootstrap/DriveMirrorExactDiffFinalize.py' $
 try{[void](RefreshFile 'local-agent/python/central_control_worker_v1.py' $PythonControlLocal 'PYTHON_CONTROL')}catch{Log ('PYTHON_CONTROL_REFRESH_FAILED '+$_.Exception.Message)}
 if(Test-Path -LiteralPath $PythonControlLocal){
   try{
-    $pyc=(Get-Command python.exe -ErrorAction SilentlyContinue).Source
+    $pyc=''
+    foreach($candidate in @('C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\python.exe','C:\Users\User\AppData\Local\Programs\Python\Python310\python.exe')){if(Test-Path -LiteralPath $candidate){$pyc=$candidate;break}}
+    if(-not$pyc){$pyc=(Get-Command python.exe -ErrorAction SilentlyContinue).Source}
     if(-not$pyc){$pyc=(Get-Command python -ErrorAction SilentlyContinue).Source}
     if($pyc){
       $psiPy=New-Object Diagnostics.ProcessStartInfo
