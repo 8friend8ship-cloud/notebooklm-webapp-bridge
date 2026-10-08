@@ -20,6 +20,12 @@ using System; using System.Runtime.InteropServices;
 public static class OaiSyncWin {
  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+ [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd,out uint pid);
+ [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+ [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach,uint idAttachTo,bool fAttach);
+ [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd,int nCmdShow);
+ [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
+ [DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr hWnd);
  [StructLayout(LayoutKind.Sequential)] public struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
  [DllImport("user32.dll")] public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 }
@@ -141,10 +147,27 @@ elseif($Mode-eq'RESTORE'){
   }
   if($target){
     try{
-      $restoreOk=[OaiSyncWin]::SetForegroundWindow([IntPtr][int64]$target.hwnd)
-      Start-Sleep -Milliseconds 250
-      $restoreOk=$restoreOk-and([OaiSyncWin]::GetForegroundWindow().ToInt64()-eq[int64]$target.hwnd)
-      if(-not$restoreOk){$guardError='SET_FOREGROUND_DID_NOT_STICK'}
+      $h=[IntPtr][int64]$target.hwnd
+      $fg=[OaiSyncWin]::GetForegroundWindow()
+      [uint32]$fgPid=0;[uint32]$targetPid=0
+      $fgThread=$(if($fg-ne[IntPtr]::Zero){[OaiSyncWin]::GetWindowThreadProcessId($fg,[ref]$fgPid)}else{0})
+      $targetThread=[OaiSyncWin]::GetWindowThreadProcessId($h,[ref]$targetPid)
+      $currentThread=[OaiSyncWin]::GetCurrentThreadId()
+      $attachedCurrent=$false;$attachedForeground=$false
+      try{
+        if($currentThread-ne$targetThread){$attachedCurrent=[OaiSyncWin]::AttachThreadInput($currentThread,$targetThread,$true)}
+        if($fgThread-ne0 -and $fgThread-ne$targetThread){$attachedForeground=[OaiSyncWin]::AttachThreadInput($fgThread,$targetThread,$true)}
+        [void][OaiSyncWin]::ShowWindow($h,9)
+        [void][OaiSyncWin]::BringWindowToTop($h)
+        [void][OaiSyncWin]::SetForegroundWindow($h)
+        [void][OaiSyncWin]::SetFocus($h)
+        Start-Sleep -Milliseconds 400
+        $restoreOk=([OaiSyncWin]::GetForegroundWindow().ToInt64()-eq[int64]$target.hwnd)
+      }finally{
+        if($attachedForeground){[void][OaiSyncWin]::AttachThreadInput($fgThread,$targetThread,$false)}
+        if($attachedCurrent){[void][OaiSyncWin]::AttachThreadInput($currentThread,$targetThread,$false)}
+      }
+      if(-not$restoreOk){$guardError='ATTACH_THREAD_FOREGROUND_RESTORE_DID_NOT_STICK'}
     }catch{$guardError=$_.Exception.Message}
   }else{
     $guardError='CAPTURED_EXACT_CHAT_WINDOW_NOT_FOUND'
