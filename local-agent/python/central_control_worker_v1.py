@@ -367,14 +367,19 @@ def _reconcile_continuity_from_records(continuity_path:Path):
         out["state"]="HOLD_CONTINUITY_MISSING_OR_PARSE_FAIL"
         return out
     current=str(st.get("first_unfinished",""))
+    if current==central_first:
+        out.update({
+            "ok":True,
+            "state":"UNCHANGED_RECORD_AUTHORITY_MATCH",
+            "firstUnfinished":current,
+            "rule":"MATCHING_FIRST_UNFINISHED_VALUE_IS_AUTHORITATIVE; UNRELATED_LOG_MTIME_GROWTH_MUST_NOT_FORCE_CONTINUITY_REWRITE"
+        })
+        return out
     try:
         latest_record_mtime=max(central_log_path.stat().st_mtime,ebook_path.stat().st_mtime)
         continuity_mtime=continuity_path.stat().st_mtime
     except Exception:
         out["state"]="HOLD_RECORD_MTIME_UNAVAILABLE"
-        return out
-    if current==central_first and continuity_mtime+2>=latest_record_mtime:
-        out.update({"ok":True,"state":"UNCHANGED_RECORD_AUTHORITY_MATCH","firstUnfinished":current})
         return out
     if latest_record_mtime<=continuity_mtime+2 and current!=central_first:
         out["state"]="HOLD_CONTINUITY_NEWER_THAN_RECORDS_BUT_VALUE_DIFFERS"
@@ -575,17 +580,19 @@ def openai_cross_validate(root:Path):
     ps_path=base/"Runtime_Readback"/"CENTRAL_PS_BRIDGE_LAST.json"
     remote_path=root/"CENTRAL_REMOTE_MANAGER_DISPATCHER_LAST.json"
     keepalive_path=root/"REMOTE_DC_KEEPALIVE_LAST.json"
+    record_reconcile=_reconcile_continuity_from_records(continuity_path)
     c=_read_obj(continuity_path); plan=_read_obj(plan_path); three=_read_obj(three_path); gem=_read_obj(gemini_path); nb=_read_obj(notebook_path)
     first=str(c.get("first_unfinished",""))
     central_first=_latest_first_unfinished(central_log_path)
     ebook_first=_latest_first_unfinished(ebook_path)
+    record_authority_current=bool(
+        record_reconcile.get("ok")
+        and first
+        and central_first
+        and ebook_first
+        and first==central_first==ebook_first
+    )
     runtime_truth=_runtime_pid_json_truth(project_root,root,first)
-    try:
-        continuity_mtime=continuity_path.stat().st_mtime
-        latest_record_mtime=max(central_log_path.stat().st_mtime,ebook_path.stat().st_mtime)
-        continuity_not_older_than_records=continuity_mtime+2>=latest_record_mtime
-    except Exception:
-        continuity_not_older_than_records=False
     comparisons={
         "continuity_vs_python_plan": bool(first and first==str(plan.get("firstUnfinished",""))),
         "continuity_vs_three_pack": bool(first and first==str((((three.get("latest") or {}).get("continuity") or {}).get("firstUnfinished","")))),
@@ -594,7 +601,7 @@ def openai_cross_validate(root:Path):
         "central_nodelog_vs_ebook": bool(central_first and central_first==ebook_first),
         "continuity_vs_central_nodelog": bool(first and first==central_first),
         "continuity_vs_ebook": bool(first and first==ebook_first),
-        "continuity_not_older_than_latest_records": bool(continuity_not_older_than_records),
+        "record_authority_current": record_authority_current,
         "runtime_pid_json_truth": bool(runtime_truth.get("ok"))
     }
     evidence=[
@@ -625,17 +632,18 @@ def openai_cross_validate(root:Path):
     consistent=all(comparisons.values()) and core_fresh
     out={
         "ok":consistent,
-        "version":"OPENAI_CROSS_VALIDATION_V3_PID_JSON_RUNTIME_TRUTH_20261009",
+        "version":"OPENAI_CROSS_VALIDATION_V3_1_RECORD_VALUE_AUTHORITY_20261009",
         "checkedAtKst":kst_now(),"timezone":"Asia/Seoul",
         "firstUnfinished":first,
         "centralNodeLogFirstUnfinished":central_first,
         "ebookFirstUnfinished":ebook_first,
         "runtimeTruth":runtime_truth,
+        "recordReconcile":record_reconcile,
         "comparisons":comparisons,
         "coreFreshWithinSeconds":900,
         "coreFresh":core_fresh,
         "evidence":evidence,
-        "rule":"CONTINUITY_MUST_MATCH_LATEST_CENTRAL_NODELOG_AND_EBOOK; RECEIPT_ONLY_PASS_FORBIDDEN; LIVE_PID_PLUS_JSON_DELTA_OR_FINISHED_RESULT_JSON_CROSSCHECK_REQUIRED; LIVE_PID_WITHOUT_JSON_DELTA_IS_WAIT_NOT_ERROR; LIVE_RUNTIME_RECEIPTS_USE_900S_FRESHNESS"
+        "rule":"FIRST_UNFINISHED_VALUE_AUTHORITY_MUST_MATCH_CENTRAL_NODELOG_EBOOK_CONTINUITY; UNRELATED_LOG_MTIME_GROWTH_IS_NOT_A_CONFLICT; RECEIPT_ONLY_PASS_FORBIDDEN; LIVE_PID_PLUS_JSON_DELTA_OR_FINISHED_RESULT_JSON_CROSSCHECK_REQUIRED; LIVE_PID_WITHOUT_JSON_DELTA_IS_WAIT_NOT_ERROR; LIVE_RUNTIME_RECEIPTS_USE_900S_FRESHNESS"
     }
     local=root/"OPENAI_CROSS_VALIDATION_LAST.json";save_json(local,out)
     central=find_central()
