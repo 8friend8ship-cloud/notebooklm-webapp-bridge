@@ -8,11 +8,11 @@ No Google OAuth, no arbitrary shell, no browser/UI mutation.
 The only recovery mutation allowed is an exact, fixed PowerShell script under HomeDesignAutomationV7.
 """
 from __future__ import annotations
-import argparse, base64, json, os, platform, re, subprocess, time, urllib.request
+import argparse, base64, hashlib, json, os, platform, re, subprocess, time, urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-VERSION="PY_CENTRAL_CONTROL_WORKER_V6_RECORD_RECONCILE_20261009"
+VERSION="PY_CENTRAL_CONTROL_WORKER_V7_OPENAI_AUTO_BRIDGE_NODELOG_20261009"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
 QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
@@ -217,9 +217,104 @@ def _lane(text:str):
         return "GUI_OR_GEMINI_EYE"
     if any(k in t for k in ["powershell","service","scheduled task","process","registry","파워썰","프로세스","예약"]):
         return "POWERSHELL_LOCAL"
-    if any(k in t for k in ["file","json","log","hash","api","sheet","drive","record","verify","cross","search","파일","로그","시트","드라이브","검수","기록","크로스"]):
+    if any(k in t for k in ["file","json","log","hash","api","sheet","drive","record","verify","cross","search","파일","로그","시트","드라이브","검수","기록","크로스","진행","계속","이어서","작업진행","실행"]):
         return "PYTHON_API"
     return "OPENAI_REASONING"
+
+def _append_text_retry(path:Path, text:str):
+    path.parent.mkdir(parents=True,exist_ok=True)
+    last=None
+    for _ in range(20):
+        try:
+            with open(path,"a",encoding="utf-8",newline="\n") as fh:
+                fh.write(text)
+                fh.flush()
+                os.fsync(fh.fileno())
+            return True,""
+        except PermissionError as e:
+            last=e
+            time.sleep(0.1)
+        except Exception as e:
+            return False,repr(e)
+    return False,repr(last) if last else "APPEND_FAILED"
+
+def _record_openai_python_bridge_event(root:Path, plan:dict):
+    project_root=Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"
+    local=root/"OPENAI_PYTHON_BRIDGE_NODELOG_LAST.json"
+    next_step=(plan.get("nextStep") or {})
+    signature_payload={
+        "lineage":"DUAL_EYE_MULTI_BRAIN_BRIDGE_V1",
+        "instructionSummary":str(plan.get("instructionSummary","")),
+        "firstUnfinished":str(plan.get("firstUnfinished","")),
+        "nextStep":str(next_step.get("description","")),
+        "workerVersion":VERSION
+    }
+    sig=hashlib.sha256(json.dumps(signature_payload,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode("utf-8")).hexdigest()
+    previous=load_state(local)
+    duplicate=bool(previous and previous.get("eventSignature")==sig)
+    event={
+        "ok":True,
+        "version":"OPENAI_PYTHON_AUTO_BRIDGE_NODELOG_V1_20261009",
+        "lineage":"DUAL_EYE_MULTI_BRAIN_BRIDGE_V1",
+        "atKst":kst_now(),
+        "workerVersion":VERSION,
+        "eventSignature":sig,
+        "duplicateSuppressed":duplicate,
+        "newTaskProjectNodePackTriggerGeminiSession":0,
+        "instructionSummary":signature_payload["instructionSummary"],
+        "firstUnfinished":signature_payload["firstUnfinished"],
+        "nextStep":next_step,
+        "pythonRequired":True,
+        "pythonDefaultForProgressCommands":True,
+        "openAiDirectComplexExecution":False,
+        "supportMode":"REUSE_EXISTING_VERIFY_AND_SELF_HEAL_NO_DUPLICATE",
+        "autoBridgeRoute":[
+            "OPENAI_PACK_WORK_INSTRUCTION",
+            "NOTEBOOK_REMOTE_WORKLOAD_SUPPORT",
+            "PYTHON_API",
+            "PERSISTENCE_AUTORESUME_WATCHDOG_VERIFY",
+            "GEMINI_EYE_BRAIN_LIBRARY_CHECK",
+            "NOTEBOOK_EYE_RUNTIME_READBACK",
+            "POWERSHELL_LOCAL_ONLY_WHEN_OS_ACTION_REQUIRED",
+            "OWNER_SOURCE_PID_JSON_DELTA_CROSSCHECK",
+            "CENTRAL_NODELOG_AND_LUMI_EBOOK_READBACK"
+        ],
+        "nodeLogFields":["INPUT","DECISION","ACTION","BEFORE","AFTER","DELTA","EVIDENCE","FAIL_OR_WAIT","FIRST_UNFINISHED","OUTPUT"],
+        "voiceScienceFirstUnfinishedUnchanged":True
+    }
+    append_ok=True;append_errors=[]
+    if not duplicate:
+        block=(
+            "\n\n## "+kst_now()+" OPENAI PYTHON AUTO-BRIDGE NODE EVENT\n"
+            "LINEAGE: DUAL_EYE_MULTI_BRAIN_BRIDGE_V1\n"
+            "EVENT_SIGNATURE: "+sig+"\n"
+            "NEW TASK/PROJECT/NODE/PACK/TRIGGER/GEMINI SESSION: 0\n"
+            "OPENAI_WORK_COMMAND_TO_NOTEBOOK_PYTHON_API: ACTIVE\n"
+            "PYTHON_DEFAULT_FOR_PROGRESS_COMMANDS: true\n"
+            "SUPPORT_MODE: REUSE_EXISTING_VERIFY_AND_SELF_HEAL_NO_DUPLICATE\n"
+            "FIRST_UNFINISHED: "+signature_payload["firstUnfinished"]+"\n"
+            "NEXT_STEP: "+signature_payload["nextStep"]+"\n"
+            "ROUTE: OPENAI_PACK -> NOTEBOOK_REMOTE_WORKLOAD_SUPPORT -> PYTHON_API -> PERSISTENCE/AUTORESUME/WATCHDOG -> GEMINI_EYE -> NOTEBOOK_EYE -> CONDITIONAL_POWERSHELL -> PID/JSON_DELTA_CROSSCHECK -> RECORD_READBACK\n"
+            "VOICE_SCIENCE_STATE_MUTATED: false\n"
+        )
+        for p in [
+            project_root/"CentralAgentManager"/"GEMINI_ALL_PROJECT_WORKFLOW_NODELOG_20261003.md",
+            project_root/"logs"/"lumi_ebook"/"LUMI_EBOOK_CHAT_APPEND_20260925.md"
+        ]:
+            ok,err=_append_text_retry(p,block)
+            append_ok=append_ok and ok
+            if not ok: append_errors.append({"path":str(p),"error":err})
+    event["nodeLogAppendOk"]=append_ok
+    event["appendErrors"]=append_errors
+    save_json(local,event)
+    central=find_central()
+    if central:
+        dp=central/"Runtime_Readback"/"PYTHON"/"OPENAI_PYTHON_BRIDGE_NODELOG_LAST.json"
+        try:
+            save_json(dp,event);event["driveReceiptPath"]=str(dp);save_json(local,event)
+        except Exception as e:
+            event["driveReceiptError"]=repr(e);save_json(local,event)
+    return event
 
 def openai_step_plan(root:Path, continuity_path:Path|None=None):
     cp=continuity_path or (Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json")
@@ -300,6 +395,9 @@ def openai_step_plan(root:Path, continuity_path:Path|None=None):
         },
         "executionRule":"USER_TO_OPENAI_MAX3_SIMPLE__BEYOND3_OR_COMPLEX_TO_NOTEBOOK_PYTHON_GEMINI__REMOTE_DC_HAND_ONLY__DRIVE_STATE__VERCELAI_FIRESTORE_DRIVE_AFTER_DEPLOY"
     }
+    bridge_event=_record_openai_python_bridge_event(root,out)
+    out["autoBridgeNodeLog"]=bridge_event
+    out["ok"]=bool(out["ok"] and bridge_event.get("nodeLogAppendOk",False))
     local=root/"OPENAI_PYTHON_STEP_PLAN_LAST.json"
     save_json(local,out)
     central=find_central()
