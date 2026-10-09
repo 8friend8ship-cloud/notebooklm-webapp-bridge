@@ -52,6 +52,25 @@ def save_json(path,obj):
     tmp.write_text(json.dumps(obj,ensure_ascii=False,indent=2),encoding="utf-8")
     os.replace(tmp,path)
 
+def write_internal_heartbeat(root:Path, phase:str, extra=None):
+    """Refresh the existing persistence heartbeat from the scheduled Python control lane."""
+    try:
+        hb={
+            "ok":True,
+            "version":"CENTRAL_INTERNAL_HEARTBEAT_V2_PYTHON_CONTROL_20261009",
+            "workerVersion":VERSION,
+            "phase":str(phase),
+            "updatedAt":now(),
+            "pid":os.getpid(),
+            "source":"PYTHON_CONTROL_SCHEDULED_HEARTBEAT"
+        }
+        if isinstance(extra,dict):
+            hb.update(extra)
+        save_json(root/"CENTRAL_INTERNAL_HEARTBEAT.json",hb)
+        return True
+    except Exception:
+        return False
+
 def load_state(p):
     try:return json.loads(p.read_text(encoding="utf-8-sig"))
     except:return {}
@@ -323,6 +342,7 @@ def openai_cross_validate(root:Path):
     return 0 if out["ok"] else 4
 
 def run_once(root:Path):
+    write_internal_heartbeat(root,"START")
     state_path=root/"python-control-state.json"
     receipt_path=root/"PYTHON_CONTROL_WORKER_LAST.json"
     central=find_central()
@@ -358,6 +378,7 @@ def run_once(root:Path):
         try: save_json(dp,out);out["driveReceiptPath"]=str(dp)
         except Exception as e: out["driveReceiptError"]=str(e);out["ok"]=False
         save_json(receipt_path,out)
+    write_internal_heartbeat(root,"COMPLETE",{"status":out.get("status",""),"ok":bool(out.get("ok"))})
     print(json.dumps(out,ensure_ascii=False))
     return 0 if out["ok"] else 2
 
