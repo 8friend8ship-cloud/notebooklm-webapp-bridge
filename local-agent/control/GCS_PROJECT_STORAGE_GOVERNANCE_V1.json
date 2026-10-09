@@ -1,0 +1,91 @@
+{
+  "version": "GCS_PROJECT_STORAGE_GOVERNANCE_V1_20261009",
+  "lineage": "DUAL_EYE_MULTI_BRAIN_BRIDGE_V1",
+  "canonical_project_template": {
+    "spreadsheet_id": "1Es5UnIrWTAJo2GIjNA600oY9VGA_z45cz16j7VzmdHg",
+    "title": "LUMI_프로젝트_운영시트_V2",
+    "role": "SOURCE_TEMPLATE_FOR_NEW_PROJECT_COPY_CUSTOMIZE",
+    "required_tabs": [
+      "GCS",
+      "GCS관리"
+    ],
+    "copy_rule": "COPY_FULL_LUMI_PROJECT_STRUCTURE_THEN_REPLACE_PROJECT_ID_NAME_PURPOSE_DATA_CLASS_EXPECTED_GB_REGION_RETENTION_BUDGET_AND_FUTURE_PHASES",
+    "forbidden_inheritance": [
+      "LUMI_IDENTITY_DATA",
+      "BUCKET_NAMES",
+      "RAW_SECRETS",
+      "PAID_APPROVALS",
+      "PROJECT_SPECIFIC_OBJECT_POINTERS"
+    ]
+  },
+  "central_approval_chain": [
+    "CENTRAL_AGENT_MANAGER",
+    "API_PACK",
+    "ACCOUNTING_PACK",
+    "DRIVE_PACK_GCS_ADAPTER"
+  ],
+  "approval_rules": {
+    "free_first": true,
+    "paid_or_cap_increase_requires_physical_approval": true,
+    "no_silent_billing": true,
+    "alert_threshold_percent": [
+      50,
+      80,
+      90,
+      100
+    ],
+    "block_new_paid_jobs_at_percent": 100,
+    "bucket_creation_requires_explicit_approval": true,
+    "region_storage_class_lifecycle_must_be_read_back_before_write": true
+  },
+  "storage_roles": {
+    "drive": "canonical central records, ebook, final receipts, selective final assets",
+    "gcs": "bounded large/intermediate object storage only after approval",
+    "local_c": "primary working storage",
+    "external_f": "backup only, not realtime"
+  },
+  "object_pass_contract": [
+    "BEFORE local path + sha256 + size",
+    "EXECUTE only after 3-way approval",
+    "AFTER GCS generation + size + crc32c/md5 when available",
+    "DELTA local vs GCS readback",
+    "RECEIPT central + project GCS관리",
+    "receipt-only PASS forbidden"
+  ],
+  "default_state": "ACTIVATION_HOLD",
+  "current_project_readback": {
+    "gcloud_project": "video-template-factory",
+    "bucket_count": 0,
+    "lumi_gcs_write_enable": false
+  },
+  "python_runtime_routes": {
+    "cloud_drive_gcs": {
+      "executable": "C:\\Users\\User\\AppData\\Local\\HomeDesignAutomationV7\\PythonCloud3148\\cloudio-venv\\Scripts\\python.exe",
+      "python": "3.14.8",
+      "google_cloud_storage": "3.16.0",
+      "purpose": "Drive/GCS/Google API object and metadata work"
+    },
+    "general_notebook": {
+      "executable": "C:\\Users\\User\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+      "python": "3.14.3",
+      "purpose": "existing scheduled notebook/general workers; preserve in place"
+    },
+    "lumi_voice_torch": {
+      "executable": "C:\\Users\\User\\Documents\\LUMI_TTS_TEMPLATE\\CosyVoiceRuntime\\venv\\Scripts\\python.exe",
+      "python": "3.10.11",
+      "purpose": "Torch/CosyVoice/Lumi voice; never replace with cloud runtime"
+    }
+  },
+  "new_project_bootstrap_order": [
+    "copy Lumi project workbook",
+    "customize project identity/purpose/future phases",
+    "verify GCS and GCS관리 tabs exist exactly once",
+    "set WRITE_ENABLE=false",
+    "register project GCS intent in API registry",
+    "read accounting forecast/cap",
+    "run no-write bucket/region/lifecycle/billing/quota preflight",
+    "enable only inside approved limit",
+    "feed verified lessons back to template automation"
+  ],
+  "new_pack_or_trigger_creation": false
+}
