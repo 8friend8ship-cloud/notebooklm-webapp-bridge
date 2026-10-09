@@ -415,6 +415,14 @@ def _live_project_processes(project_root:Path):
         name=str(x.get("Name","") or "").lower()
         if name not in allowed_names:
             continue
+        if "\\appdata\\local\\homedesignautomationv7\\localagent\\" in low:
+            continue
+        if "\\appdata\\local\\homedesignautomationv7\\desktopcommander\\" in low:
+            continue
+        if "\\billingaudit\\" in low:
+            continue
+        if "get-ciminstance win32_process" in low:
+            continue
         if any(h in low for h in controls):
             continue
         rows.append({
@@ -435,7 +443,7 @@ def _recent_json_delta(project_root:Path, root:Path):
         project_root/"LumiVoiceRuntime",
         project_root/"CentralAgentManager",
         project_root/"CentralRemotePack",
-        root
+        project_root/"Config"
     ]
     skip={".git","node_modules","venv",".venv","env","__pycache__","site-packages"}
     items=[]
@@ -500,7 +508,10 @@ def _runtime_pid_json_truth(project_root:Path, root:Path, first:str):
     expected=_execution_expected(first)
     latest=js.get("latestResultJson")
     recent_result=bool(latest and int(latest.get("ageSeconds",999999))<=21600)
-    if procs and int(js.get("jsonDeltaCount",0))>0:
+    if not expected:
+        state="NO_EXECUTION_REQUIRED_REVIEW_OR_PLANNING"
+        ok=True
+    elif procs and int(js.get("jsonDeltaCount",0))>0:
         state="LIVE_PID_AND_JSON_DELTA_CONFIRMED"
         ok=True
     elif procs:
@@ -509,12 +520,9 @@ def _runtime_pid_json_truth(project_root:Path, root:Path, first:str):
     elif recent_result:
         state="PID_FINISHED_RECENT_RESULT_JSON_PRESENT"
         ok=True
-    elif expected:
+    else:
         state="EXPECTED_EXECUTION_BUT_NO_PID_OR_RECENT_RESULT_JSON"
         ok=False
-    else:
-        state="NO_EXECUTION_PID_REQUIRED_FOR_REVIEW_OR_PLANNING"
-        ok=True
     return {
         "ok":ok,
         "state":state,
