@@ -12,7 +12,7 @@ import argparse, base64, json, os, platform, re, subprocess, urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-VERSION="PY_CENTRAL_CONTROL_WORKER_V4_OPENAI_STEP_PLANNER_20261007"
+VERSION="PY_CENTRAL_CONTROL_WORKER_V5_RECORD_AUTHORITY_GUARD_20261009"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
 QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
@@ -291,10 +291,21 @@ def _evidence(path:Path, role:str):
     state=str(obj.get("status",obj.get("state",obj.get("managerState","PRESENT"))))
     return {"role":role,"path":str(path),"exists":True,"mtimeKst":ts.isoformat(),"ageSeconds":age,"state":state}
 
+def _latest_first_unfinished(path:Path):
+    try:
+        txt=path.read_text(encoding="utf-8-sig",errors="replace")
+        hits=re.findall(r"(?im)^\\s*FIRST_UNFINISHED\\s*[:=]\\s*(.+?)\\s*$",txt)
+        return hits[-1].strip() if hits else ""
+    except Exception:
+        return ""
+
 def openai_cross_validate(root:Path):
     profile=Path(os.environ.get("USERPROFILE","."))
     base=root.parent
-    continuity_path=profile/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json"
+    project_root=profile/"HomeDesignAutomationV7"
+    continuity_path=project_root/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json"
+    central_log_path=project_root/"CentralAgentManager"/"GEMINI_ALL_PROJECT_WORKFLOW_NODELOG_20261003.md"
+    ebook_path=project_root/"logs"/"lumi_ebook"/"LUMI_EBOOK_CHAT_APPEND_20260925.md"
     plan_path=root/"OPENAI_PYTHON_STEP_PLAN_LAST.json"
     three_path=root/"OPENAI_3PACK_SYNC_LAST.json"
     gemini_path=root/"GEMINI_EYE_ACTIVE.json"
@@ -304,14 +315,28 @@ def openai_cross_validate(root:Path):
     keepalive_path=root/"REMOTE_DC_KEEPALIVE_LAST.json"
     c=_read_obj(continuity_path); plan=_read_obj(plan_path); three=_read_obj(three_path); gem=_read_obj(gemini_path); nb=_read_obj(notebook_path)
     first=str(c.get("first_unfinished",""))
+    central_first=_latest_first_unfinished(central_log_path)
+    ebook_first=_latest_first_unfinished(ebook_path)
+    try:
+        continuity_mtime=continuity_path.stat().st_mtime
+        latest_record_mtime=max(central_log_path.stat().st_mtime,ebook_path.stat().st_mtime)
+        continuity_not_older_than_records=continuity_mtime+2>=latest_record_mtime
+    except Exception:
+        continuity_not_older_than_records=False
     comparisons={
         "continuity_vs_python_plan": bool(first and first==str(plan.get("firstUnfinished",""))),
         "continuity_vs_three_pack": bool(first and first==str((((three.get("latest") or {}).get("continuity") or {}).get("firstUnfinished","")))),
         "continuity_vs_gemini_eye": bool((not gem) or first==str(gem.get("continuityFirstUnfinished",""))),
-        "continuity_vs_notebook": bool((not nb) or first==str(nb.get("continuityFirstUnfinished","")))
+        "continuity_vs_notebook": bool((not nb) or first==str(nb.get("continuityFirstUnfinished",""))),
+        "central_nodelog_vs_ebook": bool(central_first and central_first==ebook_first),
+        "continuity_vs_central_nodelog": bool(first and first==central_first),
+        "continuity_vs_ebook": bool(first and first==ebook_first),
+        "continuity_not_older_than_latest_records": bool(continuity_not_older_than_records)
     }
     evidence=[
         _evidence(continuity_path,"DRIVE_JSON_LOCAL_CANON"),
+        _evidence(central_log_path,"CENTRAL_NODELOG"),
+        _evidence(ebook_path,"LUMI_EBOOK"),
         _evidence(plan_path,"PYTHON"),
         _evidence(three_path,"THREE_PACK"),
         _evidence(gemini_path,"GEMINI_EYE"),
@@ -325,14 +350,16 @@ def openai_cross_validate(root:Path):
     consistent=all(comparisons.values()) and core_fresh
     out={
         "ok":consistent,
-        "version":"OPENAI_CROSS_VALIDATION_V1_20261007",
+        "version":"OPENAI_CROSS_VALIDATION_V2_RECORD_AUTHORITY_20261009",
         "checkedAtKst":kst_now(),"timezone":"Asia/Seoul",
         "firstUnfinished":first,
+        "centralNodeLogFirstUnfinished":central_first,
+        "ebookFirstUnfinished":ebook_first,
         "comparisons":comparisons,
         "coreFreshWithinSeconds":900,
         "coreFresh":core_fresh,
         "evidence":evidence,
-        "rule":"DRIVE_JSON_PLUS_PYTHON_PLUS_POWERSHELL_PLUS_REMOTEDC_PLUS_GEMINI_EYE_KST_CROSSCHECK; UNUSED_POWERSHELL_IS_ADVISORY_NOT_FATAL"
+        "rule":"CONTINUITY_MUST_MATCH_LATEST_CENTRAL_NODELOG_AND_EBOOK_AND_NOT_BE_OLDER_THAN_THOSE_RECORDS; LIVE_RUNTIME_RECEIPTS_USE_900S_FRESHNESS; LONG_TRAINING_IS_NOT_FAILURE"
     }
     local=root/"OPENAI_CROSS_VALIDATION_LAST.json";save_json(local,out)
     central=find_central()
