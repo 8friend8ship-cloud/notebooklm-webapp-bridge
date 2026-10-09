@@ -537,6 +537,7 @@ def openai_cross_validate(root:Path):
     first=str(c.get("first_unfinished",""))
     central_first=_latest_first_unfinished(central_log_path)
     ebook_first=_latest_first_unfinished(ebook_path)
+    runtime_truth=_runtime_pid_json_truth(project_root,root,first)
     try:
         continuity_mtime=continuity_path.stat().st_mtime
         latest_record_mtime=max(central_log_path.stat().st_mtime,ebook_path.stat().st_mtime)
