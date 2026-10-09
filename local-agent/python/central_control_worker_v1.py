@@ -296,7 +296,7 @@ def _latest_first_unfinished(path:Path):
         lines=path.read_text(encoding="utf-8-sig",errors="replace").splitlines()
         hits=[]
         for i,line in enumerate(lines):
-            m=re.match(r"^\\s*(?:[-*]\\s*)?FIRST_UNFINISHED\\s*[:=]\\s*(.*?)\\s*$",line,re.I)
+            m=re.match(r"^[ \t]*(?:[-*][ \t]*)?FIRST_UNFINISHED[ \t]*[:=][ \t]*(.*?)[ \t]*$",line,re.I)
             if not m:
                 continue
             value=m.group(1).strip().strip("` ")
@@ -305,7 +305,7 @@ def _latest_first_unfinished(path:Path):
                 while j<len(lines) and not lines[j].strip():
                     j+=1
                 if j<len(lines):
-                    value=re.sub(r"^\\s*(?:[-*]\\s*)?","",lines[j]).strip().strip("` ")
+                    value=re.sub(r"^[ \t]*(?:[-*][ \t]*)?","",lines[j]).strip().strip("` ")
             if value:
                 hits.append(value)
         return hits[-1] if hits else ""
