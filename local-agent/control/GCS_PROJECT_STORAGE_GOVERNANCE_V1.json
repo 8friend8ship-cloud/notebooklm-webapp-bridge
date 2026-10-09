@@ -20,7 +20,10 @@
     "current_tab_count": 124,
     "workflow_standard_rule": "PWS-051",
     "template_pack_contract": "TPL_LUMI_FULL_PROJECT_COPY_CUSTOMIZE_V1",
-    "full_new_project_copy_runtime_canary": "PENDING"
+    "full_new_project_copy_runtime_canary": "PENDING",
+    "central_template_automation": "TPL_LUMI_FULL_PROJECT_COPY_CUSTOMIZE_V1",
+    "central_template_automation_status": "ACTIVE_POLICY_RUNTIME_COPY_CANARY_PENDING",
+    "central_template_automation_row": 52
   },
   "central_approval_chain": [
     "CENTRAL_AGENT_MANAGER",
