@@ -320,7 +320,6 @@ def _reconcile_continuity_from_records(continuity_path:Path):
     ebook_path=project_root/"logs"/"lumi_ebook"/"LUMI_EBOOK_CHAT_APPEND_20260925.md"
     central_first=_latest_first_unfinished(central_log_path)
     ebook_first=_latest_first_unfinished(ebook_path)
-    runtime_truth=_runtime_pid_json_truth(project_root,root,first)
     out={
         "ok":False,
         "state":"NO_RECORD_AUTHORITY",
