@@ -8,7 +8,7 @@ No Google OAuth, no arbitrary shell, no browser/UI mutation.
 The only recovery mutation allowed is an exact, fixed PowerShell script under HomeDesignAutomationV7.
 """
 from __future__ import annotations
-import argparse, base64, json, os, platform, re, subprocess, urllib.request
+import argparse, base64, json, os, platform, re, subprocess, time, urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -48,9 +48,22 @@ def find_central():
 
 def save_json(path,obj):
     path.parent.mkdir(parents=True,exist_ok=True)
-    tmp=path.with_suffix(path.suffix+".tmp")
+    tmp=path.with_name(path.name+f".{os.getpid()}.tmp")
     tmp.write_text(json.dumps(obj,ensure_ascii=False,indent=2),encoding="utf-8")
-    os.replace(tmp,path)
+    last=None
+    for _ in range(20):
+        try:
+            os.replace(tmp,path)
+            return
+        except PermissionError as e:
+            last=e
+            time.sleep(0.1)
+    try:
+        tmp.unlink(missing_ok=True)
+    except Exception:
+        pass
+    if last:
+        raise last
 
 def write_internal_heartbeat(root:Path, phase:str, extra=None):
     """Refresh the existing persistence heartbeat from the scheduled Python control lane."""
