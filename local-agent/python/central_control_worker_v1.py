@@ -293,9 +293,22 @@ def _evidence(path:Path, role:str):
 
 def _latest_first_unfinished(path:Path):
     try:
-        txt=path.read_text(encoding="utf-8-sig",errors="replace")
-        hits=re.findall(r"(?im)^\\s*FIRST_UNFINISHED\\s*[:=]\\s*(.+?)\\s*$",txt)
-        return hits[-1].strip() if hits else ""
+        lines=path.read_text(encoding="utf-8-sig",errors="replace").splitlines()
+        hits=[]
+        for i,line in enumerate(lines):
+            m=re.match(r"^\\s*(?:[-*]\\s*)?FIRST_UNFINISHED\\s*[:=]\\s*(.*?)\\s*$",line,re.I)
+            if not m:
+                continue
+            value=m.group(1).strip().strip("` ")
+            if not value:
+                j=i+1
+                while j<len(lines) and not lines[j].strip():
+                    j+=1
+                if j<len(lines):
+                    value=re.sub(r"^\\s*(?:[-*]\\s*)?","",lines[j]).strip().strip("` ")
+            if value:
+                hits.append(value)
+        return hits[-1] if hits else ""
     except Exception:
         return ""
 
