@@ -12,7 +12,7 @@ import argparse, base64, json, os, platform, re, subprocess, urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-VERSION="PY_CENTRAL_CONTROL_WORKER_V5_RECORD_AUTHORITY_GUARD_20261009"
+VERSION="PY_CENTRAL_CONTROL_WORKER_V6_RECORD_RECONCILE_20261009"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
 QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
@@ -194,6 +194,7 @@ def _lane(text:str):
 
 def openai_step_plan(root:Path, continuity_path:Path|None=None):
     cp=continuity_path or (Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json")
+    record_reconcile=_reconcile_continuity_from_records(cp)
     st=load_state(cp)
     summary=str(st.get("last_received_user_instruction_summary",""))
     first=str(st.get("first_unfinished",""))
@@ -234,6 +235,7 @@ def openai_step_plan(root:Path, continuity_path:Path|None=None):
         "firstUnfinished":first,
         "lastGood":st.get("last_good",[]),
         "instructionSummary":summary,
+        "recordReconcile":record_reconcile,
         "complexWork":complex_work,
         "splitRecommended":handoff_required,
         "handoffRequired":handoff_required,
@@ -312,6 +314,66 @@ def _latest_first_unfinished(path:Path):
     except Exception:
         return ""
 
+def _reconcile_continuity_from_records(continuity_path:Path):
+    project_root=Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"
+    central_log_path=project_root/"CentralAgentManager"/"GEMINI_ALL_PROJECT_WORKFLOW_NODELOG_20261003.md"
+    ebook_path=project_root/"logs"/"lumi_ebook"/"LUMI_EBOOK_CHAT_APPEND_20260925.md"
+    central_first=_latest_first_unfinished(central_log_path)
+    ebook_first=_latest_first_unfinished(ebook_path)
+    out={
+        "ok":False,
+        "state":"NO_RECORD_AUTHORITY",
+        "continuityPath":str(continuity_path),
+        "centralFirstUnfinished":central_first,
+        "ebookFirstUnfinished":ebook_first,
+        "changed":False
+    }
+    if not central_first or not ebook_first:
+        return out
+    if central_first!=ebook_first:
+        out["state"]="HOLD_RECORD_AUTHORITY_CONFLICT"
+        return out
+    st=load_state(continuity_path)
+    if not st:
+        out["state"]="HOLD_CONTINUITY_MISSING_OR_PARSE_FAIL"
+        return out
+    current=str(st.get("first_unfinished",""))
+    try:
+        latest_record_mtime=max(central_log_path.stat().st_mtime,ebook_path.stat().st_mtime)
+        continuity_mtime=continuity_path.stat().st_mtime
+    except Exception:
+        out["state"]="HOLD_RECORD_MTIME_UNAVAILABLE"
+        return out
+    if current==central_first and continuity_mtime+2>=latest_record_mtime:
+        out.update({"ok":True,"state":"UNCHANGED_RECORD_AUTHORITY_MATCH","firstUnfinished":current})
+        return out
+    if latest_record_mtime<=continuity_mtime+2 and current!=central_first:
+        out["state"]="HOLD_CONTINUITY_NEWER_THAN_RECORDS_BUT_VALUE_DIFFERS"
+        out["firstUnfinished"]=current
+        return out
+    previous_summary=str(st.get("last_received_user_instruction_summary",""))
+    if previous_summary:
+        st["previous_instruction_summary"]=previous_summary
+    st["first_unfinished"]=central_first
+    st["status"]="WAIT_RESOURCE" if "WAIT_RESOURCE" in central_first else "ACTIVE_UNFINISHED"
+    st["last_received_user_instruction_summary"]=(
+        "Record-authority continuity reconcile: central nodelog and Lumi ebook agree on FIRST_UNFINISHED="
+        +central_first+
+        ". Resume only this recorded step after normal preflight. Previous instruction summary is preserved separately."
+    )
+    st["updated_at"]=kst_now()
+    st["record_reconcile"]={
+        "version":"OPENAI_CONTINUITY_RECORD_RECONCILE_V1_20261009",
+        "atKst":kst_now(),
+        "centralFirstUnfinished":central_first,
+        "ebookFirstUnfinished":ebook_first,
+        "previousFirstUnfinished":current,
+        "rule":"MUTATE_ONLY_WHEN_CENTRAL_AND_EBOOK_AGREE_AND_ARE_NEWER_THAN_CONTINUITY"
+    }
+    save_json(continuity_path,st)
+    out.update({"ok":True,"state":"RECONCILED_FROM_MATCHING_NEWER_RECORDS","changed":True,"firstUnfinished":central_first})
+    return out
+
 def openai_cross_validate(root:Path):
     profile=Path(os.environ.get("USERPROFILE","."))
     base=root.parent
@@ -383,6 +445,8 @@ def openai_cross_validate(root:Path):
 
 def run_once(root:Path):
     write_internal_heartbeat(root,"START")
+    continuity_path=Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json"
+    record_reconcile=_reconcile_continuity_from_records(continuity_path)
     state_path=root/"python-control-state.json"
     receipt_path=root/"PYTHON_CONTROL_WORKER_LAST.json"
     central=find_central()
@@ -398,7 +462,7 @@ def run_once(root:Path):
     st=load_state(state_path)
     out={"ok":True,"version":VERSION,"requestId":rid,"enabled":enabled,"controlSha":sha,
          "taskId":c.get("taskId"),"action":c.get("action"),"executed":False,"deduped":False,
-         "remoteDcDependency":False,"driveQueueClaim":queue_result,"taskAudit":task_audit,"startedAt":now(),"completedAt":"","error":""}
+         "remoteDcDependency":False,"recordReconcile":record_reconcile,"driveQueueClaim":queue_result,"taskAudit":task_audit,"startedAt":now(),"completedAt":"","error":""}
     if not enabled or not rid:
         out["status"]="NO_ACTIVE_REQUEST"
     elif st.get("attemptedRequestId")==rid:
