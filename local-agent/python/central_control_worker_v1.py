@@ -403,12 +403,18 @@ def _live_project_processes(project_root:Path):
     controls=(
         "central_control_worker_v1.py","notebookremoteworkloadsupport.ps1","homedesignautoresume.ps1",
         "openawebsyncguard.ps1","openaiwebsyncguard.ps1","activate-geminieye.ps1",
-        "remotemanager","watchdog","monitor-continuous","windowactivitysupervisor","dualmonitorworklane"
+        "remotemanager","watchdog","monitor-continuous","windowactivitysupervisor","dualmonitorworklane",
+        "managedcfttabcleanup.ps1","windowlayoutgovernor.ps1","centralagentpowershellbridge.ps1",
+        "desktopcommanderkeepalive.ps1","workloadadmissiongovernor.ps1"
     )
+    allowed_names={"python.exe","pythonw.exe","powershell.exe","pwsh.exe","cmd.exe","node.exe","ffmpeg.exe","ffprobe.exe","unrealeditor.exe"}
     rows=[]
     for x in obj:
         cmdline=str(x.get("CommandLine","") or "")
         low=cmdline.lower()
+        name=str(x.get("Name","") or "").lower()
+        if name not in allowed_names:
+            continue
         if any(h in low for h in controls):
             continue
         rows.append({
