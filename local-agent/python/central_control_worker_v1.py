@@ -320,6 +320,7 @@ def _reconcile_continuity_from_records(continuity_path:Path):
     ebook_path=project_root/"logs"/"lumi_ebook"/"LUMI_EBOOK_CHAT_APPEND_20260925.md"
     central_first=_latest_first_unfinished(central_log_path)
     ebook_first=_latest_first_unfinished(ebook_path)
+    runtime_truth=_runtime_pid_json_truth(project_root,root,first)
     out={
         "ok":False,
         "state":"NO_RECORD_AUTHORITY",
@@ -374,6 +375,150 @@ def _reconcile_continuity_from_records(continuity_path:Path):
     out.update({"ok":True,"state":"RECONCILED_FROM_MATCHING_NEWER_RECORDS","changed":True,"firstUnfinished":central_first})
     return out
 
+
+def _execution_expected(first:str):
+    u=str(first or "").upper()
+    hints=("TRAIN","RUN","EXECUTE","RENDER","SYNC","GENERATE","BUILD","DEPLOY","DOWNLOAD","UPLOAD","TOKENIZE","PROCESS","INGEST","EXPORT","IMPORT")
+    return any(h in u for h in hints)
+
+def _live_project_processes(project_root:Path):
+    ps=os.path.join(os.environ.get("SystemRoot",r"C:\Windows"),"System32","WindowsPowerShell","v1.0","powershell.exe")
+    if not os.path.exists(ps): ps="powershell.exe"
+    cmd=(
+        "$ErrorActionPreference='SilentlyContinue'; "
+        "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and "
+        "($_.CommandLine -like '*HomeDesignAutomationV7*' -or $_.CommandLine -like '*LumiVoiceRuntime*') } | "
+        "Select-Object ProcessId,ParentProcessId,Name,CreationDate,CommandLine | ConvertTo-Json -Compress"
+    )
+    flags=getattr(subprocess,"CREATE_NO_WINDOW",0x08000000)
+    try:
+        cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-WindowStyle","Hidden","-Command",cmd],
+                          stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=10,
+                          check=False,shell=False,creationflags=flags)
+        raw=(cp.stdout or "").strip()
+        obj=json.loads(raw) if raw else []
+        if isinstance(obj,dict): obj=[obj]
+    except Exception:
+        obj=[]
+    controls=(
+        "central_control_worker_v1.py","notebookremoteworkloadsupport.ps1","homedesignautoresume.ps1",
+        "openawebsyncguard.ps1","openaiwebsyncguard.ps1","activate-geminieye.ps1",
+        "remotemanager","watchdog","monitor-continuous","windowactivitysupervisor","dualmonitorworklane"
+    )
+    rows=[]
+    for x in obj:
+        cmdline=str(x.get("CommandLine","") or "")
+        low=cmdline.lower()
+        if any(h in low for h in controls):
+            continue
+        rows.append({
+            "pid":int(x.get("ProcessId",0) or 0),
+            "parentPid":int(x.get("ParentProcessId",0) or 0),
+            "name":str(x.get("Name","") or ""),
+            "creationDate":str(x.get("CreationDate","") or ""),
+            "commandLine":cmdline[:1200]
+        })
+    return rows
+
+def _recent_json_delta(project_root:Path, root:Path):
+    state_path=root/"OPENAI_RUNTIME_PID_JSON_STATE.json"
+    prev=load_state(state_path)
+    prev_map={str(x.get("path","")):x for x in (prev.get("files") or []) if isinstance(x,dict)}
+    now_ts=datetime.now().timestamp()
+    bases=[
+        project_root/"LumiVoiceRuntime",
+        project_root/"CentralAgentManager",
+        project_root/"CentralRemotePack",
+        root
+    ]
+    skip={".git","node_modules","venv",".venv","env","__pycache__","site-packages"}
+    items=[]
+    scanned=0
+    for base in bases:
+        if not base.exists():
+            continue
+        for dirpath,dirnames,filenames in os.walk(base):
+            dirnames[:]=[n for n in dirnames if n.lower() not in skip]
+            for name in filenames:
+                if not name.lower().endswith(".json"):
+                    continue
+                scanned+=1
+                if scanned>25000:
+                    break
+                p=Path(dirpath)/name
+                try:
+                    st=p.stat()
+                except Exception:
+                    continue
+                age=max(0,int(now_ts-st.st_mtime))
+                if age>21600:
+                    continue
+                old=prev_map.get(str(p),{})
+                old_size=old.get("size")
+                old_mtime=old.get("mtime")
+                delta=(int(st.st_size)-int(old_size)) if isinstance(old_size,(int,float)) else None
+                advanced=bool(isinstance(old_mtime,(int,float)) and st.st_mtime>float(old_mtime)+0.0001)
+                items.append({
+                    "path":str(p),
+                    "name":name,
+                    "size":int(st.st_size),
+                    "deltaBytes":delta,
+                    "mtime":float(st.st_mtime),
+                    "mtimeKst":datetime.fromtimestamp(st.st_mtime,KST).isoformat(),
+                    "ageSeconds":age,
+                    "mtimeAdvanced":advanced
+                })
+            if scanned>25000:
+                break
+        if scanned>25000:
+            break
+    items.sort(key=lambda x:x["mtime"],reverse=True)
+    items=items[:40]
+    growth=[x for x in items if (isinstance(x.get("deltaBytes"),int) and x["deltaBytes"]!=0) or x.get("mtimeAdvanced")]
+    results=[x for x in items if any(k in x["name"].upper() for k in ("RESULT","FINAL_QA","REPORT"))]
+    snap={"updatedAtKst":kst_now(),"files":[{"path":x["path"],"size":x["size"],"mtime":x["mtime"]} for x in items]}
+    save_json(state_path,snap)
+    return {
+        "statePath":str(state_path),
+        "scannedJsonCount":scanned,
+        "trackedRecentJsonCount":len(items),
+        "jsonDeltaCount":len(growth),
+        "jsonDeltas":growth[:12],
+        "latestResultJson":results[0] if results else None,
+        "baselineCreated":not bool(prev_map)
+    }
+
+def _runtime_pid_json_truth(project_root:Path, root:Path, first:str):
+    procs=_live_project_processes(project_root)
+    js=_recent_json_delta(project_root,root)
+    expected=_execution_expected(first)
+    latest=js.get("latestResultJson")
+    recent_result=bool(latest and int(latest.get("ageSeconds",999999))<=21600)
+    if procs and int(js.get("jsonDeltaCount",0))>0:
+        state="LIVE_PID_AND_JSON_DELTA_CONFIRMED"
+        ok=True
+    elif procs:
+        state="LIVE_PID_NO_JSON_DELTA_WAIT_NOT_ERROR"
+        ok=True
+    elif recent_result:
+        state="PID_FINISHED_RECENT_RESULT_JSON_PRESENT"
+        ok=True
+    elif expected:
+        state="EXPECTED_EXECUTION_BUT_NO_PID_OR_RECENT_RESULT_JSON"
+        ok=False
+    else:
+        state="NO_EXECUTION_PID_REQUIRED_FOR_REVIEW_OR_PLANNING"
+        ok=True
+    return {
+        "ok":ok,
+        "state":state,
+        "executionExpected":expected,
+        "activeProjectProcessCount":len(procs),
+        "activeProjectProcesses":procs[:12],
+        "json":js,
+        "rule":"RECEIPT_ONLY_PASS_FORBIDDEN__LIVE_PID_PLUS_JSON_DELTA_OR_FINISHED_RESULT_JSON__LIVE_PID_WITHOUT_JSON_DELTA_IS_WAIT_NOT_ERROR"
+    }
+
 def openai_cross_validate(root:Path):
     profile=Path(os.environ.get("USERPROFILE","."))
     base=root.parent
@@ -406,7 +551,8 @@ def openai_cross_validate(root:Path):
         "central_nodelog_vs_ebook": bool(central_first and central_first==ebook_first),
         "continuity_vs_central_nodelog": bool(first and first==central_first),
         "continuity_vs_ebook": bool(first and first==ebook_first),
-        "continuity_not_older_than_latest_records": bool(continuity_not_older_than_records)
+        "continuity_not_older_than_latest_records": bool(continuity_not_older_than_records),
+        "runtime_pid_json_truth": bool(runtime_truth.get("ok"))
     }
     evidence=[
         _evidence(continuity_path,"DRIVE_JSON_LOCAL_CANON"),
@@ -418,23 +564,35 @@ def openai_cross_validate(root:Path):
         _evidence(notebook_path,"NOTEBOOK"),
         _evidence(ps_path,"POWERSHELL"),
         _evidence(remote_path,"REMOTEDC_MANAGER"),
-        _evidence(keepalive_path,"REMOTEDC_KEEPALIVE")
+        _evidence(keepalive_path,"REMOTEDC_KEEPALIVE"),
+        {
+            "role":"LIVE_PID_JSON_RUNTIME",
+            "path":str((runtime_truth.get("json") or {}).get("statePath","")),
+            "exists":True,
+            "mtimeKst":kst_now(),
+            "ageSeconds":0,
+            "state":str(runtime_truth.get("state","UNKNOWN")),
+            "activePids":[int(x.get("pid",0)) for x in (runtime_truth.get("activeProjectProcesses") or [])],
+            "jsonDeltaCount":int(((runtime_truth.get("json") or {}).get("jsonDeltaCount",0))),
+            "latestResultJson":((runtime_truth.get("json") or {}).get("latestResultJson"))
+        }
     ]
     core_roles={"PYTHON","THREE_PACK","GEMINI_EYE","NOTEBOOK","REMOTEDC_MANAGER"}
     core_fresh=all(x["exists"] and x["ageSeconds"]<=900 for x in evidence if x["role"] in core_roles)
     consistent=all(comparisons.values()) and core_fresh
     out={
         "ok":consistent,
-        "version":"OPENAI_CROSS_VALIDATION_V2_RECORD_AUTHORITY_20261009",
+        "version":"OPENAI_CROSS_VALIDATION_V3_PID_JSON_RUNTIME_TRUTH_20261009",
         "checkedAtKst":kst_now(),"timezone":"Asia/Seoul",
         "firstUnfinished":first,
         "centralNodeLogFirstUnfinished":central_first,
         "ebookFirstUnfinished":ebook_first,
+        "runtimeTruth":runtime_truth,
         "comparisons":comparisons,
         "coreFreshWithinSeconds":900,
         "coreFresh":core_fresh,
         "evidence":evidence,
-        "rule":"CONTINUITY_MUST_MATCH_LATEST_CENTRAL_NODELOG_AND_EBOOK_AND_NOT_BE_OLDER_THAN_THOSE_RECORDS; LIVE_RUNTIME_RECEIPTS_USE_900S_FRESHNESS; LONG_TRAINING_IS_NOT_FAILURE"
+        "rule":"CONTINUITY_MUST_MATCH_LATEST_CENTRAL_NODELOG_AND_EBOOK; RECEIPT_ONLY_PASS_FORBIDDEN; LIVE_PID_PLUS_JSON_DELTA_OR_FINISHED_RESULT_JSON_CROSSCHECK_REQUIRED; LIVE_PID_WITHOUT_JSON_DELTA_IS_WAIT_NOT_ERROR; LIVE_RUNTIME_RECEIPTS_USE_900S_FRESHNESS"
     }
     local=root/"OPENAI_CROSS_VALIDATION_LAST.json";save_json(local,out)
     central=find_central()
