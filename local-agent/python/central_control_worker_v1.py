@@ -48,12 +48,28 @@ def find_central():
 
 def save_json(path,obj):
     path.parent.mkdir(parents=True,exist_ok=True)
+    payload=json.dumps(obj,ensure_ascii=False,indent=2)
     tmp=path.with_name(path.name+f".{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(obj,ensure_ascii=False,indent=2),encoding="utf-8")
+    tmp.write_text(payload,encoding="utf-8")
     last=None
     for _ in range(20):
         try:
             os.replace(tmp,path)
+            return
+        except PermissionError as e:
+            last=e
+            time.sleep(0.1)
+    # Windows/Drive-sync fallback: target may allow direct write while denying rename/delete-share.
+    for _ in range(20):
+        try:
+            with open(path,"w",encoding="utf-8",newline="\n") as fh:
+                fh.write(payload)
+                fh.flush()
+                os.fsync(fh.fileno())
+            try:
+                tmp.unlink(missing_ok=True)
+            except Exception:
+                pass
             return
         except PermissionError as e:
             last=e
