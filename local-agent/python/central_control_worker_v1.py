@@ -12,7 +12,7 @@ import argparse, base64, hashlib, json, os, platform, re, subprocess, time, urll
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-VERSION="PY_CENTRAL_CONTROL_WORKER_V7_OPENAI_AUTO_BRIDGE_NODELOG_20261009"
+VERSION="PY_CENTRAL_CONTROL_WORKER_V8_CONTINUITY_PROJECT_ROUTE_20261010"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
 QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
@@ -183,6 +183,170 @@ def execute(c,root:Path):
         if rc!=0: raise RuntimeError(f"PERSISTENCE_REPAIR_EXIT_{rc}:{tail}")
         return {"script":str(script),"exitCode":rc,"outputTail":tail}
     return exact_recovery(root)
+
+def _sha256_file(path:Path):
+    h=hashlib.sha256()
+    with open(path,"rb") as fh:
+        for chunk in iter(lambda:fh.read(1024*1024),b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def _pid_alive(pid:int):
+    try:
+        pid=int(pid)
+        if pid<=0:return False
+        if os.name=="nt":
+            import ctypes
+            h=ctypes.windll.kernel32.OpenProcess(0x1000,False,pid)
+            if h:
+                ctypes.windll.kernel32.CloseHandle(h)
+                return True
+            return False
+        os.kill(pid,0)
+        return True
+    except Exception:
+        return False
+
+def run_continuity_project_route(root:Path, continuity_path:Path, central:Path|None=None):
+    receipt=root/"CONTINUITY_PROJECT_PYTHON_LAST.json"
+    config_path=root/"PYTHON_WORKLOAD_ROUTE_V1.json"
+    st=load_state(continuity_path)
+    first=str(st.get("first_unfinished",""))
+    status=str(st.get("status",""))
+    base={"ok":True,"version":"CONTINUITY_PROJECT_ROUTE_EXECUTOR_V1_20261010","workerVersion":VERSION,
+          "firstUnfinished":first,"continuityStatus":status,"executed":False,"status":"NO_MATCH","time":now()}
+    if status not in ("ACTIVE_UNFINISHED","INTERRUPTED_THINKING","WAIT_REMOTE_DISCONNECT","WAIT_RESOURCE") or not first:
+        base["status"]="NO_ACTIVE_CONTINUITY_ROUTE";save_json(receipt,base);return base
+    cfg=load_state(config_path)
+    if cfg.get("python_workload_route_schema")!="CONTINUITY_PROJECT_ROUTE_V1_20261010":
+        base.update(ok=False,status="ROUTE_SCHEMA_MISMATCH");save_json(receipt,base);return base
+    if cfg.get("lineage")!="DUAL_EYE_MULTI_BRAIN_BRIDGE_V1":
+        base.update(ok=False,status="ROUTE_LINEAGE_MISMATCH");save_json(receipt,base);return base
+    routes=[x for x in cfg.get("continuity_project_routes",[]) if bool(x.get("enabled")) and str(x.get("first_unfinished",""))==first]
+    if not routes:
+        base["status"]="NO_REGISTERED_PROJECT_ROUTE";save_json(receipt,base);return base
+    if len(routes)!=1:
+        base.update(ok=False,status="AMBIGUOUS_PROJECT_ROUTE",routeCount=len(routes));save_json(receipt,base);return base
+    route=routes[0]
+    rid=str(route.get("route_id",""))
+    base["routeId"]=rid
+    if not rid or route.get("lineage")!="DUAL_EYE_MULTI_BRAIN_BRIDGE_V1":
+        base.update(ok=False,status="ROUTE_ID_OR_LINEAGE_INVALID");save_json(receipt,base);return base
+
+    runtimes=cfg.get("python_runtime_routes",{})
+    runtime_key=str(route.get("runtime_key",""))
+    runtime=(runtimes.get(runtime_key) or {})
+    exe=Path(str(runtime.get("executable","")))
+    script=Path(str(route.get("script","")))
+    args=route.get("args",[])
+    if not exe.is_file():
+        base.update(ok=False,status="RUNTIME_EXECUTABLE_MISSING",runtimeKey=runtime_key,executable=str(exe));save_json(receipt,base);return base
+    if not script.is_file():
+        base.update(ok=False,status="PROJECT_SCRIPT_MISSING",script=str(script));save_json(receipt,base);return base
+    try:
+        allowed_root=(Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7").resolve()
+        resolved_script=script.resolve()
+        if not resolved_script.is_relative_to(allowed_root):
+            raise RuntimeError("SCRIPT_OUTSIDE_HOMEDESIGN_ROOT")
+    except Exception as e:
+        base.update(ok=False,status="PROJECT_SCRIPT_PATH_NOT_ALLOWED",error=str(e));save_json(receipt,base);return base
+    if not isinstance(args,list) or any(not isinstance(x,str) or len(x)>256 for x in args) or len(args)>16:
+        base.update(ok=False,status="PROJECT_ARGS_INVALID");save_json(receipt,base);return base
+
+    script_sha=_sha256_file(script)
+    expected_script_sha=str(route.get("script_sha256","")).lower()
+    if not expected_script_sha or script_sha.lower()!=expected_script_sha:
+        base.update(ok=False,status="PROJECT_SCRIPT_SHA_MISMATCH",scriptSha256=script_sha,expectedScriptSha256=expected_script_sha);save_json(receipt,base);return base
+
+    before=[]
+    for item in route.get("required_before_hashes",[]):
+        bp=Path(str(item.get("path","")))
+        exp=str(item.get("sha256","")).lower()
+        if not bp.is_file():
+            base.update(ok=False,status="REQUIRED_BEFORE_FILE_MISSING",path=str(bp));save_json(receipt,base);return base
+        actual=_sha256_file(bp)
+        before.append({"path":str(bp),"sha256":actual,"expected":exp,"match":actual.lower()==exp})
+    if not all(x["match"] for x in before):
+        base.update(ok=False,status="REQUIRED_BEFORE_HASH_MISMATCH",before=before);save_json(receipt,base);return base
+
+    outputs=route.get("outputs",[])
+    output_state=[]
+    for item in outputs:
+        op=Path(str(item.get("path","")))
+        output_state.append({"path":str(op),"required":bool(item.get("required",False)),"exists":op.exists(),"kind":str(item.get("kind",""))})
+    if bool(route.get("forbid_existing_outputs_before_run",False)) and any(x["exists"] for x in output_state):
+        required=[x for x in output_state if x["required"]]
+        if required and all(x["exists"] for x in required):
+            for x in output_state:
+                if x["exists"]:
+                    x["sha256"]=_sha256_file(Path(x["path"]))
+            result_decision=""
+            for x in output_state:
+                if x["kind"]=="result_json" and x["exists"]:
+                    try:result_decision=str(load_state(Path(x["path"])).get("decision",""))
+                    except Exception:pass
+            base.update(status="DEDUPED_REQUIRED_OUTPUTS_ALREADY_EXIST",outputs=output_state,resultDecision=result_decision,before=before)
+            save_json(receipt,base);return base
+        base.update(ok=False,status="PARTIAL_OUTPUTS_EXIST_FAIL_CLOSE",outputs=output_state,before=before);save_json(receipt,base);return base
+
+    lock=root/("CONTINUITY_PROJECT_ROUTE_"+re.sub(r"[^A-Za-z0-9_.-]","_",rid)+".lock.json")
+    if lock.exists():
+        prior=load_state(lock)
+        prior_pid=int(prior.get("pid",0) or 0)
+        if _pid_alive(prior_pid):
+            base.update(status="WAIT_EXISTING_PROJECT_ROUTE_NOT_ERROR",lock=str(lock),existingPid=prior_pid,before=before)
+            save_json(receipt,base);return base
+        try:lock.unlink()
+        except Exception as e:
+            base.update(ok=False,status="STALE_ROUTE_LOCK_CANNOT_CLEAR",error=str(e),lock=str(lock));save_json(receipt,base);return base
+    try:
+        fd=os.open(str(lock),os.O_CREAT|os.O_EXCL|os.O_WRONLY)
+        with os.fdopen(fd,"w",encoding="utf-8") as fh:
+            json.dump({"routeId":rid,"pid":os.getpid(),"claimedAt":now(),"firstUnfinished":first},fh,ensure_ascii=False,indent=2)
+    except FileExistsError:
+        base.update(status="WAIT_EXISTING_PROJECT_ROUTE_NOT_ERROR",lock=str(lock),before=before);save_json(receipt,base);return base
+
+    started=time.time()
+    try:
+        flags=getattr(subprocess,"CREATE_NO_WINDOW",0x08000000)
+        timeout=max(60,min(int(route.get("timeout_seconds",3600)),21600))
+        cp=subprocess.run([str(exe),str(script),*args],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                          text=True,encoding="utf-8",errors="replace",timeout=timeout,check=False,shell=False,creationflags=flags)
+        after=[]
+        required_ok=True
+        result_decision=""
+        for item in outputs:
+            op=Path(str(item.get("path","")))
+            row={"path":str(op),"required":bool(item.get("required",False)),"exists":op.exists(),"kind":str(item.get("kind",""))}
+            if op.exists():
+                row["sha256"]=_sha256_file(op);row["bytes"]=op.stat().st_size
+                if row["kind"]=="result_json":
+                    try:result_decision=str(load_state(op).get("decision",""))
+                    except Exception:pass
+            if row["required"] and not row["exists"]:required_ok=False
+            after.append(row)
+        ok=(cp.returncode==0 and required_ok)
+        out={**base,"ok":ok,"executed":True,"status":"DONE" if ok else "ERROR","routeId":rid,
+             "runtimeKey":runtime_key,"executable":str(exe),"script":str(script),"scriptSha256":script_sha,
+             "args":args,"before":before,"outputs":after,"resultDecision":result_decision,
+             "exitCode":cp.returncode,"outputTail":(cp.stdout or "")[-12000:],
+             "elapsedSeconds":round(time.time()-started,3),"startedAt":datetime.fromtimestamp(started,timezone.utc).isoformat(),"completedAt":now()}
+        save_json(receipt,out)
+        if central:
+            try:save_json(central/"Runtime_Readback"/"PYTHON"/"CONTINUITY_PROJECT_PYTHON_LAST.json",out)
+            except Exception as e:
+                out["driveReceiptError"]=str(e);save_json(receipt,out)
+        return out
+    except subprocess.TimeoutExpired as e:
+        out={**base,"ok":False,"executed":True,"status":"PROJECT_ROUTE_TIMEOUT","routeId":rid,
+             "elapsedSeconds":round(time.time()-started,3),"outputTail":str(e)[-4000:],"completedAt":now()}
+        save_json(receipt,out);return out
+    except Exception as e:
+        out={**base,"ok":False,"executed":True,"status":"PROJECT_ROUTE_EXCEPTION","routeId":rid,"error":repr(e),"completedAt":now()}
+        save_json(receipt,out);return out
+    finally:
+        try:lock.unlink(missing_ok=True)
+        except Exception:pass
 
 def audit_scheduled_tasks(root:Path):
     try:
@@ -406,6 +570,143 @@ def openai_step_plan(root:Path, continuity_path:Path|None=None):
         save_json(dp,out);out["driveReceiptPath"]=str(dp);save_json(local,out)
     print(json.dumps(out,ensure_ascii=False))
     return 0 if out["ok"] else 4
+
+def execute_first_unfinished(root:Path, continuity_path:Path|None=None):
+    """Execute only an explicitly whitelisted continuity FIRST_UNFINISHED through notebook Python."""
+    cp=continuity_path or (Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json")
+    reconcile=_reconcile_continuity_from_records(cp)
+    st=load_state(cp)
+    first=str(st.get("first_unfinished",""))
+    status=str(st.get("status",""))
+    receipt=root/"OPENAI_PYTHON_FIRST_UNFINISHED_EXEC_LAST.json"
+    project=Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"
+    oral=project/"LumiVoiceRuntime"/"oral_x1"
+    supported="RUN_JOINT_PREV1_PREV2_DISTILL_TRAIN_AND_DIAGNOSTIC_ONCE_THEN_VERIFY_FROZEN_GATES"
+    if first!=supported:
+        out={"ok":True,"version":"OPENAI_PYTHON_SAFE_FIRST_UNFINISHED_EXEC_V1_20261010",
+             "status":"NO_SUPPORTED_EXECUTION_REQUIRED","firstUnfinished":first,
+             "continuityStatus":status,"recordReconcile":reconcile,"executed":False,
+             "newTaskProjectNodePackTriggerGeminiSession":0}
+        save_json(receipt,out);print(json.dumps(out,ensure_ascii=False));return 0
+
+    script=oral/"_real_sequence_forward_monotonic_attention_v1.py"
+    preflight=oral/"REAL_SEQUENCE_PREV2_PLUS_JOINT_HISTORY_TEACHER_STUDENT_PREFLIGHT_V1.json"
+    result=oral/"REAL_SEQUENCE_PREV2_PLUS_JOINT_HISTORY_TEACHER_STUDENT_RESULT_V1.json"
+    candidate=oral/"REAL_SEQUENCE_PREV2_PLUS_JOINT_HISTORY_TEACHER_STUDENT_CANDIDATE_V1.pt"
+    base=oral/"REAL_SEQUENCE_FORWARD_MONOTONIC_ATTENTION_CANDIDATE_V1.pt"
+    prev1=oral/"REAL_SEQUENCE_PREV1_FREE_RUNNING_TEACHER_STUDENT_DISTILLATION_CANDIDATE_V1.pt"
+    py=Path(r"C:\Users\User\Documents\LUMI_TTS_TEMPLATE\CosyVoiceRuntime\venv\Scripts\python.exe")
+
+    def fstate(x:Path):
+        if not x.exists(): return {"exists":False,"bytes":0,"sha256":""}
+        return {"exists":True,"bytes":x.stat().st_size,"sha256":hashlib.sha256(x.read_bytes()).hexdigest()}
+
+    before={"result":fstate(result),"candidate":fstate(candidate),"base":fstate(base),
+            "prev1Candidate":fstate(prev1),"preflight":fstate(preflight),"source":fstate(script)}
+    if before["result"]["exists"] or before["candidate"]["exists"]:
+        out={"ok":True,"version":"OPENAI_PYTHON_SAFE_FIRST_UNFINISHED_EXEC_V1_20261010",
+             "status":"EXISTING_RESULT_OR_CANDIDATE__DUPLICATE_RUN_SUPPRESSED",
+             "firstUnfinished":first,"continuityStatus":status,"recordReconcile":reconcile,
+             "executed":False,"duplicateSuppressed":True,"before":before,
+             "newTaskProjectNodePackTriggerGeminiSession":0}
+        save_json(receipt,out);print(json.dumps(out,ensure_ascii=False));return 0
+
+    expected={
+      "base":"9856626afd8871e0e11b8f95eb4a93d990a5199b0ad2b6db147a5288f150de2d",
+      "prev1":"fc3f5e390080a18503d6039d140e7c6adade54d0a469f78da0c90aeddc761e9d",
+      "preflight":"9cfe266669e6aa7245868f0e2d7328682034e89733ea6e625bccd27b6b17a3b0"
+    }
+    guards={
+      "pythonExists":py.exists(),"sourceExists":script.exists(),"preflightExists":preflight.exists(),
+      "baseHashMatch":before["base"]["sha256"]==expected["base"],
+      "prev1HashMatch":before["prev1Candidate"]["sha256"]==expected["prev1"],
+      "preflightHashMatch":before["preflight"]["sha256"]==expected["preflight"],
+      "continuityActive":status=="ACTIVE_UNFINISHED"
+    }
+    if not all(guards.values()):
+        out={"ok":False,"version":"OPENAI_PYTHON_SAFE_FIRST_UNFINISHED_EXEC_V1_20261010",
+             "status":"FAIL_CLOSED_PREEXEC_GUARD","firstUnfinished":first,"guards":guards,
+             "before":before,"recordReconcile":reconcile,"executed":False,
+             "newTaskProjectNodePackTriggerGeminiSession":0}
+        save_json(receipt,out);print(json.dumps(out,ensure_ascii=False));return 4
+
+    flags=getattr(subprocess,"CREATE_NO_WINDOW",0x08000000)
+    cmd=[str(py),str(script),"--mode","joint-history-distill-train"]
+    started=kst_now()
+    proc=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,
+                          shell=False,creationflags=flags)
+    pid=proc.pid
+    timed_out=False
+    try:
+        stdout,_=proc.communicate(timeout=7200)
+        rc=proc.returncode
+    except subprocess.TimeoutExpired:
+        timed_out=True
+        proc.kill()
+        stdout,_=proc.communicate()
+        rc=124
+    after={"result":fstate(result),"candidate":fstate(candidate),"base":fstate(base),
+           "prev1Candidate":fstate(prev1),"preflight":fstate(preflight),"source":fstate(script)}
+    result_obj=load_state(result) if result.exists() else {}
+    delta={
+      "resultBytes":after["result"]["bytes"]-before["result"]["bytes"],
+      "candidateBytes":after["candidate"]["bytes"]-before["candidate"]["bytes"],
+      "baseShaUnchanged":after["base"]["sha256"]==before["base"]["sha256"],
+      "prev1CandidateShaUnchanged":after["prev1Candidate"]["sha256"]==before["prev1Candidate"]["sha256"]
+    }
+    complete=(rc==0 and after["result"]["exists"] and after["candidate"]["exists"] and
+              delta["baseShaUnchanged"] and delta["prev1CandidateShaUnchanged"])
+    out={
+      "ok":bool(complete),"version":"OPENAI_PYTHON_SAFE_FIRST_UNFINISHED_EXEC_V1_20261010",
+      "status":"COMPLETE" if complete else "ERROR_OR_INCOMPLETE",
+      "firstUnfinished":first,"continuityStatus":status,"recordReconcile":reconcile,
+      "executed":True,"pythonExecutable":str(py),"command":cmd,"childPid":pid,
+      "startedAtKst":started,"completedAtKst":kst_now(),"exitCode":rc,"timedOut":timed_out,
+      "stdoutTail":(stdout or "")[-6000:],"before":before,"after":after,"delta":delta,
+      "resultDecision":result_obj.get("decision",""),
+      "optimizerStepCount":result_obj.get("optimizer_step_count",0),
+      "aggregate":result_obj.get("aggregate",{}),"gates":result_obj.get("gates",{}),
+      "newTaskProjectNodePackTriggerGeminiSession":0
+    }
+    save_json(receipt,out)
+    central=find_central()
+    if central:
+        dp=central/"Runtime_Readback"/"PYTHON"/"OPENAI_PYTHON_FIRST_UNFINISHED_EXEC_LAST.json"
+        save_json(dp,out);out["driveReceiptPath"]=str(dp);save_json(receipt,out)
+    print(json.dumps(out,ensure_ascii=False))
+    return 0 if out["ok"] else 4
+
+
+def execute_first_unfinished(root:Path, continuity_path:Path|None=None):
+    """Generic continuity executor: exact FIRST_UNFINISHED -> manifest-whitelisted project Python route."""
+    cp=continuity_path or (Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json")
+    reconcile=_reconcile_continuity_from_records(cp)
+    central=find_central()
+    route=run_continuity_project_route(root,cp,central)
+    receipt=root/"OPENAI_PYTHON_FIRST_UNFINISHED_EXEC_LAST.json"
+    out={
+        "ok":bool(route.get("ok",False)),
+        "version":"OPENAI_PYTHON_GENERIC_FIRST_UNFINISHED_EXEC_V2_20261010",
+        "workerVersion":VERSION,
+        "firstUnfinished":str(route.get("firstUnfinished","")),
+        "continuityStatus":str(route.get("continuityStatus","")),
+        "recordReconcile":reconcile,
+        "executed":bool(route.get("executed",False)),
+        "status":str(route.get("status","")),
+        "routeId":str(route.get("routeId","")),
+        "projectRoute":route,
+        "newTaskProjectNodePackTriggerGeminiSession":0
+    }
+    save_json(receipt,out)
+    if central:
+        try:
+            dp=central/"Runtime_Readback"/"PYTHON"/"OPENAI_PYTHON_FIRST_UNFINISHED_EXEC_LAST.json"
+            save_json(dp,out);out["driveReceiptPath"]=str(dp);save_json(receipt,out)
+        except Exception as e:
+            out["driveReceiptError"]=str(e);out["ok"]=False;save_json(receipt,out)
+    print(json.dumps(out,ensure_ascii=False))
+    return 0 if out["ok"] else 4
+
 
 def _read_obj(path:Path):
     try:return json.loads(path.read_text(encoding="utf-8-sig"))
@@ -757,6 +1058,39 @@ def run_once(root:Path):
     state_path=root/"python-control-state.json"
     receipt_path=root/"PYTHON_CONTROL_WORKER_LAST.json"
     central=find_central()
+
+    project_route=run_continuity_project_route(root,continuity_path,central)
+    route_status=str(project_route.get("status",""))
+    route_claimed=bool(project_route.get("routeId")) or route_status not in ("NO_ACTIVE_CONTINUITY_ROUTE","NO_REGISTERED_PROJECT_ROUTE")
+    if route_claimed:
+        out={
+            "ok":bool(project_route.get("ok",False)),
+            "version":VERSION,
+            "requestId":"",
+            "enabled":True,
+            "taskId":"CONTINUITY_PROJECT_ROUTE",
+            "action":"CONTINUITY_PROJECT_PYTHON",
+            "executed":bool(project_route.get("executed",False)),
+            "deduped":route_status=="DEDUPED_REQUIRED_OUTPUTS_ALREADY_EXIST",
+            "remoteDcDependency":False,
+            "recordReconcile":record_reconcile,
+            "projectRoute":project_route,
+            "status":"PROJECT_ROUTE_"+route_status,
+            "startedAt":project_route.get("startedAt",project_route.get("time",now())),
+            "completedAt":project_route.get("completedAt",now()),
+            "error":project_route.get("error","")
+        }
+        save_json(receipt_path,out)
+        if central:
+            try:
+                dp=central/"Runtime_Readback"/"PYTHON"/"PYTHON_CONTROL_WORKER_LAST.json"
+                save_json(dp,out);out["driveReceiptPath"]=str(dp);save_json(receipt_path,out)
+            except Exception as e:
+                out["driveReceiptError"]=str(e);out["ok"]=False;save_json(receipt_path,out)
+        write_internal_heartbeat(root,"COMPLETE",{"status":out.get("status",""),"ok":bool(out.get("ok")),"projectRouteId":project_route.get("routeId","")})
+        print(json.dumps(out,ensure_ascii=False))
+        return 0 if out["ok"] else 2
+
     queue_result=None
     try:
         queue_result=claim_drive_queue(central,root)
@@ -804,6 +1138,7 @@ if __name__=="__main__":
     ap.add_argument("--self-test",action="store_true")
     ap.add_argument("--openai-plan",action="store_true")
     ap.add_argument("--cross-validate",action="store_true")
+    ap.add_argument("--execute-first-unfinished",action="store_true")
     ap.add_argument("--continuity",default="")
     a=ap.parse_args()
     root=Path(a.root)
@@ -814,4 +1149,7 @@ if __name__=="__main__":
         raise SystemExit(openai_step_plan(root,cp))
     if a.cross_validate:
         raise SystemExit(openai_cross_validate(root))
+    if a.execute_first_unfinished:
+        cp=Path(a.continuity) if a.continuity else None
+        raise SystemExit(execute_first_unfinished(root,cp))
     raise SystemExit(run_once(root))
