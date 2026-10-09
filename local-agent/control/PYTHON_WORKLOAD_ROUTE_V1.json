@@ -1,0 +1,157 @@
+{
+  "version": "GCS_PROJECT_STORAGE_GOVERNANCE_V1_20261009",
+  "lineage": "DUAL_EYE_MULTI_BRAIN_BRIDGE_V1",
+  "python_workload_route_schema": "CONTINUITY_PROJECT_ROUTE_V1_20261010",
+  "canonical_project_template": {
+    "spreadsheet_id": "1Es5UnIrWTAJo2GIjNA600oY9VGA_z45cz16j7VzmdHg",
+    "title": "LUMI_프로젝트_운영시트_V2",
+    "role": "SOURCE_TEMPLATE_FOR_NEW_PROJECT_COPY_CUSTOMIZE",
+    "required_tabs": [
+      "GCS",
+      "GCS관리"
+    ],
+    "copy_rule": "COPY_FULL_LUMI_PROJECT_STRUCTURE_THEN_REPLACE_PROJECT_ID_NAME_PURPOSE_DATA_CLASS_EXPECTED_GB_REGION_RETENTION_BUDGET_AND_FUTURE_PHASES",
+    "forbidden_inheritance": [
+      "LUMI_IDENTITY_DATA",
+      "BUCKET_NAMES",
+      "RAW_SECRETS",
+      "PAID_APPROVALS",
+      "PROJECT_SPECIFIC_OBJECT_POINTERS"
+    ],
+    "current_tab_count": 124,
+    "workflow_standard_rule": "PWS-051",
+    "template_pack_contract": "TPL_LUMI_FULL_PROJECT_COPY_CUSTOMIZE_V1",
+    "full_new_project_copy_runtime_canary": "PENDING",
+    "central_template_automation": "TPL_LUMI_FULL_PROJECT_COPY_CUSTOMIZE_V1",
+    "central_template_automation_status": "ACTIVE_POLICY_RUNTIME_COPY_CANARY_PENDING",
+    "central_template_automation_row": 52
+  },
+  "central_approval_chain": [
+    "CENTRAL_AGENT_MANAGER",
+    "API_PACK",
+    "ACCOUNTING_PACK",
+    "DRIVE_PACK_GCS_ADAPTER"
+  ],
+  "approval_rules": {
+    "free_first": true,
+    "paid_or_cap_increase_requires_physical_approval": true,
+    "no_silent_billing": true,
+    "alert_threshold_percent": [
+      50,
+      80,
+      90,
+      100
+    ],
+    "block_new_paid_jobs_at_percent": 100,
+    "bucket_creation_requires_explicit_approval": true,
+    "region_storage_class_lifecycle_must_be_read_back_before_write": true
+  },
+  "storage_roles": {
+    "drive": "canonical central records, ebook, final receipts, selective final assets",
+    "gcs": "bounded large/intermediate object storage only after approval",
+    "local_c": "primary working storage",
+    "external_f": "backup only, not realtime"
+  },
+  "object_pass_contract": [
+    "BEFORE local path + sha256 + size",
+    "EXECUTE only after 3-way approval",
+    "AFTER GCS generation + size + crc32c/md5 when available",
+    "DELTA local vs GCS readback",
+    "RECEIPT central + project GCS관리",
+    "receipt-only PASS forbidden"
+  ],
+  "default_state": "ACTIVATION_HOLD",
+  "current_project_readback": {
+    "gcloud_project": "video-template-factory",
+    "bucket_count": 0,
+    "lumi_gcs_write_enable": false
+  },
+  "python_runtime_routes": {
+    "cloud_drive_gcs": {
+      "executable": "C:\\Users\\User\\AppData\\Local\\HomeDesignAutomationV7\\PythonCloud3148\\cloudio-venv\\Scripts\\python.exe",
+      "python": "3.14.8",
+      "google_cloud_storage": "3.16.0",
+      "purpose": "Drive/GCS/Google API object and metadata work"
+    },
+    "general_notebook": {
+      "executable": "C:\\Users\\User\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+      "python": "3.14.3",
+      "purpose": "existing scheduled notebook/general workers; preserve in place"
+    },
+    "lumi_voice_torch": {
+      "executable": "C:\\Users\\User\\Documents\\LUMI_TTS_TEMPLATE\\CosyVoiceRuntime\\venv\\Scripts\\python.exe",
+      "python": "3.10.11",
+      "purpose": "Torch/CosyVoice/Lumi voice; never replace with cloud runtime"
+    }
+  },
+  "continuity_project_routes": [
+    {
+      "route_id": "LUMI_JOINT_PREV1_PREV2_DISTILL_TRAIN_V1",
+      "enabled": true,
+      "lineage": "DUAL_EYE_MULTI_BRAIN_BRIDGE_V1",
+      "first_unfinished": "RUN_JOINT_PREV1_PREV2_DISTILL_TRAIN_AND_DIAGNOSTIC_ONCE_THEN_VERIFY_FROZEN_GATES",
+      "runtime_key": "lumi_voice_torch",
+      "script": "C:\\Users\\User\\HomeDesignAutomationV7\\LumiVoiceRuntime\\oral_x1\\_real_sequence_forward_monotonic_attention_v1.py",
+      "script_sha256": "06576651535c8dfcb6936fd192f2239039622a0b778ff81d5b97c61d9306fb6f",
+      "args": [
+        "--mode",
+        "joint-history-distill-train"
+      ],
+      "timeout_seconds": 7200,
+      "one_shot": true,
+      "required_before_hashes": [
+        {
+          "path": "C:\\Users\\User\\HomeDesignAutomationV7\\LumiVoiceRuntime\\oral_x1\\REAL_SEQUENCE_FORWARD_MONOTONIC_ATTENTION_CANDIDATE_V1.pt",
+          "sha256": "9856626afd8871e0e11b8f95eb4a93d990a5199b0ad2b6db147a5288f150de2d"
+        },
+        {
+          "path": "C:\\Users\\User\\HomeDesignAutomationV7\\LumiVoiceRuntime\\oral_x1\\REAL_SEQUENCE_PREV1_FREE_RUNNING_TEACHER_STUDENT_DISTILLATION_CANDIDATE_V1.pt",
+          "sha256": "fc3f5e390080a18503d6039d140e7c6adade54d0a469f78da0c90aeddc761e9d"
+        },
+        {
+          "path": "C:\\Users\\User\\HomeDesignAutomationV7\\LumiVoiceRuntime\\oral_x1\\REAL_SEQUENCE_PREV2_PLUS_JOINT_HISTORY_TEACHER_STUDENT_PREFLIGHT_V1.json",
+          "sha256": "9cfe266669e6aa7245868f0e2d7328682034e89733ea6e625bccd27b6b17a3b0"
+        }
+      ],
+      "outputs": [
+        {
+          "path": "C:\\Users\\User\\HomeDesignAutomationV7\\LumiVoiceRuntime\\oral_x1\\REAL_SEQUENCE_PREV2_PLUS_JOINT_HISTORY_TEACHER_STUDENT_RESULT_V1.json",
+          "kind": "result_json",
+          "required": true
+        },
+        {
+          "path": "C:\\Users\\User\\HomeDesignAutomationV7\\LumiVoiceRuntime\\oral_x1\\REAL_SEQUENCE_PREV2_PLUS_JOINT_HISTORY_TEACHER_STUDENT_CANDIDATE_V1.pt",
+          "kind": "candidate_checkpoint",
+          "required": true
+        }
+      ],
+      "forbid_existing_outputs_before_run": true,
+      "execution_owner": "NOTEBOOK_PYTHON_API",
+      "remote_dc_role": "READBACK_ONLY"
+    }
+  ],
+  "new_project_bootstrap_order": [
+    "copy Lumi project workbook",
+    "customize project identity/purpose/future phases",
+    "verify GCS and GCS관리 tabs exist exactly once",
+    "set WRITE_ENABLE=false",
+    "register project GCS intent in API registry",
+    "read accounting forecast/cap",
+    "run no-write bucket/region/lifecycle/billing/quota preflight",
+    "enable only inside approved limit",
+    "feed verified lessons back to template automation"
+  ],
+  "new_pack_or_trigger_creation": false,
+  "existing_project_migration": {
+    "status": "PASS_X2",
+    "canonical_project_count": 20,
+    "gcs_tabs_exact_once": true,
+    "gcs_management_tabs_exact_once": true,
+    "write_enable_false_all": true,
+    "activation_hold_all": true,
+    "snapshots_backups_canaries_blind_mutation": false,
+    "source": "00_PROJECT_20_MASTER_STATUS_20260911/CENTRAL_AGENT_MANAGEMENT",
+    "receipt": "RCPT-GCS-20-CANONICAL-MIGRATION-X2-20261009"
+  },
+  "template_promotion_rule": "DO_NOT_PROMOTE_FULL_COPY_RUNTIME_VERIFIED_UNTIL_A_REAL_NEW_PROJECT_COPY_CUSTOMIZE_X1_X2_PASSES"
+}
