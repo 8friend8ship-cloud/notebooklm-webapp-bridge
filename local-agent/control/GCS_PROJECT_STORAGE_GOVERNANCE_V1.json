@@ -16,7 +16,11 @@
       "RAW_SECRETS",
       "PAID_APPROVALS",
       "PROJECT_SPECIFIC_OBJECT_POINTERS"
-    ]
+    ],
+    "current_tab_count": 124,
+    "workflow_standard_rule": "PWS-051",
+    "template_pack_contract": "TPL_LUMI_FULL_PROJECT_COPY_CUSTOMIZE_V1",
+    "full_new_project_copy_runtime_canary": "PENDING"
   },
   "central_approval_chain": [
     "CENTRAL_AGENT_MANAGER",
@@ -87,5 +91,17 @@
     "enable only inside approved limit",
     "feed verified lessons back to template automation"
   ],
-  "new_pack_or_trigger_creation": false
+  "new_pack_or_trigger_creation": false,
+  "existing_project_migration": {
+    "status": "PASS_X2",
+    "canonical_project_count": 20,
+    "gcs_tabs_exact_once": true,
+    "gcs_management_tabs_exact_once": true,
+    "write_enable_false_all": true,
+    "activation_hold_all": true,
+    "snapshots_backups_canaries_blind_mutation": false,
+    "source": "00_PROJECT_20_MASTER_STATUS_20260911/CENTRAL_AGENT_MANAGEMENT",
+    "receipt": "RCPT-GCS-20-CANONICAL-MIGRATION-X2-20261009"
+  },
+  "template_promotion_rule": "DO_NOT_PROMOTE_FULL_COPY_RUNTIME_VERIFIED_UNTIL_A_REAL_NEW_PROJECT_COPY_CUSTOMIZE_X1_X2_PASSES"
 }
