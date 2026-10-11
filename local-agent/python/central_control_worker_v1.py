@@ -1127,6 +1127,143 @@ def run_once(root:Path):
     print(json.dumps(out,ensure_ascii=False))
     return 0 if out["ok"] else 2
 
+def record_existing_openai_progress_event(root:Path,args):
+    """Explicit OpenAI assistant->existing Python worker stage relay; never claim automatic chat capture."""
+    import datetime
+    allowed_stages={"RECEIVED","PREFLIGHT","EXECUTE","SOURCE_READBACK","FINAL","HOLD"}
+    stage=str(args.progress_stage or "RECEIVED")
+    ref=str(args.progress_ref or "")
+    intent=str(args.progress_text or "").strip()
+    if stage not in allowed_stages or not re.fullmatch(r"[A-Za-z0-9_:-]{12,125}",ref) or intent!="진행":
+        print(json.dumps({"ok":False,"status":"HOLD_INVALID_PROGRESS_ROUTE_OR_TEXT","stage":stage},ensure_ascii=False))
+        return 4
+    root_project=Path(os.environ.get("USERPROFILE",str(Path.home())))/"HomeDesignAutomationV7"
+    continuity=root_project/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json"
+    state=load_state(continuity)
+    status=str(state.get("status",""))
+    expected_lineage="DUAL_EYE_MULTI_BRAIN_BRIDGE_V1"
+    if state.get("lineage")!=expected_lineage or status not in {"ACTIVE_UNFINISHED","INTERRUPTED_THINKING","WAIT_REMOTE_DISCONNECT","WAIT_RESOURCE"}:
+        print(json.dumps({"ok":False,"status":"HOLD_CONTINUITY_GATE_NOT_VERIFIED","continuity":status},ensure_ascii=False))
+        return 5
+    ev=root_project/"logs"/"dual_eye_brain_bridge"/"events.jsonl"
+    if not ev.is_file():
+        print(json.dumps({"ok":False,"status":"HOLD_EXISTING_NODE_EVENT_SINK_MISSING"},ensure_ascii=False))
+        return 6
+    evidence_path=Path(args.progress_evidence) if args.progress_evidence else None
+    evidence={}
+    if evidence_path:
+        if not evidence_path.is_file() or not any(str(evidence_path.resolve()).lower().startswith(str(x.resolve()).lower()+os.sep) for x in [root_project,root]):
+            print(json.dumps({"ok":False,"status":"HOLD_UNVERIFIED_EVIDENCE_PATH"},ensure_ascii=False))
+            return 7
+        raw=evidence_path.read_bytes()
+        evidence={"path":str(evidence_path),"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()}
+    if args.progress_detail and (len(args.progress_detail)>640 or any(v in args.progress_detail.lower() for v in ("http://","https://","signature=","api_key","sk-"))):
+        print(json.dumps({"ok":False,"status":"HOLD_PROGRESS_DETAIL_UNSAFE_OR_TOO_LONG"},ensure_ascii=False))
+        return 8
+    if stage in {"SOURCE_READBACK","FINAL"} and not evidence:
+        print(json.dumps({"ok":False,"status":"HOLD_SOURCE_READBACK_REQUIRED_BEFORE_PASS"},ensure_ascii=False))
+        return 8
+    # One event per existing instruction-reference + stage: no new TASK or NODE.
+    existing=[]
+    try:
+        with ev.open("r",encoding="utf-8-sig") as fh:
+            for line in fh:
+                try:
+                    j=json.loads(line)
+                    if j.get("kind")=="OPENAI_PROGRESS_EXISTING_NODE_STAGE" and j.get("instructionRef")==ref and j.get("stage")==stage:
+                        existing.append(j)
+                except (ValueError,TypeError):pass
+    except OSError as e:
+        print(json.dumps({"ok":False,"status":"HOLD_NODELOG_READ_FAILED","errorType":type(e).__name__},ensure_ascii=False))
+        return 9
+    if existing:
+        print(json.dumps({"ok":True,"status":"DEDUPED_EXISTING_STAGE_READBACK","instructionRef":ref,"stage":stage,"existingEvidence":existing[-1].get("evidence",{})},ensure_ascii=False))
+        return 0
+    first=str(state.get("first_unfinished",""))
+    event={
+        "kind":"OPENAI_PROGRESS_EXISTING_NODE_STAGE",
+        "lineage":expected_lineage,
+        "task_id":"EXISTING_LINEAGE",
+        "node_id":"DUAL_EYE_MULTI_BRAIN_BRIDGE",
+        "owner":"OPENAI_PACK->NOTEBOOK_POWERSHELL_PYTHON_PACK",
+        "functionOwner":{"RECEIVED":"OPENAI_PACK","PREFLIGHT":"CENTRAL_AGENT_MANAGER_PACK","EXECUTE":"NOTEBOOK_POWERSHELL_PYTHON_PACK","SOURCE_READBACK":"NOTEBOOK_POWERSHELL_PYTHON_PACK+WATCHDOG_PACK","FINAL":"CENTRAL_AGENT_MANAGER_PACK+EBOOK_PACK","HOLD":"CENTRAL_AGENT_MANAGER_PACK+EBOOK_PACK"}[stage],
+        "functionContract":"PACK_TAB_FUNCTION_ROUTE_CONSISTENCY_V1::OPENAI_PROGRESS_EXISTING_NODE_BRIDGE_20261010",
+        "instructionRef":ref,
+        "intent":"진행",
+        "ingress":"EXPLICIT_ASSISTANT_TOOL_RELAY__NOT_AUTOMATIC_CHAT_CAPTURE",
+        "stage":stage,
+        "status":("HOLD" if stage=="HOLD" else ("WAIT_FOR_NEXT_STAGE" if stage!="FINAL" else "FINAL_SOURCE_RECEIPT_NOT_MODEL_PASS")),
+        "at":datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).isoformat(),
+        "continuityStatus":status,
+        "firstUnfinished":first[:360],
+        "continuitySha256":hashlib.sha256(continuity.read_bytes()).hexdigest(),
+        "evidence":evidence,
+        "detail":str(args.progress_detail or ""),
+        "receiptOnlyPassForbidden":True,
+        "audioGoldClaim":False
+    }
+    with ev.open("a",encoding="utf-8",newline="\n") as fh:
+        fh.write(json.dumps(event,ensure_ascii=False,separators=(",",":"))+"\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    real=[]
+    for line in ev.read_text(encoding="utf-8-sig").splitlines():
+        try:
+            j=json.loads(line)
+            if j.get("kind")==event["kind"] and j.get("instructionRef")==ref and j.get("stage")==stage:
+                real.append(j)
+        except ValueError:pass
+    ok=len(real)==1 and real[0].get("continuitySha256")==event["continuitySha256"]
+    print(json.dumps({"ok":ok,"status":"EXISTING_NODE_EVENT_APPEND_AND_READBACK_PASS" if ok else "HOLD_NODE_EVENT_READBACK_MISMATCH","stage":stage,"instructionRef":ref,"eventCount":len(real),"evidence":evidence,"autoChatCapture":False},ensure_ascii=False))
+    return 0 if ok else 10
+
+def plan_existing_gemini_two_lanes(root:Path,args):
+    """Read-only routing canary: Python is coordinator, Gemini is optional specialist, no execution."""
+    import importlib.util
+    project=Path(os.environ.get("USERPROFILE",str(Path.home())))/"HomeDesignAutomationV7"
+    cfg=project/"Config"/"PACK_TAB_FUNCTION_ROUTE_CONSISTENCY_V1.json"
+    innovation=project/"Config"/"GEMINI_AI_INNOVATION_PACK"/"GEMINI_AI_INNOVATION_PACK_V1.json"
+    state_path=project/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json"
+    if not cfg.is_file() or not innovation.is_file() or not state_path.is_file():
+        print(json.dumps({"ok":False,"status":"HOLD_CANONICAL_SOURCE_MISSING"},ensure_ascii=False))
+        return 4
+    c=load_state(cfg); i=load_state(innovation); s=load_state(state_path)
+    policy=c.get("gemini_two_lane_python_first_route_20261010",{})
+    domain=str(args.gemini_plan_domain or "").strip().lower()
+    routes=policy.get("domain_routes",{})
+    if domain not in routes or c.get("lineage")!="DUAL_EYE_MULTI_BRAIN_BRIDGE_V1" or i.get("lineage")!=c.get("lineage"):
+        print(json.dumps({"ok":False,"status":"HOLD_ROUTE_UNKNOWN_OR_LINEAGE_CONFLICT","knownDomains":sorted(routes)},ensure_ascii=False))
+        return 5
+    selected=routes[domain]
+    installed={}
+    for module in ("numpy","scipy","websocket","google.genai"):
+        try:installed[module]=importlib.util.find_spec(module) is not None
+        except (ImportError,ModuleNotFoundError,ValueError):installed[module]=False
+    evidence={
+      "kind":"EXISTING_GEMINI_TWO_LANE_PYTHON_READ_ONLY_ROUTE",
+      "ok":True,
+      "status":"ROUTE_DESIGN_SOURCE_X1__NO_LIVE_GEMINI_OR_WORKSPACE_ACTION",
+      "lineage":c["lineage"],
+      "domain":domain,
+      "route":selected,
+      "workLane":policy.get("work_lane_alias",""),
+      "innovationLane":policy.get("innovation_lane",""),
+      "pythonOrchestrator":policy.get("python_orchestrator",""),
+      "localPythonModules":installed,
+      "currentContinuityStatus":s.get("status",""),
+      "firstUnfinishedReadback":str(s.get("first_unfinished",""))[:150],
+      "contractSourceBytes":cfg.stat().st_size,
+      "contractSourceSHA256":hashlib.sha256(cfg.read_bytes()).hexdigest(),
+      "innovationSourceSHA256":hashlib.sha256(innovation.read_bytes()).hexdigest(),
+      "actualGeminiModelCalled":False,
+      "actualWorkspaceChanged":False,
+      "actualPaidCall":False,
+      "newSessionCreated":False,
+      "manualAudioGoldCreated":False
+    }
+    print(json.dumps(evidence,ensure_ascii=False))
+    return 0
+
 def self_test():
     assert ALLOWED=={"CANARY_ECHO","PYTHON_RUNTIME_INFO","REMOTE_DC_RECOVER_EXACT","LOCAL_CONSUMER_PERSISTENCE_REPAIR"}
     print(json.dumps({"ok":True,"version":VERSION,"tests":["STRICT_WHITELIST","EXACT_RECOVERY_ONLY","DRIVE_QUEUE_READY_TO_CLAIMED","NO_ARBITRARY_SHELL","ONE_REQUEST_DEDUPE","OPENAI_STEP_PLANNER","NOTEBOOK_BRAIN_HANDOFF_MAX3","KST_CROSS_VALIDATION"]}))
@@ -1140,8 +1277,18 @@ if __name__=="__main__":
     ap.add_argument("--cross-validate",action="store_true")
     ap.add_argument("--execute-first-unfinished",action="store_true")
     ap.add_argument("--continuity",default="")
+    ap.add_argument("--progress-text",default="")
+    ap.add_argument("--progress-ref",default="")
+    ap.add_argument("--progress-stage",default="")
+    ap.add_argument("--progress-evidence",default="")
+    ap.add_argument("--progress-detail",default="")
+    ap.add_argument("--gemini-plan-domain",default="")
     a=ap.parse_args()
     root=Path(a.root)
+    if a.gemini_plan_domain:
+        raise SystemExit(plan_existing_gemini_two_lanes(root,a))
+    if a.progress_stage:
+        raise SystemExit(record_existing_openai_progress_event(root,a))
     if a.self_test:
         raise SystemExit(self_test())
     if a.openai_plan:
