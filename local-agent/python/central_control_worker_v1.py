@@ -12,7 +12,7 @@ import argparse, base64, hashlib, json, os, platform, re, subprocess, time, urll
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-VERSION="PY_CENTRAL_CONTROL_WORKER_V11_NEGATION_GATE_P0_SINGLETON_20261013"
+VERSION="PY_CENTRAL_CONTROL_WORKER_V12_WORD_BOUNDARY_NEGATION_GATE_20261013"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
 QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
@@ -809,11 +809,11 @@ def _reconcile_continuity_from_records(continuity_path:Path):
 
 def _execution_expected(first:str):
     u=str(first or "").upper()
-    # Remove explicit negated execution verbs before checking positive work hints.
-    # Example: "Do not regenerate approved X16" must not be misread as GENERATE work.
-    u=re.sub(r"\b(?:DO\s+NOT|DON['’]?T|NEVER|NO)\s+(?:RE)?(?:TRAIN|RUN|EXECUTE|RENDER|SYNC|GENERATE|BUILD|DEPLOY|DOWNLOAD|UPLOAD|TOKENIZE|PROCESS|INGEST|EXPORT|IMPORT)\w*\b"," ",u)
-    hints=("TRAIN","RUN","EXECUTE","RENDER","SYNC","GENERATE","BUILD","DEPLOY","DOWNLOAD","UPLOAD","TOKENIZE","PROCESS","INGEST","EXPORT","IMPORT")
-    return any(h in u for h in hints)
+    # Remove explicit negated execution verbs first.
+    u=re.sub(r"\b(?:DO\s+NOT|DON['’]?T|NEVER|NO)\s+(?:RE)?(?:TRAIN(?:ING|ED)?|RUN(?:NING)?|EXECUT(?:E|ED|ING)|RENDER(?:ED|ING)?|SYNC(?:ED|ING)?|GENERAT(?:E|ED|ING)|BUILD(?:ING|T)?|DEPLOY(?:ED|ING)?|DOWNLOAD(?:ED|ING)?|UPLOAD(?:ED|ING)?|TOKENIZ(?:E|ED|ING)|PROCESS(?:ED|ING)?|INGEST(?:ED|ING)?|EXPORT(?:ED|ING)?|IMPORT(?:ED|ING)?)\b"," ",u)
+    # Positive execution must be a real verb token, never a substring such as RUN in RUNTIME.
+    verb=r"\b(?:TRAIN(?:ING|ED)?|RUN(?:NING)?|EXECUT(?:E|ED|ING)|RENDER(?:ED|ING)?|SYNC(?:ED|ING)?|GENERAT(?:E|ED|ING)|BUILD(?:ING|T)?|DEPLOY(?:ED|ING)?|DOWNLOAD(?:ED|ING)?|UPLOAD(?:ED|ING)?|TOKENIZ(?:E|ED|ING)|PROCESS(?:ED|ING)?|INGEST(?:ED|ING)?|EXPORT(?:ED|ING)?|IMPORT(?:ED|ING)?)\b"
+    return re.search(verb,u) is not None
 
 def _live_project_processes(project_root:Path):
     ps=os.path.join(os.environ.get("SystemRoot",r"C:\Windows"),"System32","WindowsPowerShell","v1.0","powershell.exe")
