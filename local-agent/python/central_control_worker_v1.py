@@ -12,7 +12,7 @@ import argparse, base64, hashlib, json, os, platform, re, subprocess, time, urll
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-VERSION="PY_CENTRAL_CONTROL_WORKER_V10_SINGLETON_P0_REMOTE_RECOVERY_20261013"
+VERSION="PY_CENTRAL_CONTROL_WORKER_V11_NEGATION_GATE_P0_SINGLETON_20261013"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
 QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
@@ -809,6 +809,9 @@ def _reconcile_continuity_from_records(continuity_path:Path):
 
 def _execution_expected(first:str):
     u=str(first or "").upper()
+    # Remove explicit negated execution verbs before checking positive work hints.
+    # Example: "Do not regenerate approved X16" must not be misread as GENERATE work.
+    u=re.sub(r"\b(?:DO\s+NOT|DON['’]?T|NEVER|NO)\s+(?:RE)?(?:TRAIN|RUN|EXECUTE|RENDER|SYNC|GENERATE|BUILD|DEPLOY|DOWNLOAD|UPLOAD|TOKENIZE|PROCESS|INGEST|EXPORT|IMPORT)\w*\b"," ",u)
     hints=("TRAIN","RUN","EXECUTE","RENDER","SYNC","GENERATE","BUILD","DEPLOY","DOWNLOAD","UPLOAD","TOKENIZE","PROCESS","INGEST","EXPORT","IMPORT")
     return any(h in u for h in hints)
 
