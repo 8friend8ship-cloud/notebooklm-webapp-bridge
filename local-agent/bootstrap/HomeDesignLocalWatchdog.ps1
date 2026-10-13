@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='WATCHDOG_V26_ONEWAY_PIN_CHAIN_20260921'
+$Version='WATCHDOG_V27_P0_RDC_CANONICAL_PYTHON_20261013'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $SupervisorCommit='a329971bdfd4bd9c7f2a84fc36c9ae768091d457'
 $SupervisorBlob='934e37d58c6fa139131054a3ce4db1830e7f49da'
@@ -14,8 +14,8 @@ $Entry=Join-Path $Root 'WATCHDOG_ENTRY_LATEST.json'
 $BootstrapLocal=Join-Path $Root 'AgentBootstrap.ps1'
 $FlowGuardLocal=Join-Path $Root 'FlowDemandGuard.ps1'
 $RemoteDataPlaneGuardLocal=Join-Path $Root 'RemoteDcDataPlaneGuard.ps1'
-$DataPlaneCommit='9c6fe28acd1245fbe7a9b7ba13c856b0ff54e6c0'
-$DataPlaneBlob='d76a6f4f101287ea0651eb139f52fc62ce511660'
+$DataPlaneCommit='843e6e7306c67ede701e01cf84e28154eecee4a6'
+$DataPlaneBlob='0f1d93209dc7a166e49d9d5889ad832ed0d276aa'
 $AuditCommit='c622685d3e13ae987bd9cf19defd60c395de20b3'
 $AuditBlob='a2b85ddbc338c524c5542f7ea58dd240e2bffa9c'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
@@ -120,6 +120,19 @@ function EnsureBootstrapLatest{
 }
 $start=(Get-Date).ToString('o');Save $Entry 'WATCHDOG_ENTRY_LATEST.json' ([ordered]@{ok=$true;action='WATCHDOG_ENTRY_V19_PINNED_SUPERVISOR';version=$Version;pid=$PID;startedAt=$start;normalChromeTouched=$false;oauthChanged=$false;scopeChanged=$false})
 Save (Join-Path $Root 'CENTRAL_INTERNAL_HEARTBEAT.json') 'CENTRAL_INTERNAL_HEARTBEAT.json' ([ordered]@{ok=$true;status='ACTIVE_INTERNAL_ALIVE';timestamp=(Get-Date).ToString('o');displayOffSeconds=1800;sleepTimeoutAc=0;sleepTimeoutDc=0;hibernateTimeoutAc=0;hibernateTimeoutDc=0;source='HomeDesignAutomation-AutoResume';normalChromeTouched=$false})
+# P0: restore RemoteDC data plane before heavy/supervisor work.
+try{
+  $f=FetchPinnedBytes $DataPlaneCommit 'local-agent/bootstrap/RemoteDcDataPlaneGuard.ps1' $DataPlaneBlob 15
+  if($f.ok){
+    $need=(-not(Test-Path $RemoteDataPlaneGuardLocal))
+    if(-not$need){$need=((GitBlobSha1 $RemoteDataPlaneGuardLocal).ToLowerInvariant()-ne([string]$f.sha).ToLowerInvariant())}
+    if($need){[IO.File]::WriteAllBytes(($RemoteDataPlaneGuardLocal+'.download'),[byte[]]$f.bytes);Move-Item ($RemoteDataPlaneGuardLocal+'.download') $RemoteDataPlaneGuardLocal -Force}
+  }
+  if(Test-Path -LiteralPath $RemoteDataPlaneGuardLocal -PathType Leaf){
+    & powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $RemoteDataPlaneGuardLocal | Out-Null
+  }
+}catch{}
+
 try{& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $Root 'HeavyAppRunOwnedWatchdog.ps1')|Out-Null}catch{}
 try{
 $cleanupLocal=Join-Path $Root 'RunOwnedUiCleanup.ps1'
@@ -146,9 +159,17 @@ try{
     if($need){[IO.File]::WriteAllBytes(($pyWorkerLocal+'.download'),[byte[]]$pf.bytes);Move-Item ($pyWorkerLocal+'.download') $pyWorkerLocal -Force}
   }
   if(Test-Path -LiteralPath $pyWorkerLocal -PathType Leaf){
-    $py=(Get-Command python.exe -ErrorAction SilentlyContinue)
-    if(-not$py){$py=Get-Command python -ErrorAction SilentlyContinue}
-    if($py){& $py.Source $pyWorkerLocal | Out-Null}
+    $pyPath=''
+    foreach($candidate in @(
+      'C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\python.exe',
+      'C:\Users\User\AppData\Local\Python\bin\python.exe',
+      'C:\Users\User\AppData\Local\Programs\Python\Python310\python.exe'
+    )){if(Test-Path -LiteralPath $candidate){$pyPath=$candidate;break}}
+    if(-not$pyPath){
+      $cmd=Get-Command python.exe -All -ErrorAction SilentlyContinue | Where-Object {$_.Source -and $_.Source -notlike '*\WindowsApps\*'} | Select-Object -First 1
+      if($cmd){$pyPath=$cmd.Source}
+    }
+    if($pyPath){& $pyPath $pyWorkerLocal | Out-Null}
   }
 }catch{}
 $chatgptAutoOpenDisabled=$true
