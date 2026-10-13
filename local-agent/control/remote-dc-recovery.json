@@ -1,5 +1,5 @@
 {
-  "enabled": true,
+  "enabled": false,
   "requestId": "RDC_OPENAI_PRIORITY_DRIVE_SYNC_20261013_0947KST",
   "target": "BOOK-1HE2THGKRA",
   "reason": "Current RemoteDC list-online but live-connection/ping failure during Google Drive sync; restore existing exact data-plane chain before project work.",
@@ -18,5 +18,7 @@
   ],
   "expiresAt": "2026-10-13T05:00:00Z",
   "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; ONE_ATTEMPT_PER_REQUEST_ID; no reboot; no broad Node kill; no reauth; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
-  "requiredReadback": "R2 Guard receipt + R1 list_devices + ping + real PowerShell command + file RW X2 + central receipt"
+  "requiredReadback": "R2 Guard receipt + R1 list_devices + ping + real PowerShell command + file RW X2 + central receipt",
+  "completedAt": "2026-10-13T01:08:30Z",
+  "completion": "REMOTE_DC_RECOVERED_SINGLE_CHAIN_PING_RW_X2_PASS"
 }
