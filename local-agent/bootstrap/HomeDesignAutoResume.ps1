@@ -2,7 +2,7 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$Version='HOME_DESIGN_AUTO_RESUME_V15_BOUNDED_RDC_SELFHEAL_20260921'
+$Version='HOME_DESIGN_AUTO_RESUME_V16_SINGLE_PYTHON_LANE_20261013'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Log=Join-Path $Root 'auto-resume.log'
 $ResumeLocal=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1'
@@ -12,10 +12,10 @@ $KeepAliveLocal=Join-Path $Root 'DesktopCommanderKeepAlive.ps1'
 $OpenAISyncLocal=Join-Path $Root 'OpenAIWebSyncGuard.ps1'
 $DriveMirrorFixLocal=Join-Path $Root 'DriveMirrorExactDiffFinalize.py'
 $PythonControlLocal=Join-Path $Root 'central_control_worker_v1.py'
-$WatchdogCommit='cc5fd27f5d53344a79a82662fc5cec5029326246'
-$KeepAliveCommit='28d9f8d0ea5a7d48b05335cdf4ed715acf93c35c'
-$KeepAliveBlob='983b9a4ca34edd40627b7b7453412832a40bad69'
-$WatchdogBlob='8bf8038fe4a9fc13c553da4c68c2da40df8ba443'
+$WatchdogCommit='06f3959b43de365776e0bf9ad56b338dc14ca6d4'
+$KeepAliveCommit='178eb2c03fcc1b992d94e03fe0d9873cc9cd9a55'
+$KeepAliveBlob='dd9000c76c76e62c5da982f6fc7ee2ffbd56357c'
+$WatchdogBlob='ab2e1e7225c095e9f9b447aba90a5360a7448537'
 $ResumeCommit='5d4a789fb9744598f1f3c211b1d970a42297f793'
 $ResumeBlob='62f3153a9e746ad1c83ebea294cd1e6c952d90d5'
 New-Item -ItemType Directory -Force -Path $Root|Out-Null
@@ -104,25 +104,36 @@ try{[void](RefreshFile 'local-agent/bootstrap/DriveMirrorExactDiffFinalize.py' $
 try{[void](RefreshFile 'local-agent/python/central_control_worker_v1.py' $PythonControlLocal 'PYTHON_CONTROL')}catch{Log ('PYTHON_CONTROL_REFRESH_FAILED '+$_.Exception.Message)}
 if(Test-Path -LiteralPath $PythonControlLocal){
   try{
-    $pyc=''
-    foreach($candidate in @('C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\python.exe','C:\Users\User\AppData\Local\Programs\Python\Python310\python.exe')){if(Test-Path -LiteralPath $candidate){$pyc=$candidate;break}}
-    if(-not$pyc){$pyc=(Get-Command python.exe -ErrorAction SilentlyContinue).Source}
-    if(-not$pyc){$pyc=(Get-Command python -ErrorAction SilentlyContinue).Source}
-    if($pyc){
-      $psiPy=New-Object Diagnostics.ProcessStartInfo
-      $psiPy.FileName=$pyc
-      $psiPy.UseShellExecute=$false
-      $psiPy.CreateNoWindow=$true
-      $psiPy.RedirectStandardOutput=$true
-      $psiPy.RedirectStandardError=$true
-      $psiPy.Arguments='"'+$PythonControlLocal+'"'
-      $pp=[Diagnostics.Process]::Start($psiPy)
-      $pyOut=$pp.StandardOutput.ReadToEnd()
-      $pyErr=$pp.StandardError.ReadToEnd()
-      $pp.WaitForExit()
-      $pyRc=[int]$pp.ExitCode
-      Log ('PYTHON_CONTROL_EXIT='+$pyRc+' '+(($pyOut+' '+$pyErr).Trim()))
-    }else{Log 'PYTHON_CONTROL_PYTHON_MISSING'}
+    $pcTask=Get-ScheduledTask -TaskName 'HomeDesignAutomation-PythonControl' -ErrorAction SilentlyContinue
+    if($pcTask -and [string]$pcTask.State -ne 'Disabled'){
+      Log 'PYTHON_CONTROL_DELEGATED_TO_EXISTING_SCHEDULED_TASK'
+    }else{
+      $pyc=''
+      foreach($candidate in @('C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\python.exe','C:\Users\User\AppData\Local\Python\bin\python.exe','C:\Users\User\AppData\Local\Programs\Python\Python310\python.exe')){if(Test-Path -LiteralPath $candidate){$pyc=$candidate;break}}
+      if(-not$pyc){
+        $cmd=Get-Command python.exe -All -ErrorAction SilentlyContinue | Where-Object {$_.Source -and $_.Source -notlike '*\WindowsApps\*'} | Select-Object -First 1
+        if($cmd){$pyc=$cmd.Source}
+      }
+      if($pyc){
+        $psiPy=New-Object Diagnostics.ProcessStartInfo
+        $psiPy.FileName=$pyc
+        $psiPy.UseShellExecute=$false
+        $psiPy.CreateNoWindow=$true
+        $psiPy.RedirectStandardOutput=$true
+        $psiPy.RedirectStandardError=$true
+        $psiPy.Arguments='"'+$PythonControlLocal+'"'
+        $pp=[Diagnostics.Process]::Start($psiPy)
+        if(-not$pp.WaitForExit(180000)){
+          try{& taskkill.exe /PID ([int]$pp.Id) /T /F 2>$null|Out-Null}catch{}
+          Log 'PYTHON_CONTROL_FALLBACK_TIMEOUT_180S'
+        }else{
+          $pyOut=$pp.StandardOutput.ReadToEnd()
+          $pyErr=$pp.StandardError.ReadToEnd()
+          $pyRc=[int]$pp.ExitCode
+          Log ('PYTHON_CONTROL_FALLBACK_EXIT='+$pyRc+' '+(($pyOut+' '+$pyErr).Trim()))
+        }
+      }else{Log 'PYTHON_CONTROL_PYTHON_MISSING'}
+    }
   }catch{Log ('PYTHON_CONTROL_EXCEPTION '+$_.Exception.Message)}
 }
 if(Test-Path -LiteralPath $KeepAliveLocal){
