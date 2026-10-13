@@ -1,7 +1,7 @@
 param([switch]$ForceRestart)
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_KEEPALIVE_V13_0251_GUARD_V11_20260921'
+$Version='REMOTE_DC_KEEPALIVE_V14_PID_CONFLICT_FIX_20261013'
 $Package='@wonderwhy-er/desktop-commander@0.2.51'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -24,7 +24,7 @@ function RefreshGuard{try{$u='https://raw.githubusercontent.com/'+$Repo+'/'+$Gua
 function RunGuard{try{if(-not(Test-Path $Guard)){return $null};$raw=& powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $Guard 2>&1|Out-String;try{return $raw|ConvertFrom-Json}catch{$lines=@($raw-split"`r?`n"|Where-Object{$_.Trim().StartsWith('{')});if($lines.Count){return $lines[-1]|ConvertFrom-Json}}}catch{};return $null}
 function AllProc{try{@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)}catch{@()}}
 function RemoteProc([array]$p){@($p|Where-Object{([string]$_.Name)-match'(?i)^node(?:\.exe)?$' -and ([string]$_.CommandLine)-match'(?i)desktop-commander' -and ([string]$_.CommandLine)-match'(?i)(?:^|\s)remote(?:\s|$)'})}
-function StopRoots([array]$ids){$out=@();foreach($id in @($ids|Select-Object -Unique)){try{$pid=[int]$id;if($pid-gt0){& taskkill.exe /PID $pid /T /F 2>$null|Out-Null;if($LASTEXITCODE-eq0){$out+=$pid}}}catch{}};@($out)}
+function StopRoots([array]$ids){$out=@();foreach($id in @($ids|Select-Object -Unique)){try{$procId=[int]$id;if($procId-gt0){& taskkill.exe /PID $procId /T /F 2>$null|Out-Null;if($LASTEXITCODE-eq0){$out+=$procId}}}catch{}};@($out)}
 function WarmCache{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$o=@(& npm.cmd exec --yes --package=$Package -- node -e "console.log('DC_CACHE_READY')" 2>&1);[pscustomobject]@{ok=($LASTEXITCODE-eq0);output=$o-join"`n"}}catch{[pscustomobject]@{ok=$false;output=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
 function StartRemote{$old=$env:npm_config_cache;try{$env:npm_config_cache=$DcCache;$p=Start-Process npx.cmd -ArgumentList @('--yes',$Package,'remote','--persist-session') -WindowStyle Hidden -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru;[pscustomobject]@{ok=$true;pid=[int]$p.Id}}catch{[pscustomobject]@{ok=$false;pid=0;error=$_.Exception.Message}}finally{$env:npm_config_cache=$old}}
 $started=(Get-Date).ToString('o');$guardSha=RefreshGuard;$pre=RunGuard;$actions=@();$errors=@();$restart=$false
