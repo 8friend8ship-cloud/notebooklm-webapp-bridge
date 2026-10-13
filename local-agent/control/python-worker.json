@@ -1,9 +1,11 @@
 {
-  "enabled": true,
+  "enabled": false,
   "requestId": "PY_REMOTE_RECOVERY_OPENAI_PRIORITY_DRIVE_SYNC_20261013_0947KST",
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "action": "REMOTE_DC_RECOVER_EXACT",
   "payload": "Recover current RemoteDC live-connection failure during Google Drive sync; reuse existing allowlisted recovery only; preserve DUAL_EYE_MULTI_BRAIN_BRIDGE_V1 and do not create duplicate task, pack, trigger, node, or Gemini session",
   "policy": "REMOTE_INDEPENDENT; SAFE_WHITELIST_ONLY; ONE_ATTEMPT_PER_REQUEST_ID; NO_ARBITRARY_SHELL; NO_BROWSER; NO_OAUTH; NO_REBOOT; NO_BROAD_PROCESS_KILL",
-  "expectedReceipt": "Runtime_Readback/PYTHON/PYTHON_CONTROL_WORKER_LAST.json"
+  "expectedReceipt": "Runtime_Readback/PYTHON/PYTHON_CONTROL_WORKER_LAST.json",
+  "completedAt": "2026-10-13T01:08:30Z",
+  "completion": "REMOTE_DC_RECOVERED_SINGLE_CHAIN_PING_RW_X2_PASS"
 }
