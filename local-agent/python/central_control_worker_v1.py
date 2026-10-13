@@ -1059,6 +1059,52 @@ def run_once(root:Path):
     receipt_path=root/"PYTHON_CONTROL_WORKER_LAST.json"
     central=find_central()
 
+    # P0 infrastructure recovery must preempt project continuity work.
+    # Reuse the existing allowlisted RemoteDC recovery control; no new task/pack/trigger.
+    try:
+        control_pre,control_sha_pre=fetch_control()
+    except Exception:
+        control_pre,control_sha_pre={}, ""
+    pre_rid=str(control_pre.get("requestId",""))
+    pre_enabled=bool(control_pre.get("enabled",False))
+    pre_action=str(control_pre.get("action","")).upper()
+    pre_state=load_state(root/"python-control-state.json")
+    if pre_enabled and pre_rid and pre_action=="REMOTE_DC_RECOVER_EXACT" and pre_state.get("attemptedRequestId")!=pre_rid:
+        started_pre=now()
+        pre_out={"ok":True,"version":VERSION,"requestId":pre_rid,"enabled":True,
+                 "controlSha":control_sha_pre,"taskId":control_pre.get("taskId"),
+                 "action":pre_action,"executed":False,"deduped":False,
+                 "remoteDcDependency":False,"recordReconcile":record_reconcile,
+                 "status":"P0_REMOTE_DC_RECOVERY_PREEMPT","startedAt":started_pre,
+                 "completedAt":"","error":""}
+        try:
+            pre_out["result"]=execute(control_pre,root)
+            pre_out["executed"]=True
+            pre_out["status"]="P0_REMOTE_DC_RECOVERY_DONE"
+        except Exception as e:
+            pre_out["ok"]=False
+            pre_out["status"]="P0_REMOTE_DC_RECOVERY_ERROR"
+            pre_out["error"]=str(e)
+        finally:
+            save_json(root/"python-control-state.json",
+                      {"attemptedRequestId":pre_rid,"attemptedAt":now(),
+                       "attemptOk":pre_out["ok"],"version":VERSION})
+        pre_out["completedAt"]=now()
+        save_json(root/"PYTHON_CONTROL_WORKER_LAST.json",pre_out)
+        if central:
+            try:
+                dp=central/"Runtime_Readback"/"PYTHON"/"PYTHON_CONTROL_WORKER_LAST.json"
+                save_json(dp,pre_out);pre_out["driveReceiptPath"]=str(dp)
+                save_json(root/"PYTHON_CONTROL_WORKER_LAST.json",pre_out)
+            except Exception as e:
+                pre_out["driveReceiptError"]=str(e)
+        write_internal_heartbeat(root,"COMPLETE",
+                                 {"status":pre_out.get("status",""),
+                                  "ok":bool(pre_out.get("ok")),
+                                  "p0RemoteRecovery":True})
+        print(json.dumps(pre_out,ensure_ascii=False))
+        return 0 if pre_out["ok"] else 2
+
     project_route=run_continuity_project_route(root,continuity_path,central)
     route_status=str(project_route.get("status",""))
     route_claimed=bool(project_route.get("routeId")) or route_status not in ("NO_ACTIVE_CONTINUITY_ROUTE","NO_REGISTERED_PROJECT_ROUTE")
