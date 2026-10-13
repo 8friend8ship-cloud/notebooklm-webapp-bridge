@@ -1,7 +1,7 @@
 param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
-$Version='REMOTE_DC_DATA_PLANE_GUARD_V10_0251_20260921'
+$Version='REMOTE_DC_DATA_PLANE_GUARD_V11_CANONICAL_PYTHON_20261013'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
 $Base=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7'
 $Root=Join-Path $Base 'LocalAgent'
@@ -42,9 +42,18 @@ function RunPythonControlWorker{
     $p=Join-Path $Root 'central_control_worker_v1.py'
     [IO.File]::WriteAllBytes(($p+'.download'),$b);Move-Item ($p+'.download') $p -Force
     $o.fetched=$true
-    $py=(Get-Command python.exe -ErrorAction SilentlyContinue);if(-not$py){$py=Get-Command python -ErrorAction SilentlyContinue}
-    if(-not$py){throw 'PYTHON_NOT_FOUND'}
-    & $py.Source $p | Out-Null
+    $pyPath=''
+    foreach($candidate in @(
+      'C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\python.exe',
+      'C:\Users\User\AppData\Local\Python\bin\python.exe',
+      'C:\Users\User\AppData\Local\Programs\Python\Python310\python.exe'
+    )){if(Test-Path -LiteralPath $candidate){$pyPath=$candidate;break}}
+    if(-not$pyPath){
+      $cmd=Get-Command python.exe -All -ErrorAction SilentlyContinue | Where-Object {$_.Source -and $_.Source -notlike '*\WindowsApps\*'} | Select-Object -First 1
+      if($cmd){$pyPath=$cmd.Source}
+    }
+    if(-not$pyPath){throw 'PYTHON_NOT_FOUND_OR_ONLY_WINDOWSAPP_ALIAS'}
+    & $pyPath $p | Out-Null
     $o.exitCode=$LASTEXITCODE;$o.ran=$true;$o.ok=([int]$o.exitCode-eq0)
   }catch{$o.error=$_.Exception.Message}
   return [pscustomobject]$o
