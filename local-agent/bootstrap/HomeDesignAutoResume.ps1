@@ -2,7 +2,7 @@ param()
 $ErrorActionPreference='Continue'
 $ProgressPreference='SilentlyContinue'
 $Repo='8friend8ship-cloud/notebooklm-webapp-bridge'
-$Version='HOME_DESIGN_AUTO_RESUME_V16_SINGLE_PYTHON_LANE_20261013'
+$Version='HOME_DESIGN_AUTO_RESUME_V17_SINGLE_ACTION_PYTHON_LANE_20261013'
 $Root=Join-Path $env:LOCALAPPDATA 'HomeDesignAutomationV7\LocalAgent'
 $Log=Join-Path $Root 'auto-resume.log'
 $ResumeLocal=Join-Path $Root 'RESUME_LOCAL_AGENT_ONCE.ps1'
@@ -51,7 +51,7 @@ function RepairVisibleScheduledActions{
         if([string]$t.TaskName -eq 'HomeDesignAutomation-PythonControl'){
           $pyw='C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe'
           $script=Join-Path $Root 'central_control_worker_v1.py'
-          if((Test-Path -LiteralPath $pyw) -and (($exec -ne $pyw) -or ($args -notlike ('*'+$script+'*')))){
+          if((Test-Path -LiteralPath $pyw) -and (($exec -ne $pyw) -or ($args -notlike ('*'+$script+'*')) -or (@($t.Actions).Count -ne 1))){
             $newAction=New-ScheduledTaskAction -Execute $pyw -Argument ('"'+$script+'"');$mode='PYTHON_CONTROL_CANONICAL_PYTHONW'
           }
         }elseif($hay -like '*Run-LumiRealDialogueBridgeV1.ps1*'){
