@@ -3,7 +3,7 @@
   "taskId": "TASK_20260919_LOCAL_CONSUMER_PERSISTENCE_REPAIR_001",
   "taskType": "NOTEBOOK_LOCAL_CONSUMER_PERSISTENCE_REPAIR",
   "target": "BOOK-1HE2THGKRA",
-  "status": "READY",
+  "status": "DONE",
   "requestedAt": "2026-09-19T02:27:00Z",
   "requestedBy": "CENTRAL_AGENT",
   "parentTaskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
@@ -14,5 +14,7 @@
     "noNewOAuth": true,
     "noBroadKill": true,
     "exactAllowlistedScriptsOnly": true
-  }
+  },
+  "completedAt": "2026-10-13T01:09:00Z",
+  "completion": "EXISTING_AUTORESUME_TASK_PRESENT_AND_CURRENT_RECOVERY_VERIFIED__STALE_READY_CLOSED"
 }
