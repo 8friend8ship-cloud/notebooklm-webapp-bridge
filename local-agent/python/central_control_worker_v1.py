@@ -12,7 +12,7 @@ import argparse, base64, hashlib, json, os, platform, re, subprocess, time, urll
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-VERSION="PY_CENTRAL_CONTROL_WORKER_V9_P0_REMOTE_RECOVERY_PREEMPT_20261013"
+VERSION="PY_CENTRAL_CONTROL_WORKER_V10_SINGLETON_P0_REMOTE_RECOVERY_20261013"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
 QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
@@ -1050,6 +1050,26 @@ def openai_cross_validate(root:Path):
     print(json.dumps(out,ensure_ascii=False))
     return 0 if out["ok"] else 4
 
+def _acquire_worker_singleton():
+    if os.name!="nt":
+        return "NON_WINDOWS_SINGLETON_NOT_REQUIRED"
+    import ctypes
+    k32=ctypes.windll.kernel32
+    k32.CreateMutexW.restype=ctypes.c_void_p
+    k32.CreateMutexW.argtypes=[ctypes.c_void_p,ctypes.c_bool,ctypes.c_wchar_p]
+    handle=k32.CreateMutexW(None,False,"Local\\HomeDesignAutomationV7.CentralControlWorkerV1")
+    if not handle:
+        raise OSError("CREATE_WORKER_MUTEX_FAILED")
+    if k32.GetLastError()==183:
+        k32.CloseHandle(ctypes.c_void_p(handle))
+        return None
+    return handle
+
+def _release_worker_singleton(handle):
+    if os.name=="nt" and handle and isinstance(handle,int):
+        import ctypes
+        ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(handle))
+
 def run_once(root:Path):
     write_internal_heartbeat(root,"START")
     continuity_path=Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json"
@@ -1344,4 +1364,11 @@ if __name__=="__main__":
     if a.execute_first_unfinished:
         cp=Path(a.continuity) if a.continuity else None
         raise SystemExit(execute_first_unfinished(root,cp))
-    raise SystemExit(run_once(root))
+    _worker_mutex=_acquire_worker_singleton()
+    if _worker_mutex is None:
+        print(json.dumps({"ok":True,"version":VERSION,"status":"WAIT_EXISTING_WORKER_NOT_ERROR","duplicateSuppressed":True},ensure_ascii=False))
+        raise SystemExit(0)
+    try:
+        raise SystemExit(run_once(root))
+    finally:
+        _release_worker_singleton(_worker_mutex)
