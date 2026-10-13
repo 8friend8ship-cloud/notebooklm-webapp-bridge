@@ -152,22 +152,21 @@ def claim_drive_queue(central:Path|None, root:Path):
     return done
 
 def exact_recovery(root:Path):
-    candidates=[
-        root/"RemoteDcDataPlaneGuard.ps1",
-        root/"DesktopCommanderKeepAlive.ps1",
-    ]
-    script=next((p for p in candidates if p.exists()),None)
-    if not script: raise RuntimeError("EXACT_RECOVERY_SCRIPT_MISSING")
+    # Use the existing KeepAlive preflight/restart lane directly.
+    # Do not call RemoteDcDataPlaneGuard here because that guard itself invokes
+    # the Python control worker, which can recurse on a fresh recovery request.
+    script=root/"DesktopCommanderKeepAlive.ps1"
+    if not script.exists(): raise RuntimeError("EXACT_KEEPALIVE_SCRIPT_MISSING")
     ps=os.path.join(os.environ.get("SystemRoot",r"C:\Windows"),"System32","WindowsPowerShell","v1.0","powershell.exe")
     if not os.path.exists(ps): ps="powershell.exe"
     flags=getattr(subprocess,"CREATE_NO_WINDOW",0x08000000)
-    cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-WindowStyle","Hidden","-ExecutionPolicy","Bypass","-File",str(script)],
+    cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-WindowStyle","Hidden","-ExecutionPolicy","Bypass","-File",str(script),"-ForceRestart"],
                       stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=300,check=False,shell=False,creationflags=flags)
     tail=(cp.stdout or "")[-4000:]
-    if cp.returncode not in (0,4):
+    if cp.returncode not in (0,4,5):
         raise RuntimeError(f"RECOVERY_SCRIPT_EXIT_{cp.returncode}:{tail}")
-    return {"script":str(script),"exitCode":cp.returncode,"outputTail":tail,
-            "meaning":"0=local recovery healthy;4=attempt made but cloud verification still required"}
+    return {"script":str(script),"forceRestart":True,"exitCode":cp.returncode,"outputTail":tail,
+            "meaning":"0=local transport healthy after safe preflight/restart;4=local recovery incomplete;5=human verification gate"}
 
 def execute(c,root:Path):
     action=str(c.get("action","")).upper()
