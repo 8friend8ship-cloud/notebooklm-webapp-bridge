@@ -12,7 +12,7 @@ import argparse, base64, hashlib, json, os, platform, re, subprocess, time, urll
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-VERSION="PY_CENTRAL_CONTROL_WORKER_V8_CONTINUITY_PROJECT_ROUTE_20261010"
+VERSION="PY_CENTRAL_CONTROL_WORKER_V9_P0_REMOTE_RECOVERY_PREEMPT_20261013"
 REPO="8friend8ship-cloud/notebooklm-webapp-bridge"
 CONTROL_PATH="local-agent/control/python-worker.json"
 QUEUE_CONTROL_PATH="local-agent/control/notebook-local-queue.json"
