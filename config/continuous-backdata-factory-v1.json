@@ -1,0 +1,15 @@
+{
+  "version": "FRONT_REQUIREMENT_REVERSE_FACTORY_V1_20260823",
+  "appIds": ["APP_NLM_BRIDGE"],
+  "controlTargetId": "FPC_MEDIA_20260823",
+  "cycleMinutes": 10,
+  "dailyTargets": {"queens": 400, "seed": 100, "t1": 50, "t2": 25, "assets": 120},
+  "apiAbWindowsKst": [9, 13, 17, 21],
+  "reverseRequirement": ["source", "audio", "timeline", "frame", "subtitle", "exportFormat", "platform", "persona", "locale"],
+  "pipeline": ["FRONT_REQUIREMENT_REVERSE", "QUEENS_MEDIA_INPUT", "SEED_TIMELINE_FRAME_AUDIO", "T1_EDIT_PACKAGE", "T2_PLATFORM_DELTA", "EXPORT_READBACK", "PLATFORM_POINTER", "CENTRAL_REINGEST"],
+  "qualityGate": {"deterministicEditFields": 1.0, "exportReadbackCount": 2, "assetLineageRights": 1.0},
+  "apiPromotionRule": {"apiIsExceptionForUnrepresentableSceneOnly": true, "qualityGainPoints": 8, "coverageGain": 0.15, "winningResultBecomesAssetSeed": true},
+  "storage": {"editPackage": "COMPACT_JSON", "heavyMedia": "DRIVE_OR_APPROVED_PLATFORM_POINTER", "timeline": "VERSIONED_METADATA"},
+  "physicalTriggerPolicy": "REUSE_EXISTING_NOTEBOOKLM_MEDIA_FACTORY_WAKE_NO_DUPLICATE",
+  "approvalBoundary": ["NEW_OAUTH", "NEW_PAID_MEDIA_API", "PUBLIC_PRODUCTION_OR_PUBLISH", "PAYMENT", "DESTRUCTIVE_DELETE"]
+}
