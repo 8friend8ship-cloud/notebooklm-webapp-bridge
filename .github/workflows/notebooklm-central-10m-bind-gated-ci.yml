@@ -1,0 +1,44 @@
+name: NotebookLM Central 10m Bind Gated CI
+
+on:
+  push:
+    branches:
+      - fix/notebooklm-central-10m-bind-20260831
+    paths:
+      - 'apps-script/DriveAutoClassifySeedWriteback10m.gs'
+      - 'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/BindNotebookLMCentral10m.ps1'
+      - 'tests/drive-auto-classify-10m.test.mjs'
+      - 'tests/notebooklm-central-10m-bind-gated.test.ps1'
+      - '.github/workflows/notebooklm-central-10m-bind-gated-ci.yml'
+  pull_request:
+    paths:
+      - 'apps-script/DriveAutoClassifySeedWriteback10m.gs'
+      - 'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/BindNotebookLMCentral10m.ps1'
+      - 'tests/drive-auto-classify-10m.test.mjs'
+      - 'tests/notebooklm-central-10m-bind-gated.test.ps1'
+      - '.github/workflows/notebooklm-central-10m-bind-gated-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Drive 10m logical contract x2
+        shell: pwsh
+        run: |
+          node tests/drive-auto-classify-10m.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tests/drive-auto-classify-10m.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Receipt-gated bind contract x2
+        shell: pwsh
+        run: |
+          ./tests/notebooklm-central-10m-bind-gated.test.ps1
+          ./tests/notebooklm-central-10m-bind-gated.test.ps1
