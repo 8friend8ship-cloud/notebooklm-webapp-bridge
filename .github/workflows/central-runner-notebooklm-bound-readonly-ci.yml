@@ -1,0 +1,22 @@
+name: Central Runner NotebookLM Bound Readonly CI
+
+on:
+  pull_request:
+    paths:
+      - 'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/RecoverExistingBoundAppsScript.ps1'
+      - 'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/CentralAppsScriptRunnerV2.ps1'
+      - 'notebooklm-webapp-bridge-source-v0.2.0/scripts/windows/central-runner/tasks.json'
+      - 'tests/central-runner-notebooklm-bound-readonly.test.ps1'
+      - '.github/workflows/central-runner-notebooklm-bound-readonly-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate read-only recovery twice
+        shell: pwsh
+        run: |
+          ./tests/central-runner-notebooklm-bound-readonly.test.ps1
+          ./tests/central-runner-notebooklm-bound-readonly.test.ps1
