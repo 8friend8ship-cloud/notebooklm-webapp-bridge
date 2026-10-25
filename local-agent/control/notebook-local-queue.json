@@ -3,8 +3,8 @@
   "taskId": "TASK_20260919_LOCAL_CONSUMER_PERSISTENCE_REPAIR_001",
   "taskType": "NOTEBOOK_LOCAL_CONSUMER_PERSISTENCE_REPAIR",
   "target": "BOOK-1HE2THGKRA",
-  "status": "DONE",
-  "requestedAt": "2026-09-19T02:27:00Z",
+  "status": "READY",
+  "requestedAt": "2026-10-25T01:00:00Z",
   "requestedBy": "CENTRAL_AGENT",
   "parentTaskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "action": "INSTALL_AUTO_RESUME_TASK_THEN_RECOVERY_COORDINATOR_V4",
@@ -15,6 +15,7 @@
     "noBroadKill": true,
     "exactAllowlistedScriptsOnly": true
   },
-  "completedAt": "2026-10-13T01:09:00Z",
-  "completion": "EXISTING_AUTORESUME_TASK_PRESENT_AND_CURRENT_RECOVERY_VERIFIED__STALE_READY_CLOSED"
+  "recoveryRequestId": "RDC_CAP010_REAL_X2_20260919_0958KST",
+  "reason": "2026-10-25 local consumer/RemoteDC chain stopped after notebook heartbeat; reuse existing persistence repair task and existing CAP010 X2 only.",
+  "completionGate": "AUTORESUME/PYTHONCONTROL persistence + RemoteDC online + real PowerShell + file RW X2"
 }
