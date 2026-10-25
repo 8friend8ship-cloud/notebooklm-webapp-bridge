@@ -16,7 +16,7 @@
     "R2_NOTEBOOK_LOCAL_REMOTE",
     "R1_REMOTE_DC"
   ],
-  "expiresAt": "2026-10-25T03:00:00Z",
+  "expiresAt": "2026-10-26T00:00:00Z",
   "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; ONE_ATTEMPT_PER_REQUEST_ID; no reboot; no broad Node kill; no reauth; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "requiredReadback": "R2 Guard receipt + R1 list_devices + real PowerShell command + file RW X2 + central receipt"
 }
