@@ -1,8 +1,8 @@
 {
-  "enabled": false,
-  "requestId": "RDC_OPENAI_PRIORITY_DRIVE_SYNC_20261013_0947KST",
+  "enabled": true,
+  "requestId": "RDC_CAP010_REAL_X2_20260919_0958KST",
   "target": "BOOK-1HE2THGKRA",
-  "reason": "Current RemoteDC list-online but live-connection/ping failure during Google Drive sync; restore existing exact data-plane chain before project work.",
+  "reason": "2026-10-25 current incident: RemoteDC data-plane timed out on read_file/list_processes and device is offline. Reuse existing CAP010 X2 failover proof and restore the exact single RemoteDC chain before project work.",
   "package": "@wonderwhy-er/desktop-commander@0.2.51",
   "action": "FORCE_REMOTE_RESTART_ONCE",
   "preferredConsumers": [
@@ -16,9 +16,7 @@
     "R2_NOTEBOOK_LOCAL_REMOTE",
     "R1_REMOTE_DC"
   ],
-  "expiresAt": "2026-10-13T05:00:00Z",
+  "expiresAt": "2026-10-25T03:00:00Z",
   "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; ONE_ATTEMPT_PER_REQUEST_ID; no reboot; no broad Node kill; no reauth; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
-  "requiredReadback": "R2 Guard receipt + R1 list_devices + ping + real PowerShell command + file RW X2 + central receipt",
-  "completedAt": "2026-10-13T01:08:30Z",
-  "completion": "REMOTE_DC_RECOVERED_SINGLE_CHAIN_PING_RW_X2_PASS"
+  "requiredReadback": "R2 Guard receipt + R1 list_devices + real PowerShell command + file RW X2 + central receipt"
 }
