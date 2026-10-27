@@ -1,10 +1,10 @@
 {
   "enabled": true,
-  "requestId": "RDC_CAP010_REAL_X2_20260919_0958KST",
+  "requestId": "RDC_R3_RECHECK_20261027_0915KST",
   "target": "BOOK-1HE2THGKRA",
-  "reason": "2026-10-25 current incident: RemoteDC data-plane timed out on read_file/list_processes and device is offline. Reuse existing CAP010 X2 failover proof and restore the exact single RemoteDC chain before project work.",
-  "package": "@wonderwhy-er/desktop-commander@0.2.51",
-  "action": "FORCE_REMOTE_RESTART_ONCE",
+  "reason": "Existing lineage R3 recovery control refresh; require live verification before restart. Preserve approved version and avoid duplicate execution.",
+  "package": "@wonderwhy-er/desktop-commander@0.2.48",
+  "action": "VERIFY_THEN_RECOVER_IF_UNHEALTHY",
   "preferredConsumers": [
     "NOTEBOOK_PACK",
     "NOTEBOOK_POWERSHELL_PYTHON_PACK",
@@ -16,7 +16,7 @@
     "R2_NOTEBOOK_LOCAL_REMOTE",
     "R1_REMOTE_DC"
   ],
-  "expiresAt": "2026-10-26T00:00:00Z",
+  "expiresAt": "2026-10-27T03:00:00Z",
   "policy": "ONE_SHOT_EXACT_PROCESS_RECOVERY; ONE_ATTEMPT_PER_REQUEST_ID; no reboot; no broad Node kill; no reauth; preserve TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "requiredReadback": "R2 Guard receipt + R1 list_devices + real PowerShell command + file RW X2 + central receipt"
 }
