@@ -1,9 +1,9 @@
 {
-  "enabled": false,
-  "requestId": "RDC_CAP010_REAL_X2_20260919_0958KST",
+  "enabled": true,
+  "requestId": "RDC_R3_EXACT_RECOVERY_20261027_0915KST",
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "action": "REMOTE_DC_RECOVER_EXACT",
-  "payload": "2026-10-25 current RemoteDC recovery is delegated to RemoteDcDataPlaneGuard to avoid duplicate restart. PythonControl remains responsible for the existing notebook-local persistence repair queue only.",
+  "payload": "Activate existing approved exact RemoteDC recovery lane for current lineage. No new OAuth, no reboot, no broad process kill, no arbitrary shell.",
   "policy": "REMOTE_INDEPENDENT; SAFE_WHITELIST_ONLY; ONE_ATTEMPT_PER_REQUEST_ID; NO_ARBITRARY_SHELL; NO_BROWSER; NO_OAUTH; NO_REBOOT; NO_BROAD_PROCESS_KILL",
   "expectedReceipt": "Runtime_Readback/PYTHON/PYTHON_CONTROL_WORKER_LAST.json",
   "deferredTo": "RemoteDcDataPlaneGuard",
