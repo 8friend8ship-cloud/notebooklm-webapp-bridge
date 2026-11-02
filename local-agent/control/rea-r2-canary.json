@@ -1,11 +1,11 @@
 {
   "schema": "REA_R2_CANARY_V1",
-  "enabled": true,
+  "enabled": false,
   "target": "BOOK-1HE2THGKRA",
   "action": "R2_CANARY_ECHO",
   "requestId": "REA_R2_X2_20261102_V2K9BB",
   "nonce": "R2SECONDNONCE2026AAA",
   "expiresAt": "2026-11-02T16:35:01.190Z",
-  "policy": "ONE_SHOT_PING_ONLY;NO_REMOTE_SHELL;NO_PROJECT_MUTATION;NO_NEW_TRIGGER",
+  "policy": "X1_X2_VERIFIED;FIXED_PING_DISABLED;NO_REMOTE_SHELL;NO_PROJECT_MUTATION;NO_NEW_TRIGGER",
   "lineage": "DUAL_EYE_MULTI_BRAIN_BRIDGE_V1"
 }
