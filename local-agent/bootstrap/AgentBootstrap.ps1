@@ -63,6 +63,21 @@ try{
     ApplyIndependentLane 'local-agent/stable/appscript.json' 'APPSCRIPT' $AppScriptAgentFile $AppScriptLaneStateFile
     ApplyIndependentLane 'local-agent/stable/flow.json' 'FLOW' $FlowAgentFile $FlowLaneStateFile
     ApplyIndependentLane 'local-agent/stable/image.json' 'IMAGE' $ImageAgentFile $ImageLaneStateFile
-    if($Loop){Start-Sleep -Seconds $pollSeconds}
+    if($Loop){
+      # REA/R2 passive fixed-canary ingress: reuses this EXISTING 5-minute bootstrap loop.
+      # Only a strict ping/nonce; no arbitrary command, no new task or timer.
+      try{
+        $reaScript=Join-Path $env:USERPROFILE 'HomeDesignAutomationV7\CentralRemotePack\RDC_R2_GitHub_Canary_V1.py'
+        $reaPython=Join-Path $env:LOCALAPPDATA 'Python\pythoncore-3.14-64\python.exe'
+        if((Test-Path -LiteralPath $reaScript) -and (Test-Path -LiteralPath $reaPython)){
+          $reaRaw=& $reaPython -B $reaScript --once 2>$null | Out-String
+          try{
+            $reaStatus=[string](($reaRaw|ConvertFrom-Json).status)
+            if($reaStatus -eq 'R2_FIXED_CANARY_PASS'){BLog 'REA_R2_CANARY_PASS_RECEIPT_WRITTEN'}
+          }catch{BLog 'REA_R2_CANARY_OUTPUT_INVALID'}
+        }
+      }catch{BLog 'REA_R2_CANARY_READONLY_EXCEPTION'}
+      Start-Sleep -Seconds $pollSeconds
+    }
   }while($Loop)
 }finally{try{$mutex.ReleaseMutex()}catch{};$mutex.Dispose()}
