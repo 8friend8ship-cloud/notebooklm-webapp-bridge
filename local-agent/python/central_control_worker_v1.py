@@ -1074,6 +1074,19 @@ def _release_worker_singleton(handle):
         ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(handle))
 
 def run_once(root:Path):
+    # R2 existing-worker passive REA learning. Read only vendor history;
+    # never block remote recovery or create tasks, triggers, or sessions.
+    try:
+        import importlib.util as _rea_importlib
+        _rea_script=Path.home()/"HomeDesignAutomationV7"/"CentralRemotePack"/"RDC_REA_LearningLoop_V1.py"
+        if _rea_script.is_file():
+            _rea_spec=_rea_importlib.spec_from_file_location("rdc_rea_learning_existing",str(_rea_script))
+            if _rea_spec is not None and _rea_spec.loader is not None:
+                _rea_module=_rea_importlib.module_from_spec(_rea_spec)
+                _rea_spec.loader.exec_module(_rea_module)
+                _rea_module.ingest()
+    except Exception:
+        pass  # Observability cannot block the canonical worker.
     write_internal_heartbeat(root,"START")
     continuity_path=Path(os.environ.get("USERPROFILE","."))/"HomeDesignAutomationV7"/"CentralRemotePack"/"OPENAI_CHAT_CONTINUITY_STATE_V1.json"
     record_reconcile=_reconcile_continuity_from_records(continuity_path)
