@@ -3,9 +3,9 @@
   "enabled": true,
   "target": "BOOK-1HE2THGKRA",
   "action": "R2_CANARY_ECHO",
-  "requestId": "REA_R2_X1_20261102_V1K9AA",
-  "nonce": "R2CLOUDPASSNVA2026",
-  "expiresAt": "2026-11-02T16:24:26.714Z",
+  "requestId": "REA_R2_X2_20261102_V2K9BB",
+  "nonce": "R2SECONDNONCE2026AAA",
+  "expiresAt": "2026-11-02T16:35:01.190Z",
   "policy": "ONE_SHOT_PING_ONLY;NO_REMOTE_SHELL;NO_PROJECT_MUTATION;NO_NEW_TRIGGER",
   "lineage": "DUAL_EYE_MULTI_BRAIN_BRIDGE_V1"
 }
