@@ -88,9 +88,20 @@ try{
   if((Test-Path -LiteralPath $morningPending) -and (Test-Path -LiteralPath $morningScript)){
     $sid=(Get-Process -Id $PID).SessionId
     if($sid -gt 0){
-      $morningRaw=& powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $morningScript -InteractiveResume 2>&1|Out-String
-      $morningRc=$LASTEXITCODE
-      Log ('MORNING_INTERACTIVE_RESUME_EXIT='+$morningRc+' '+$morningRaw.Trim())
+      # Run morning UI resume with a bound shorter than the scheduled task's 10-minute limit.
+      # Do not kill the process tree: Google Drive and Chrome may be healthy child processes.
+      $morningExe=Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+      $morningProc=Start-Process -FilePath $morningExe -ArgumentList @(
+        '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass',
+        '-File',('"' + $morningScript + '"'),'-InteractiveResume'
+      ) -WindowStyle Hidden -PassThru
+      if($morningProc.WaitForExit(240000)){
+        Log ('MORNING_INTERACTIVE_RESUME_EXIT='+$morningProc.ExitCode+' pid='+$morningProc.Id)
+      }else{
+        Log ('MORNING_INTERACTIVE_RESUME_TIMEOUT_240S pid='+$morningProc.Id+' downstream=HOLD')
+        try{$morningProc.Kill()}catch{Log ('MORNING_INTERACTIVE_RESUME_STOP_FAILED '+$_.Exception.Message)}
+        exit 3 # Fail closed: no downstream bootstrap while the morning gate is unresolved.
+      }
     }
   }
 }catch{Log ('MORNING_INTERACTIVE_RESUME_EXCEPTION '+$_.Exception.Message)}
