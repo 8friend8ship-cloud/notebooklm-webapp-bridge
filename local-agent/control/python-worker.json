@@ -1,11 +1,11 @@
 {
   "enabled": true,
-  "requestId": "RDC_R3_EXACT_RECOVERY_20261027_0915KST",
+  "requestId": "RDC_R001_SAFE_PREFLIGHT_RECOVERY_20261118_X1",
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "action": "REMOTE_DC_RECOVER_EXACT",
-  "payload": "Activate existing approved exact RemoteDC recovery lane for current lineage. No new OAuth, no reboot, no broad process kill, no arbitrary shell.",
-  "policy": "REMOTE_INDEPENDENT; SAFE_WHITELIST_ONLY; ONE_ATTEMPT_PER_REQUEST_ID; NO_ARBITRARY_SHELL; NO_BROWSER; NO_OAUTH; NO_REBOOT; NO_BROAD_PROCESS_KILL",
+  "payload": "Recover existing RemoteDC only if the preflight guard allows it. 2026-11-18 09:03 KST: no remote process and HOLD_INSTALL_CHANGE_WINDOW (RECENT_INSTALLER_PROCESS); laptop heartbeat remained live. If installer guard still active, defer same one-shot request until guard clears. No reboot/OAuth/new task/trigger/broad kill/version change.",
+  "policy": "REMOTE_INDEPENDENT; SAFE_WHITELIST_ONLY; ONE_EXISTING_TASK; ONE_APPROVED_PROCESS_CHAIN; NO_FORCE_RESTART_OVERRIDE; INSTALL_CHANGE_HOLD_RETRY; NO_ARBITRARY_SHELL; NO_BROWSER; NO_OAUTH; NO_REBOOT; NO_BROAD_PROCESS_KILL",
   "expectedReceipt": "Runtime_Readback/PYTHON/PYTHON_CONTROL_WORKER_LAST.json",
-  "deferredTo": "RemoteDcDataPlaneGuard",
+  "deferredTo": "DesktopCommanderKeepAlive",
   "persistenceQueueTaskId": "TASK_20260919_LOCAL_CONSUMER_PERSISTENCE_REPAIR_001"
 }
