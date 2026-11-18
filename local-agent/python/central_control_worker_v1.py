@@ -160,16 +160,16 @@ def exact_recovery(root:Path):
     ps=os.path.join(os.environ.get("SystemRoot",r"C:\Windows"),"System32","WindowsPowerShell","v1.0","powershell.exe")
     if not os.path.exists(ps): ps="powershell.exe"
     flags=getattr(subprocess,"CREATE_NO_WINDOW",0x08000000)
-    cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-WindowStyle","Hidden","-ExecutionPolicy","Bypass","-File",str(script),"-ForceRestart"],
+    cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-WindowStyle","Hidden","-ExecutionPolicy","Bypass","-File",str(script)],
                       stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=300,check=False,shell=False,creationflags=flags)
     tail=(cp.stdout or "")[-4000:]
     # An installer hold is not a successful restart and must stay retryable.
     if cp.returncode==4 and "HOLD_INSTALL_CHANGE_WINDOW" in tail:
-        return {"script":str(script),"forceRestart":True,"exitCode":4,"outputTail":tail,
+        return {"script":str(script),"forceRestart":False,"exitCode":4,"outputTail":tail,
                 "deferred":True,"meaning":"Installer guard active; no remote restart attempted"}
     if cp.returncode!=0:
         raise RuntimeError(f"RECOVERY_SCRIPT_EXIT_{cp.returncode}:{tail}")
-    return {"script":str(script),"forceRestart":True,"exitCode":0,"outputTail":tail,
+    return {"script":str(script),"forceRestart":False,"exitCode":0,"outputTail":tail,
             "deferred":False,"meaning":"Local preflight and transport recovered; cloud data-plane X2 still required"}
 
 def execute(c,root:Path):
