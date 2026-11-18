@@ -163,10 +163,14 @@ def exact_recovery(root:Path):
     cp=subprocess.run([ps,"-NoProfile","-NonInteractive","-WindowStyle","Hidden","-ExecutionPolicy","Bypass","-File",str(script),"-ForceRestart"],
                       stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=300,check=False,shell=False,creationflags=flags)
     tail=(cp.stdout or "")[-4000:]
-    if cp.returncode not in (0,4,5):
+    # An installer hold is not a successful restart and must stay retryable.
+    if cp.returncode==4 and "HOLD_INSTALL_CHANGE_WINDOW" in tail:
+        return {"script":str(script),"forceRestart":True,"exitCode":4,"outputTail":tail,
+                "deferred":True,"meaning":"Installer guard active; no remote restart attempted"}
+    if cp.returncode!=0:
         raise RuntimeError(f"RECOVERY_SCRIPT_EXIT_{cp.returncode}:{tail}")
-    return {"script":str(script),"forceRestart":True,"exitCode":cp.returncode,"outputTail":tail,
-            "meaning":"0=local transport healthy after safe preflight/restart;4=local recovery incomplete;5=human verification gate"}
+    return {"script":str(script),"forceRestart":True,"exitCode":0,"outputTail":tail,
+            "deferred":False,"meaning":"Local preflight and transport recovered; cloud data-plane X2 still required"}
 
 def execute(c,root:Path):
     action=str(c.get("action","")).upper()
@@ -1114,16 +1118,25 @@ def run_once(root:Path):
                  "completedAt":"","error":""}
         try:
             pre_out["result"]=execute(control_pre,root)
-            pre_out["executed"]=True
-            pre_out["status"]="P0_REMOTE_DC_RECOVERY_DONE"
+            if pre_out["result"].get("deferred",False):
+                pre_out["ok"]=False
+                pre_out["executed"]=False
+                pre_out["status"]="P0_REMOTE_DC_RECOVERY_DEFERRED_INSTALL_CHANGE"
+                pre_out["error"]="INSTALL_CHANGE_WINDOW_ACTIVE_RETRY_AFTER_GUARD_CLEAR"
+            else:
+                pre_out["executed"]=True
+                pre_out["status"]="P0_REMOTE_DC_RECOVERY_DONE"
         except Exception as e:
             pre_out["ok"]=False
             pre_out["status"]="P0_REMOTE_DC_RECOVERY_ERROR"
             pre_out["error"]=str(e)
         finally:
-            save_json(root/"python-control-state.json",
-                      {"attemptedRequestId":pre_rid,"attemptedAt":now(),
-                       "attemptOk":pre_out["ok"],"version":VERSION})
+            # Keep the same request pending only for the install-change hold.
+            # Every other outcome consumes this one-shot request.
+            if pre_out["status"]!="P0_REMOTE_DC_RECOVERY_DEFERRED_INSTALL_CHANGE":
+                save_json(root/"python-control-state.json",
+                          {"attemptedRequestId":pre_rid,"attemptedAt":now(),
+                           "attemptOk":pre_out["ok"],"version":VERSION})
         pre_out["completedAt"]=now()
         save_json(root/"PYTHON_CONTROL_WORKER_LAST.json",pre_out)
         if central:
