@@ -1,6 +1,6 @@
 param()
 $ErrorActionPreference='Continue'
-$o=[ordered]@{active=$false;reason='';latestMsiId=0;latestMsiTime='';installerProcessCount=0}
+$o=[ordered]@{active=$false;reason='';latestMsiId=0;latestMsiTime='';installerProcessCount=0;installerProcessNames=@();installerProcessPids=@()}
 try{
   $ev=Get-WinEvent -FilterHashtable @{LogName='Application';ProviderName='MsiInstaller';Id=1040,1042;StartTime=(Get-Date).AddHours(-3)} -ErrorAction SilentlyContinue | Sort-Object TimeCreated -Descending | Select-Object -First 1
   if($ev){
@@ -12,6 +12,8 @@ try{
 try{
   $p=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {([string]$_.Name -match '^(winget|setup|installer)\.exe$') -and $_.CreationDate -and ((Get-Date)-([datetime]$_.CreationDate)).TotalMinutes -lt 30})
   $o.installerProcessCount=$p.Count
+  $o.installerProcessNames=@($p|ForEach-Object{[string]$_.Name}|Select-Object -Unique)
+  $o.installerProcessPids=@($p|ForEach-Object{[int]$_.ProcessId})
   if($p.Count -gt 0){$o.active=$true;if(-not $o.reason){$o.reason='RECENT_INSTALLER_PROCESS'}}
 }catch{}
 $o|ConvertTo-Json -Compress
