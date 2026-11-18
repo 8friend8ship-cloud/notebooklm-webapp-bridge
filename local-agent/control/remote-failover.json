@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "device": "BOOK-1HE2THGKRA",
-  "remoteDataPlaneState": "OFFLINE_R3_R2_RECOVERY_REQUESTED",
+  "remoteDataPlaneState": "R1_RECOVERED_REAL_X2_20261118_TIMESTAMPED_NOT_CONTINUOUS_HEALTH",
   "requestedMode": "CENTRAL_3_LANE_FAILOVER",
   "centralStageOrder": [
     "R3_OPENAI_CLOUD_REMOTE",
@@ -18,15 +18,15 @@
   "allowAutomaticSecurityApproval": false,
   "allowBroadProcessKill": false,
   "allowAutomaticReboot": false,
-  "targetRemotePackage": "@wonderwhy-er/desktop-commander@0.2.48",
+  "targetRemotePackage": "@wonderwhy-er/desktop-commander@0.2.51",
   "requiredReadback": "R2 Guard V7 receipt + list_devices + ping + real PowerShell command + file write/read x2 + central receipt",
   "taskId": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
   "resumeId": "R20260909_001",
-  "lastGood": "REMOTE_DC_ONLINE_PING_FILE_RW_X2_20260918",
-  "firstUnfinished": "LOCAL_APPLY_INSTALL_AUTO_RESUME_V4_AND_CLAIM_EXISTING_PYTHON_RECOVERY_TASK",
-  "updatedAt": "2026-09-19T01:47:00Z",
+  "lastGood": "REMOTE_DC_REAL_COMMAND_AND_FILE_RW_X2_PASS_20261118_1044KST",
+  "firstUnfinished": "VERIFY_EXISTING_10MIN_R2_FAILOVER_TASK_AFTER_NEXT_TIMER_TICK_AND_RECHECK_R1_CLOUD_X2",
+  "updatedAt": "2026-11-18T11:12:22+09:00",
   "notes": "RemoteDC offline while user is away. Route through R3 OpenAI/Cloud to R2 NotebookPack + Notebook PowerShell/Python + MonitorPack + KeyboardPack. R1 RemoteDC is target, not control dependency. No reboot/reauth/broad kill.",
-  "activeRecoveryRequestId": "PY_REMOTE_RECOVERY_WATCHDOG_V21_20260919_1038KST",
+  "activeRecoveryRequestId": "RDC_R001_SAFE_PREFLIGHT_RECOVERY_20261118_X1",
   "controlPlaneIndependentOfRemoteDc": true,
   "independentControlLanes": [
     "OPENAI_CLOUD_CONTROL",
@@ -51,5 +51,23 @@
   ],
   "staleWatchdogDirectExecutionForbidden": true,
   "failureSignature": "LOCAL_CONSUMER_NOT_CLAIMING_DUE_STALE_WATCHDOG_DIRECT_BOOTSTRAP",
-  "fixSignature": "INSTALL_AUTO_RESUME_V4_RUNNER_FIRST_20260919"
+  "fixSignature": "INSTALL_AUTO_RESUME_V4_RUNNER_FIRST_20260919",
+  "recoveryRequestState": "CONSUMED_LOCAL_KEEP_SESSION_NO_RESTART__CLOUD_X2_CONFIRMED_SEPARATELY",
+  "remoteDcRecoveryV2": {
+    "lineage": "TASK_20260909_REMOTE_DC_DISPLAY_OFF_RECOVERY_001",
+    "updated": "2026-11-18 KST",
+    "periodicIndependentTask": "CentralAgent_Failover_Check",
+    "periodicIndependentMinutes": 10,
+    "localRecoveryEntry": "F:\\CENTRAL_AGENT_DATA\\00_CONTROL\\failover_check.py",
+    "approvedKeepAlive": "DesktopCommanderKeepAlive.ps1",
+    "currentVersion": "0.2.51",
+    "startWithR2R3WhenR1Offline": true,
+    "cloudVerifyNeverInferredFromLocalTCP": true,
+    "installerChangeHoldPreserved": true,
+    "userDisabledSchedulersPreserved": true,
+    "noNewTaskTriggerOAuthReboot": true,
+    "localValidation": "G_PRIMARY read/write X1/X2; R1 local KEEP_SESSION 1 producer chain; dispatcher offline routing 7/7 X2; REA privacy+dedupe PASS",
+    "historicalSourceFailure": "2026-11-18 09:03 installer guard HOLD; Python worker exitCode4 misclassified as DONE; 10:36 remote restored",
+    "nextGate": "EXISTING_PERIODIC_TASK_NEXT_RUN_AND_CLOUD_R1_REAL_TOOL_RW_X2_AFTER_OFFLINE_RECURRENCE"
+  }
 }
