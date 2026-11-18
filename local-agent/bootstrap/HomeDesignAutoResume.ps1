@@ -105,9 +105,21 @@ try{[void](RefreshFile 'local-agent/python/central_control_worker_v1.py' $Python
 if(Test-Path -LiteralPath $PythonControlLocal){
   try{
     $pcTask=Get-ScheduledTask -TaskName 'HomeDesignAutomation-PythonControl' -ErrorAction SilentlyContinue
-    if($pcTask -and [string]$pcTask.State -ne 'Disabled'){
-      Log 'PYTHON_CONTROL_DELEGATED_TO_EXISTING_SCHEDULED_TASK'
+    # An enabled task is not proof that its worker still executes.
+    # Fall back to the existing singleton Python worker after two missed 5m cycles.
+    $pcReceipt=Join-Path $Root 'PYTHON_CONTROL_WORKER_LAST.json'
+    $pcFresh=$false
+    try{if(Test-Path -LiteralPath $pcReceipt -PathType Leaf){
+      $pcFresh=(((Get-Date)-(Get-Item -LiteralPath $pcReceipt).LastWriteTime).TotalMinutes -lt 12)
+    }}catch{}
+    if($pcTask -and [string]$pcTask.State -eq 'Running'){
+      Log 'PYTHON_CONTROL_DELEGATED_RUNNING_TASK'
+    }elseif($pcTask -and [string]$pcTask.State -ne 'Disabled' -and $pcFresh){
+      Log 'PYTHON_CONTROL_DELEGATED_FRESH_RECEIPT'
     }else{
+      Log ('PYTHON_CONTROL_EXISTING_SINGLETON_FALLBACK taskState='+
+        $(if($pcTask){[string]$pcTask.State}else{'MISSING'})+
+        ' receiptFresh='+$pcFresh)
       $pyc=''
       foreach($candidate in @('C:\Users\User\AppData\Local\Python\pythoncore-3.14-64\python.exe','C:\Users\User\AppData\Local\Python\bin\python.exe','C:\Users\User\AppData\Local\Programs\Python\Python310\python.exe')){if(Test-Path -LiteralPath $candidate){$pyc=$candidate;break}}
       if(-not$pyc){
